@@ -164,7 +164,21 @@ export default function Home() {
              <div className="flex flex-col items-center hidden sm:flex">
                <CloudIcon className="text-neutral-400 mb-2 size-6 sm:size-8" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_dust")}</span>
-               <span className="font-black text-xl sm:text-2xl whitespace-nowrap">{weatherData.details.dust}</span>
+               <div className="flex flex-col items-center">
+                 <span className="font-black text-xl sm:text-2xl whitespace-nowrap">{weatherData.details.dust.split('(')[0].trim()}</span>
+                 <div className="flex gap-1 mt-1">
+                   {weatherData.details.dust.includes("국내:") && (
+                     <>
+                       <span className="px-1.5 py-0.5 rounded-md bg-sky-blue/10 text-sky-blue text-[8px] font-black border border-sky-blue/20">
+                         KR: {weatherData.details.dust.match(/국내:\s*([^/|)]+)/)?.[1].trim()}
+                       </span>
+                       <span className="px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-500 text-[8px] font-black border border-purple-500/20">
+                         WHO: {weatherData.details.dust.match(/WHO:\s*([^/|)]+)/)?.[1].trim()}
+                       </span>
+                     </>
+                   )}
+                 </div>
+               </div>
              </div>
              <div className="flex flex-col items-center hidden sm:flex">
                <SunIcon className="text-yellow-400 mb-2 size-6 sm:size-8" />
