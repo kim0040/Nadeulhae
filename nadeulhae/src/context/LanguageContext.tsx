@@ -276,19 +276,19 @@ const translations: Record<Language, Record<string, string>> = {
     about_contributors_desc: "전북대학교 소프트웨어공학과 3학년(24학번) 동기 3명이 함께 만든 데이터베이스 팀 프로젝트입니다. 모든 팀원이 데이터베이스 설계 및 구축에 핵심적으로 참여했습니다.",
     
     con_hm_name: "김현민",
-    con_hm_role: "Project Lead (Lead Architect / Core DB Design)",
-    con_hm_desc: "데이터 간의 유기적인 관계를 정의하고 정규화된 DB 아키텍처를 설계하여, 나들해 플랫폼의 고성능 데이터 처리 기반을 구축했습니다.",
+    con_hm_role: "전북대학교 소프트웨어공학과 24학번",
+    con_hm_desc: "서비스 전체 구조를 잡고 기상 데이터를 효율적으로 저장할 수 있는 데이터베이스의 뼈대를 설계했습니다.",
     
     con_es_name: "김은수",
-    con_es_role: "Data Specialist (Crawl & DB Construction)",
-    con_es_desc: "복잡한 기상 및 위치 데이터를 수집(Crawl)하고 데이터베이스에 최적화된 형태로 적재하여, 신뢰성 높은 데이터 원천을 확보했습니다.",
+    con_es_role: "전북대학교 소프트웨어공학과 24학번",
+    con_es_desc: "공공 API와 위치 데이터를 직접 수집해서 우리 데이터베이스에 맞게 차곡차곡 쌓는 작업을 맡았습니다.",
     
     con_jh_name: "이재혁",
-    con_jh_role: "Data Engineer (Weather/Air DB Pipeline)",
-    con_jh_desc: "실시간 대기질 및 기상 API 데이터를 DB와 실시간으로 연동하는 전천후 파이프라인을 구축하여 물리적 데이터를 정보화했습니다.",
+    con_jh_role: "전북대학교 소프트웨어공학과 24학번",
+    con_jh_desc: "실시간으로 변하는 날씨 데이터를 우리 데이터베이스와 연결해 주는 파이프라인을 만들었습니다.",
 
-    about_philosophy_title: "함께 데이터를 빚어낸 사람들",
-    about_philosophy_desc: "전북대학교 소프트웨어공학과 24학번 동기 3인은 단순한 개발을 넘어, 데이터가 가장 효율적으로 흐를 수 있는 공학적 구조를 설계하는 데 모든 열정을 쏟았습니다.",
+    about_philosophy_title: "나들해를 만든 사람들",
+    about_philosophy_desc: "전북대학교 소프트웨어공학과 24학번 동기 3명이 함께 기획하고 개발했습니다. 서비스의 화려함보다는 데이터가 어떻게 흐르고 저장되는지, 데이터베이스의 기본에 집중하며 만들었습니다.",
 
     // Statistics Page Extra
     cal_archive_title: "과거 나들이 아카이브",
@@ -558,19 +558,19 @@ const translations: Record<Language, Record<string, string>> = {
     about_contributors_desc: "A database team project created by three juniors (Class of '24) from Jeonbuk National University, Software Engineering. All members actively participated in core DB design and construction.",
     
     con_hm_name: "Hyeonmin Kim",
-    con_hm_role: "Project Lead (Lead Architect / Core DB Design)",
-    con_hm_desc: "Defined organic relationships between data and designed a normalized DB architecture, building a high-performance foundation for Nadeulhae.",
+    con_hm_role: "JNU Software Engineering ('24)",
+    con_hm_desc: "Handled the overall service structure and designed the core database foundation for storing weather data efficiently.",
     
     con_es_name: "Eunsu Kim",
-    con_es_role: "Data Specialist (Crawl & DB Construction)",
-    con_es_desc: "Crawled complex weather/location data and loaded it into the DB in optimized formats, securing a highly reliable data source.",
+    con_es_role: "JNU Software Engineering ('24)",
+    con_es_desc: "Collected public API and location data and organized them into our database one by one.",
     
     con_jh_name: "Jaehyeok Lee",
-    con_jh_role: "Data Engineer (Weather/Air DB Pipeline)",
-    con_jh_desc: "Built real-time pipelines connecting air quality/weather API data to the DB, transforming physical data into information.",
+    con_jh_role: "JNU Software Engineering ('24)",
+    con_jh_desc: "Created the pipeline that connects real-time weather data variations to our database.",
 
     about_philosophy_title: "The Minds Behind Nadeulhae",
-    about_philosophy_desc: "Three JNU Software Engineering juniors ('24) dedicated their passion to engineering the most efficient data structures beyond mere development.",
+    about_philosophy_desc: "Three Software Engineering juniors ('24) from JNU planned and developed this together. We focused on the basics of databases—how data flows and is stored—rather than just UI flashy features.",
 
     // Statistics Page Extra
     cal_archive_title: "Picnic Data Archive",
