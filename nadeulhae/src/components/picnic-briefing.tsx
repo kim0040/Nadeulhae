@@ -140,7 +140,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest leading-none mb-1">{t("status_nearby_station")}</span>
                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-blue/10 border border-sky-blue/20">
                  <MapPinIcon size={12} className="text-sky-blue" />
-                 <span className="text-xs font-black text-sky-blue">{metadata?.station || "Dukjin-dong"}</span>
+                 <span className="text-xs font-black text-sky-blue">{metadata?.station || t("station_dukjin")}</span>
                </div>
              </div>
           </div>

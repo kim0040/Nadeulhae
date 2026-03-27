@@ -48,6 +48,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     status_coming_soon: "백엔드 연결 대기 중",
     status_nearby_station: "인근 측정소",
+    station_dukjin: "덕진동",
     
     // Statistics
     stats_title: "과거 데이터로 보는 전주",
@@ -95,8 +96,12 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Calendar
     cal_title: "전주 피크닉 캘린더",
-    cal_desc: "최근 3년간의 기상 데이터를 시각화한 결과입니다. 하이라이트된 날짜는 전주에서 피크닉을 즐기기에 가장 쾌적했던 날들을 나타냅니다.",
+    cal_desc: "전주의 날씨 데이터를 분석해 피크닉 최적 일정을 확인하세요.",
     cal_legend: "피크닉 최적일",
+    cal_realtime_title: "실시간 피크닉 캘린더",
+    cal_realtime_desc: "기상청 실시간 예보 기반, 최적의 피크닉 날짜를 확인하세요",
+    cal_realtime_status: "실시간 데이터",
+    cal_realtime_note: "기상청으로부터 실시간으로 수신된 예보 데이터입니다. 매시간 업데이트됩니다.",
     
     // Briefing
     brief_title: "오늘의 나들이 브리핑",
@@ -287,12 +292,15 @@ const translations: Record<Language, Record<string, string>> = {
     con_jh_role: "전북대학교 소프트웨어공학과 24학번",
     con_jh_desc: "실시간으로 변하는 날씨 데이터를 우리 데이터베이스와 연결해 주는 파이프라인을 만들었습니다.",
 
+    con_university: "전북대학교",
+    con_department: "소프트웨어공학과 24학번",
+
     about_philosophy_title: "나들해를 만든 사람들",
     about_philosophy_desc: "전북대학교 소프트웨어공학과 24학번 동기 3명이 함께 기획하고 개발했습니다. 서비스의 화려함보다는 데이터가 어떻게 흐르고 저장되는지, 데이터베이스의 기본에 집중하며 만들었습니다.",
 
     // Statistics Page Extra
     cal_archive_title: "과거 나들이 아카이브",
-    cal_archive_desc: "지난 몇 년간의 데이터를 바탕으로 전주의 나들이 트렌드를 확인하세요.",
+    cal_archive_desc: "지난 3년간의 데이터를 바탕으로 전주의 나들이 트렌드를 확인하세요",
     cal_insight_title: "💡 인사이트",
     cal_insight_text: "전주는 전통적으로 5월 2~3주차 주말이 가장 쾌적한 피크닉 지수를 기록했습니다.",
     cal_origin_title: "데이터 출처",
@@ -330,6 +338,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     status_coming_soon: "Coming Soon",
     status_nearby_station: "Nearby Station",
+    station_dukjin: "Dukjin-dong",
     
     // Statistics
     stats_title: "Jeonju through Data",
@@ -377,8 +386,12 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Calendar
     cal_title: "Jeonju Picnic Calendar",
-    cal_desc: "Visualization of weather data from the last 3 years. Highlighted dates represent the most pleasant days for a picnic in Jeonju.",
+    cal_desc: "Analyze Jeonju's weather data to find the best picnic dates.",
     cal_legend: "Optimal Picnic Day",
+    cal_realtime_title: "Real-time Picnic Calendar",
+    cal_realtime_desc: "Based on live KMA forecasts, find the best picnic dates",
+    cal_realtime_status: "Live Data",
+    cal_realtime_note: "Live forecast data received from Korea Meteorological Administration. Updated hourly.",
     
     // Briefing
     brief_title: "Today's Picnic Briefing",
@@ -568,6 +581,9 @@ const translations: Record<Language, Record<string, string>> = {
     con_jh_name: "Jaehyeok Lee",
     con_jh_role: "JNU Software Engineering ('24)",
     con_jh_desc: "Created the pipeline that connects real-time weather data variations to our database.",
+
+    con_university: "JBNU",
+    con_department: "Software Engineering '24",
 
     about_philosophy_title: "The Minds Behind Nadeulhae",
     about_philosophy_desc: "Three Software Engineering juniors ('24) from JNU planned and developed this together. We focused on the basics of databases—how data flows and is stored—rather than just UI flashy features.",

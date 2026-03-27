@@ -94,40 +94,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Contributors Section - MOVED TO TOP */}
-      <section id="contributors" className="container mx-auto py-32 px-4 bg-sky-blue/5 dark:bg-white/5 border-y border-sky-blue/10 dark:border-white/5 relative overflow-hidden">
-        <div className="absolute top-0 right-0 px-8 py-2 bg-sky-blue/10 border-l border-b border-sky-blue/20 rounded-bl-3xl text-[10px] font-black uppercase tracking-[0.3em] text-sky-blue">
-          The Engineering Team
-        </div>
-        
-        <div className="text-center mb-20">
-          <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">{t("about_contributors_title")}</h2>
-          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-3xl mx-auto">
-            {t("about_philosophy_desc")}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
-          {contributors.map((person, i) => (
-            <div key={i} className="flex flex-col items-center group transition-all p-12 rounded-[4rem] bg-white/70 dark:bg-neutral-900/70 border border-neutral-100 dark:border-white/5 hover:border-sky-blue/30 hover:shadow-2xl backdrop-blur-md">
-              <div className="size-36 rounded-[3rem] bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-sky-blue mb-10 border-2 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/10 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)]">
-                <person.icon size={56} strokeWidth={1.2} />
-              </div>
-              <h3 className="font-black text-3xl text-foreground group-hover:text-sky-blue transition-colors">
-                {t(person.nameKey)}
-              </h3>
-              <p className="text-[12px] text-sky-blue uppercase tracking-[0.3em] mt-4 font-black bg-sky-blue/5 px-4 py-1.5 rounded-full border border-sky-blue/10">
-                {t(person.roleKey)}
-              </p>
-              <div className="w-12 h-1 bg-neutral-200 dark:bg-neutral-800 my-8 rounded-full group-hover:bg-sky-blue/30 transition-colors" />
-              <p className="text-center text-base text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-4">
-                {t(person.descKey)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Tech Stack Section */}
       <section className="py-24 relative overflow-hidden">
         <Marquee pauseOnHover className="[--duration:40s]">
@@ -221,6 +187,45 @@ export default function AboutPage() {
               </div>
               <p className="text-neutral-500 dark:text-neutral-400 text-base leading-relaxed font-medium">
                 {t(`${item.tag}_d`)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Contributors Section */}
+      <section id="contributors" className="container mx-auto py-32 px-4 bg-sky-blue/5 dark:bg-white/5 border-y border-sky-blue/10 dark:border-white/5 relative overflow-hidden">
+        <div className="absolute top-0 right-0 px-8 py-2 bg-sky-blue/10 border-l border-b border-sky-blue/20 rounded-bl-3xl text-[10px] font-black uppercase tracking-[0.3em] text-sky-blue">
+          The Engineering Team
+        </div>
+        
+        <div className="text-center mb-20">
+          <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">{t("about_contributors_title")}</h2>
+          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-3xl mx-auto">
+            {t("about_philosophy_desc")}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+          {contributors.map((person, i) => (
+            <div key={i} className="flex flex-col items-center group transition-all p-12 rounded-[4rem] bg-white/70 dark:bg-neutral-900/70 border border-neutral-100 dark:border-white/5 hover:border-sky-blue/30 hover:shadow-2xl backdrop-blur-md">
+              <div className="size-36 rounded-[3rem] bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-sky-blue mb-10 border-2 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/10 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)]">
+                <person.icon size={56} strokeWidth={1.2} />
+              </div>
+              <h3 className="font-black text-3xl text-foreground group-hover:text-sky-blue transition-colors">
+                {t(person.nameKey)}
+              </h3>
+              <div className="flex flex-col items-center gap-2 mt-4">
+                <span className="text-xs text-sky-blue font-bold tracking-wider">
+                  {t("con_university")}
+                </span>
+                <span className="text-[11px] text-neutral-400 dark:text-neutral-500 font-medium">
+                  {t("con_department")}
+                </span>
+              </div>
+              <div className="w-12 h-1 bg-neutral-200 dark:bg-neutral-800 my-8 rounded-full group-hover:bg-sky-blue/30 transition-colors" />
+              <p className="text-center text-base text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-4">
+                {t(person.descKey)}
               </p>
             </div>
           ))}
