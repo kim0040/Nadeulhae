@@ -235,11 +235,17 @@ export default function Home() {
 
       {/* Marquee Section */}
       <section className="w-full py-8 sm:py-12 bg-background border-y border-sky-blue/10 transition-colors">
+        <div className="container mx-auto px-4 mb-6 flex flex-col items-center">
+          <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-2 drop-shadow-sm opacity-80">
+            {t("trend_header")}
+          </span>
+          <div className="h-px w-12 bg-sky-blue/30 mb-2" />
+        </div>
         <Marquee pauseOnHover className="[--duration:25s]">
           {trends.map((trend, i) => (
-            <span key={i} className="text-lg sm:text-xl font-medium text-sky-blue mx-6 flex items-center gap-2">
-              <span className="size-1 rounded-full bg-sky-blue" />
-              {t("trend_title").replace("{spot}", `#${trend}`)}
+            <span key={i} className="text-xl sm:text-3xl font-black text-sky-blue/90 mx-8 flex items-center gap-3 hover:scale-110 transition-transform cursor-default">
+              <span className="size-2 rounded-full bg-sky-blue/40 shadow-[0_0_8px_rgba(135,206,235,0.5)]" />
+              #{t("trend_title").replace("{spot}", trend)}
             </span>
           ))}
         </Marquee>

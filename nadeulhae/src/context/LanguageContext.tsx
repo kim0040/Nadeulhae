@@ -244,7 +244,8 @@ const translations: Record<Language, Record<string, string>> = {
     insight_3_desc: "덕진공원 인근은 현재 '여유' 로우며, 쾌적한 자리 선점이 가능합니다.",
     insight_3_cta: "장소 예약 문의",
     
-    trend_title: "지금 전주 시민들이 많이 찾는 스팟: {spot}",
+    trend_header: "지금 전주 시민들이 많이 찾는 스팟",
+    trend_title: "{spot}",
     
     course_1_title: "따뜻한 야외 타임 - 덕진공원",
     course_1_desc: "햇살이 가장 따뜻하고 미세먼지가 없는 시간대예요. 덕진공원에서 돗자리를 펴고 샌드위치를 드시는 걸 추천해요!",
@@ -535,7 +536,8 @@ const translations: Record<Language, Record<string, string>> = {
     insight_3_desc: "Deokjin Park area is currently 'Relaxed', easy to find a good spot.",
     insight_3_cta: "Booking Inquiry",
     
-    trend_title: "Popular spots in Jeonju: {spot}",
+    trend_header: "Popular spots in Jeonju",
+    trend_title: "{spot}",
     
     course_1_title: "Warm Outdoor Time - Deokjin Park",
     course_1_desc: "The sun is warmest and the air is clear. We recommend a picnic with a mat at Deokjin Park!",

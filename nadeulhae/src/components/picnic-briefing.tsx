@@ -130,7 +130,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
               <Sparkles size={24} />
             </div>
             <div>
-              <h3 className="text-2xl sm:text-4xl font-black text-foreground dark:text-white tracking-tight leading-none">{t("brief_title")}</h3>
+              <h3 className="text-2xl sm:text-4xl font-black text-neutral-900 dark:text-neutral-100 tracking-tight leading-none">{t("brief_title")}</h3>
               <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.3em] mt-2 italic opacity-70">{t("brief_station_engine")}</p>
             </div>
           </div>
@@ -180,14 +180,14 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-y-10 gap-x-6 relative z-10">
             {techData.map((item, i) => (
               <div key={i} className="flex flex-col items-start group">
-                <div className="flex items-center gap-2 text-neutral-400 dark:text-neutral-500 mb-2 group-hover:text-sky-blue transition-colors">
+                <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 mb-2 group-hover:text-sky-blue transition-colors">
                   <div className="p-1 rounded-md bg-[var(--interactive)] border border-[var(--interactive-border)] transition-colors group-hover:bg-sky-blue/10">
                     {item.icon}
                   </div>
                   <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-xl sm:text-2xl font-black text-foreground dark:text-neutral-100 tabular-nums tracking-tighter">
+                  <span className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-neutral-100 tabular-nums tracking-tighter">
                     {item.value}
                   </span>
                 </div>
