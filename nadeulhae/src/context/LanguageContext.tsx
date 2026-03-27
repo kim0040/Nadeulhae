@@ -277,18 +277,18 @@ const translations: Record<Language, Record<string, string>> = {
     
     con_hm_name: "김현민",
     con_hm_role: "Project Lead (Lead Architect / Core DB Design)",
-    con_hm_desc: "Nadeulhae의 전체 시스템 아키텍처를 설계하고, 대량의 환경 데이터를 효율적으로 조회할 수 있는 핵심 DB 스키마 구축을 주도했습니다.",
+    con_hm_desc: "데이터 간의 유기적인 관계를 정의하고 정규화된 DB 아키텍처를 설계하여, 나들해 플랫폼의 고성능 데이터 처리 기반을 구축했습니다.",
     
     con_es_name: "김은수",
     con_es_role: "Data Specialist (Crawl & DB Construction)",
-    con_es_desc: "실시간 대기질 및 지리 정보를 수집하는 정교한 크롤링 파이프라인을 구축하고, 이를 DB에 최적화하여 적재하는 안정적인 시스템을 구현했습니다.",
+    con_es_desc: "복잡한 기상 및 위치 데이터를 수집(Crawl)하고 데이터베이스에 최적화된 형태로 적재하여, 신뢰성 높은 데이터 원천을 확보했습니다.",
     
     con_jh_name: "이재혁",
     con_jh_role: "Data Engineer (Weather/Air DB Pipeline)",
-    con_jh_desc: "기상청 실시간 데이터를 DB에 매칭하여 유기적으로 연동되는 파이프라인을 구현하고, 공용 데이터의 활용 가치를 DB 설계를 통해 극대화했습니다.",
+    con_jh_desc: "실시간 대기질 및 기상 API 데이터를 DB와 실시간으로 연동하는 전천후 파이프라인을 구축하여 물리적 데이터를 정보화했습니다.",
 
-    about_philosophy_title: "데이터를 설계하는 사람들, Nadeulhae 3인",
-    about_philosophy_desc: "우리는 단순한 웹 서비스를 넘어, 방대한 환경 데이터를 어떻게 가장 효율적으로 구조화하고 다룰 수 있을지에 대한 '데이터베이스 공학적 해답'을 찾는 데 열정을 다했습니다. 전북대 SW공학과 24학번 동기 3인이 밤낮으로 고민해 완성한 정교한 DB 스키마와 데이터 파이프라인은 나들해 플랫폼을 지탱하는 가장 강력한 성과이자 자부심입니다.",
+    about_philosophy_title: "함께 데이터를 빚어낸 사람들",
+    about_philosophy_desc: "전북대학교 소프트웨어공학과 24학번 동기 3인은 단순한 개발을 넘어, 데이터가 가장 효율적으로 흐를 수 있는 공학적 구조를 설계하는 데 모든 열정을 쏟았습니다.",
 
     // Statistics Page Extra
     cal_archive_title: "과거 나들이 아카이브",
@@ -559,18 +559,18 @@ const translations: Record<Language, Record<string, string>> = {
     
     con_hm_name: "Hyeonmin Kim",
     con_hm_role: "Project Lead (Lead Architect / Core DB Design)",
-    con_hm_desc: "Architected the overall system and led the design of the core database schema for efficient high-volume environmental data retrieval.",
+    con_hm_desc: "Defined organic relationships between data and designed a normalized DB architecture, building a high-performance foundation for Nadeulhae.",
     
     con_es_name: "Eunsu Kim",
     con_es_role: "Data Specialist (Crawl & DB Construction)",
-    con_es_desc: "Built sophisticated crawling pipelines for real-time air quality and geographic data, ensuring optimized data ingestion and storage.",
+    con_es_desc: "Crawled complex weather/location data and loaded it into the DB in optimized formats, securing a highly reliable data source.",
     
     con_jh_name: "Jaehyeok Lee",
     con_jh_role: "Data Engineer (Weather/Air DB Pipeline)",
-    con_jh_desc: "Implemented real-time data matching and integration pipelines, maximizing the utility of public data through advanced DB structuring.",
+    con_jh_desc: "Built real-time pipelines connecting air quality/weather API data to the DB, transforming physical data into information.",
 
-    about_philosophy_title: "The Minds Behind the Data: Team Nadeulhae",
-    about_philosophy_desc: "Beyond building a simple web service, we dedicated ourselves to finding 'database engineering solutions' for structuring and handling vast environmental data efficiently. The sophisticated DB schemas and pipelines crafted by three JNU Software Engineering juniors are the core achievements we take the most pride in—the true engine driving Every moment of Nadeulhae.",
+    about_philosophy_title: "The Minds Behind Nadeulhae",
+    about_philosophy_desc: "Three JNU Software Engineering juniors ('24) dedicated their passion to engineering the most efficient data structures beyond mere development.",
 
     // Statistics Page Extra
     cal_archive_title: "Picnic Data Archive",
