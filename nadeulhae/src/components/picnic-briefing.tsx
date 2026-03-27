@@ -170,11 +170,15 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
              <Clock size={12} className="text-neutral-400" />
-             <span className="text-[10px] font-black text-neutral-500 uppercase">W: {getUpdateTime('kma')}</span>
+             <span className="text-[10px] font-black text-neutral-500 uppercase">
+               W: {getUpdateTime('kma')} ({metadata?.intervals.kma || "매시 45분"})
+             </span>
           </div>
           <div className="flex items-center gap-2">
              <Database size={12} className="text-neutral-400" />
-             <span className="text-[10px] font-black text-neutral-500 uppercase">A: {getUpdateTime('air')}</span>
+             <span className="text-[10px] font-black text-neutral-500 uppercase">
+               A: {getUpdateTime('air')} ({metadata?.intervals.air || "매시 정각"})
+             </span>
           </div>
         </div>
 
