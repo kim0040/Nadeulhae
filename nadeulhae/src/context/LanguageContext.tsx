@@ -87,7 +87,7 @@ const translations: Record<Language, Record<string, string>> = {
     about_algo_weather_title: "강수 및 풍속",
     about_algo_weather_desc: "비나 눈이 감지되면 즉시 35점으로 고정됩니다. 강풍(4m/s 초과) 시에도 쾌적함을 위해 감점됩니다.",
     about_algo_data_title: "실시간 데이터 동기화",
-    about_algo_data_desc: "기상청(1분 단위) 및 에어코리아(10분 단위) 서버 데이터를 실시간으로 동기화하여 가장 정확한 정보를 제공합니다.",
+    about_algo_data_desc: "기상청(매시 45분 기준) 및 에어코리아(매시 정각 기준)의 공식 관측 데이터를 실시간으로 동기화하여 가장 정확한 정보를 제공합니다.",
     about_placeholder: "이곳에 당신의 정보가 들어갈 수 있도록 추후 정보를 업데이트할 예정입니다.",
     
     // Calendar
@@ -219,7 +219,7 @@ const translations: Record<Language, Record<string, string>> = {
     about_algo_weather_title: "Precipitation & Wind",
     about_algo_weather_desc: "Rain or snow drops the score to 35 immediately. Strong winds (>4m/s) also reduce the score for comfort.",
     about_algo_data_title: "Real-time Syncing",
-    about_algo_data_desc: "We sync with KMA (every 1m) and AirKorea (every 10m) to provide the most reliable and up-to-date data available.",
+    about_algo_data_desc: "We sync with KMA (hourly at 45m) and AirKorea (hourly at 0m) official observation data to provide the most reliable information available.",
     about_placeholder: "Your information could be here. Updates coming soon.",
     
     // Calendar
