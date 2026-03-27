@@ -100,7 +100,6 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     { label: t("hero_vec"), value: `${details.vec ?? "--"}°`, icon: <Navigation size={14} style={{ transform: `rotate(${details.vec || 0}deg)` }} /> },
     { label: t("hero_pm10"), value: `${details.pm10 ?? "--"}µg/m³`, icon: <Cloud size={14} /> },
     { label: t("hero_pm25"), value: `${details.pm25 ?? "--"}µg/m³`, icon: <Sparkles size={14} /> },
-    { label: t("hero_uv"), value: details.uv || t("status_normal"), icon: <Sun size={14} /> },
     { label: t("hero_o3"), value: `${details.o3 ?? "--"}ppm`, icon: <Zap size={14} /> },
     { label: t("hero_no2"), value: `${details.no2 ?? "--"}ppm`, icon: <Zap size={14} /> },
     { label: t("hero_khai"), value: `${details.khai ?? "--"}`, icon: <ShieldCheck size={14} /> },
@@ -168,17 +167,6 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           ))}
         </div>
 
-        {/* Dust Status Pills (Requested UI) */}
-        {(details as any).kr && (details as any).who && (
-          <div className="flex flex-wrap gap-2 mb-12">
-            <div className="px-4 py-2 rounded-full bg-sky-blue/10 text-sky-blue text-[11px] font-black border border-sky-blue/20 backdrop-blur-md shadow-sm">
-              국내 기준: {(details as any).kr}
-            </div>
-            <div className="px-4 py-2 rounded-full bg-purple-500/10 text-purple-500 text-[11px] font-black border border-purple-500/20 backdrop-blur-md shadow-sm">
-              WHO 기준: {(details as any).who}
-            </div>
-          </div>
-        )}
 
         {/* 2. Technical Data Grid (Full Parameters) */}
         <div className="relative p-8 rounded-[2.5rem] bg-[var(--interactive)] border border-[var(--interactive-border)] overflow-hidden">
