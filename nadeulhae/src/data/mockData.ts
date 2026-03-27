@@ -5,8 +5,8 @@
 
 export const mockWeatherData = {
   score: 95,
-  status: "완벽함",
-  message: "오늘은 피크닉 가기 완벽한 날이에요!",
+  status: "status_excellent",
+  message: "msg_excellent",
   details: {
     temp: 22,
     humidity: 45,

@@ -86,8 +86,8 @@ const translations: Record<Language, Record<string, string>> = {
     about_algo_dust_desc: "국내(환경부)와 WHO 기준을 동시에 분석합니다. 30µg/m³ 초과 시 농도에 따라 감점폭이 커집니다.",
     about_algo_weather_title: "강수 및 풍속",
     about_algo_weather_desc: "비나 눈이 감지되면 즉시 35점으로 고정됩니다. 강풍(4m/s 초과) 시에도 쾌적함을 위해 감점됩니다.",
-    about_algo_data_title: "실시간 동기화",
-    about_algo_data_desc: "기상청(1분) 및 에어코리아(10분) 서버 패치 주기에 맞춰 가장 신선한 데이터를 제공합니다.",
+    about_algo_data_title: "실시간 데이터 동기화",
+    about_algo_data_desc: "기상청(1분 단위) 및 에어코리아(10분 단위) 서버 데이터를 실시간으로 동기화하여 가장 정확한 정보를 제공합니다.",
     about_placeholder: "이곳에 당신의 정보가 들어갈 수 있도록 추후 정보를 업데이트할 예정입니다.",
     
     // Calendar
@@ -120,6 +120,25 @@ const translations: Record<Language, Record<string, string>> = {
     
     brief_pty_rain: "현재 비가 내리고 있습니다. 우산을 챙기거나 실내 나들이 코스를 권장합니다.",
     brief_pty_snow: "현재 눈이 내리고 있습니다. 빙판길 안전에 유의하며 설경을 즐겨보세요.",
+
+    // Status Tiers
+    status_excellent: "최고의 날",
+    status_good: "좋은 날",
+    status_fair: "보통인 날",
+    status_poor: "나쁜 날",
+    
+    msg_excellent: "오늘은 전주에서 피크닉 가기 완벽한 날이에요!",
+    msg_excellent_1: "오늘 전주는 나들이하기에 더할 나위 없이 완벽해요!",
+    msg_excellent_2: "기상 조건이 최상입니다. 지금 바로 세병호로 떠나보세요!",
+    msg_good: "산책하고 나들이하기 참 좋은 날씨입니다.",
+    msg_good_1: "햇살이 기분 좋게 내리쬐는 전주의 오후네요.",
+    msg_good_2: "가벼운 산책으로 기분 전환하기 딱 좋은 날씨입니다.",
+    msg_fair: "그럭저럭 나들이하기 괜찮은 날씨예요.",
+    msg_fair_1: "조금은 아쉽지만, 근처 공원 산책 정도는 괜찮아요.",
+    msg_fair_2: "날씨가 아주 나쁘진 않으니 가볍게 야외 공기를 쐬 보세요.",
+    msg_poor: "오늘은 야외 활동을 피하는 것이 좋겠어요.",
+    msg_poor_1: "날씨가 불안정합니다. 가급적 실내 활동을 권장드려요.",
+    msg_poor_2: "현재 야외 활동을 하기엔 부적합한 기상 조건입니다.",
 
     // Statistics Page Extra
     cal_archive_title: "과거 나들이 아카이브",
@@ -200,7 +219,7 @@ const translations: Record<Language, Record<string, string>> = {
     about_algo_weather_title: "Precipitation & Wind",
     about_algo_weather_desc: "Rain or snow drops the score to 35 immediately. Strong winds (>4m/s) also reduce the score for comfort.",
     about_algo_data_title: "Real-time Syncing",
-    about_algo_data_desc: "We sync with KMA (1m) and AirKorea (10m) to provide the most reliable data available.",
+    about_algo_data_desc: "We sync with KMA (every 1m) and AirKorea (every 10m) to provide the most reliable and up-to-date data available.",
     about_placeholder: "Your information could be here. Updates coming soon.",
     
     // Calendar
@@ -233,6 +252,25 @@ const translations: Record<Language, Record<string, string>> = {
     
     brief_pty_rain: "It is currently raining. We recommend an umbrella or an indoor course.",
     brief_pty_snow: "It is currently snowing. Watch out for slippery roads and enjoy the view.",
+
+    // Status Tiers
+    status_excellent: "Excellent",
+    status_good: "Good",
+    status_fair: "Fair",
+    status_poor: "Poor",
+    
+    msg_excellent: "It's a perfect day for a picnic in Jeonju!",
+    msg_excellent_1: "Conditions are absolutely perfect for an outing today!",
+    msg_excellent_2: "Top-tier weather detected! Time to head to Deokjin Park.",
+    msg_good: "The weather is great for an outing today.",
+    msg_good_1: "A lovely afternoon in Jeonju with pleasant sunshine.",
+    msg_good_2: "Perfect weather for a refreshing light walk.",
+    msg_fair: "It's a decent day for a short walk.",
+    msg_fair_1: "Not the best, but a quick stroll nearby is okay.",
+    msg_fair_2: "The weather isn't too bad for a bit of fresh air.",
+    msg_poor: "Better stay indoors and avoid outdoor activities today.",
+    msg_poor_1: "Atmospheric conditions are unstable. Stay indoors if possible.",
+    msg_poor_2: "Current weather is unsuitable for outdoor planning.",
 
     // Statistics Page Extra
     cal_archive_title: "Picnic Data Archive",

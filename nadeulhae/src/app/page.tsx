@@ -111,11 +111,20 @@ export default function Home() {
   if (!weatherData) return <div className="h-screen w-full flex items-center justify-center bg-background text-sky-blue animate-pulse font-bold">{t("loading_weather")}</div>
 
 
+  const getScoreColor = (s: number) => {
+    if (s >= 86) return { primary: "#2DD4BF", secondary: "#87CEEB", text: "text-teal-500", bg: "bg-teal-500/10", border: "border-teal-500/20" };
+    if (s >= 66) return { primary: "#10B981", secondary: "#34D399", text: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" };
+    if (s >= 36) return { primary: "#F59E0B", secondary: "#FBBF24", text: "text-orange-500", bg: "bg-orange-500/10", border: "border-orange-500/20" };
+    return { primary: "#EF4444", secondary: "#F87171", text: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/20" };
+  }
+
+  const scoreColors = getScoreColor(weatherData.score);
+
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden bg-background">
       {/* Hero Section */}
       <section className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden py-24 sm:py-32">
-        {/* [BACKEND_LINK]: 실시간 날씨 상태(맑음, 흐림 등)에 따라 Particles의 색상이나 밀도가 변경될 수 있습니다. */}
+        {/* ... */}
         <Particles
           className="absolute inset-0 z-0"
           quantity={100}
@@ -127,20 +136,20 @@ export default function Home() {
         
         <div className="z-10 flex flex-col items-center gap-6 p-4 text-center">
           <WordPullUp
-            words={language === "ko" ? weatherData.message : t("hero_title")}
+            words={t(weatherData.message)}
             className="text-4xl sm:text-5xl md:text-7xl text-sky-blue px-4 font-black tracking-tight"
           />
           
-          <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-sky-blue/10 dark:bg-white/10 backdrop-blur-md border border-sky-blue/20 dark:border-white/20 shadow-2xl transition-all hover:scale-105 duration-500">
-            <ShineBorder shineColor={["#87CEEB", "#F5F5DC", "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
+          <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-white/5 dark:bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-105 duration-500">
+            <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
             <div className="flex flex-col items-center gap-2">
               <span className="text-xs sm:text-sm font-medium text-foreground/60">{t("hero_score_label")}</span>
               <div className="text-8xl sm:text-9xl font-black flex items-center text-foreground tabular-nums tracking-tighter">
                 <NumberTicker value={weatherData.score} />
                 <span className="text-3xl sm:text-5xl text-sky-blue ml-2">{t("hero_unit")}</span>
               </div>
-              <div className="px-6 py-1.5 rounded-full bg-sky-blue/20 text-sky-blue text-xs sm:text-sm font-bold animate-pulse">
-                {weatherData.status}
+              <div className={cn("px-6 py-1.5 rounded-full font-bold animate-pulse text-xs sm:text-sm", scoreColors.bg, scoreColors.text, "border", scoreColors.border)}>
+                {t(weatherData.status)}
               </div>
             </div>
           </div>

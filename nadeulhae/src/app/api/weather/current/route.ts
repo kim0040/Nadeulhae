@@ -132,13 +132,31 @@ export async function GET() {
   if (weatherData.wind > 4) score -= (weatherData.wind - 4) * 5;
   score = Math.max(10, Math.min(100, Math.round(score)));
 
-  let status = "좋음", message = "산책하기 좋은 날씨예요!";
-  // ... 생략 ...
+  let statusKey = "status_good";
+  let messageKey = "msg_good";
+
+  if (score >= 86) {
+    statusKey = "status_excellent";
+    messageKey = "msg_excellent";
+  } else if (score >= 66) {
+    statusKey = "status_good";
+    messageKey = "msg_good";
+  } else if (score >= 36) {
+    statusKey = "status_fair";
+    messageKey = "msg_fair";
+  } else {
+    statusKey = "status_poor";
+    messageKey = "msg_poor";
+  }
+
+  const variations = ["", "_1", "_2"];
+  const randIdx = Math.floor(Math.random() * variations.length);
+  messageKey = messageKey + variations[randIdx];
 
   return NextResponse.json({
     score,
-    status,
-    message,
+    status: statusKey, // Frontend will translate this
+    message: messageKey, // Frontend will translate this
     details: {
       temp: weatherData.temp,
       humidity: weatherData.humidity,
