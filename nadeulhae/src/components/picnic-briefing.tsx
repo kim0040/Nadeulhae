@@ -130,7 +130,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
               <Sparkles size={24} />
             </div>
             <div>
-              <h3 className="text-2xl sm:text-4xl font-black text-neutral-900 dark:text-neutral-100 tracking-tight leading-none">{t("brief_title")}</h3>
+              <h3 className="text-2xl sm:text-4xl font-black text-foreground tracking-tight leading-none">{t("brief_title")}</h3>
               <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.3em] mt-2 italic opacity-70">{t("brief_station_engine")}</p>
             </div>
           </div>
@@ -172,22 +172,22 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="flex items-center justify-between mb-8 relative z-10">
             <div className="flex items-center gap-2">
               <div className="size-2 rounded-full bg-sky-blue animate-pulse" />
-              <h4 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-neutral-400">{t("brief_observation_grid")}</h4>
+              <h4 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">{t("brief_observation_grid")}</h4>
             </div>
-            <span className="text-[8px] sm:text-[10px] font-black text-neutral-300 dark:text-neutral-600 uppercase tracking-[0.15em]">{t("brief_nrs_protocol")}</span>
+            <span className="text-[8px] sm:text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.15em]">{t("brief_nrs_protocol")}</span>
           </div>
           
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-y-10 gap-x-6 relative z-10">
             {techData.map((item, i) => (
               <div key={i} className="flex flex-col items-start group">
-                <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 mb-2 group-hover:text-sky-blue transition-colors">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2 group-hover:text-sky-blue transition-colors">
                   <div className="p-1 rounded-md bg-[var(--interactive)] border border-[var(--interactive-border)] transition-colors group-hover:bg-sky-blue/10">
                     {item.icon}
                   </div>
                   <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-neutral-100 tabular-nums tracking-tighter">
+                  <span className="text-xl sm:text-2xl font-black text-foreground tabular-nums tracking-tighter">
                     {item.value}
                   </span>
                 </div>
