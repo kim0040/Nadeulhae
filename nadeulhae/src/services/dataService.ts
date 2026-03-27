@@ -55,7 +55,24 @@ export const dataService = {
     try {
       if (MOCK_MODE) {
         await new Promise(resolve => setTimeout(resolve, 800));
-        return mockWeatherData;
+        
+        // Dynamic mock data for testing UI changes
+        const states = [
+          { score: 95, status: "status_excellent", message: "msg_excellent" },
+          { score: 72, status: "status_good", message: "msg_good" },
+          { score: 45, status: "status_fair", message: "msg_fair" }
+        ];
+        
+        // Rotate state based on current time (minutes) to show different states on refresh
+        const stateIndex = Math.floor(Date.now() / 15000) % states.length;
+        return {
+          ...mockWeatherData,
+          ...states[stateIndex],
+          details: {
+            ...mockWeatherData.details,
+            temp: states[stateIndex].score === 95 ? 22 : states[stateIndex].score === 72 ? 26 : 31
+          }
+        };
       }
       
       const response = await fetch(`${API_BASE}/current`, { next: { revalidate: 60 } });

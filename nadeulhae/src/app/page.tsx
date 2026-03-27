@@ -142,15 +142,17 @@ export default function Home() {
           
           <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-white/5 dark:bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-105 duration-500">
             <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-xs sm:text-sm font-medium text-foreground/60">{t("hero_score_label")}</span>
-              <div className="text-8xl sm:text-9xl font-black flex items-center text-foreground tabular-nums tracking-tighter">
-                <NumberTicker value={weatherData.score} />
-                <span className="text-3xl sm:text-5xl text-sky-blue ml-2">{t("hero_unit")}</span>
-              </div>
-              <div className={cn("px-6 py-1.5 rounded-full font-bold animate-pulse text-xs sm:text-sm", scoreColors.bg, scoreColors.text, "border", scoreColors.border)}>
-                {t(weatherData.status)}
-              </div>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none group-hover/score:scale-105 transition-transform duration-500 z-30">
+               <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-1 drop-shadow-md">{t("hero_score_label")}</span>
+               <div className="flex items-baseline gap-1">
+                 <span className="text-6xl sm:text-8xl font-black tracking-tighter text-foreground drop-shadow-[0_0_30px_rgba(135,206,235,0.3)] select-none transition-all">{weatherData.score}</span>
+                 <span className="text-sm sm:text-xl font-black text-foreground/70 drop-shadow-sm">{t("hero_unit")}</span>
+               </div>
+               {weatherData.score >= 80 && (
+                 <div className="mt-2 text-[10px] sm:text-xs font-black text-sky-blue bg-sky-blue/10 px-3 py-1 rounded-full border border-sky-blue/20 backdrop-blur-md animate-pulse z-40">
+                   {t("hero_best_day")}
+                 </div>
+               )}
             </div>
           </div>
           

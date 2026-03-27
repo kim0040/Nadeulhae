@@ -30,6 +30,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Hero
     hero_title: "오늘 전주는 피크닉 가기 완벽한 날이에요!",
     hero_score_label: "피크닉 지수",
+    hero_best_day: "최고의 나들이 날씨!",
     hero_unit: "점",
     hero_temp: "기온",
     hero_humidity: "습도",
@@ -335,6 +336,7 @@ const translations: Record<Language, Record<string, string>> = {
     hero_vec: "Wind Dir",
     hero_precip: "Precip",
     hero_uv: "UV",
+    hero_best_day: "Perfect Picnic Weather!",
     
     status_coming_soon: "Coming Soon",
     status_nearby_station: "Nearby Station",
