@@ -26,6 +26,9 @@ import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/context/LanguageContext"
 import { MagicCard } from "@/components/magicui/magic-card"
+import { ShineBorder } from "@/components/magicui/shine-border"
+import { BorderBeam } from "@/components/magicui/border-beam"
+import { Meteors } from "@/components/magicui/meteors"
 
 const features = [
   {
@@ -209,26 +212,59 @@ export default function AboutPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12 max-w-6xl mx-auto">
           {contributors.map((person, i) => (
-            <MagicCard key={i} className="flex flex-col items-center group transition-all p-8 sm:p-12 rounded-[3rem] sm:rounded-[4rem] bg-[var(--card)] border border-[var(--card-border)] hover:border-sky-blue/30 hover:shadow-2xl backdrop-blur-md">
-              <div className="size-28 sm:size-36 rounded-[2.5rem] sm:rounded-[3rem] bg-[var(--interactive)] flex items-center justify-center text-sky-blue mb-8 sm:mb-10 border-2 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/10 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)]">
-                <person.icon size={48} className="sm:size-14" strokeWidth={1.2} />
-              </div>
-              <h3 className="font-black text-2xl sm:text-3xl text-foreground group-hover:text-sky-blue transition-colors">
-                {t(person.nameKey)}
-              </h3>
-              <div className="flex flex-col items-center gap-1.5 mt-4">
-                <span className="text-[10px] sm:text-xs text-sky-blue font-bold tracking-wider">
-                  {t("con_university")}
-                </span>
-                <span className="text-[10px] sm:text-[11px] text-neutral-400 dark:text-neutral-500 font-medium">
-                  {t("con_department")}
-                </span>
-              </div>
-              <div className="w-10 h-1 bg-[var(--interactive)] my-6 sm:my-8 rounded-full group-hover:bg-sky-blue/30 transition-colors" />
-              <p className="text-center text-sm sm:text-base text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-2 sm:px-4">
-                {t(person.descKey)}
-              </p>
-            </MagicCard>
+            <div key={i} className="relative group rounded-[3rem] sm:rounded-[4rem] overflow-hidden h-full">
+              <MagicCard className="h-full bg-[var(--card)] border border-[var(--card-border)] hover:border-sky-blue/30 backdrop-blur-md transition-all duration-500">
+                {/* Background & Meteor Layer */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  <Meteors number={25} className="opacity-30 group-hover:opacity-70 transition-opacity" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-sky-blue/10 via-transparent to-transparent" />
+                </div>
+                
+                {/* Interactive Content Wrapper */}
+                <div className="relative z-10 flex flex-col items-center w-full h-full p-8 sm:p-14 justify-between">
+                  <div className="flex flex-col items-center w-full">
+                    <div className="size-28 sm:size-36 rounded-[2.5rem] sm:rounded-[3rem] bg-[var(--interactive)] flex items-center justify-center text-sky-blue mb-10 border-2 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/15 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)] group-hover:shadow-[0_0_40px_rgba(135,206,235,0.4)]">
+                      <person.icon size={48} className="sm:size-16 transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-700 ease-out" strokeWidth={1} />
+                    </div>
+                    
+                    <h3 className="font-black text-3xl sm:text-4xl text-foreground group-hover:text-sky-blue transition-colors text-center mb-4 tracking-tighter">
+                      {t(person.nameKey)}
+                    </h3>
+                    
+                    <div className="flex flex-col items-center gap-2 mb-8">
+                      <span className="text-[10px] sm:text-xs text-sky-blue font-black tracking-[0.2em] uppercase bg-sky-blue/10 px-3 py-1 rounded-full border border-sky-blue/20">
+                        {t("con_university")}
+                      </span>
+                      <span className="text-[10px] sm:text-[11px] text-neutral-400 dark:text-neutral-500 font-bold uppercase tracking-widest mt-1">
+                        {t("con_department")}
+                      </span>
+                    </div>
+                    
+                    <div className="w-12 h-1.5 bg-sky-blue/20 mb-8 rounded-full group-hover:w-24 group-hover:bg-sky-blue transition-all duration-700" />
+                    
+                    <p className="text-center text-sm sm:text-base text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-4">
+                      {t(person.descKey)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Premium Border Effects */}
+                <BorderBeam 
+                  size={400} 
+                  duration={8} 
+                  delay={i * 1.5} 
+                  colorFrom="var(--sky-blue)" 
+                  colorTo="#3b82f6" 
+                  borderWidth={2}
+                />
+                <ShineBorder 
+                  borderWidth={1.5} 
+                  duration={10} 
+                  shineColor={["#87CEEB", "#3b82f6", "#87CEEB"]} 
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </MagicCard>
+            </div>
           ))}
         </div>
       </section>
