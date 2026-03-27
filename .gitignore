@@ -27,7 +27,7 @@ yarn-error.log*
 # Data & Scripts
 *.csv
 *.command
-나들해*.md
+# 나들해*.md (Allow these)
 brain/
 temp/
 /tmp/
