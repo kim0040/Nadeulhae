@@ -8,7 +8,7 @@ const rateLimitMap = new Map<string, { count: number, lastReset: number }>()
 const LIMIT = 60 // 60 requests
 const WINDOW = 60 * 1000 // 1 minute
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   // Only rate limit API routes
   if (request.nextUrl.pathname.startsWith('/api')) {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'anonymous'
