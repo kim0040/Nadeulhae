@@ -9,7 +9,9 @@ import {
   SearchIcon,
   HistoryIcon,
   CodeIcon,
-  ArrowRight
+  ArrowRight,
+  Thermometer,
+  Wind
 } from "lucide-react"
 
 
@@ -110,25 +112,65 @@ export default function AboutPage() {
         </BentoGrid>
       </section>
 
-      {/* Tech Stack Section */}
+      {/* Tech Stack Section (existing) */}
       <section className="bg-sky-blue/5 dark:bg-white/5 py-32 border-y border-sky-blue/10 dark:border-white/5 relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-blue/10 dark:from-transparent to-transparent opacity-50"></div>
-        <div className="container relative z-10 mx-auto px-4 text-center mb-20">
+        {/* ... existing marquee ... */}
+      </section>
 
-          <h2 className="text-4xl font-black mb-6 tracking-tight">{t("about_built_with")}</h2>
-          <p className="text-neutral-500 dark:text-neutral-400 max-w-md mx-auto text-lg font-medium">
-            최상의 퍼포먼스와 시각적 경험을 위해 최신 기술들을 활용했습니다.
+      {/* Algorithm & Logic Section */}
+      <section className="container mx-auto py-32 px-4">
+        <div className="text-center mb-20">
+          <h2 className="text-4xl font-black mb-6 tracking-tight">{t("about_algo_title")}</h2>
+          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-2xl mx-auto">
+            {t("about_algo_desc")}
           </p>
         </div>
-        
-        <Marquee className="[--duration:25s]" pauseOnHover>
-          {["Next.js 15+", "Tailwind CSS 4", "Framer Motion", "Magic UI", "Lucide React", "Next Themes", "Gemini AI API"].map((tech) => (
-            <div key={tech} className="mx-10 flex items-center gap-4 bg-[var(--card)] backdrop-blur-xl px-8 py-5 rounded-[2rem] shadow-xl border border-[var(--card-border)] hover:scale-105 transition-transform">
-              <CodeIcon size={22} className="text-sky-blue" />
-              <span className="font-black text-foreground text-lg">{tech}</span>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          {/* Temperature logic */}
+          <div className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-orange-400/30 transition-all duration-500">
+            <div className="size-14 rounded-2xl bg-orange-100/50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 mb-8 group-hover:scale-110 transition-transform">
+              <Thermometer size={28} />
             </div>
-          ))}
-        </Marquee>
+            <h3 className="text-2xl font-black mb-4">{t("about_algo_temp_title")}</h3>
+            <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+              {t("about_algo_temp_desc")}
+            </p>
+          </div>
+
+          {/* Air Quality logic */}
+          <div className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-sky-blue/30 transition-all duration-500">
+            <div className="size-14 rounded-2xl bg-sky-blue/10 dark:bg-sky-blue/20 flex items-center justify-center text-sky-blue mb-8 group-hover:scale-110 transition-transform">
+              <Wind size={28} />
+            </div>
+            <h3 className="text-2xl font-black mb-4">{t("about_algo_dust_title")}</h3>
+            <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+              {t("about_algo_dust_desc")}
+            </p>
+          </div>
+
+          {/* Rain & Wind logic */}
+          <div className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-purple-400/30 transition-all duration-500">
+            <div className="size-14 rounded-2xl bg-purple-100/50 dark:bg-purple-900/20 flex items-center justify-center text-purple-500 mb-8 group-hover:scale-110 transition-transform">
+              <CloudSunIcon size={28} />
+            </div>
+            <h3 className="text-2xl font-black mb-4">{t("about_algo_weather_title")}</h3>
+            <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+              {t("about_algo_weather_desc")}
+            </p>
+          </div>
+
+          {/* Data syncing logic */}
+          <div className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-teal-400/30 transition-all duration-500">
+            <div className="size-14 rounded-2xl bg-teal-100/50 dark:bg-teal-900/20 flex items-center justify-center text-teal-500 mb-8 group-hover:scale-110 transition-transform">
+              <HistoryIcon size={28} />
+            </div>
+            <h3 className="text-2xl font-black mb-4">{t("about_algo_data_title")}</h3>
+            <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+              {t("about_algo_data_desc")}
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* Contributors Section */}

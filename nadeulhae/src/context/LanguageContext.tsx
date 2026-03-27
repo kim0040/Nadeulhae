@@ -64,6 +64,18 @@ const translations: Record<Language, Record<string, string>> = {
     about_built_with: "Built with Modern Stack",
     about_contributors_title: "만든 사람들",
     about_contributors_desc: "전주 나들해를 함께 만들어가는 기여자들입니다.",
+    
+    // Algorithm Section
+    about_algo_title: "나들이 지수 알고리즘",
+    about_algo_desc: "나들이 지수는 어떻게 계산될까요? 여러 환경 요인을 종합하여 0~100점 사이의 점수를 산출합니다.",
+    about_algo_temp_title: "최적 온도 (18-24°C)",
+    about_algo_temp_desc: "기본 100점에서 시작하여, 18도 미만(-3점/도) 혹은 24도 초과(-4점/도) 시 감점됩니다.",
+    about_algo_dust_title: "이중 미세먼지 기준",
+    about_algo_dust_desc: "국내(환경부)와 WHO 기준을 동시에 분석합니다. 30µg/m³ 초과 시 농도에 따라 감점폭이 커집니다.",
+    about_algo_weather_title: "강수 및 풍속",
+    about_algo_weather_desc: "비나 눈이 감지되면 즉시 35점으로 고정됩니다. 강풍(4m/s 초과) 시에도 쾌적함을 위해 감점됩니다.",
+    about_algo_data_title: "실시간 동기화",
+    about_algo_data_desc: "기상청(1분) 및 에어코리아(10분) 서버 패치 주기에 맞춰 가장 신선한 데이터를 제공합니다.",
     about_placeholder: "이곳에 당신의 정보가 들어갈 수 있도록 추후 정보를 업데이트할 예정입니다.",
     
     // Calendar
@@ -147,14 +159,26 @@ const translations: Record<Language, Record<string, string>> = {
     result_desc: "Optimized route based on weather transitions.",
     
     // About
-    about_hero_tag: "Our Vision",
-    about_hero_title: "Connecting every moment in Jeonju with weather",
-    about_hero_desc: "Nadeulhae goes beyond simple weather info, designed to ensure your precious trips to Jeonju are beautiful within the flow of weather.",
-    about_features_title: "How can we help?",
-    about_features_desc: "Data and AI meet to suggest the perfect half-day in Jeonju.",
+    about_hero_tag: "Jeonju Weather Intelligence",
+    about_hero_title: "The Science of a Perfect Picnic",
+    about_hero_desc: "Nadeulhae isn't just a weather app. It's a data-driven companion that analyzes environmental signals to suggest the best time for your Jeonju outing.",
+    about_features_title: "Key Features",
+    about_features_desc: "From real-time weather grids to AI-powered trip plans, we bring data to life.",
     about_built_with: "Built with Modern Stack",
-    about_contributors_title: "Contributors",
-    about_contributors_desc: "The people building Jeonju Nadeulhae together.",
+    about_contributors_title: "Team Nadeulhae",
+    about_contributors_desc: "The people who brought Jeonju's weather to life.",
+    
+    // Algorithm Section
+    about_algo_title: "The Picnic Index Algorithm",
+    about_algo_desc: "How do we calculate the perfect moment? Our algorithm weighs multiple environmental factors to give you a score from 0 to 100.",
+    about_algo_temp_title: "Optimal Temperature (18-24°C)",
+    about_algo_temp_desc: "Base score starts at 100. We deduct points for extreme cold (-3 pts/°C) or heat (-4 pts/°C).",
+    about_algo_dust_title: "Dual Air Quality Standards",
+    about_algo_dust_desc: "We compare Domestic (KR) and WHO standards. Scores drop significantly if PM10 exceeds 30µg/m³.",
+    about_algo_weather_title: "Precipitation & Wind",
+    about_algo_weather_desc: "Rain or snow drops the score to 35 immediately. Strong winds (>4m/s) also reduce the score for comfort.",
+    about_algo_data_title: "Real-time Syncing",
+    about_algo_data_desc: "We sync with KMA (1m) and AirKorea (10m) to provide the most reliable data available.",
     about_placeholder: "Your information could be here. Updates coming soon.",
     
     // Calendar
