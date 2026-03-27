@@ -11,7 +11,13 @@ import {
   CodeIcon,
   ArrowRight,
   Thermometer,
-  Wind
+  Wind,
+  Droplets,
+  Navigation,
+  Cloud,
+  Zap,
+  ShieldCheck,
+  CloudRain
 } from "lucide-react"
 
 
@@ -126,49 +132,88 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {/* Temperature logic */}
-          <div className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-orange-400/30 transition-all duration-500">
-            <div className="size-14 rounded-2xl bg-orange-100/50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 mb-8 group-hover:scale-110 transition-transform">
-              <Thermometer size={28} />
+          <div className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-orange-400/30 transition-all duration-500">
+            <div className="size-12 rounded-xl bg-orange-100/50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 mb-6 group-hover:scale-110 transition-transform">
+              <Thermometer size={24} />
             </div>
-            <h3 className="text-2xl font-black mb-4">{t("about_algo_temp_title")}</h3>
-            <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+            <h3 className="text-xl font-black mb-3">{t("about_algo_temp_title")}</h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
               {t("about_algo_temp_desc")}
             </p>
           </div>
 
           {/* Air Quality logic */}
-          <div className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-sky-blue/30 transition-all duration-500">
-            <div className="size-14 rounded-2xl bg-sky-blue/10 dark:bg-sky-blue/20 flex items-center justify-center text-sky-blue mb-8 group-hover:scale-110 transition-transform">
-              <Wind size={28} />
+          <div className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-sky-blue/30 transition-all duration-500">
+            <div className="size-12 rounded-xl bg-sky-blue/10 dark:bg-sky-blue/20 flex items-center justify-center text-sky-blue mb-6 group-hover:scale-110 transition-transform">
+              <Wind size={24} />
             </div>
-            <h3 className="text-2xl font-black mb-4">{t("about_algo_dust_title")}</h3>
-            <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+            <h3 className="text-xl font-black mb-3">{t("about_algo_dust_title")}</h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
               {t("about_algo_dust_desc")}
             </p>
           </div>
 
           {/* Rain & Wind logic */}
-          <div className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-purple-400/30 transition-all duration-500">
-            <div className="size-14 rounded-2xl bg-purple-100/50 dark:bg-purple-900/20 flex items-center justify-center text-purple-500 mb-8 group-hover:scale-110 transition-transform">
-              <CloudSunIcon size={28} />
+          <div className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-purple-400/30 transition-all duration-500">
+            <div className="size-12 rounded-xl bg-purple-100/50 dark:bg-purple-900/20 flex items-center justify-center text-purple-500 mb-6 group-hover:scale-110 transition-transform">
+              <CloudSunIcon size={24} />
             </div>
-            <h3 className="text-2xl font-black mb-4">{t("about_algo_weather_title")}</h3>
-            <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+            <h3 className="text-xl font-black mb-3">{t("about_algo_weather_title")}</h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
               {t("about_algo_weather_desc")}
             </p>
           </div>
 
           {/* Data syncing logic */}
-          <div className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-teal-400/30 transition-all duration-500">
-            <div className="size-14 rounded-2xl bg-teal-100/50 dark:bg-teal-900/20 flex items-center justify-center text-teal-500 mb-8 group-hover:scale-110 transition-transform">
-              <HistoryIcon size={28} />
+          <div className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-teal-400/30 transition-all duration-500">
+            <div className="size-12 rounded-xl bg-teal-100/50 dark:bg-teal-900/20 flex items-center justify-center text-teal-500 mb-6 group-hover:scale-110 transition-transform">
+              <HistoryIcon size={24} />
             </div>
-            <h3 className="text-2xl font-black mb-4">{t("about_algo_data_title")}</h3>
-            <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+            <h3 className="text-xl font-black mb-3">{t("about_algo_data_title")}</h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
               {t("about_algo_data_desc")}
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* New: Detailed Environmental Metric Guide */}
+      <section className="bg-sky-blue/5 dark:bg-white/[0.02] py-32 border-y border-sky-blue/10 dark:border-white/5">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl font-black mb-6 tracking-tight">{t("about_data_title")}</h2>
+            <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-2xl mx-auto">
+              {t("about_data_desc")}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {[
+              { id: 'temp', icon: <Thermometer size={20} /> },
+              { id: 'humi', icon: <Droplets size={20} /> },
+              { id: 'wind', icon: <Wind size={20} /> },
+              { id: 'vec', icon: <Navigation size={20} /> },
+              { id: 'pm10', icon: <Cloud size={20} /> },
+              { id: 'pm25', icon: <SparklesIcon size={20} /> },
+              { id: 'o3', icon: <Zap size={20} /> },
+              { id: 'no2', icon: <SearchIcon size={20} /> },
+              { id: 'khai', icon: <ShieldCheck size={20} /> },
+              { id: 'precip', icon: <CloudRain size={20} /> },
+            ].map((item) => (
+              <div key={item.id} className="group p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-lg hover:border-sky-blue/30 transition-all">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 rounded-xl bg-sky-blue/10 text-sky-blue group-hover:scale-110 transition-transform">
+                    {item.icon}
+                  </div>
+                  <h3 className="text-lg font-black text-foreground">{t(`about_item_${item.id}`)}</h3>
+                </div>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
+                  {t(`about_item_${item.id}_desc`)}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
