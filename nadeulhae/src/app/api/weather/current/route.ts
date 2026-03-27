@@ -70,13 +70,18 @@ export async function GET() {
         const data = await res.json();
         const items = data.response?.body?.items || [];
         
-        // 전북대 근처 측정소 우선순위: 덕진동 -> 금암동 -> 중앙동
+        // 전북대 근처 측정소 우선순위: 덕진동 -> 금암동 -> 중앙동 -> 기타 전주 주요 지역
         const jeonju = items.find((item: any) => 
           item.stationName.includes("덕진동") || 
           item.stationName.includes("금암동") ||
           item.stationName.includes("중앙동") ||
+          item.stationName.includes("송천동") ||
+          item.stationName.includes("서신동") ||
+          item.stationName.includes("효자동") ||
+          item.stationName.includes("혁신동") ||
+          item.stationName.includes("노송동") ||
           item.stationName.includes("전주")
-        );
+        ) || items[0]; // 검색 실패 시 첫 번째 관측소(전북 지역) 데이터라도 반환
         
         if (jeonju) {
           const pm10 = parseInt(jeonju.pm10Value) || 25;
