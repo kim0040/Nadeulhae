@@ -88,64 +88,7 @@ export const Particles: React.FC<ParticlesProps> = ({
   const canvasSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1
   const rafID = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (canvasRef.current) {
-      context.current = canvasRef.current.getContext("2d")
-    }
-    rgb.current = hexToRgb(color)
-    initCanvas()
-    animate()
-    window.addEventListener("resize", initCanvas)
-    return () => {
-      if (rafID.current != null) window.cancelAnimationFrame(rafID.current)
-      window.removeEventListener("resize", initCanvas)
-    }
-  }, [color])
-
-  useEffect(() => {
-    onMouseMove()
-  }, [mousePosition.x, mousePosition.y])
-
-  useEffect(() => {
-    initCanvas()
-  }, [refresh])
-
-  const initCanvas = () => {
-    resizeCanvas()
-    drawParticles()
-  }
-
-  const onMouseMove = () => {
-    if (canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect()
-      const { w, h } = canvasSize.current
-      const x = mousePosition.x - rect.left - w / 2
-      const y = mousePosition.y - rect.top - h / 2
-      const inside = x < w / 2 && x > -w / 2 && y < h / 2 && y > -h / 2
-      if (inside) {
-        mouse.current.x = x
-        mouse.current.y = y
-      }
-    }
-  }
-
-  const resizeCanvas = () => {
-    if (canvasContainerRef.current && canvasRef.current && context.current) {
-      canvasSize.current.w = canvasContainerRef.current.offsetWidth
-      canvasSize.current.h = canvasContainerRef.current.offsetHeight
-      canvasRef.current.width = canvasSize.current.w * dpr
-      canvasRef.current.height = canvasSize.current.h * dpr
-      canvasRef.current.style.width = `${canvasSize.current.w}px`
-      canvasRef.current.style.height = `${canvasSize.current.h}px`
-      context.current.scale(dpr, dpr)
-      circles.current = []
-      for (let i = 0; i < quantity; i++) {
-        const circle = circleParams()
-        drawCircle(circle)
-      }
-    }
-  }
+  const rgb = useRef<number[]>(hexToRgb(color))
 
   const circleParams = (): Circle => {
     const x = Math.floor(Math.random() * canvasSize.current.w)
@@ -160,8 +103,6 @@ export const Particles: React.FC<ParticlesProps> = ({
     const magnetism = 0.1 + Math.random() * 4
     return { x, y, translateX, translateY, size: pSize, alpha, targetAlpha, dx, dy, magnetism }
   }
-
-  const rgb = useRef<number[]>(hexToRgb(color))
 
   const drawCircle = (circle: Circle, update = false) => {
     if (context.current) {
@@ -207,6 +148,72 @@ export const Particles: React.FC<ParticlesProps> = ({
       }
     }
   }
+
+  const resizeCanvas = () => {
+    if (canvasContainerRef.current && canvasRef.current && context.current) {
+      canvasSize.current.w = canvasContainerRef.current.offsetWidth
+      canvasSize.current.h = canvasContainerRef.current.offsetHeight
+      canvasRef.current.width = canvasSize.current.w * dpr
+      canvasRef.current.height = canvasSize.current.h * dpr
+      canvasRef.current.style.width = `${canvasSize.current.w}px`
+      canvasRef.current.style.height = `${canvasSize.current.h}px`
+      context.current.scale(dpr, dpr)
+      circles.current = []
+      for (let i = 0; i < quantity; i++) {
+        const circle = circleParams()
+        drawCircle(circle)
+      }
+    }
+  }
+
+  const initCanvas = () => {
+    resizeCanvas()
+    drawParticles()
+  }
+
+  const onMouseMove = () => {
+    if (canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect()
+      const { w, h } = canvasSize.current
+      const x = mousePosition.x - rect.left - w / 2
+      const y = mousePosition.y - rect.top - h / 2
+      const inside = x < w / 2 && x > -w / 2 && y < h / 2 && y > -h / 2
+      if (inside) {
+        mouse.current.x = x
+        mouse.current.y = y
+      }
+    }
+  }
+
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      context.current = canvasRef.current.getContext("2d")
+    }
+    rgb.current = hexToRgb(color)
+    initCanvas()
+    animate()
+    window.addEventListener("resize", initCanvas)
+    return () => {
+      if (rafID.current != null) window.cancelAnimationFrame(rafID.current)
+      window.removeEventListener("resize", initCanvas)
+    }
+  }, [color])
+
+  useEffect(() => {
+    onMouseMove()
+  }, [mousePosition.x, mousePosition.y])
+
+  useEffect(() => {
+    initCanvas()
+  }, [refresh])
+
+  if (!mounted) return null
 
   return (
     <div className={cn("pointer-events-none", className)} ref={canvasContainerRef} aria-hidden="true" {...props}>

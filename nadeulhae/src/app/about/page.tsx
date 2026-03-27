@@ -4,7 +4,6 @@ import {
   CloudSunIcon, 
   MapIcon, 
   CpuIcon, 
-  UsersIcon, 
   SparklesIcon,
   SearchIcon,
   HistoryIcon,
@@ -17,7 +16,8 @@ import {
   Cloud,
   Zap,
   ShieldCheck,
-  CloudRain
+  CloudRain,
+  Database
 } from "lucide-react"
 
 
@@ -31,32 +31,32 @@ import { cn } from "@/lib/utils"
 
 const features = [
   {
-    name: "날씨 지능형 분석",
-    description: "단순 온도를 넘어 습도, 풍속, 미세먼지를 종합하여 최적의 피크닉 순간을 포착합니다.",
+    nameKey: "about_feature_1_name",
+    descKey: "about_feature_1_desc",
     className: "col-span-3 lg:col-span-2",
     icon: CloudSunIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-sky-blue/10 to-transparent" />,
     pending: false,
   },
   {
-    name: "AI 코스 큐레이션",
-    description: "LLM이 전주의 장소 DB와 실시간 날씨를 조합해 맞춤형 동선을 설계합니다.",
+    nameKey: "about_feature_2_name",
+    descKey: "about_feature_2_desc",
     className: "col-span-3 lg:col-span-1",
     icon: SparklesIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-purple-100/10 to-transparent" />,
     pending: true,
   },
   {
-    name: "로컬 장소 DB",
-    description: "전주의 숨은 명소부터 인기 카페까지, 실내외 특성을 고려한 큐레이션을 제공합니다.",
+    nameKey: "about_feature_3_name",
+    descKey: "about_feature_3_desc",
     className: "col-span-3 lg:col-span-1",
     icon: MapIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-teal-100/10 to-transparent" />,
     pending: true,
   },
   {
-    name: "과거 데이터 통찰",
-    description: "지난 3년의 기상 통계를 통해 가장 완벽한 요일과 시간대를 추천합니다.",
+    nameKey: "about_feature_4_name",
+    descKey: "about_feature_4_desc",
     className: "col-span-3 lg:col-span-2",
     icon: CpuIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-orange-100/10 to-transparent" />,
@@ -65,9 +65,9 @@ const features = [
 ]
 
 const contributors = [
-  { id: "hm", avatar: "👨‍💻", roleKey: "con_hm_role", nameKey: "con_hm_name", descKey: "con_hm_desc" },
-  { id: "es", avatar: "📊", roleKey: "con_es_role", nameKey: "con_es_name", descKey: "con_es_desc" },
-  { id: "jh", avatar: "🗄️", roleKey: "con_jh_role", nameKey: "con_jh_name", descKey: "con_jh_desc" },
+  { id: "hm", icon: CpuIcon, roleKey: "con_hm_role", nameKey: "con_hm_name", descKey: "con_hm_desc" },
+  { id: "es", icon: SearchIcon, roleKey: "con_es_role", nameKey: "con_es_name", descKey: "con_es_desc" },
+  { id: "jh", icon: Database, roleKey: "con_jh_role", nameKey: "con_jh_name", descKey: "con_jh_desc" },
 ]
 
 import { useLanguage } from "@/context/LanguageContext"
@@ -110,7 +110,7 @@ export default function AboutPage() {
             </p>
           </div>
           <div className="flex items-center gap-3 text-sky-blue font-black text-xs bg-sky-blue/10 px-6 py-3 rounded-full border border-sky-blue/20 shadow-lg shadow-sky-blue/5">
-            <SparklesIcon size={18} /> 100% Data-Driven
+            <SparklesIcon size={18} /> {t("about_data_driven")}
           </div>
         </div>
 
@@ -119,9 +119,11 @@ export default function AboutPage() {
             <div key={i} className="relative group">
               <BentoCard 
                 {...feature} 
+                name={t(feature.nameKey)}
+                description={t(feature.descKey)}
                 Icon={feature.icon as any} 
                 href={feature.pending ? "#" : "#ai-generator"} 
-                cta={feature.pending ? t("about_status_pending") : "자세히 보기"} 
+                cta={feature.pending ? t("about_status_pending") : t("about_feature_cta")} 
                 className={cn(
                   feature.className, 
                   "rounded-[2rem] border-sky-blue/5 dark:border-white/5 shadow-2xl",
@@ -140,13 +142,80 @@ export default function AboutPage() {
         </BentoGrid>
       </section>
 
-      {/* Tech Stack Section (existing) */}
-      <section className="bg-sky-blue/5 dark:bg-white/5 py-32 border-y border-sky-blue/10 dark:border-white/5 relative">
-        {/* ... existing marquee ... */}
+      {/* Tech Stack Section */}
+      <section className="bg-sky-blue/5 dark:bg-white/5 py-32 border-y border-sky-blue/10 dark:border-white/5 relative overflow-hidden">
+        <div className="absolute top-0 left-0 px-8 py-2 bg-sky-blue/10 border-b border-r border-sky-blue/20 rounded-br-3xl text-[10px] font-black uppercase tracking-[0.3em] text-sky-blue">
+          Engineered With
+        </div>
+        <Marquee pauseOnHover className="[--duration:30s]">
+          {[
+            "Next.js 16", "React 19+", "TypeScript", "Tailwind CSS", 
+            "Prisma ORM", "MySQL", "Lucide Icons", "Magic UI", 
+            "Framer Motion", "Shadcn UI", "Vercel", "i18n"
+          ].map((tech, i) => (
+            <div key={i} className="mx-12 flex items-center gap-3 group">
+              <CodeIcon size={20} className="text-sky-blue opacity-50 group-hover:opacity-100 transition-opacity" />
+              <span className="text-2xl font-black text-neutral-400 dark:text-neutral-600 group-hover:text-foreground transition-colors tracking-tighter italic">
+                {tech}
+              </span>
+            </div>
+          ))}
+        </Marquee>
       </section>
 
-      {/* Algorithm & Logic Section ... */}
-      {/* ... (Detailed Metric Guide section already added) ... */}
+      {/* Environmental Metric Guide */}
+      <section id="guide" className="container mx-auto py-32 px-4 bg-white/50 dark:bg-neutral-900/20 backdrop-blur-xl border-y border-sky-blue/10 dark:border-white/5">
+        <div className="max-w-4xl mx-auto text-center mb-20">
+          <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">{t("guide_title")}</h2>
+          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium leading-relaxed">
+            {t("guide_desc")}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {[
+            { tag: "guide_temp", icon: Thermometer },
+            { tag: "guide_humi", icon: Droplets },
+            { tag: "guide_wind", icon: Wind },
+            { tag: "guide_vec", icon: Navigation },
+            { tag: "guide_pm10", icon: Cloud },
+            { tag: "guide_pm25", icon: SparklesIcon },
+            { tag: "guide_o3", icon: Zap },
+            { tag: "guide_no2", icon: Zap },
+            { tag: "guide_khai", icon: ShieldCheck },
+            { tag: "guide_rn1", icon: CloudRain },
+          ].map((item, i) => (
+            <div key={i} className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-white/5 shadow-xl hover:shadow-2xl transition-all group">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="p-3 rounded-2xl bg-sky-blue/10 text-sky-blue group-hover:bg-sky-blue group-hover:text-white transition-all">
+                  <item.icon size={24} />
+                </div>
+                <h3 className="text-xl font-black text-foreground">
+                  {t(`${item.tag}_t`)}
+                </h3>
+              </div>
+              <p className="text-neutral-500 dark:text-neutral-400 text-sm leading-relaxed font-medium">
+                {t(`${item.tag}_d`)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Project Philosophy Section */}
+      <section className="container mx-auto py-32 px-4 flex flex-col items-center">
+        <div className="max-w-4xl p-12 md:p-20 rounded-[4rem] bg-sky-blue/5 border border-sky-blue/10 relative overflow-hidden text-center">
+          <div className="absolute top-0 right-0 p-10 opacity-10">
+            <Database size={200} className="text-sky-blue" />
+          </div>
+          <h2 className="text-3xl md:text-5xl font-black mb-8 tracking-tight text-foreground relative z-10">
+            {t("about_philosophy_title")}
+          </h2>
+          <p className="text-neutral-600 dark:text-neutral-400 text-xl md:text-2xl font-medium leading-relaxed relative z-10 italic">
+            &quot;{t("about_philosophy_desc")}&quot;
+          </p>
+        </div>
+      </section>
 
       {/* Contributors Section */}
       <section id="contributors" className="container mx-auto py-32 px-4 pb-64">
@@ -157,28 +226,21 @@ export default function AboutPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto">
           {contributors.map((person, i) => (
-            <div key={i} className="flex flex-col items-center group transition-all">
-              <div className="size-32 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-4xl mb-6 border-4 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/10 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)]">
-                {person.avatar}
+            <div key={i} className="flex flex-col items-center group transition-all p-10 rounded-[3rem] bg-white/50 dark:bg-neutral-900/50 border border-transparent hover:border-sky-blue/20 hover:shadow-2xl">
+              <div className="size-32 rounded-[2.5rem] bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-sky-blue mb-8 border-2 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/10 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)]">
+                <person.icon size={48} strokeWidth={1.5} />
               </div>
               <h3 className="font-black text-2xl text-foreground group-hover:text-sky-blue transition-colors">
                 {t(person.nameKey)}
               </h3>
-              <p className="text-[11px] text-sky-blue uppercase tracking-[0.2em] mt-2 font-black">
+              <p className="text-[11px] text-sky-blue uppercase tracking-[0.2em] mt-3 font-black">
                 {t(person.roleKey)}
               </p>
-              <p className="text-center mt-6 text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-4">
+              <p className="text-center mt-8 text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-2">
                 {t(person.descKey)}
               </p>
             </div>
           ))}
-        </div>
-        
-        <div className="mt-32 text-center max-w-xl mx-auto p-12 rounded-[3rem] border-2 border-dashed border-[var(--card-border)] bg-[var(--card)]">
-          <UsersIcon size={48} className="mx-auto mb-6 text-sky-blue opacity-40" />
-          <p className="text-lg italic font-medium text-neutral-400 dark:text-neutral-500 leading-relaxed">
-            "{t("about_placeholder")}"
-          </p>
         </div>
       </section>
     </main>

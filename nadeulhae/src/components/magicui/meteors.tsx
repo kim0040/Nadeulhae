@@ -28,6 +28,7 @@ export const Meteors = ({
   const [meteorStyles, setMeteorStyles] = useState<Array<React.CSSProperties>>([])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
   }, [])
 
@@ -39,6 +40,7 @@ export const Meteors = ({
       animationDelay: Math.random() * (maxDelay - minDelay) + minDelay + "s",
       animationDuration: Math.floor(Math.random() * (maxDuration - minDuration) + minDuration) + "s",
     }))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMeteorStyles(styles)
   }, [number, minDelay, maxDelay, minDuration, maxDuration, angle])
 

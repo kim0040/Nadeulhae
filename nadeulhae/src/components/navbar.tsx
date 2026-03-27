@@ -19,6 +19,7 @@ export function Navbar() {
   const [lastScrollY, setLastScrollY] = useState(0)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
     
     const controlNavbar = () => {
@@ -41,7 +42,7 @@ export function Navbar() {
   const navItems = [
     { name: t("nav_about"), href: "/about", icon: InfoIcon },
     { name: t("nav_calendar"), href: "/statistics/calendar", icon: CalendarIcon },
-    { name: "로그인", href: "/login", icon: LogInIcon },
+    { name: t("nav_login"), href: "/login", icon: LogInIcon },
   ]
 
   return (
@@ -58,7 +59,7 @@ export function Navbar() {
         <span className={cn(
           "text-sm sm:text-2xl font-black tracking-tighter text-foreground group-hover:text-sky-blue transition-colors",
           language === "en" ? "hidden lg:block" : "hidden sm:block"
-        )}>나들해</span>
+        )}>{t("logo_text")}</span>
       </Link>
 
       {/* Navigation Pill (Centered on Large / Compact on Small) */}
@@ -73,12 +74,17 @@ export function Navbar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-1.5 text-xs sm:text-sm font-black transition-all hover:text-sky-blue whitespace-nowrap",
+                "flex items-center gap-1.5 text-xs sm:text-sm font-black transition-all hover:text-sky-blue whitespace-nowrap relative group/nav",
                 pathname === item.href ? "text-sky-blue scale-105" : "text-neutral-500 dark:text-neutral-400 hover:scale-105"
               )}
             >
               <item.icon size={16} className="shrink-0" />
-              <span className={cn(item.name === "로그인" && "hidden sm:inline")}>{item.name}</span>
+              <span className={cn(item.href === "/login" && "hidden sm:inline")}>{item.name}</span>
+              {item.href === "/login" && (
+                <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-500 text-[8px] text-white px-1.5 py-0.5 rounded-full opacity-0 group-hover/nav:opacity-100 transition-opacity whitespace-nowrap font-black">
+                  {t("nav_login_unsupported")}
+                </span>
+              )}
             </Link>
           ))}
         </div>

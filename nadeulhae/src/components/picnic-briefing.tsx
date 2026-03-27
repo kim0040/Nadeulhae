@@ -131,7 +131,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
             </div>
             <div>
               <h3 className="text-2xl sm:text-4xl font-black text-foreground dark:text-white tracking-tight leading-none">{t("brief_title")}</h3>
-              <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.3em] mt-2 italic opacity-70">Situational Analysis Engine</p>
+              <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.3em] mt-2 italic opacity-70">{t("brief_station_engine")}</p>
             </div>
           </div>
           
@@ -172,9 +172,9 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="flex items-center justify-between mb-8 relative z-10">
             <div className="flex items-center gap-2">
               <div className="size-2 rounded-full bg-sky-blue animate-pulse" />
-              <h4 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-neutral-400">Environment Observation Grid</h4>
+              <h4 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-neutral-400">{t("brief_observation_grid")}</h4>
             </div>
-            <span className="text-[8px] sm:text-[10px] font-black text-neutral-300 dark:text-neutral-600 uppercase tracking-[0.15em]">NRS V1.0 - Real-time Protocol</span>
+            <span className="text-[8px] sm:text-[10px] font-black text-neutral-300 dark:text-neutral-600 uppercase tracking-[0.15em]">{t("brief_nrs_protocol")}</span>
           </div>
           
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-y-10 gap-x-6 relative z-10">
@@ -206,9 +206,9 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="flex items-center gap-3">
              <Clock size={14} className="text-sky-blue opacity-50" />
              <div className="flex flex-col">
-               <span className="text-[8px] font-black text-neutral-400 uppercase tracking-widest">KMA Sync</span>
+               <span className="text-[8px] font-black text-neutral-400 uppercase tracking-widest">{t("brief_kma_sync")}</span>
                <span className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 italic">
-                 {getUpdateTime('kma')} ({metadata?.intervals.kma || "45m"})
+                 {getUpdateTime('kma')} ({t(metadata?.intervals.kma || "interval_45m")})
                </span>
              </div>
           </div>
@@ -216,9 +216,9 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="flex items-center gap-3">
              <Database size={14} className="text-sky-blue opacity-50" />
              <div className="flex flex-col">
-               <span className="text-[8px] font-black text-neutral-400 uppercase tracking-widest">Air Poll</span>
+               <span className="text-[8px] font-black text-neutral-400 uppercase tracking-widest">{t("brief_air_sync")}</span>
                <span className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 italic">
-                 {getUpdateTime('air')} ({metadata?.intervals.air || "1h"})
+                 {getUpdateTime('air')} ({t(metadata?.intervals.air || "interval_0m")})
                </span>
              </div>
           </div>
@@ -228,7 +228,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-400/5 border border-orange-400/20">
             <AlertCircle size={10} className="text-orange-400" />
             <span className="text-[8px] font-black text-orange-400 uppercase tracking-widest">
-              {t("status_coming_soon")}: AI Engine / DB Archive
+              {t("status_coming_soon")}: {t("brief_ai_db_archive")}
             </span>
           </div>
         </div>

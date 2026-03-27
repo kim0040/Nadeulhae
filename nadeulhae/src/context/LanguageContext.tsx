@@ -18,6 +18,9 @@ const translations: Record<Language, Record<string, string>> = {
     nav_stats: "통계 달력",
     nav_calendar: "달력",
     nav_login: "로그인",
+    nav_login_status: "연결 준비 중",
+    nav_login_unsupported: "현재 지원되지 않음",
+    logo_text: "나들해",
     
     // UI General
     loading_weather: "전주 날씨 데이터를 불러오고 있습니다...",
@@ -61,6 +64,7 @@ const translations: Record<Language, Record<string, string>> = {
     ai_loc_mock: "전주시 완산구 (내 위치)",
     ai_button: "AI 코스 생성하기",
     ai_loading: "전주 날씨 데이터 분석 중...",
+    ai_processing_label: "LLM & 날씨 DB 분석 중",
     ai_loading_detail: "기상 층밀림 현상 분석 중...",
     
     // Result
@@ -181,21 +185,110 @@ const translations: Record<Language, Record<string, string>> = {
     about_item_precip: "강수량 (Precipitation)",
     about_item_precip_desc: "비나 눈의 양입니다. 나들이에는 0mm가 가장 완벽하며, 소량이라도 강수가 있으면 지수가 급격히 하락합니다.",
 
+    // Features
+    about_feature_1_name: "날씨 지능형 분석",
+    about_feature_1_desc: "단순 온도를 넘어 습도, 풍속, 미세먼지를 종합하여 최적의 피크닉 순간을 포착합니다.",
+    about_feature_2_name: "AI 코스 큐레이션",
+    about_feature_2_desc: "LLM이 전주의 장소 DB와 실시간 날씨를 조합해 맞춤형 동선을 설계합니다.",
+    about_feature_3_name: "로컬 장소 DB",
+    about_feature_3_desc: "전주의 숨은 명소부터 인기 카페까지, 실내외 특성을 고려한 큐레이션을 제공합니다.",
+    about_feature_4_name: "과거 데이터 통찰",
+    about_feature_4_desc: "지난 3년의 기상 통계를 통해 가장 완벽한 요일과 시간대를 추천합니다.",
+    about_feature_cta: "자세히 보기",
+    about_data_driven: "100% 데이터 기반",
+
+    // Technical Labels & Briefing UI
+    brief_station_engine: "상황 분석 엔진",
+    brief_observation_grid: "환경 관측 그리드",
+    brief_nrs_protocol: "NRS V1.0 - 실시간 프로토콜",
+    brief_kma_sync: "기상청 동기화",
+    brief_air_sync: "대기질 동기화",
+    brief_ai_db_archive: "AI 엔진 / DB 아카이브",
+    
+    // Status & Levels
+    level_excel: "매우 좋음",
+    level_good: "좋음",
+    level_mod: "보통",
+    level_bad: "나쁨",
+    level_v_bad: "매우 나쁨",
+    
+    uv_low: "낮음",
+    uv_mod: "보통",
+    uv_high: "높음",
+    uv_v_high: "매우 높음",
+    uv_extreme: "위험",
+    
+    // Meta & Sources
+    interval_45m: "매시 45분",
+    interval_0m: "매시 정각",
+    data_source_kma: "기상청",
+    data_source_air: "한국환경공단",
+    data_source_combined: "기상청, 한국환경공단",
+    label_domestic: "국내",
+    label_who: "WHO",
+
+    // Insights & Trends
+    insight_1_title: "최적의 요일",
+    insight_1_desc: "지난 3년 통계 분석 결과, 이번 달 가장 쾌적한 피크닉 요일은 '토요일'입니다.",
+    insight_1_cta: "통계 달력 보기",
+    insight_2_title: "기후 에너지",
+    insight_2_desc: "오늘 전주의 기상 에너지는 92%로, 외부 활동에 매우 긍정적인 수치입니다.",
+    insight_2_cta: "에너지 리포트",
+    insight_3_title: "실시간 혼잡도",
+    insight_3_desc: "덕진공원 인근은 현재 '여유' 로우며, 쾌적한 자리 선점이 가능합니다.",
+    insight_3_cta: "장소 예약 문의",
+    
+    trend_title: "지금 전주 시민들이 많이 찾는 스팟: {spot}",
+    
+    course_1_title: "따뜻한 야외 타임 - 덕진공원",
+    course_1_desc: "햇살이 가장 따뜻하고 미세먼지가 없는 시간대예요. 덕진공원에서 돗자리를 펴고 샌드위치를 드시는 걸 추천해요!",
+    course_2_title: "바람 피하기 타임 - 카페 정비",
+    course_2_desc: "늦은 오후부터는 찬 바람이 불어 체감 온도가 떨어질 수 있어요. 카페로 이동해 여유를 즐겨보세요.",
+
+    // Metric Guide Title
+    guide_title: "상세 기상 및 대기 데이터 가이드",
+    guide_desc: "나들해는 기상청과 한국환경공단의 실시간 오픈 API를 통해 수집된 10가지 이상의 정밀 데이터를 분석하여 피크닉 최적도를 산출합니다. 각 지표의 의미와 기준은 다음과 같습니다.",
+
+    // Metrics
+    guide_temp_t: "기온",
+    guide_temp_d: "현재 지표면 부근의 대기 온도입니다. 18°C~24°C 사이가 야외 활동에 가장 쾌적하며, 30°C 이상이거나 5°C 이하일 경우 주의가 필요합니다.",
+    guide_humi_t: "습도",
+    guide_humi_d: "공기 중 수증기의 비율입니다. 40%~60%가 가장 쾌적하며, 70% 이상일 경우 불쾌지수가 높아지고 땀 증발이 더뎌집니다.",
+    guide_wind_t: "풍속",
+    guide_wind_d: "공기의 이동 속도입니다. 1.5m/s~3.5m/s는 시원한 바람을 느끼기 좋으나, 5m/s 이상일 경우 물건이 날아가거나 돗자리 이용에 불편함이 있습니다.",
+    guide_vec_t: "풍향",
+    guide_vec_d: "바람이 불어오는 방향입니다. 전주의 지형적 특성상 북서풍이 불 때 체감 온도가 더 낮게 느껴질 수 있습니다.",
+    guide_pm10_t: "미세먼지(PM10)",
+    guide_pm10_d: "지름 10µg 이하의 미세 오염물질입니다. 30µg/m³ 이하는 '좋음', 80µg/m³ 이상은 '나쁨'으로 분류되어 장시간 실외 활동 자제를 권고합니다.",
+    guide_pm25_t: "초미세먼지(PM2.5)",
+    guide_pm25_d: "지름 2.5µg 이하로 폐포까지 침투 가능한 고위험 물질입니다. 15µg/m³ 이하가 이상적이며, 35µg/m³ 초과 시 마스크 착용이 필수적입니다.",
+    guide_o3_t: "오존",
+    guide_o3_d: "대기 중 농도가 높아지면 눈과 호흡기를 자극합니다. 주로 햇빛이 강한 여름 오후에 농도가 높아지며, 0.09ppm 초과 시 주의보가 발령됩니다.",
+    guide_no2_t: "이산화질소",
+    guide_no2_d: "주로 자동차 배기가스에서 배출되며 기관지 염증을 유발할 수 있습니다. 0.03ppm 이하가 쾌적한 수준입니다.",
+    guide_khai_t: "통합대기환경지수",
+    guide_khai_d: "초미세먼지, 오존 등 여러 오염물질을 종합하여 산출한 수치입니다. 0~50은 '좋음', 100 이상은 '나쁨'을 뜻합니다.",
+    guide_rn1_t: "강수량",
+    guide_rn1_d: "최근 1시간 동안 내린 비의 양입니다. 0.1mm 이상의 강수가 감지되면 피크닉 점수가 크게 하락합니다.",
+
     // Contributors & Status
     about_status_pending: "백엔드 연결 준비 중",
     about_contributors_desc: "전북대학교 소프트웨어공학과 3학년(24학번) 동기 3명이 함께 만든 데이터베이스 팀 프로젝트입니다. 모든 팀원이 데이터베이스 설계 및 구축에 핵심적으로 참여했습니다.",
     
     con_hm_name: "김현민",
-    con_hm_role: "Project Lead",
-    con_hm_desc: "아이디어 제안 및 프로젝트 총괄. 전체적인 아키텍처 설계와 프론트엔드/서버 개발을 주도하였습니다.",
+    con_hm_role: "Project Lead (Lead Architect / Core DB Design)",
+    con_hm_desc: "Nadeulhae의 전체 시스템 아키텍처를 설계하고, 대량의 환경 데이터를 효율적으로 조회할 수 있는 핵심 DB 스키마 구축을 주도했습니다.",
     
     con_es_name: "김은수",
-    con_es_role: "Data Engineer",
-    con_es_desc: "플랫폼의 가치를 높이는 유용한 장소 정보 크롤링 및 데이터 전처리 작업을 담당하였습니다.",
+    con_es_role: "Data Specialist (Crawl & DB Construction)",
+    con_es_desc: "실시간 대기질 및 지리 정보를 수집하는 정교한 크롤링 파이프라인을 구축하고, 이를 DB에 최적화하여 적재하는 안정적인 시스템을 구현했습니다.",
     
     con_jh_name: "이재혁",
-    con_jh_role: "Database Engineer",
-    con_jh_desc: "기상청/에어코리아 오픈 API 연동 및 실시간 데이터베이스 적재 로직을 구현하였습니다.",
+    con_jh_role: "Data Engineer (Weather/Air DB Pipeline)",
+    con_jh_desc: "기상청 실시간 데이터를 DB에 매칭하여 유기적으로 연동되는 파이프라인을 구현하고, 공용 데이터의 활용 가치를 DB 설계를 통해 극대화했습니다.",
+
+    about_philosophy_title: "데이터를 설계하는 사람들, Nadeulhae 3인",
+    about_philosophy_desc: "우리는 단순한 웹 서비스를 넘어, 방대한 환경 데이터를 어떻게 가장 효율적으로 구조화하고 다룰 수 있을지에 대한 '데이터베이스 공학적 해답'을 찾는 데 열정을 다했습니다. 전북대 SW공학과 24학번 동기 3인이 밤낮으로 고민해 완성한 정교한 DB 스키마와 데이터 파이프라인은 나들해 플랫폼을 지탱하는 가장 강력한 성과이자 자부심입니다.",
 
     // Statistics Page Extra
     cal_archive_title: "과거 나들이 아카이브",
@@ -212,6 +305,9 @@ const translations: Record<Language, Record<string, string>> = {
     nav_about: "About",
     nav_calendar: "Calendar",
     nav_login: "Login",
+    nav_login_status: "Sync Pending",
+    nav_login_unsupported: "Unsupported",
+    logo_text: "Nadeulhae",
     
     // Hero
     hero_title: "Jeonju is perfect for a picnic today!",
@@ -250,6 +346,7 @@ const translations: Record<Language, Record<string, string>> = {
     ai_loc_mock: "Wansan-gu (My Location)",
     ai_button: "Generate AI Course",
     ai_loading: "Analyzing weather data...",
+    ai_processing_label: "LLM & Weather DB Processing",
     ai_loading_detail: "Calculating atmospheric shifts...",
     
     // Result
@@ -370,21 +467,110 @@ const translations: Record<Language, Record<string, string>> = {
     about_item_precip: "Precipitation",
     about_item_precip_desc: "Amount of rain or snow. 0mm is perfect; any amount significantly lowers the picnic score.",
 
+    // Features
+    about_feature_1_name: "Weather Intelligence",
+    about_feature_1_desc: "Captures the optimal picnic moment by integrating humidity, wind, and dust beyond just temperature.",
+    about_feature_2_name: "AI Course Curation",
+    about_feature_2_desc: "LLM designs customized routes by combining Jeonju's place DB and real-time weather.",
+    about_feature_3_name: "Local Place DB",
+    about_feature_3_desc: "Provides curation considering indoor/outdoor characteristics, from hidden gems to popular cafes in Jeonju.",
+    about_feature_4_name: "Past Data Insights",
+    about_feature_4_desc: "Recommends the most perfect day and time through weather statistics of the past 3 years.",
+    about_feature_cta: "View Details",
+    about_data_driven: "100% Data-Driven",
+
+    // Technical Labels & Briefing UI
+    brief_station_engine: "Situational Analysis Engine",
+    brief_observation_grid: "Environment Observation Grid",
+    brief_nrs_protocol: "NRS V1.0 - Real-time Protocol",
+    brief_kma_sync: "KMA Sync",
+    brief_air_sync: "Air Poll",
+    brief_ai_db_archive: "AI Engine / DB Archive",
+    
+    // Status & Levels
+    level_excel: "Excellent",
+    level_good: "Good",
+    level_mod: "Moderate",
+    level_bad: "Bad",
+    level_v_bad: "Very Bad",
+    
+    uv_low: "Low",
+    uv_mod: "Moderate",
+    uv_high: "High",
+    uv_v_high: "Very High",
+    uv_extreme: "Extreme",
+    
+    // Meta & Sources
+    interval_45m: "Hourly at 45m",
+    interval_0m: "Hourly at 0m",
+    data_source_kma: "KMA",
+    data_source_air: "AirKorea",
+    data_source_combined: "KMA, AirKorea",
+    label_domestic: "Domestic",
+    label_who: "WHO",
+
+    // Insights & Trends
+    insight_1_title: "Optimal Picnic Day",
+    insight_1_desc: "Based on 3-year stats, the most pleasant day this month is 'Saturday'.",
+    insight_1_cta: "View Stats Calendar",
+    insight_2_title: "Climate Energy",
+    insight_2_desc: "Jeonju's weather energy is 92% today, highly positive for outdoor activities.",
+    insight_2_cta: "Energy Report",
+    insight_3_title: "Real-time Crowd",
+    insight_3_desc: "Deokjin Park area is currently 'Relaxed', easy to find a good spot.",
+    insight_3_cta: "Booking Inquiry",
+    
+    trend_title: "Popular spots in Jeonju: {spot}",
+    
+    course_1_title: "Warm Outdoor Time - Deokjin Park",
+    course_1_desc: "The sun is warmest and the air is clear. We recommend a picnic with a mat at Deokjin Park!",
+    course_2_title: "Shelter from Wind - Cafe Time",
+    course_2_desc: "Cool breezes may lower the perceived temperature in the late afternoon. Enjoy some tea at a cozy cafe.",
+
+    // Metric Guide Title
+    guide_title: "Environmental Data Guide",
+    guide_desc: "Nadeulhae calculates picnic scores by analyzing 10+ precision data points collected through real-time open APIs from the KMA and AirKorea. Here's a guide to each metric.",
+
+    // Metrics
+    guide_temp_t: "Temperature",
+    guide_temp_d: "Current atmospheric temperature near the surface. 18°C~24°C is best for outdoor activities; caution is needed above 30°C or below 5°C.",
+    guide_humi_t: "Humidity",
+    guide_humi_d: "The ratio of water vapor in the air. 40%~60% is ideal; values above 70% increase discomfort and slow perspiration evaporation.",
+    guide_wind_t: "Wind Speed",
+    guide_wind_d: "The velocity of air movement. 1.5m/s~3.5m/s is perfect for a cool breeze, but above 5m/s might flip mats or disperse belongings.",
+    guide_vec_t: "Wind Direction",
+    guide_vec_d: "The direction from which the wind blows. Due to Jeonju's geography, northwesterly winds often feel cooler than the actual temperature.",
+    guide_pm10_t: "PM10 (Dust)",
+    guide_pm10_d: "Pollutants below 10µg in diameter. Below 30µg/m³ is 'Good'; above 80µg/m³ is 'Bad', meaning long outdoor exposures should be limited.",
+    guide_pm25_t: "PM2.5 (Fine Dust)",
+    guide_pm25_d: "High-risk particles below 2.5µg that can reach the deep lungs. Below 15µg/m³ is ideal; masks are essential above 35µg/m³.",
+    guide_o3_t: "Ozone",
+    guide_o3_d: "High ozone levels can irritate eyes and lungs. Levels peak on sunny summer afternoons; alerts are issued above 0.09ppm.",
+    guide_no2_t: "Nitrogen Dioxide",
+    guide_no2_d: "Mainly emitted from vehicle exhausts and can cause bronchial inflammation. Below 0.03ppm is considered pleasant.",
+    guide_khai_t: "CAI (Air Quality Index)",
+    guide_khai_d: "An integrated value of pollutants like PM2.5 and Ozone. 0-50 is 'Good'; 100+ is 'Bad' for outdoor activities.",
+    guide_rn1_t: "Precipitation",
+    guide_rn1_d: "The amount of rain over the last hour. Any rain detection (above 0.1mm) significantly drops the overall picnic score.",
+
     // Contributors & Status
     about_status_pending: "Backend Sync Pending",
     about_contributors_desc: "A database team project created by three juniors (Class of '24) from Jeonbuk National University, Software Engineering. All members actively participated in core DB design and construction.",
     
     con_hm_name: "Hyeonmin Kim",
-    con_hm_role: "Project Lead",
-    con_hm_desc: "Ideation and overall management. Led the architecture design, frontend, and server logic development.",
+    con_hm_role: "Project Lead (Lead Architect / Core DB Design)",
+    con_hm_desc: "Architected the overall system and led the design of the core database schema for efficient high-volume environmental data retrieval.",
     
     con_es_name: "Eunsu Kim",
-    con_es_role: "Data Engineer",
-    con_es_desc: "Responsible for crawling and preprocessing useful place data to enhance the platform's value.",
+    con_es_role: "Data Specialist (Crawl & DB Construction)",
+    con_es_desc: "Built sophisticated crawling pipelines for real-time air quality and geographic data, ensuring optimized data ingestion and storage.",
     
     con_jh_name: "Jaehyeok Lee",
-    con_jh_role: "Database Engineer",
-    con_jh_desc: "Implemented real-time data storage logic and integrated weather/air quality Open APIs.",
+    con_jh_role: "Data Engineer (Weather/Air DB Pipeline)",
+    con_jh_desc: "Implemented real-time data matching and integration pipelines, maximizing the utility of public data through advanced DB structuring.",
+
+    about_philosophy_title: "The Minds Behind the Data: Team Nadeulhae",
+    about_philosophy_desc: "Beyond building a simple web service, we dedicated ourselves to finding 'database engineering solutions' for structuring and handling vast environmental data efficiently. The sophisticated DB schemas and pipelines crafted by three JNU Software Engineering juniors are the core achievements we take the most pride in—the true engine driving Every moment of Nadeulhae.",
 
     // Statistics Page Extra
     cal_archive_title: "Picnic Data Archive",
@@ -404,12 +590,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Detect browser language
-    const browserLang = navigator.language.split('-')[0]
-    if (browserLang === 'ko') {
-      setLanguage('ko')
-    } else {
-      setLanguage('en')
-    }
+    const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'ko'
+    const targetLang = browserLang === 'ko' ? 'ko' : 'en'
+    
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLanguage(targetLang)
   }, [])
 
   const t = (key: string) => {

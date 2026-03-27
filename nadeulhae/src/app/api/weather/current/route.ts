@@ -30,7 +30,8 @@ export async function GET() {
       const formatter = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
       const parts = formatter.formatToParts(currentTime);
       const findPart = (type: string) => parts.find(p => p.type === type)?.value || "";
-      let year = findPart('year'), month = findPart('month'), day = findPart('day'), hour = findPart('hour');
+      const year = findPart('year'), month = findPart('month'), day = findPart('day');
+      let hour = findPart('hour');
       if (currentTime.getMinutes() < 45) {
         const prevHour = new Date(currentTime.getTime() - 60 * 60 * 1000);
         const prevParts = formatter.formatToParts(prevHour);

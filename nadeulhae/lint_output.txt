@@ -1,0 +1,138 @@
+
+> nadeulhae@0.1.0 lint
+> eslint
+
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/about/page.tsx
+    9:3   warning  'HistoryIcon' is defined but never used                          @typescript-eslint/no-unused-vars
+   11:3   warning  'ArrowRight' is defined but never used                           @typescript-eslint/no-unused-vars
+  215:13  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  215:42  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/api/weather/current/route.ts
+  33:11  error  'year' is never reassigned. Use 'const' instead   prefer-const
+  33:36  error  'month' is never reassigned. Use 'const' instead  prefer-const
+  33:63  error  'day' is never reassigned. Use 'const' instead    prefer-const
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/layout.tsx
+  5:10  warning  'ThemeToggle' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/login/page.tsx
+  5:33  warning  'LogIn' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/page.tsx
+   13:3    warning  'ArrowRight' is defined but never used                                                                @typescript-eslint/no-unused-vars
+   34:53   warning  'mockCourse' is defined but never used                                                                @typescript-eslint/no-unused-vars
+   46:11   warning  'language' is assigned a value but never used                                                         @typescript-eslint/no-unused-vars
+   82:6    warning  React Hook useEffect has a missing dependency: 't'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  301:96   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                       react/no-unescaped-entities
+  301:121  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                       react/no-unescaped-entities
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/magicui/particles.tsx
+   97:5  error    Error: Cannot access variable before it is declared
+
+`initCanvas` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/magicui/particles.tsx:97:5
+   95 |     }
+   96 |     rgb.current = hexToRgb(color)
+>  97 |     initCanvas()
+      |     ^^^^^^^^^^ `initCanvas` accessed before it is declared
+   98 |     animate()
+   99 |     window.addEventListener("resize", initCanvas)
+  100 |     return () => {
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/magicui/particles.tsx:114:3
+  112 |   }, [refresh])
+  113 |
+> 114 |   const initCanvas = () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 115 |     resizeCanvas()
+      | ^^^^^^^^^^^^^^^^^^
+> 116 |     drawParticles()
+      | ^^^^^^^^^^^^^^^^^^
+> 117 |   }
+      | ^^^^ `initCanvas` is declared here
+  118 |
+  119 |   const onMouseMove = () => {
+  120 |     if (canvasRef.current) {                                                                                                                                                                                                                                             react-hooks/immutability
+   98:5  error    Error: Cannot access variable before it is declared
+
+`animate` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/magicui/particles.tsx:98:5
+   96 |     rgb.current = hexToRgb(color)
+   97 |     initCanvas()
+>  98 |     animate()
+      |     ^^^^^^^ `animate` accessed before it is declared
+   99 |     window.addEventListener("resize", initCanvas)
+  100 |     return () => {
+  101 |       if (rafID.current != null) window.cancelAnimationFrame(rafID.current)
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/magicui/particles.tsx:179:3
+  177 |   }
+  178 |
+> 179 |   const animate = () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^
+> 180 |     if (context.current) {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 181 |       context.current.clearRect(0, 0, canvasSize.current.w, canvasSize.current.h)
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 199 |     rafID.current = window.requestAnimationFrame(animate)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 200 |   }
+      | ^^^^ `animate` is declared here
+  201 |
+  202 |   const drawParticles = () => {
+  203 |     if (context.current) {  react-hooks/immutability
+  104:6  warning  React Hook useEffect has missing dependencies: 'animate' and 'initCanvas'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+  107:5  error    Error: Cannot access variable before it is declared
+
+`onMouseMove` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/magicui/particles.tsx:107:5
+  105 |
+  106 |   useEffect(() => {
+> 107 |     onMouseMove()
+      |     ^^^^^^^^^^^ `onMouseMove` accessed before it is declared
+  108 |   }, [mousePosition.x, mousePosition.y])
+  109 |
+  110 |   useEffect(() => {
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/magicui/particles.tsx:119:3
+  117 |   }
+  118 |
+> 119 |   const onMouseMove = () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 120 |     if (canvasRef.current) {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 121 |       const rect = canvasRef.current.getBoundingClientRect()
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 130 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 131 |   }
+      | ^^^^ `onMouseMove` is declared here
+  132 |
+  133 |   const resizeCanvas = () => {
+  134 |     if (canvasContainerRef.current && canvasRef.current && context.current) {                                                                                                       react-hooks/immutability
+  108:6  warning  React Hook useEffect has a missing dependency: 'onMouseMove'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/exhaustive-deps
+  112:6  warning  React Hook useEffect has a missing dependency: 'initCanvas'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/navbar.tsx
+   7:46  warning  'Globe' is defined but never used                   @typescript-eslint/no-unused-vars
+  15:28  warning  'resolvedTheme' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/picnic-archive-calendar.tsx
+  13:3  warning  'isSameDay' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/picnic-briefing.tsx
+  25:20  warning  'score' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/components/picnic-calendar.tsx
+  12:3  warning  'addDays' is defined but never used   @typescript-eslint/no-unused-vars
+  14:3  warning  'parseISO' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 27 problems (10 errors, 17 warnings)
+

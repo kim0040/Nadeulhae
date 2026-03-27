@@ -5,10 +5,14 @@ import Link from "next/link"
 import { ArrowLeft, User, Mail, Lock, Sparkles } from "lucide-react"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { Particles } from "@/components/magicui/particles"
+import { Meteors } from "@/components/magicui/meteors"
+import { BorderBeam } from "@/components/magicui/border-beam"
 import { useTheme } from "next-themes"
+import { useLanguage } from "@/context/LanguageContext"
 
 export default function SignupPage() {
   const { resolvedTheme } = useTheme()
+  const { t } = useLanguage()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -20,6 +24,7 @@ export default function SignupPage() {
         quantity={50}
         color={resolvedTheme === "dark" ? "#ffffff" : "#87CEEB"}
       />
+      <Meteors number={20} />
       
       <div className="w-full max-w-md z-10">
         <Link href="/login" className="inline-flex items-center gap-2 text-neutral-500 dark:text-neutral-400 hover:text-sky-blue dark:hover:text-sky-blue mb-8 transition-colors font-bold group">
@@ -27,10 +32,18 @@ export default function SignupPage() {
           로그인으로 돌아가기
         </Link>
         
-        <div className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-2xl border border-sky-blue/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-sky-blue/5">
-          <div className="text-center mb-10">
+        <div className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-2xl border border-sky-blue/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-sky-blue/5 relative overflow-hidden group">
+          <BorderBeam size={200} duration={12} delay={9} colorFrom="#87CEEB" colorTo="#F5F5DC" />
+          
+          <div className="absolute top-4 right-4 z-20">
+            <span className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20 text-[10px] sm:text-[11px] font-black uppercase tracking-widest backdrop-blur-md animate-pulse">
+               COMING SOON
+            </span>
+          </div>
+
+          <div className="text-center mb-10 relative z-10">
             <h1 className="text-3xl font-black mb-2 tracking-tight">시작해볼까요?</h1>
-            <p className="text-neutral-500 dark:text-neutral-400 font-medium">새로운 나들해 계정을 생성하세요.</p>
+            <p className="text-neutral-500 dark:text-neutral-400 font-medium">{t("nav_login_unsupported")}</p>
           </div>
           
           <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
@@ -80,8 +93,8 @@ export default function SignupPage() {
               가입 시 나들해의 <span className="underline cursor-pointer">서비스 이용약관</span> 및 <span className="underline cursor-pointer">개인정보 처리방침</span>에 동의하게 됩니다.
             </p>
             
-            <ShimmerButton className="w-full py-4 rounded-2xl font-black text-lg shadow-sky-blue/20 shadow-xl flex items-center justify-center gap-2">
-              지금 가입하기
+            <ShimmerButton className="w-full py-4 rounded-2xl font-black text-lg shadow-sky-blue/20 shadow-xl flex items-center justify-center gap-2 opacity-50 cursor-not-allowed">
+              회원가입 (준비 중)
               <Sparkles size={18} />
             </ShimmerButton>
           </form>

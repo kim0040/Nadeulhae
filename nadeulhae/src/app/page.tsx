@@ -154,7 +154,7 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="grid grid-cols-3 sm:flex gap-6 sm:gap-12 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 text-foreground">
+          <div className="grid grid-cols-5 sm:flex gap-1 sm:gap-12 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 text-foreground overflow-x-auto sm:overflow-visible no-scrollbar pb-4 sm:pb-0 w-full justify-center px-1 sm:px-4">
              <div className="flex flex-col items-center">
                <ThermometerIcon className="text-orange-400 mb-2 size-6 sm:size-8" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_temp")}</span>
@@ -170,29 +170,29 @@ export default function Home() {
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_wind")}</span>
                <span className="font-black text-xl sm:text-3xl">{weatherData.details.wind ?? "--"}m/s</span>
              </div>
-             <div className="flex flex-col items-center hidden sm:flex">
-               <CloudIcon className="text-neutral-400 mb-2 size-6 sm:size-8" />
+             <div className="flex flex-col items-center">
+               <CloudIcon className="text-neutral-400 mb-2 size-6" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_dust")}</span>
                <div className="flex flex-col items-center">
-                 <span className="font-black text-xl sm:text-2xl whitespace-nowrap">{weatherData.details.dust?.split('(')[0].trim() || "--"}</span>
+                 <span className="font-black text-xl sm:text-2xl whitespace-nowrap">{weatherData.details.dust}</span>
                  <div className="flex gap-1.5 mt-2">
-                   {weatherData.details.dust?.includes("국내:") && (
+                   {weatherData.details.dust_domestic && (
                      <>
                        <span className="px-2 py-0.5 rounded-md bg-sky-blue/10 text-sky-blue text-[10px] font-black border border-sky-blue/20">
-                         KR: {weatherData.details.dust.match(/국내:\s*([^/|)]+)/)?.[1].trim()}
+                         {t("label_domestic")}: {t(weatherData.details.dust_domestic)}
                        </span>
                        <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-500 text-[10px] font-black border border-purple-500/20">
-                         WHO: {weatherData.details.dust.match(/WHO:\s*([^/|)]+)/)?.[1].trim()}
+                         {t("label_who")}: {t(weatherData.details.dust_who)}
                        </span>
                      </>
                    )}
                  </div>
                </div>
              </div>
-             <div className="flex flex-col items-center hidden sm:flex">
-               <SunIcon className="text-yellow-400 mb-2 size-6 sm:size-8" />
+             <div className="flex flex-col items-center">
+               <SunIcon className="text-yellow-400 mb-2 size-6" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_uv")}</span>
-               <span className="font-black text-xl sm:text-3xl">{weatherData.details.uv ?? "--"}</span>
+               <span className="font-black text-xl sm:text-3xl">{t(weatherData.details.uv || "uv_mod")}</span>
              </div>
           </div>
         </div>
@@ -218,6 +218,9 @@ export default function Home() {
             <BentoCard 
               key={insight.name} 
               {...insight} 
+              name={t(insight.name)}
+              description={t(insight.description)}
+              cta={t(insight.cta)}
               Icon={icons[insight.icon as keyof typeof icons]} 
               className={cn(insight.className, "min-h-[14rem] transition-all hover:shadow-2xl")}
             />
@@ -231,7 +234,7 @@ export default function Home() {
           {trends.map((trend, i) => (
             <span key={i} className="text-lg sm:text-xl font-medium text-sky-blue mx-6 flex items-center gap-2">
               <span className="size-1 rounded-full bg-sky-blue" />
-              {trend}
+              {t("trend_title").replace("{spot}", `#${trend}`)}
             </span>
           ))}
         </Marquee>
@@ -295,8 +298,8 @@ export default function Home() {
           <div className="mt-16 flex flex-col items-center gap-8 animate-in fade-in zoom-in duration-700">
             <AnimatedCircularProgressBar value={85} gaugePrimaryColor="#87CEEB" />
             <div className="flex flex-col items-center bg-sky-blue/10 dark:bg-sky-blue/20 px-10 py-5 rounded-[2.5rem] border border-sky-blue/30 backdrop-blur-xl">
-              <p className="text-sky-blue font-black italic text-center text-xl animate-pulse">"{t("ai_loading_detail")}"</p>
-              <p className="text-[12px] text-neutral-400 mt-2 font-bold uppercase tracking-[0.2em]">LLM & Weather DB Processing</p>
+              <p className="text-sky-blue font-black italic text-center text-xl animate-pulse">&quot;{t("ai_loading_detail")}&quot;</p>
+              <p className="text-[12px] text-neutral-400 mt-2 font-bold uppercase tracking-[0.2em]">{t("ai_processing_label")}</p>
             </div>
           </div>
         )}
@@ -326,9 +329,9 @@ export default function Home() {
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black text-foreground mb-1">{item.title}</h3>
+                    <h3 className="text-2xl font-black text-foreground mb-1">{t(item.title)}</h3>
                     <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed text-sm">
-                      {item.description}
+                      {t(item.description)}
                     </p>
                   </div>
                 </div>

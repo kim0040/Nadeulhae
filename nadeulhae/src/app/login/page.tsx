@@ -5,10 +5,14 @@ import Link from "next/link"
 import { ArrowLeft, Mail, Lock, LogIn } from "lucide-react"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { Particles } from "@/components/magicui/particles"
+import { Meteors } from "@/components/magicui/meteors"
+import { BorderBeam } from "@/components/magicui/border-beam"
 import { useTheme } from "next-themes"
+import { useLanguage } from "@/context/LanguageContext"
 
 export default function LoginPage() {
   const { resolvedTheme } = useTheme()
+  const { t } = useLanguage()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
 
@@ -19,6 +23,7 @@ export default function LoginPage() {
         quantity={50}
         color={resolvedTheme === "dark" ? "#ffffff" : "#87CEEB"}
       />
+      <Meteors number={20} />
       
       <div className="w-full max-w-md z-10">
         <Link href="/" className="inline-flex items-center gap-2 text-neutral-500 dark:text-neutral-400 hover:text-sky-blue dark:hover:text-sky-blue mb-8 transition-colors font-bold group">
@@ -26,10 +31,18 @@ export default function LoginPage() {
           홈으로 돌아가기
         </Link>
         
-        <div className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-2xl border border-sky-blue/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-sky-blue/5">
-          <div className="text-center mb-10">
-            <h1 className="text-3xl font-black mb-2 tracking-tight">반가워요!</h1>
-            <p className="text-neutral-500 dark:text-neutral-400 font-medium">나들해 계정으로 로그인하세요.</p>
+        <div className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-2xl border border-sky-blue/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-sky-blue/5 relative overflow-hidden group">
+          <BorderBeam size={200} duration={12} delay={9} colorFrom="#87CEEB" colorTo="#F5F5DC" />
+          
+          <div className="absolute top-4 right-4 z-20">
+            <span className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20 text-[10px] sm:text-[11px] font-black uppercase tracking-widest backdrop-blur-md animate-pulse">
+               COMING SOON
+            </span>
+          </div>
+
+          <div className="text-center mb-10 relative z-10">
+            <h1 className="text-3xl font-black mb-2 tracking-tight">{t("nav_login")}</h1>
+            <p className="text-neutral-500 dark:text-neutral-400 font-medium">{t("nav_login_unsupported")}</p>
           </div>
           
           <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
@@ -65,8 +78,8 @@ export default function LoginPage() {
               <button className="text-xs font-bold text-neutral-400 dark:text-neutral-500 hover:text-sky-blue transition-colors">비밀번호를 잊으셨나요?</button>
             </div>
             
-            <ShimmerButton className="w-full py-4 rounded-2xl font-black text-lg shadow-sky-blue/20 shadow-xl">
-              로그인하기
+            <ShimmerButton className="w-full py-4 rounded-2xl font-black text-lg shadow-sky-blue/20 shadow-xl opacity-50 cursor-not-allowed">
+              {t("nav_login")} (준비 중)
             </ShimmerButton>
           </form>
           
