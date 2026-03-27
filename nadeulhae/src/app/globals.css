@@ -52,6 +52,8 @@
   --muted-foreground: #a3a3a3;
   --interactive: #f5f5f5;
   --interactive-border: #e5e5e5;
+  --beam-from: #87CEEB;
+  --beam-to: #F5F5DC;
 }
 
 .dark {
@@ -63,6 +65,8 @@
   --muted-foreground: #737373;
   --interactive: rgba(255, 255, 255, 0.05);
   --interactive-border: rgba(255, 255, 255, 0.1);
+  --beam-from: #87CEEB;
+  --beam-to: #ffffff;
   color-scheme: dark;
 }
 

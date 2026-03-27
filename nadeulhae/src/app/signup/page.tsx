@@ -32,8 +32,8 @@ export default function SignupPage() {
           로그인으로 돌아가기
         </Link>
         
-        <div className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-2xl border border-sky-blue/20 dark:border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl shadow-sky-blue/5 relative overflow-hidden group">
-          <BorderBeam size={200} duration={12} delay={9} colorFrom="#87CEEB" colorTo="#F5F5DC" />
+        <div className="bg-[var(--card)] backdrop-blur-2xl border border-[var(--card-border)] p-8 sm:p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+          <BorderBeam size={200} duration={12} delay={9} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
           
           <div className="absolute top-4 right-4 z-20">
             <span className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20 text-[10px] sm:text-[11px] font-black uppercase tracking-widest backdrop-blur-md animate-pulse">
@@ -54,7 +54,7 @@ export default function SignupPage() {
                 <input 
                   type="text" 
                   placeholder="홍길동"
-                  className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-sky-blue/50 transition-all font-medium"
+                  className="w-full bg-[var(--interactive)] border border-[var(--interactive-border)] rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-sky-blue/50 transition-all font-medium"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
@@ -68,7 +68,7 @@ export default function SignupPage() {
                 <input 
                   type="email" 
                   placeholder="name@example.com"
-                  className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-sky-blue/50 transition-all font-medium"
+                  className="w-full bg-[var(--interactive)] border border-[var(--interactive-border)] rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-sky-blue/50 transition-all font-medium"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -82,7 +82,7 @@ export default function SignupPage() {
                 <input 
                   type="password" 
                   placeholder="최소 8자 이상"
-                  className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-sky-blue/50 transition-all font-medium"
+                  className="w-full bg-[var(--interactive)] border border-[var(--interactive-border)] rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-sky-blue/50 transition-all font-medium"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />

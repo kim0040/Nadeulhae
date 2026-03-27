@@ -25,12 +25,13 @@ import { Marquee } from "@/components/magicui/marquee"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/context/LanguageContext"
+import { MagicCard } from "@/components/magicui/magic-card"
 
 const features = [
   {
     nameKey: "about_feature_1_name",
     descKey: "about_feature_1_desc",
-    className: "col-span-3 lg:col-span-2",
+    className: "md:col-span-2",
     icon: CloudSunIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-sky-blue/10 to-transparent" />,
     pending: false,
@@ -38,7 +39,7 @@ const features = [
   {
     nameKey: "about_feature_2_name",
     descKey: "about_feature_2_desc",
-    className: "col-span-3 lg:col-span-1",
+    className: "md:col-span-1",
     icon: SparklesIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-purple-100/10 to-transparent" />,
     pending: true,
@@ -46,7 +47,7 @@ const features = [
   {
     nameKey: "about_feature_3_name",
     descKey: "about_feature_3_desc",
-    className: "col-span-3 lg:col-span-1",
+    className: "md:col-span-1",
     icon: MapIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-teal-100/10 to-transparent" />,
     pending: true,
@@ -54,7 +55,7 @@ const features = [
   {
     nameKey: "about_feature_4_name",
     descKey: "about_feature_4_desc",
-    className: "col-span-3 lg:col-span-2",
+    className: "md:col-span-2",
     icon: CpuIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-orange-100/10 to-transparent" />,
     pending: true,
@@ -126,7 +127,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <BentoGrid className="grid-cols-3 gap-8">
+        <BentoGrid className="md:grid-cols-3 gap-4 sm:gap-8">
           {features.map((feature, i) => (
             <div key={i} className="relative group">
               <BentoCard 
@@ -155,7 +156,7 @@ export default function AboutPage() {
       </section>
 
       {/* Environmental Metric Guide */}
-      <section id="guide" className="container mx-auto py-32 px-4 bg-white/50 dark:bg-neutral-900/20 backdrop-blur-xl border-t border-sky-blue/10 dark:border-white/5 pb-64">
+      <section id="guide" className="container mx-auto py-32 px-4 bg-[var(--interactive)] backdrop-blur-xl border-t border-[var(--card-border)] pb-32">
         <div className="max-w-4xl mx-auto text-center mb-20">
           <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">{t("guide_title")}</h2>
           <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium leading-relaxed">
@@ -163,7 +164,7 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
           {[
             { tag: "guide_temp", icon: Thermometer },
             { tag: "guide_humi", icon: Droplets },
@@ -176,19 +177,19 @@ export default function AboutPage() {
             { tag: "guide_khai", icon: ShieldCheck },
             { tag: "guide_rn1", icon: CloudRain },
           ].map((item, i) => (
-            <div key={i} className="p-10 rounded-[2.5rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-white/5 shadow-xl hover:shadow-2xl transition-all group">
-              <div className="flex items-center gap-5 mb-8">
-                <div className="p-4 rounded-2xl bg-sky-blue/10 text-sky-blue group-hover:bg-sky-blue group-hover:text-white transition-all shadow-lg shadow-sky-blue/5">
-                  <item.icon size={28} />
+            <MagicCard key={i} className="p-6 sm:p-10 rounded-[2.5rem] bg-[var(--card)] border border-[var(--card-border)] shadow-xl hover:shadow-2xl transition-all group">
+              <div className="flex items-center gap-4 sm:gap-5 mb-6 sm:mb-8">
+                <div className="p-3 sm:p-4 rounded-2xl bg-sky-blue/10 text-sky-blue group-hover:bg-sky-blue group-hover:text-white transition-all shadow-lg shadow-sky-blue/5">
+                  <item.icon size={24} className="sm:size-7" />
                 </div>
-                <h3 className="text-2xl font-black text-foreground">
+                <h3 className="text-xl sm:text-2xl font-black text-foreground">
                   {t(`${item.tag}_t`)}
                 </h3>
               </div>
-              <p className="text-neutral-500 dark:text-neutral-400 text-base leading-relaxed font-medium">
+              <p className="text-neutral-500 dark:text-neutral-400 text-sm sm:text-base leading-relaxed font-medium">
                 {t(`${item.tag}_d`)}
               </p>
-            </div>
+            </MagicCard>
           ))}
         </div>
       </section>
@@ -206,28 +207,28 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12 max-w-6xl mx-auto">
           {contributors.map((person, i) => (
-            <div key={i} className="flex flex-col items-center group transition-all p-12 rounded-[4rem] bg-white/70 dark:bg-neutral-900/70 border border-neutral-100 dark:border-white/5 hover:border-sky-blue/30 hover:shadow-2xl backdrop-blur-md">
-              <div className="size-36 rounded-[3rem] bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-sky-blue mb-10 border-2 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/10 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)]">
-                <person.icon size={56} strokeWidth={1.2} />
+            <MagicCard key={i} className="flex flex-col items-center group transition-all p-8 sm:p-12 rounded-[3rem] sm:rounded-[4rem] bg-[var(--card)] border border-[var(--card-border)] hover:border-sky-blue/30 hover:shadow-2xl backdrop-blur-md">
+              <div className="size-28 sm:size-36 rounded-[2.5rem] sm:rounded-[3rem] bg-[var(--interactive)] flex items-center justify-center text-sky-blue mb-8 sm:mb-10 border-2 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/10 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)]">
+                <person.icon size={48} className="sm:size-14" strokeWidth={1.2} />
               </div>
-              <h3 className="font-black text-3xl text-foreground group-hover:text-sky-blue transition-colors">
+              <h3 className="font-black text-2xl sm:text-3xl text-foreground group-hover:text-sky-blue transition-colors">
                 {t(person.nameKey)}
               </h3>
-              <div className="flex flex-col items-center gap-2 mt-4">
-                <span className="text-xs text-sky-blue font-bold tracking-wider">
+              <div className="flex flex-col items-center gap-1.5 mt-4">
+                <span className="text-[10px] sm:text-xs text-sky-blue font-bold tracking-wider">
                   {t("con_university")}
                 </span>
-                <span className="text-[11px] text-neutral-400 dark:text-neutral-500 font-medium">
+                <span className="text-[10px] sm:text-[11px] text-neutral-400 dark:text-neutral-500 font-medium">
                   {t("con_department")}
                 </span>
               </div>
-              <div className="w-12 h-1 bg-neutral-200 dark:bg-neutral-800 my-8 rounded-full group-hover:bg-sky-blue/30 transition-colors" />
-              <p className="text-center text-base text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-4">
+              <div className="w-10 h-1 bg-[var(--interactive)] my-6 sm:my-8 rounded-full group-hover:bg-sky-blue/30 transition-colors" />
+              <p className="text-center text-sm sm:text-base text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-2 sm:px-4">
                 {t(person.descKey)}
               </p>
-            </div>
+            </MagicCard>
           ))}
         </div>
       </section>

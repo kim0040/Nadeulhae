@@ -120,7 +120,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       initial={{ opacity: 0, scale: 0.98 }}
       whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true }}
-      className="w-full max-w-5xl mx-auto rounded-[3rem] bg-white/40 dark:bg-neutral-900/40 backdrop-blur-3xl border border-white/50 dark:border-white/10 shadow-2xl overflow-hidden"
+      className="w-full max-w-5xl mx-auto rounded-[3rem] bg-[var(--card)] backdrop-blur-3xl border border-[var(--card-border)] shadow-2xl overflow-hidden"
     >
       {/* Header with Title and Station info */}
       <div className="p-8 sm:p-12 pb-6">
@@ -138,7 +138,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="flex items-center gap-3">
              <div className="flex flex-col items-end">
                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest leading-none mb-1">{t("status_nearby_station")}</span>
-               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-blue/10 border border-sky-blue/20">
+               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--interactive)] border border-[var(--interactive-border)]">
                  <MapPinIcon size={12} className="text-sky-blue" />
                  <span className="text-xs font-black text-sky-blue">{metadata?.station || t("station_dukjin")}</span>
                </div>
@@ -168,7 +168,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
         </div>
 
         {/* 2. Technical Data Grid (Full Parameters) */}
-        <div className="relative p-8 rounded-[2.5rem] bg-neutral-900/[0.03] dark:bg-white/[0.03] border border-neutral-200/50 dark:border-white/5 overflow-hidden">
+        <div className="relative p-8 rounded-[2.5rem] bg-[var(--interactive)] border border-[var(--interactive-border)] overflow-hidden">
           <div className="flex items-center justify-between mb-8 relative z-10">
             <div className="flex items-center gap-2">
               <div className="size-2 rounded-full bg-sky-blue animate-pulse" />
@@ -181,7 +181,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
             {techData.map((item, i) => (
               <div key={i} className="flex flex-col items-start group">
                 <div className="flex items-center gap-2 text-neutral-400 dark:text-neutral-500 mb-2 group-hover:text-sky-blue transition-colors">
-                  <div className="p-1 rounded-md bg-neutral-100 dark:bg-neutral-800 transition-colors group-hover:bg-sky-blue/10">
+                  <div className="p-1 rounded-md bg-[var(--interactive)] border border-[var(--interactive-border)] transition-colors group-hover:bg-sky-blue/10">
                     {item.icon}
                   </div>
                   <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
@@ -201,7 +201,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       </div>
 
       {/* Footer with Sync Status */}
-      <div className="bg-sky-blue/[0.02] dark:bg-zinc-900/60 px-8 sm:px-12 py-6 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row justify-between items-center gap-6">
+      <div className="bg-[var(--interactive)] px-8 sm:px-12 py-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row justify-between items-center gap-6">
         <div className="flex flex-wrap items-center justify-center gap-6">
           <div className="flex items-center gap-3">
              <Clock size={14} className="text-sky-blue opacity-50" />

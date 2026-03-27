@@ -301,7 +301,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Statistics Page Extra
     cal_archive_title: "과거 나들이 아카이브",
     cal_archive_desc: "지난 3년간의 데이터를 바탕으로 전주의 나들이 트렌드를 확인하세요",
-    cal_insight_title: "💡 인사이트",
+    cal_insight_title: "인사이트",
     cal_insight_text: "전주는 전통적으로 5월 2~3주차 주말이 가장 쾌적한 피크닉 지수를 기록했습니다.",
     cal_origin_title: "데이터 출처",
     cal_origin_desc: "위 데이터는 최근 3년간의 공공 기상 데이터와 자체 대기질 관측 결과를 결합한 나들해 나들이 수치입니다.",
@@ -591,7 +591,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Statistics Page Extra
     cal_archive_title: "Picnic Data Archive",
     cal_archive_desc: "Check Jeonju's picnic trends based on data from the past few years.",
-    cal_insight_title: "💡 Insight",
+    cal_insight_title: "Insight",
     cal_insight_text: "In Jeonju, the 2nd and 3rd weekends of May have traditionally recorded the most pleasant picnic index.",
     cal_origin_title: "Data Origin",
     cal_origin_desc: "This data is a combined metric from public weather data and local air quality observations over the last 3 years.",

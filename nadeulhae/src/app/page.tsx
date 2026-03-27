@@ -154,42 +154,45 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="grid grid-cols-5 sm:flex gap-1 sm:gap-12 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 text-foreground overflow-x-auto sm:overflow-visible no-scrollbar pb-4 sm:pb-0 w-full justify-center px-1 sm:px-4">
-             <div className="flex flex-col items-center">
+          <div className="grid grid-cols-6 sm:flex sm:flex-wrap items-center gap-y-10 sm:gap-12 mt-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 text-foreground w-full max-w-4xl justify-center px-4">
+             {/* Row 1: 3 Items */}
+             <div className="flex flex-col items-center col-span-2 transition-transform hover:scale-105 duration-300">
                <ThermometerIcon className="text-orange-400 mb-2 size-6 sm:size-8" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_temp")}</span>
                <span className="font-black text-xl sm:text-3xl">{weatherData.details.temp ?? "--"}°C</span>
              </div>
-             <div className="flex flex-col items-center">
+             <div className="flex flex-col items-center col-span-2 transition-transform hover:scale-105 duration-300">
                <DropletsIcon className="text-blue-400 mb-2 size-6 sm:size-8" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_humidity")}</span>
                <span className="font-black text-xl sm:text-3xl">{weatherData.details.humidity ?? "--"}%</span>
              </div>
-             <div className="flex flex-col items-center">
+             <div className="flex flex-col items-center col-span-2 transition-transform hover:scale-105 duration-300">
                <WindIcon className="text-teal-400 mb-2 size-6 sm:size-8" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_wind")}</span>
                <span className="font-black text-xl sm:text-3xl">{weatherData.details.wind ?? "--"}m/s</span>
              </div>
-             <div className="flex flex-col items-center">
+
+             {/* Row 2: 2 Items */}
+             <div className="flex flex-col items-center col-span-3 transition-transform hover:scale-105 duration-300">
                <CloudIcon className="text-neutral-400 mb-2 size-6" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_dust")}</span>
                <div className="flex flex-col items-center">
                  <span className="font-black text-xl sm:text-2xl whitespace-nowrap">{weatherData.details.dust}</span>
-                 <div className="flex gap-1.5 mt-2">
+                 <div className="flex gap-2 mt-3">
                    {weatherData.details.dust_domestic && (
                      <>
-                       <span className="px-2 py-0.5 rounded-md bg-sky-blue/10 text-sky-blue text-[10px] font-black border border-sky-blue/20">
+                       <div className="px-3 py-1 rounded-full bg-sky-blue/10 text-sky-blue text-[10px] font-black border border-sky-blue/20 backdrop-blur-md shadow-sm">
                          {t("label_domestic")}: {t(weatherData.details.dust_domestic)}
-                       </span>
-                       <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-500 text-[10px] font-black border border-purple-500/20">
+                       </div>
+                       <div className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-500 text-[10px] font-black border border-purple-500/20 backdrop-blur-md shadow-sm">
                          {t("label_who")}: {t(weatherData.details.dust_who)}
-                       </span>
+                       </div>
                      </>
                    )}
                  </div>
                </div>
              </div>
-             <div className="flex flex-col items-center">
+             <div className="flex flex-col items-center col-span-3 transition-transform hover:scale-105 duration-300">
                <SunIcon className="text-yellow-400 mb-2 size-6" />
                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black">{t("hero_uv")}</span>
                <span className="font-black text-xl sm:text-3xl">{t(weatherData.details.uv || "uv_mod")}</span>
@@ -251,7 +254,7 @@ export default function Home() {
         </p>
         
         <div className="w-full max-w-xl p-10 sm:12 rounded-[3.5rem] bg-[var(--card)] backdrop-blur-xl shadow-[0_30px_100px_rgba(135,206,235,0.15)] dark:shadow-[0_30px_100px_rgba(0,0,0,0.5)] border border-[var(--card-border)] relative overflow-hidden group transition-all hover:scale-[1.01]">
-          <BorderBeam size={400} duration={12} delay={5} colorFrom="#87CEEB" colorTo="#F5F5DC" />
+          <BorderBeam size={400} duration={12} delay={5} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
           
           <div className="space-y-10">
             <div className="flex flex-col gap-4">
@@ -319,7 +322,7 @@ export default function Home() {
                   key={i} 
                   className="relative w-full p-8 rounded-2xl bg-[var(--card)] backdrop-blur-xl border border-[var(--card-border)] shadow-xl flex flex-col gap-4 overflow-hidden transition-all hover:border-sky-blue/30"
                 >
-                  <BorderBeam size={250} duration={20} colorFrom={item.type === "야외" ? "#87CEEB" : "#F5F5DC"} />
+                  <BorderBeam size={250} duration={20} colorFrom={item.type === "야외" ? "var(--beam-from)" : "var(--beam-to)"} />
                   <div className="flex justify-between items-center text-foreground">
                     <span className="px-4 py-1.5 rounded-full bg-sky-blue/10 text-sky-blue text-xs font-black uppercase">
                       {item.time}

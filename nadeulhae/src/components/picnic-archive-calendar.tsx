@@ -62,7 +62,7 @@ export function PicnicArchiveCalendar() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-neutral-50/50 dark:bg-white/5 backdrop-blur-3xl rounded-[3.5rem] border border-neutral-200 dark:border-white/5 p-6 sm:p-12 overflow-hidden relative group">
+    <div className="w-full max-w-4xl mx-auto bg-[var(--card)] backdrop-blur-3xl rounded-[3.5rem] border border-[var(--card-border)] p-6 sm:p-12 overflow-hidden relative group">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between mb-16 gap-6 relative z-10">
         <div className="flex flex-col items-center sm:items-start text-center sm:text-left">

@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, Calendar as CalendarIcon, History, Zap, Sparkles } from "lucide-react"
+import { ArrowLeft, Calendar as CalendarIcon, History, Zap, Sparkles, Lightbulb } from "lucide-react"
 import { PicnicCalendar } from "@/components/picnic-calendar"
 import { PicnicArchiveCalendar } from "@/components/picnic-archive-calendar"
 import { useLanguage } from "@/context/LanguageContext"
 import { Particles } from "@/components/magicui/particles"
 import { useTheme } from "next-themes"
+import { MagicCard } from "@/components/magicui/magic-card"
 
 export default function CalendarPage() {
   const { t } = useLanguage()
@@ -59,13 +60,16 @@ export default function CalendarPage() {
               <PicnicCalendar />
             </div>
             <div className="lg:col-span-1 space-y-6">
-              <div className="p-8 rounded-[2.5rem] bg-sky-blue text-white shadow-2xl shadow-sky-blue/20">
-                <h3 className="font-black text-xl mb-4">{t("cal_insight_title")}</h3>
+              <MagicCard className="p-8 rounded-[2.5rem] bg-sky-blue text-white shadow-2xl shadow-sky-blue/20 border-transparent" gradientColor="rgba(255,255,255,0.2)">
+                <div className="flex items-center gap-3 mb-4">
+                  <Lightbulb size={24} className="text-white" />
+                  <h3 className="font-black text-xl">{t("cal_insight_title")}</h3>
+                </div>
                 <p className="text-white/90 font-bold leading-relaxed">
                   {t("cal_insight_text")}
                 </p>
-              </div>
-              <div className="p-8 rounded-[2.5rem] bg-[var(--card)] border border-[var(--card-border)]">
+              </MagicCard>
+              <MagicCard className="p-8 rounded-[2.5rem] bg-[var(--card)] border border-[var(--card-border)]">
                 <div className="flex items-start gap-4 mb-4">
                   <Sparkles className="text-sky-blue shrink-0" size={24} />
                   <h3 className="font-black text-lg text-foreground">{t("cal_realtime_status")}</h3>
@@ -73,7 +77,7 @@ export default function CalendarPage() {
                 <p className="text-neutral-500 dark:text-neutral-400 text-xs font-medium leading-relaxed">
                   {t("cal_realtime_note")}
                 </p>
-              </div>
+              </MagicCard>
             </div>
           </div>
         </div>
@@ -81,7 +85,7 @@ export default function CalendarPage() {
         {/* 아카이브 섹션 */}
         <div className="pt-24 border-t border-sky-blue/10">
           <div className="flex items-center gap-4 mb-8">
-            <div className="p-3 rounded-2xl bg-neutral-200/50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700">
+            <div className="p-3 rounded-2xl bg-[var(--interactive)] border border-[var(--interactive-border)]">
               <History size={24} className="text-neutral-600 dark:text-neutral-400" />
             </div>
             <div>

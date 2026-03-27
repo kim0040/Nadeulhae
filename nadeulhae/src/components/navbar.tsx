@@ -53,7 +53,7 @@ export function Navbar() {
     )}>
       {/* Logo on the far left */}
       <Link href="/" className="pointer-events-auto flex items-center gap-2 group shrink-0">
-        <div className="size-8 sm:size-11 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-sky-blue/20 dark:border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center p-1.5 sm:p-2 shadow-xl shadow-sky-blue/5 group-hover:scale-105 transition-transform">
+        <div className="size-8 sm:size-11 bg-[var(--card)] backdrop-blur-xl border border-[var(--card-border)] rounded-xl sm:rounded-2xl flex items-center justify-center p-1.5 sm:p-2 shadow-xl group-hover:scale-105 transition-transform">
           <Image src="/logo.png" alt="Nadeulhae Logo" width={36} height={36} className="w-full h-full object-contain" />
         </div>
         <span className={cn(
