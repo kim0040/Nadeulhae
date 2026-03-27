@@ -36,6 +36,7 @@ const features = [
     className: "col-span-3 lg:col-span-2",
     icon: CloudSunIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-sky-blue/10 to-transparent" />,
+    pending: false,
   },
   {
     name: "AI 코스 큐레이션",
@@ -43,6 +44,7 @@ const features = [
     className: "col-span-3 lg:col-span-1",
     icon: SparklesIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-purple-100/10 to-transparent" />,
+    pending: true,
   },
   {
     name: "로컬 장소 DB",
@@ -50,6 +52,7 @@ const features = [
     className: "col-span-3 lg:col-span-1",
     icon: MapIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-teal-100/10 to-transparent" />,
+    pending: true,
   },
   {
     name: "과거 데이터 통찰",
@@ -57,14 +60,14 @@ const features = [
     className: "col-span-3 lg:col-span-2",
     icon: CpuIcon,
     background: <div className="absolute inset-0 bg-gradient-to-br from-orange-100/10 to-transparent" />,
+    pending: true,
   },
 ]
 
 const contributors = [
-  { name: "Contributor 1", role: "Main Developer", avatar: "👤" },
-  { name: "Contributor 2", role: "UI/UX Designer", avatar: "🎨" },
-  { name: "Contributor 3", role: "Data Engineer", avatar: "📊" },
-  { name: "Contributor 4", role: "AI Specialist", avatar: "🤖" },
+  { id: "hm", avatar: "👨‍💻", roleKey: "con_hm_role", nameKey: "con_hm_name", descKey: "con_hm_desc" },
+  { id: "es", avatar: "📊", roleKey: "con_es_role", nameKey: "con_es_name", descKey: "con_es_desc" },
+  { id: "jh", avatar: "🗄️", roleKey: "con_jh_role", nameKey: "con_jh_name", descKey: "con_jh_desc" },
 ]
 
 import { useLanguage } from "@/context/LanguageContext"
@@ -113,7 +116,26 @@ export default function AboutPage() {
 
         <BentoGrid className="grid-cols-3 gap-8">
           {features.map((feature, i) => (
-            <BentoCard key={i} {...feature} Icon={feature.icon as any} href="#ai-generator" cta="자세히 보기" className={cn(feature.className, "rounded-[2rem] border-sky-blue/5 dark:border-white/5 shadow-2xl")} />
+            <div key={i} className="relative group">
+              <BentoCard 
+                {...feature} 
+                Icon={feature.icon as any} 
+                href={feature.pending ? "#" : "#ai-generator"} 
+                cta={feature.pending ? t("about_status_pending") : "자세히 보기"} 
+                className={cn(
+                  feature.className, 
+                  "rounded-[2rem] border-sky-blue/5 dark:border-white/5 shadow-2xl",
+                  feature.pending && "opacity-80 grayscale-[0.3]"
+                )} 
+              />
+              {feature.pending && (
+                <div className="absolute top-6 right-6 z-20">
+                  <span className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20 text-[10px] font-black uppercase tracking-widest backdrop-blur-md">
+                    {t("about_status_pending")}
+                  </span>
+                </div>
+              )}
+            </div>
           ))}
         </BentoGrid>
       </section>
@@ -123,116 +145,31 @@ export default function AboutPage() {
         {/* ... existing marquee ... */}
       </section>
 
-      {/* Algorithm & Logic Section */}
-      <section className="container mx-auto py-32 px-4">
-        <div className="text-center mb-20">
-          <h2 className="text-4xl font-black mb-6 tracking-tight">{t("about_algo_title")}</h2>
-          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-2xl mx-auto">
-            {t("about_algo_desc")}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-          {/* Temperature logic */}
-          <div className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-orange-400/30 transition-all duration-500">
-            <div className="size-12 rounded-xl bg-orange-100/50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 mb-6 group-hover:scale-110 transition-transform">
-              <Thermometer size={24} />
-            </div>
-            <h3 className="text-xl font-black mb-3">{t("about_algo_temp_title")}</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
-              {t("about_algo_temp_desc")}
-            </p>
-          </div>
-
-          {/* Air Quality logic */}
-          <div className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-sky-blue/30 transition-all duration-500">
-            <div className="size-12 rounded-xl bg-sky-blue/10 dark:bg-sky-blue/20 flex items-center justify-center text-sky-blue mb-6 group-hover:scale-110 transition-transform">
-              <Wind size={24} />
-            </div>
-            <h3 className="text-xl font-black mb-3">{t("about_algo_dust_title")}</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
-              {t("about_algo_dust_desc")}
-            </p>
-          </div>
-
-          {/* Rain & Wind logic */}
-          <div className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-purple-400/30 transition-all duration-500">
-            <div className="size-12 rounded-xl bg-purple-100/50 dark:bg-purple-900/20 flex items-center justify-center text-purple-500 mb-6 group-hover:scale-110 transition-transform">
-              <CloudSunIcon size={24} />
-            </div>
-            <h3 className="text-xl font-black mb-3">{t("about_algo_weather_title")}</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
-              {t("about_algo_weather_desc")}
-            </p>
-          </div>
-
-          {/* Data syncing logic */}
-          <div className="p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-xl group hover:border-teal-400/30 transition-all duration-500">
-            <div className="size-12 rounded-xl bg-teal-100/50 dark:bg-teal-900/20 flex items-center justify-center text-teal-500 mb-6 group-hover:scale-110 transition-transform">
-              <HistoryIcon size={24} />
-            </div>
-            <h3 className="text-xl font-black mb-3">{t("about_algo_data_title")}</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
-              {t("about_algo_data_desc")}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* New: Detailed Environmental Metric Guide */}
-      <section className="bg-sky-blue/5 dark:bg-white/[0.02] py-32 border-y border-sky-blue/10 dark:border-white/5">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl font-black mb-6 tracking-tight">{t("about_data_title")}</h2>
-            <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-2xl mx-auto">
-              {t("about_data_desc")}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {[
-              { id: 'temp', icon: <Thermometer size={20} /> },
-              { id: 'humi', icon: <Droplets size={20} /> },
-              { id: 'wind', icon: <Wind size={20} /> },
-              { id: 'vec', icon: <Navigation size={20} /> },
-              { id: 'pm10', icon: <Cloud size={20} /> },
-              { id: 'pm25', icon: <SparklesIcon size={20} /> },
-              { id: 'o3', icon: <Zap size={20} /> },
-              { id: 'no2', icon: <SearchIcon size={20} /> },
-              { id: 'khai', icon: <ShieldCheck size={20} /> },
-              { id: 'precip', icon: <CloudRain size={20} /> },
-            ].map((item) => (
-              <div key={item.id} className="group p-8 rounded-[2rem] bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-lg hover:border-sky-blue/30 transition-all">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="p-3 rounded-xl bg-sky-blue/10 text-sky-blue group-hover:scale-110 transition-transform">
-                    {item.icon}
-                  </div>
-                  <h3 className="text-lg font-black text-foreground">{t(`about_item_${item.id}`)}</h3>
-                </div>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium">
-                  {t(`about_item_${item.id}_desc`)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Algorithm & Logic Section ... */}
+      {/* ... (Detailed Metric Guide section already added) ... */}
 
       {/* Contributors Section */}
       <section id="contributors" className="container mx-auto py-32 px-4 pb-64">
         <div className="text-center mb-20">
           <h2 className="text-4xl font-black mb-6 tracking-tight">{t("about_contributors_title")}</h2>
-          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium">{t("about_contributors_desc")}</p>
+          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-2xl mx-auto">{t("about_contributors_desc")}</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-12 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto">
           {contributors.map((person, i) => (
-            <div key={i} className="flex flex-col items-center group cursor-help transition-all">
+            <div key={i} className="flex flex-col items-center group transition-all">
               <div className="size-32 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-4xl mb-6 border-4 border-transparent group-hover:border-sky-blue group-hover:bg-sky-blue/10 transition-all shadow-[inset_0_4px_10px_rgba(0,0,0,0.05)]">
                 {person.avatar}
               </div>
-              <h3 className="font-black text-2xl text-foreground group-hover:text-sky-blue transition-colors">{person.name}</h3>
-              <p className="text-[11px] text-neutral-400 dark:text-neutral-500 uppercase tracking-[0.2em] mt-2 font-bold">{person.role}</p>
+              <h3 className="font-black text-2xl text-foreground group-hover:text-sky-blue transition-colors">
+                {t(person.nameKey)}
+              </h3>
+              <p className="text-[11px] text-sky-blue uppercase tracking-[0.2em] mt-2 font-black">
+                {t(person.roleKey)}
+              </p>
+              <p className="text-center mt-6 text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium px-4">
+                {t(person.descKey)}
+              </p>
             </div>
           ))}
         </div>

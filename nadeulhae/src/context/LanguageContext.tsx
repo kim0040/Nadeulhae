@@ -75,7 +75,6 @@ const translations: Record<Language, Record<string, string>> = {
     about_features_desc: "데이터와 인공지능이 만나 전주에서의 완벽한 반나절을 제안합니다.",
     about_built_with: "Built with Modern Stack",
     about_contributors_title: "만든 사람들",
-    about_contributors_desc: "전주 나들해를 함께 만들어가는 기여자들입니다.",
     
     // Algorithm Section
     about_algo_title: "나들이 지수 알고리즘",
@@ -182,6 +181,22 @@ const translations: Record<Language, Record<string, string>> = {
     about_item_precip: "강수량 (Precipitation)",
     about_item_precip_desc: "비나 눈의 양입니다. 나들이에는 0mm가 가장 완벽하며, 소량이라도 강수가 있으면 지수가 급격히 하락합니다.",
 
+    // Contributors & Status
+    about_status_pending: "백엔드 연결 준비 중",
+    about_contributors_desc: "전북대학교 소프트웨어공학과 3학년(24학번) 동기 3명이 함께 만든 데이터베이스 팀 프로젝트입니다. 모든 팀원이 데이터베이스 설계 및 구축에 핵심적으로 참여했습니다.",
+    
+    con_hm_name: "김현민",
+    con_hm_role: "Project Lead",
+    con_hm_desc: "아이디어 제안 및 프로젝트 총괄. 전체적인 아키텍처 설계와 프론트엔드/서버 개발을 주도하였습니다.",
+    
+    con_es_name: "김은수",
+    con_es_role: "Data Engineer",
+    con_es_desc: "플랫폼의 가치를 높이는 유용한 장소 정보 크롤링 및 데이터 전처리 작업을 담당하였습니다.",
+    
+    con_jh_name: "이재혁",
+    con_jh_role: "Database Engineer",
+    con_jh_desc: "기상청/에어코리아 오픈 API 연동 및 실시간 데이터베이스 적재 로직을 구현하였습니다.",
+
     // Statistics Page Extra
     cal_archive_title: "과거 나들이 아카이브",
     cal_archive_desc: "지난 몇 년간의 데이터를 바탕으로 전주의 나들이 트렌드를 확인하세요.",
@@ -249,7 +264,6 @@ const translations: Record<Language, Record<string, string>> = {
     about_features_desc: "From real-time weather grids to AI-powered trip plans, we bring data to life.",
     about_built_with: "Built with Modern Stack",
     about_contributors_title: "Team Nadeulhae",
-    about_contributors_desc: "The people who brought Jeonju's weather to life.",
     
     // Algorithm Section
     about_algo_title: "The Picnic Index Algorithm",
@@ -355,6 +369,22 @@ const translations: Record<Language, Record<string, string>> = {
     
     about_item_precip: "Precipitation",
     about_item_precip_desc: "Amount of rain or snow. 0mm is perfect; any amount significantly lowers the picnic score.",
+
+    // Contributors & Status
+    about_status_pending: "Backend Sync Pending",
+    about_contributors_desc: "A database team project created by three juniors (Class of '24) from Jeonbuk National University, Software Engineering. All members actively participated in core DB design and construction.",
+    
+    con_hm_name: "Hyeonmin Kim",
+    con_hm_role: "Project Lead",
+    con_hm_desc: "Ideation and overall management. Led the architecture design, frontend, and server logic development.",
+    
+    con_es_name: "Eunsu Kim",
+    con_es_role: "Data Engineer",
+    con_es_desc: "Responsible for crawling and preprocessing useful place data to enhance the platform's value.",
+    
+    con_jh_name: "Jaehyeok Lee",
+    con_jh_role: "Database Engineer",
+    con_jh_desc: "Implemented real-time data storage logic and integrated weather/air quality Open APIs.",
 
     // Statistics Page Extra
     cal_archive_title: "Picnic Data Archive",
