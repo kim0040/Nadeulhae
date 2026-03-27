@@ -47,7 +47,7 @@ export const dataService = {
         return mockWeatherData;
       }
       
-      const response = await fetch(`/api/weather/current`, { next: { revalidate: 60 } });
+      const response = await fetch(`${API_BASE}/current`, { next: { revalidate: 60 } });
       if (!response.ok) throw new Error("Weather API error");
       return await response.json();
     } catch (error) {
