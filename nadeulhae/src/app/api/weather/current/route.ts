@@ -149,7 +149,7 @@ export async function GET() {
     messageKey = "msg_poor";
   }
 
-  const variations = ["", "_1", "_2"];
+  const variations = ["", "_1", "_2", "_3", "_4"];
   const randIdx = Math.floor(Math.random() * variations.length);
   messageKey = messageKey + variations[randIdx];
 
