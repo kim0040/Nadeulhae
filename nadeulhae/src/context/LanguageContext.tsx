@@ -133,9 +133,19 @@ const translations: Record<Language, Record<string, string>> = {
     hero_humidity: "Humidity",
     hero_wind: "Wind",
     hero_dust: "Dust",
+    hero_pm10: "PM10",
     hero_pm25: "PM2.5",
+    hero_o3: "O3",
+    hero_no2: "NO2",
+    hero_co: "CO",
+    hero_so2: "SO2",
+    hero_khai: "CAI",
+    hero_vec: "Wind Dir",
     hero_precip: "Precip",
     hero_uv: "UV",
+    
+    status_coming_soon: "Coming Soon",
+    status_nearby_station: "Nearby Station",
     
     // Statistics
     stats_title: "Jeonju through Data",

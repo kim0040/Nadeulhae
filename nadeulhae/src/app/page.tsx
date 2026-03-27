@@ -198,7 +198,10 @@ export default function Home() {
       {/* Statistics Section */}
       <section id="statistics" className="container mx-auto py-24 sm:py-32 px-4 bg-sky-blue/5 dark:bg-white/5 border border-sky-blue/10 dark:border-white/5 rounded-[2.5rem] mt-8 transition-colors">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-5xl font-black text-foreground tracking-tight">{t("stats_title")}</h2>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <h2 className="text-3xl sm:text-5xl font-black text-foreground tracking-tight">{t("stats_title")}</h2>
+            <span className="px-2 py-0.5 rounded-md bg-orange-400/10 text-orange-500 text-[10px] font-black border border-orange-400/20">{t("status_coming_soon")}</span>
+          </div>
           <p className="text-neutral-500 dark:text-neutral-400 mt-4 text-lg">{t("stats_desc")}</p>
         </div>
         <BentoGrid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-rows-auto lg:auto-rows-[18rem] gap-6">
@@ -225,10 +228,12 @@ export default function Home() {
         </Marquee>
       </section>
 
-
       {/* AI Action Section */}
       <section id="ai-generator" className="container mx-auto py-24 sm:py-32 px-4 flex flex-col items-center max-w-5xl">
-        <h2 className="text-4xl sm:text-6xl font-black mb-8 text-center text-foreground tracking-tight">{t("ai_title")}</h2>
+        <div className="flex items-center gap-3 mb-6">
+          <h2 className="text-4xl sm:text-6xl font-black text-foreground tracking-tight">{t("ai_title")}</h2>
+          <span className="px-3 py-1 rounded-full bg-orange-400/10 text-orange-500 text-xs font-black border border-orange-400/20">{t("status_coming_soon")}</span>
+        </div>
         <p className="text-neutral-500 dark:text-neutral-400 mb-12 text-center max-w-2xl px-2 leading-relaxed text-xl font-medium">
           {t("ai_desc")}
         </p>
