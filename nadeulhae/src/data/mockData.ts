@@ -12,12 +12,23 @@ export const mockWeatherData = {
     humidity: 45,
     wind: 2.1,
     dust: "15µg/m³ (국내: 좋음 / WHO: 좋음)",
+    pm10: 15,
+    pm25: 8,
+    o3: 0.032,
+    no2: 0.012,
+    co: 0.4,
+    so2: 0.003,
+    khai: 45,
+    pty: 0,
+    rn1: 0,
+    vec: 280,
     uv: "보통",
   },
   metadata: {
     dataSource: "기상청, 한국환경공단",
-    lastUpdate: "13:10",
-    intervals: { kma: "1분", air: "10분" }
+    station: "덕진동",
+    lastUpdate: "14:10",
+    intervals: { kma: "매시 45분", air: "매시 정각" }
   }
 };
 

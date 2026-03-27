@@ -32,7 +32,19 @@ const translations: Record<Language, Record<string, string>> = {
     hero_humidity: "습도",
     hero_wind: "풍속",
     hero_dust: "미세먼지",
+    hero_pm10: "미세먼지(PM10)",
+    hero_pm25: "초미세먼지(PM2.5)",
+    hero_o3: "오존",
+    hero_no2: "이산화질소",
+    hero_co: "일산화탄소",
+    hero_so2: "아황산가스",
+    hero_khai: "통합대기지수",
+    hero_vec: "풍향",
+    hero_precip: "강수량",
     hero_uv: "자외선",
+    
+    status_coming_soon: "백엔드 연결 대기 중",
+    status_nearby_station: "인근 측정소",
     
     // Statistics
     stats_title: "과거 데이터로 보는 전주",
