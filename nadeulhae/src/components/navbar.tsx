@@ -1,0 +1,122 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import Image from "next/image"
+import { cn } from "@/lib/utils"
+import { InfoIcon, Calendar as CalendarIcon, Globe, Languages, Sun, Moon, Monitor, LogInIcon } from "lucide-react"
+import { useLanguage } from "@/context/LanguageContext"
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
+
+export function Navbar() {
+  const pathname = usePathname()
+  const { language, setLanguage, t } = useLanguage()
+  const { theme, setTheme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  const [isVisible, setIsVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
+
+  useEffect(() => {
+    setMounted(true)
+    
+    const controlNavbar = () => {
+      if (typeof window !== 'undefined') {
+        if (window.scrollY > lastScrollY && window.scrollY > 100) {
+          setIsVisible(false);
+        } else {
+          setIsVisible(true);
+        }
+        setLastScrollY(window.scrollY);
+      }
+    };
+
+    window.addEventListener('scroll', controlNavbar);
+    return () => {
+      window.removeEventListener('scroll', controlNavbar);
+    };
+  }, [lastScrollY])
+
+  const navItems = [
+    { name: t("nav_about"), href: "/about", icon: InfoIcon },
+    { name: t("nav_calendar"), href: "/statistics/calendar", icon: CalendarIcon },
+    { name: "로그인", href: "/login", icon: LogInIcon },
+  ]
+
+  return (
+    <header className={cn(
+      "fixed top-0 left-0 right-0 z-50 p-4 sm:px-8 flex items-center justify-between transition-all duration-500",
+      isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0",
+      "pointer-events-none"
+    )}>
+      {/* Logo on the far left */}
+      <Link href="/" className="pointer-events-auto flex items-center gap-2 group shrink-0">
+        <div className="size-8 sm:size-11 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-sky-blue/20 dark:border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center p-1.5 sm:p-2 shadow-xl shadow-sky-blue/5 group-hover:scale-105 transition-transform">
+          <Image src="/logo.png" alt="Nadeulhae Logo" width={36} height={36} className="w-full h-full object-contain" />
+        </div>
+        <span className={cn(
+          "text-sm sm:text-2xl font-black tracking-tighter text-foreground group-hover:text-sky-blue transition-colors",
+          language === "en" ? "hidden lg:block" : "hidden sm:block"
+        )}>나들해</span>
+      </Link>
+
+      {/* Navigation Pill (Centered on Large / Compact on Small) */}
+      <nav className="absolute left-1/2 -translate-x-1/2 pointer-events-auto z-50 transition-all">
+        <div className={cn(
+          "bg-[var(--card)] backdrop-blur-2xl border border-[var(--card-border)] rounded-full flex items-center shadow-xl shadow-sky-blue/10 max-w-[95vw] sm:max-w-none transition-all",
+          language === "en" ? "px-1.5 sm:px-6 py-1 sm:py-2.5 gap-0.5 sm:gap-6" : "px-2 sm:px-6 py-1.5 sm:py-2.5 gap-1 sm:gap-6"
+        )}>
+        <div className="flex items-center gap-3 sm:gap-6 overflow-x-auto no-scrollbar">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-1.5 text-xs sm:text-sm font-black transition-all hover:text-sky-blue whitespace-nowrap",
+                pathname === item.href ? "text-sky-blue scale-105" : "text-neutral-500 dark:text-neutral-400 hover:scale-105"
+              )}
+            >
+              <item.icon size={16} className="shrink-0" />
+              <span className={cn(item.name === "로그인" && "hidden sm:inline")}>{item.name}</span>
+            </Link>
+          ))}
+        </div>
+        
+        <div className="flex items-center gap-2 sm:gap-4 border-l border-neutral-200 dark:border-neutral-800 pl-3 sm:pl-4 ml-2 sm:ml-4">
+           {mounted && (
+             <button 
+               onClick={() => {
+                 const modes: ("light" | "dark" | "system")[] = ["light", "dark", "system"]
+                 const currentIndex = modes.indexOf(theme as any)
+                 const nextIndex = (currentIndex + 1) % modes.length
+                 setTheme(modes[nextIndex])
+               }}
+               className="text-neutral-500 hover:text-sky-blue transition-all p-1 sm:p-1.5 flex items-center gap-1"
+               title="Theme Toggle"
+             >
+               {theme === "light" && <Sun size={16} />}
+               {theme === "dark" && <Moon size={16} />}
+               {theme === "system" && <Monitor size={16} />}
+               <span className="text-[9px] font-black hidden sm:inline uppercase">{theme}</span>
+             </button>
+           )}
+           <button 
+             onClick={() => setLanguage(language === "ko" ? "en" : "ko")}
+             className="text-neutral-500 hover:text-sky-blue transition-all flex items-center gap-1 font-black text-[10px] sm:text-xs"
+           >
+             <Languages size={18} />
+             <span className="hidden sm:inline">{language.toUpperCase()}</span>
+           </button>
+</div>
+      </div>
+      </nav>
+
+      {/* Right side balance spacer */}
+      <div className="w-12 h-1 hidden sm:block" />
+    </header>
+
+  )
+}
+
+

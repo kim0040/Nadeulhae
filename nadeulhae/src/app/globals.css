@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-sky-blue: #87CEEB;
+  --color-wood-beige: #F5F5DC;
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(calc(-100% - var(--gap))); }
+  }
+  @keyframes marquee-vertical {
+    from { transform: translateY(0); }
+    to { transform: translateY(calc(-100% - var(--gap))); }
+  }
+  @keyframes meteor {
+    0% { transform: rotate(var(--angle)) translateX(0); opacity: 1; }
+    70% { opacity: 1; }
+    100% { transform: rotate(var(--angle)) translateX(-500px); opacity: 0; }
+  }
+  @keyframes shimmer-slide {
+    to { transform: translateX(100cqw); }
+  }
+  @keyframes spin-around {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(0, 0) rotate(360deg); }
+  }
+  @keyframes shine {
+    0% { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    100% { background-position: 0% 0%; }
+  }
+
+  --animate-marquee: marquee var(--duration) linear infinite;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  --animate-meteor: meteor 5s linear infinite;
+  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+  --animate-shine: shine var(--duration) infinite linear;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: rgba(255, 255, 255, 0.8);
+  --card-border: rgba(135, 206, 235, 0.2);
+  --muted: #737373;
+  --muted-foreground: #a3a3a3;
+  --interactive: #f5f5f5;
+  --interactive-border: #e5e5e5;
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #ededed;
+  --card: rgba(23, 23, 23, 0.9);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --muted: #a3a3a3;
+  --muted-foreground: #737373;
+  --interactive: rgba(255, 255, 255, 0.05);
+  --interactive-border: rgba(255, 255, 255, 0.1);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  .magicui-card {
+    @apply bg-white dark:bg-neutral-950;
+    @apply shadow-[0_0_0_1px_rgba(0,0,0,.03),0_2px_4px_rgba(0,0,0,.05),0_12px_24px_rgba(0,0,0,.05)];
+    @apply dark:shadow-[0_0_0_1px_rgba(255,255,255,.05),0_-20px_80px_-20px_rgba(255,255,255,.1)_inset];
+  }
+}
