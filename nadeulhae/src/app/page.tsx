@@ -156,37 +156,37 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:flex lg:flex-wrap items-center gap-y-12 gap-x-8 sm:gap-12 mt-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 text-foreground w-full max-w-5xl justify-center px-4">
-             {/* Main Metrics */}
-             <div className="flex flex-col items-center transition-transform hover:scale-105 duration-300">
+          <div className="flex flex-wrap items-start justify-center gap-y-12 sm:gap-10 mt-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 text-foreground w-full max-w-4xl mx-auto px-4">
+             {/* Row 1 for Mobile (3 items, 33% each) */}
+             <div className="flex flex-col items-center basis-1/3 xl:basis-auto transition-transform hover:scale-105 duration-300">
                <ThermometerIcon className="text-orange-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1">{t("hero_temp")}</span>
-               <span className="font-black text-xl sm:text-3xl leading-tight">{weatherData.details.temp ?? "--"}°C</span>
+               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_temp")}</span>
+               <span className="font-black text-xl sm:text-3xl leading-tight text-center">{weatherData.details.temp ?? "--"}°C</span>
              </div>
-             <div className="flex flex-col items-center transition-transform hover:scale-105 duration-300">
+             <div className="flex flex-col items-center basis-1/3 xl:basis-auto transition-transform hover:scale-105 duration-300">
                <DropletsIcon className="text-blue-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1">{t("hero_humidity")}</span>
-               <span className="font-black text-xl sm:text-3xl leading-tight">{weatherData.details.humidity ?? "--"}%</span>
+               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_humidity")}</span>
+               <span className="font-black text-xl sm:text-3xl leading-tight text-center">{weatherData.details.humidity ?? "--"}%</span>
              </div>
-             <div className="flex flex-col items-center transition-transform hover:scale-105 duration-300">
+             <div className="flex flex-col items-center basis-1/3 xl:basis-auto transition-transform hover:scale-105 duration-300">
                <WindIcon className="text-teal-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1">{t("hero_wind")}</span>
-               <span className="font-black text-xl sm:text-3xl leading-tight">{weatherData.details.wind ?? "--"}m/s</span>
+               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_wind")}</span>
+               <span className="font-black text-xl sm:text-3xl leading-tight text-center">{weatherData.details.wind ?? "--"}m/s</span>
              </div>
 
-             {/* Dust & Air Quality (Prioritized Placement) */}
-             <div className="flex flex-col items-center col-span-2 md:col-span-1 lg:col-span-auto transition-transform hover:scale-105 duration-300 order-first md:order-none w-full md:w-auto">
+             {/* Row 2 for Mobile (2 items, 50% each) */}
+             <div className="flex flex-col items-center basis-1/2 xl:basis-auto transition-transform hover:scale-105 duration-300">
                <CloudIcon className="text-neutral-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1">{t("hero_dust")}</span>
+               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_dust")}</span>
                <div className="flex flex-col items-center">
-                 <span className="font-black text-xl sm:text-3xl whitespace-nowrap leading-tight">{weatherData.details.dust}</span>
+                 <span className="font-black text-xl sm:text-3xl whitespace-nowrap leading-tight text-center">{weatherData.details.dust}</span>
                  <div className="flex gap-2 mt-3">
                    {weatherData.details.kr && (
                      <>
-                       <div className="px-3 py-1 rounded-full bg-sky-blue/10 text-sky-blue text-[10px] font-black border border-sky-blue/20 backdrop-blur-md shadow-sm">
+                       <div className="px-2 sm:px-3 py-1 rounded-full bg-sky-blue/10 text-sky-blue text-[9px] sm:text-[10px] font-black border border-sky-blue/20 backdrop-blur-md shadow-sm">
                          {t("label_domestic")}: {weatherData.details.kr}
                        </div>
-                       <div className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-500 text-[10px] font-black border border-purple-500/20 backdrop-blur-md shadow-sm">
+                       <div className="px-2 sm:px-3 py-1 rounded-full bg-purple-500/10 text-purple-500 text-[9px] sm:text-[10px] font-black border border-purple-500/20 backdrop-blur-md shadow-sm">
                          {t("label_who")}: {weatherData.details.who}
                        </div>
                      </>
@@ -195,11 +195,10 @@ export default function Home() {
                </div>
              </div>
 
-             {/* Additional Info */}
-             <div className="flex flex-col items-center transition-transform hover:scale-105 duration-300">
+             <div className="flex flex-col items-center basis-1/2 xl:basis-auto transition-transform hover:scale-105 duration-300">
                <SunIcon className="text-yellow-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1">{t("hero_uv")}</span>
-               <span className="font-black text-xl sm:text-3xl leading-tight">{weatherData.details.uv || t("status_normal")}</span>
+               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_uv")}</span>
+               <span className="font-black text-xl sm:text-3xl leading-tight text-center">{weatherData.details.uv || t("status_normal")}</span>
              </div>
           </div>
         </div>
