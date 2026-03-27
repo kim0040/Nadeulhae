@@ -29,6 +29,8 @@ export interface WeatherData {
     rn1?: number;
     vec?: number;
     uv: string;
+    kr?: string;
+    who?: string;
   };
   metadata?: {
     dataSource: string;

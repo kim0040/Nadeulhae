@@ -24,7 +24,9 @@ export const mockWeatherData = {
     pty: 0,
     rn1: 0,
     vec: 280,
-    uv: "uv_mod",
+    uv: "보통",
+    kr: "좋음",
+    who: "보통",
   },
   metadata: {
     dataSource: "data_source_combined",

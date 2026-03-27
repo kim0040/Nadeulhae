@@ -46,6 +46,11 @@ export async function GET() {
         const items = data.response.body.items.item;
         const map: Record<string, string> = {};
         items.forEach((item: any) => { map[item.category] = item.obsrValue; });
+        
+        // 포맷팅된 시간 생성 (202603272100 -> 2026.03.27 21:00)
+        const fDate = `${base_date.substring(0,4)}.${base_date.substring(4,6)}.${base_date.substring(6,8)}`;
+        const fTime = `${base_time.substring(0,2)}:${base_time.substring(2,4)}`;
+
         weatherData = {
           temp: parseFloat(map["T1H"]),
           humidity: parseFloat(map["REH"]),
@@ -53,7 +58,7 @@ export async function GET() {
           pty: parseInt(map["PTY"]),
           rn1: parseFloat(map["RN1"]) || 0,
           vec: parseInt(map["VEC"]),
-          lastUpdate: `${base_date}${base_time}`
+          lastUpdate: `${fDate} ${fTime}`
         };
         cachedKma = weatherData;
         lastKmaTime = now;
@@ -94,16 +99,19 @@ export async function GET() {
           else if (pm10 <= 150) krStatus = "나쁨";
           else krStatus = "매우나쁨";
 
-          // 국제 기준 (WHO)
+          // WHO 기준 (WHO)
           let whoStatus = "보통";
           if (pm10 <= 20) whoStatus = "좋음";
           else if (pm10 <= 50) whoStatus = "보통";
           else if (pm10 <= 100) whoStatus = "나쁨";
           else whoStatus = "매우나쁨";
 
+          // 시간 포맷팅 (2026-03-27 22:00 -> 2026.03.27 22:00)
+          const fUpdate = jeonju.dataTime ? jeonju.dataTime.replace(/-/g, '.') : "";
+
           airQuality = { 
-            dust: `${pm10}µg/m³ (국내: ${krStatus} / WHO: ${whoStatus})`, 
-            value: pm10,
+            dust: `${pm10}µg/m³`, 
+            pm10: pm10,
             pm25: pm25,
             o3: parseFloat(jeonju.o3Value),
             no2: parseFloat(jeonju.no2Value),
@@ -113,7 +121,7 @@ export async function GET() {
             kr: krStatus,
             who: whoStatus,
             station: jeonju.stationName,
-            lastUpdate: jeonju.dataTime
+            lastUpdate: fUpdate
           };
           cachedAir = airQuality;
           lastAirTime = now;
@@ -122,17 +130,39 @@ export async function GET() {
     } catch (e) { console.error("AirKorea Fetch Error:", e); }
   }
 
-  // 최종 점수 계산 및 멘트 로직 (중략)
+  // 3. 자외선 지수(UV) 데이터 추가 (KMA 생활기상지수)
+  let uvIndex = "보통";
+  try {
+    const today = new Date();
+    const dateStr = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+    const hourStr = String(today.getHours()).padStart(2, '0');
+    // 자외선 지수는 매일 아침/오후 특정 시간에 발표되므로 가장 최근 시간 활용
+    const uvUrl = `https://apis.data.go.kr/1360000/LivingWthrIdxServiceV4/getUVIdxV4?serviceKey=${airKey}&dataType=JSON&areaNo=4511000000&time=${dateStr}${hourStr}`;
+    const uvRes = await fetch(uvUrl);
+    if (uvRes.ok) {
+      const uvData = await uvRes.json();
+      const uvVal = parseInt(uvData.response?.body?.items?.item?.[0]?.h0);
+      if (!isNaN(uvVal)) {
+        if (uvVal <= 2) uvIndex = "낮음";
+        else if (uvVal <= 5) uvIndex = "보통";
+        else if (uvVal <= 7) uvIndex = "높음";
+        else if (uvVal <= 10) uvIndex = "매우높음";
+        else uvIndex = "위험";
+      }
+    }
+  } catch (e) { console.error("UV Fetch Error:", e); }
+
+  // 최종 결과 반환
   if (!weatherData || !airQuality) {
     return NextResponse.json({ error: "Failed to fetch data from sources" }, { status: 503 });
   }
 
-  // 점수 계산 로직 (유지)
+  // 점수 계산 및 멘트 선정 (생략 - 기존 로직 유지)
   let score = 100;
   if (weatherData.temp < 18) score -= (18 - weatherData.temp) * 3;
   else if (weatherData.temp > 24) score -= (weatherData.temp - 24) * 4;
-  if (airQuality.value > 30) score -= (airQuality.value - 30) * 0.6;
-  if (airQuality.value > 80) score -= 20;
+  if (airQuality.pm10 > 30) score -= (airQuality.pm10 - 30) * 0.6;
+  if (airQuality.pm10 > 80) score -= 20;
   if (weatherData.pty > 0) score = 35;
   if (weatherData.humidity > 65) score -= (weatherData.humidity - 65) * 0.3;
   if (weatherData.wind > 4) score -= (weatherData.wind - 4) * 5;
@@ -140,53 +170,27 @@ export async function GET() {
 
   let statusKey = "status_good";
   let messageKey = "msg_good";
-
-  if (score >= 86) {
-    statusKey = "status_excellent";
-    messageKey = "msg_excellent";
-  } else if (score >= 66) {
-    statusKey = "status_good";
-    messageKey = "msg_good";
-  } else if (score >= 36) {
-    statusKey = "status_fair";
-    messageKey = "msg_fair";
-  } else {
-    statusKey = "status_poor";
-    messageKey = "msg_poor";
-  }
+  if (score >= 86) { statusKey = "status_excellent"; messageKey = "msg_excellent"; }
+  else if (score >= 66) { statusKey = "status_good"; messageKey = "msg_good"; }
+  else if (score >= 36) { statusKey = "status_fair"; messageKey = "msg_fair"; }
+  else { statusKey = "status_poor"; messageKey = "msg_poor"; }
 
   const variations = ["", "_1", "_2", "_3", "_4"];
-  const randIdx = Math.floor(Math.random() * variations.length);
-  messageKey = messageKey + variations[randIdx];
+  messageKey = messageKey + variations[Math.floor(Math.random() * variations.length)];
 
   return NextResponse.json({
     score,
-    status: statusKey, // Frontend will translate this
-    message: messageKey, // Frontend will translate this
+    status: statusKey,
+    message: messageKey,
     details: {
-      temp: weatherData.temp,
-      humidity: weatherData.humidity,
-      wind: weatherData.wind,
-      dust: airQuality.dust,
-      pm10: airQuality.value,
-      pm25: airQuality.pm25,
-      o3: airQuality.o3,
-      no2: airQuality.no2,
-      co: airQuality.co,
-      so2: airQuality.so2,
-      khai: airQuality.khai,
-      pty: weatherData.pty,
-      rn1: weatherData.rn1,
-      vec: weatherData.vec,
-      uv: "보통",
+      ...weatherData,
+      ...airQuality,
+      uv: uvIndex,
     },
     metadata: {
       dataSource: "기상청, 한국환경공단",
       station: airQuality.station,
-      lastUpdate: {
-        kma: weatherData.lastUpdate,
-        air: airQuality.lastUpdate
-      },
+      lastUpdate: { kma: weatherData.lastUpdate, air: airQuality.lastUpdate },
       intervals: { kma: "매시 45분", air: "매시 정각" }
     }
   });
