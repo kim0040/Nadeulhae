@@ -157,9 +157,24 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
               <div className={`mt-1 p-2 rounded-xl ${point.type === "success" ? "bg-teal-400/10 text-teal-500" : point.type === "warning" ? "bg-orange-400/10 text-orange-500" : "bg-sky-blue/10 text-sky-blue"}`}>
                 {point.icon}
               </div>
-              <p className="text-base sm:text-lg font-bold text-neutral-700 dark:text-neutral-200 leading-snug pt-1">
-                {point.text}
-              </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <p className="text-base sm:text-lg font-bold text-neutral-700 dark:text-neutral-200 leading-snug">
+                    {point.text.split('(')[0].trim()}
+                  </p>
+                  {/* Air Quality Badges Logic */}
+                  {point.text.includes("국내:") && (
+                    <div className="flex gap-1.5 ml-auto sm:ml-0">
+                      <span className="px-2 py-0.5 rounded-md bg-sky-blue/10 text-sky-blue text-[10px] font-black border border-sky-blue/20">
+                        KR: {point.text.match(/국내:\s*([^/|)]+)/)?.[1].trim()}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-500 text-[10px] font-black border border-purple-500/20">
+                        WHO: {point.text.match(/WHO:\s*([^/|)]+)/)?.[1].trim()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </motion.div>
           ))}
         </div>
