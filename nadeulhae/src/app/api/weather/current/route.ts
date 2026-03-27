@@ -49,7 +49,9 @@ export async function GET() {
           temp: parseFloat(map["T1H"]),
           humidity: parseFloat(map["REH"]),
           wind: parseFloat(map["WSD"]),
-          pty: parseInt(map["PTY"])
+          pty: parseInt(map["PTY"]),
+          rn1: parseFloat(map["RN1"]) || 0,
+          lastUpdate: `${base_date}${base_time}`
         };
         cachedKma = weatherData;
         lastKmaTime = now;
@@ -86,8 +88,10 @@ export async function GET() {
           airQuality = { 
             dust: `${pm10}µg/m³ (국내: ${krStatus} / WHO: ${whoStatus})`, 
             value: pm10,
+            pm25: parseInt(jeonju.pm25Value) || 15,
             kr: krStatus,
-            who: whoStatus
+            who: whoStatus,
+            lastUpdate: jeonju.dataTime
           };
           cachedAir = airQuality;
           lastAirTime = now;
@@ -119,12 +123,6 @@ export async function GET() {
   else if (score >= 50) { status = "보통"; message = "야외 활동은 가능하지만, 준비물이 필요할 수 있어요."; }
   else { status = "나쁨"; message = "날씨가 야외 나들이에 적합하지 않은 것 같네요."; }
 
-  const lastUpdateTime = new Date(Math.max(lastKmaTime, lastAirTime)).toLocaleTimeString("ko-KR", { 
-    timeZone: "Asia/Seoul", 
-    hour: "2-digit", 
-    minute: "2-digit" 
-  });
-
   return NextResponse.json({
     score,
     status,
@@ -134,12 +132,18 @@ export async function GET() {
       humidity: weatherData.humidity,
       wind: weatherData.wind,
       dust: airQuality.dust,
+      pm25: airQuality.pm25,
+      pty: weatherData.pty,
+      rn1: weatherData.rn1,
       uv: "보통",
     },
     metadata: {
       dataSource: "기상청, 한국환경공단",
-      lastUpdate: lastUpdateTime,
-      intervals: { kma: "1m", air: "10m" }
+      lastUpdate: {
+        kma: weatherData.lastUpdate,
+        air: airQuality.lastUpdate
+      },
+      intervals: { kma: "매시 45분", air: "매시 정각" }
     }
   });
 }

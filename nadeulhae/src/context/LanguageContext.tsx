@@ -118,9 +118,11 @@ const translations: Record<Language, Record<string, string>> = {
     hero_score_label: "Picnic Index",
     hero_unit: "pts",
     hero_temp: "Temp",
-    hero_humidity: "Humi",
+    hero_humidity: "Humidity",
     hero_wind: "Wind",
     hero_dust: "Dust",
+    hero_pm25: "PM2.5",
+    hero_precip: "Precip",
     hero_uv: "UV",
     
     // Statistics

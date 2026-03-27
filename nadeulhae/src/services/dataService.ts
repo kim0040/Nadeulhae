@@ -18,11 +18,14 @@ export interface WeatherData {
     humidity: number;
     wind: number;
     dust: string;
+    pm25?: number;
+    pty?: number;
+    rn1?: number;
     uv: string;
   };
   metadata?: {
     dataSource: string;
-    lastUpdate: string;
+    lastUpdate: string | { kma: string; air: string };
     intervals: { kma: string; air: string };
   };
 }
