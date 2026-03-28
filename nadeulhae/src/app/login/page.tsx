@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Mail, Lock } from "lucide-react"
+import { Mail, Lock } from "lucide-react"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { Particles } from "@/components/magicui/particles"
 import { Meteors } from "@/components/magicui/meteors"
@@ -27,11 +27,6 @@ export default function LoginPage() {
       <Meteors number={20} />
       
       <div className="w-full max-w-md z-10">
-        <Link href="/" className="inline-flex items-center gap-2 text-neutral-500 dark:text-neutral-400 hover:text-sky-blue dark:hover:text-sky-blue mb-8 transition-colors font-bold group">
-          <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-          {t("login_back_home")}
-        </Link>
-        
         <div className="bg-[var(--card)] backdrop-blur-2xl border border-[var(--card-border)] p-8 sm:p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
           <BorderBeam size={200} duration={12} delay={9} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
           

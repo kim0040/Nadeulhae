@@ -59,12 +59,13 @@ export function Navbar() {
         </div>
         <span className={cn(
           "text-base sm:text-2xl lg:text-[1.7rem] font-black tracking-tighter text-foreground group-hover:text-sky-blue transition-colors",
-          mounted ? (language === "en" ? "hidden lg:block" : "hidden sm:block") : "hidden sm:block"
+          "hidden lg:block",
+          mounted && language === "en" && "lg:hidden xl:block"
         )}>{t("logo_text")}</span>
       </Link>
 
       {/* Navigation Pill (Centered on Large / Compact on Small) */}
-      <nav className="absolute left-1/2 -translate-x-1/2 pointer-events-auto z-50 transition-all max-w-[95vw]">
+      <nav className="absolute left-1/2 -translate-x-1/2 pointer-events-auto z-50 transition-all max-w-[calc(100vw-7.5rem)] sm:max-w-[calc(100vw-10rem)] lg:max-w-[95vw]">
         <div className={cn(
           "bg-[var(--card)] backdrop-blur-2xl border border-[var(--card-border)] rounded-full flex items-center shadow-xl shadow-active-blue/10 transition-all",
           mounted 
