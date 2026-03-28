@@ -64,7 +64,7 @@ export const BentoCard = ({
     )}
     {bgEffect === "bloom-orange" && (
       <div className="absolute -right-16 -bottom-16 opacity-[0.1] dark:opacity-[0.2] pointer-events-none select-none group-hover:scale-125 transition-transform duration-700">
-        <div className="size-80 rounded-full bg-orange-400 blur-[80px]" />
+        <div className="size-80 rounded-full bg-nature-green blur-[80px]" />
       </div>
     )}
     {bgEffect === "circle-blue" && (

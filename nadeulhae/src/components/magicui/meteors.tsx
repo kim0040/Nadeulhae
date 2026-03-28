@@ -47,8 +47,8 @@ export const Meteors = ({
   if (!mounted) return null
 
   const isDark = resolvedTheme === "dark"
-  const meteorColor = isDark ? "bg-white/80" : "bg-sky-blue/60"
-  const trailColor = isDark ? "from-white/50" : "from-sky-blue/40"
+  const meteorColor = isDark ? "bg-white/80" : "bg-active-blue/60"
+  const trailColor = isDark ? "from-white/50" : "from-active-blue/40"
 
   return (
     <>

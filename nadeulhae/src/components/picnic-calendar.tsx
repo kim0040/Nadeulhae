@@ -1,181 +1,229 @@
+"use client"
+
 import { useState, useEffect } from "react"
-import { 
-  format, 
-  addMonths, 
-  subMonths, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
-  isSameMonth, 
-  isSameDay, 
-  addDays, 
-  eachDayOfInterval,
-  parseISO
-} from "date-fns"
+import { format, isSameDay } from "date-fns"
 import { ko, enUS } from "date-fns/locale"
-import { ChevronLeft, ChevronRight, Sparkles, Cloud, Sun, CloudRain } from "lucide-react"
+import { Sparkles, Cloud, Sun, CloudRain } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/context/LanguageContext"
 
-export function PicnicCalendar() {
+interface PicnicCalendarProps {
+  useGeolocation?: boolean
+}
+
+export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
   const { language, t } = useLanguage()
-  const [currentMonth, setCurrentMonth] = useState(new Date())
   const [forecast, setForecast] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const locale = language === "ko" ? ko : enUS
+  const todayLabel = language === "ko" ? "오늘" : "Today"
+  const forecastTitle = language === "ko" ? "10일 예보" : "10-Day Forecast"
+  const rainChanceLabel = language === "ko" ? "강수확률" : "Rain Chance"
+  const rainAmountLabel = language === "ko" ? "예상 강수" : "Expected Rain"
+  const outdoorTipLabel = language === "ko" ? "야외 팁" : "Outdoor Tip"
+  const pointLabel = language === "ko" ? "점" : "Pts"
 
   useEffect(() => {
-    const fetchForecast = async () => {
+    const fetchForecast = async (lat?: number, lon?: number) => {
       try {
-        const res = await fetch("/api/weather/forecast");
+        setIsLoading(true)
+        const query = (lat && lon) ? `?lat=${lat}&lon=${lon}` : '';
+        const res = await fetch(`/api/weather/forecast${query}`);
         const data = await res.json();
         setForecast(data);
       } catch (e) {
         console.error("Forecast fetch error:", e);
+      } finally {
+        setIsLoading(false)
       }
     };
-    fetchForecast();
-  }, []);
 
-  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
-  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
+    if (!useGeolocation) {
+      fetchForecast()
+      return
+    }
 
-  const monthStart = startOfMonth(currentMonth)
-  const monthEnd = endOfMonth(monthStart)
-  const startDate = startOfWeek(monthStart)
-  const endDate = endOfWeek(monthEnd)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => fetchForecast(pos.coords.latitude, pos.coords.longitude),
+        () => fetchForecast() // 거부 시 기본 전주 예보
+      );
+    } else {
+      fetchForecast(); // 미지원 시 기본 전주 예보
+    }
+  }, [useGeolocation]);
 
-  const calendarDays = eachDayOfInterval({
-    start: startDate,
-    end: endDate,
-  })
-
-  const getDayForecast = (day: Date) => {
-    if (!forecast || !forecast.daily) return null;
-    const dateStr = format(day, "yyyyMMdd");
-    return forecast.daily.find((d: any) => d.date === dateStr);
-  }
+  const today = new Date()
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-[var(--card)] backdrop-blur-3xl rounded-[3.5rem] border border-[var(--card-border)] shadow-[0_50px_100px_-20px_rgba(135,206,235,0.2)] p-6 sm:p-12 overflow-hidden relative group">
-      <div className="absolute inset-0 bg-gradient-to-br from-sky-blue/5 to-transparent pointer-events-none" />
-      
+    <div className="w-full max-w-6xl mx-auto px-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-16 gap-6 relative z-10">
-        <div className="flex flex-col items-center sm:items-start">
-          <h2 className="text-4xl sm:text-5xl font-black tracking-tighter text-foreground mb-2">
-            {format(currentMonth, "yyyy. MMMM", { locale })}
+      <div className="flex flex-col sm:flex-row items-baseline justify-between mb-8 gap-4 px-2">
+        <div>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tighter text-foreground mb-2">
+            {forecastTitle}
           </h2>
-          <div className="flex items-center gap-2 text-sky-blue bg-sky-blue/10 px-4 py-1.5 rounded-full border border-sky-blue/20">
-            <Sparkles size={16} className="animate-pulse" />
-            <span className="text-[11px] font-black uppercase tracking-[0.2em]">{t("cal_legend")}</span>
-          </div>
+          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
+            {forecast?.location || "Loading..."}
+          </p>
         </div>
-        <div className="flex gap-4">
-          <button 
-            onClick={prevMonth}
-            className="p-4 rounded-2xl bg-[var(--interactive)] hover:bg-sky-blue/15 hover:text-sky-blue transition-all active:scale-95 shadow-lg border border-transparent hover:border-sky-blue/20"
-          >
-            <ChevronLeft size={28} />
-          </button>
-          <button 
-            onClick={nextMonth}
-            className="p-4 rounded-2xl bg-[var(--interactive)] hover:bg-sky-blue/15 hover:text-sky-blue transition-all active:scale-95 shadow-lg border border-transparent hover:border-sky-blue/20"
-          >
-            <ChevronRight size={28} />
-          </button>
+        <div className="flex items-center gap-2 text-nature-green bg-nature-green/10 px-4 py-1.5 rounded-full border border-nature-green/20">
+          <Sparkles size={16} className="animate-pulse" />
+          <span className="text-[11px] font-black uppercase tracking-[0.2em]">{t("cal_legend")}</span>
         </div>
       </div>
 
-      {/* Weekdays */}
-      <div className="grid grid-cols-7 mb-6 relative z-10">
-        {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => (
-          <div key={day} className="text-center text-[10px] font-black text-neutral-400 dark:text-neutral-500 tracking-[0.3em] pb-4">
-            {day}
-          </div>
-        ))}
-      </div>
+      {/* Horizontal Scroll Container */}
+      <div className="relative w-full overflow-hidden rounded-[2.5rem]">
+        {/* Magic gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-r from-nature-green/8 via-transparent to-active-blue/8 pointer-events-none" />
 
-      {/* Days Grid */}
-      <div className="relative overflow-hidden min-h-[450px] z-10">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={format(currentMonth, "yyyy-MM")}
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-            className="grid grid-cols-7 gap-3 sm:gap-5"
-          >
-            {calendarDays.map((day, i) => {
-              const dayForecast = getDayForecast(day)
-              const isToday = isSameDay(day, new Date())
-              const isCurrentMonth = isSameMonth(day, monthStart)
-              const isRecommended = dayForecast && dayForecast.score >= 80
+        <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6 px-4 py-8 relative z-10">
+          <AnimatePresence>
+            {isLoading ? (
+               <div className="w-full flex justify-center py-20 text-nature-green animate-pulse font-bold tracking-widest uppercase">{language === "ko" ? "예보 불러오는 중..." : "Loading Forecast..."}</div>
+            ) : forecast?.daily?.map((dayForecast: any, i: number) => {
+              const dayDate = new Date(dayForecast.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'))
+              const isToday = isSameDay(dayDate, today)
+              const isRecommended = dayForecast.score >= 80
+              const isWetDay = dayForecast.sky?.includes("비") || dayForecast.sky?.includes("눈") || dayForecast.precipChance >= 60
+              const advice = isWetDay
+                ? language === "ko"
+                  ? "우산 또는 실내 대안 추천"
+                  : "Carry an umbrella or consider indoors"
+                : dayForecast.score >= 80
+                  ? language === "ko"
+                    ? "장시간 산책하기 좋은 날"
+                    : "Great for a long outdoor stroll"
+                  : language === "ko"
+                    ? "가벼운 야외 일정 권장"
+                    : "Best for a lighter outdoor plan"
 
-              return (
-                <div 
-                  key={i}
-                  className={cn(
-                    "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-center rounded-[2rem] sm:rounded-[2.5rem] text-sm sm:text-xl font-black transition-all border group cursor-pointer",
-                    !isCurrentMonth ? "text-neutral-300 dark:text-neutral-800 border-transparent opacity-50" : "text-foreground border-transparent hover:border-sky-blue/30 hover:bg-white/50 dark:hover:bg-black/20",
-                    isRecommended && "bg-gradient-to-br from-sky-blue to-blue-500 text-white shadow-[0_20px_40px_-10px_rgba(135,206,235,0.4)] border-transparent hover:scale-110 z-20",
-                    isToday && !isRecommended && "bg-[var(--interactive)] border-sky-blue/40 text-sky-blue ring-4 ring-sky-blue/10"
-                  )}
-                >
-                  <span className="relative z-10">{format(day, "d")}</span>
-                  
-                  {dayForecast && isCurrentMonth && (
-                    <div className={cn(
-                      "mt-1 sm:mt-2 text-[10px] sm:text-xs flex flex-col items-center gap-1",
-                      isRecommended ? "text-white/80" : "text-sky-blue/60"
-                    )}>
-                      {dayForecast.sky === "맑음" ? <Sun size={14} /> : dayForecast.sky.includes("비") ? <CloudRain size={14} /> : <Cloud size={14} />}
-                      <span className="hidden sm:inline font-bold">{dayForecast.tempMax}°</span>
+              const cardContent = (
+                <div className={cn(
+                  "h-full flex flex-col justify-between p-6 bg-card border rounded-[2.5rem] shadow-[0_22px_55px_-32px_rgba(47,111,228,0.22)] overflow-hidden",
+                  isRecommended ? "border-nature-green/30" : "border-card-border"
+                )}>
+                  {/* Top: Date & Today Badge */}
+                  <div className="w-full flex justify-between items-start mb-5 gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-1">
+                        {format(dayDate, "EEE", { locale })}
+                      </span>
+                      <span className="text-3xl font-black text-foreground leading-none">
+                        {format(dayDate, "d")}
+                      </span>
                     </div>
-                  )}
+                    {(isToday || isRecommended) && (
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        {isToday && (
+                          <span className="px-2.5 py-1 rounded-full bg-nature-green/20 text-nature-green text-[9px] font-black uppercase tracking-widest border border-nature-green/30">
+                            {todayLabel}
+                          </span>
+                        )}
+                        {isRecommended && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-nature-green/25 bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-nature-green shadow-md dark:bg-card">
+                            <Sparkles size={12} />
+                            {language === "ko" ? "추천" : "Best"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
-                  {isRecommended && (
-                    <motion.div 
-                      className="absolute -top-2 -right-2 text-white bg-orange-400 rounded-full p-2 shadow-xl border-2 border-white dark:border-background"
-                      initial={{ scale: 0, rotate: -45 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                    >
-                      <Sparkles size={14} className="fill-current" />
-                    </motion.div>
-                  )}
+                  {/* Middle: Icon & Sky */}
+                  <div className="flex flex-col items-center my-4 min-h-[138px]">
+                    <div className={cn(
+                      "size-20 rounded-[1.75rem] flex items-center justify-center border transition-transform group-hover:scale-105",
+                      isRecommended
+                        ? "bg-nature-green/10 border-nature-green/20"
+                        : isWetDay
+                          ? "bg-active-blue/10 border-active-blue/20"
+                          : "bg-[var(--interactive)] border-[var(--interactive-border)]"
+                    )}>
+                      <div className={cn(
+                      "transition-transform",
+                      isRecommended ? "text-nature-green" : dayForecast.sky?.includes("비") ? "text-active-blue" : "text-nature-green/80"
+                    )}>
+                        {dayForecast.sky?.includes("맑음") ? <Sun size={36} strokeWidth={2.5} /> : dayForecast.sky?.includes("비") || dayForecast.sky?.includes("눈") ? <CloudRain size={36} strokeWidth={2.5} /> : <Cloud size={36} strokeWidth={2.5} />}
+                      </div>
+                    </div>
+                    <span className="text-lg font-black mt-4 text-foreground text-center break-words line-clamp-2 min-h-[3.25rem]">
+                      {dayForecast.sky}
+                    </span>
+                    <span className="text-sm font-bold mt-1 text-muted-foreground text-center break-words line-clamp-2 min-h-[2.75rem]">
+                      {advice}
+                    </span>
+                  </div>
+
+                  {/* Bottom: Temp and Details */}
+                  <div className="w-full flex flex-col gap-3 mt-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-[1.35rem] border border-border bg-[var(--interactive)] px-4 py-3">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Min / Max</div>
+                        <div className="flex items-center justify-between text-sm font-black">
+                          <span className="text-blue-500 dark:text-blue-400">{dayForecast.tempMin}°</span>
+                          <span className="text-red-500 dark:text-red-400">{dayForecast.tempMax}°</span>
+                        </div>
+                      </div>
+                      <div className="rounded-[1.35rem] border border-border bg-[var(--interactive)] px-4 py-3">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{rainChanceLabel}</div>
+                        <div className="text-xl font-black text-foreground">{dayForecast.precipChance ?? 0}%</div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.35rem] border border-border bg-[var(--interactive)] px-4 py-3">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{rainAmountLabel}</div>
+                      <div className="text-base font-black text-foreground break-words">{dayForecast.precipAmount || "0mm"}</div>
+                    </div>
+
+                    <div className="rounded-[1.35rem] border border-border bg-[var(--interactive)] px-4 py-3">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{outdoorTipLabel}</div>
+                      <div className="text-xs sm:text-sm font-bold text-foreground/80 break-words line-clamp-2">
+                        {advice}
+                      </div>
+                    </div>
+
+                    <div className={cn(
+                      "w-full text-center py-3 rounded-[1.1rem] text-sm font-black uppercase tracking-wider transition-colors border",
+                      isRecommended ? "bg-gradient-to-r from-nature-green to-active-blue text-white border-transparent shadow-[0_10px_24px_-12px_rgba(47,111,228,0.45)]" : "bg-transparent text-muted-foreground border-border hover:bg-muted"
+                    )}>
+                      {dayForecast.score} {pointLabel}
+                    </div>
+                  </div>
                 </div>
               )
+
+              return (
+                <motion.div
+                  key={dayForecast.date}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="snap-center sm:snap-start shrink-0 w-[260px] min-h-[420px] group cursor-pointer relative"
+                >
+                  {cardContent}
+                </motion.div>
+              )
             })}
-          </motion.div>
-        </AnimatePresence>
+          </AnimatePresence>
+        </div>
       </div>
 
-      {/* Legend & Attribution */}
-      <div className="mt-16 pt-10 border-t border-sky-blue/10 flex flex-col sm:flex-row gap-8 items-center justify-between relative z-10">
-        <div className="flex flex-wrap gap-8 items-center justify-center">
-          <div className="flex items-center gap-3 group">
-            <div className="size-6 rounded-xl bg-gradient-to-br from-sky-blue to-blue-500 shadow-lg group-hover:scale-110 transition-transform" />
-            <span className="text-[11px] font-black text-neutral-500 uppercase tracking-widest">{t("cal_legend")}</span>
-          </div>
-          <div className="flex items-center gap-3 group">
-            <div className="size-6 rounded-xl bg-[var(--interactive)] border border-sky-blue/30 group-hover:scale-110 transition-transform" />
-            <span className="text-[11px] font-black text-neutral-500 uppercase tracking-widest">Today</span>
-          </div>
-        </div>
-        
-        <div className="flex flex-col items-center sm:items-end gap-1.5">
-          <p className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.25em]">
-            Source: {forecast?.metadata?.dataSource || "기상청"}
-          </p>
-          <div className="flex items-center gap-2 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full">
-             <div className="size-1.5 rounded-full bg-teal-400 animate-pulse" />
-             <span className="text-[9px] font-bold text-neutral-500">Updated: {forecast?.metadata?.lastUpdate || "--:--"}</span>
-          </div>
-        </div>
+      {/* Attribution */}
+      <div className="mt-8 flex justify-end items-center gap-2 px-4 opacity-50">
+        <div className="size-2 rounded-full bg-nature-green animate-pulse" />
+        <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-muted-foreground">
+          Source: {forecast?.metadata?.dataSource || "기상청"} (Updated: {forecast?.metadata?.lastUpdate || "--:--"})
+        </span>
       </div>
+
+      {/* Tailwind Hide Scrollbar override */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
     </div>
   )
 }

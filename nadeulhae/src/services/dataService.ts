@@ -7,17 +7,25 @@ import { mockWeatherData, mockInsights, mockTrends, mockCourse } from "@/data/mo
  */
 
 const MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE === "true";
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/weather";
 
 export interface WeatherData {
   score: number;
   status: string;
   message: string;
+  isFallback?: boolean;
+  eventData?: {
+    isEarthquake: boolean;
+    isWeatherWarning: boolean;
+    isRain: boolean;
+    warningMessage?: string;
+  };
   details: {
     temp: number;
     humidity: number;
     wind: number;
     dust: string;
+    sky?: number;
     pm10?: number;
     pm25?: number;
     o3?: number;
@@ -25,6 +33,7 @@ export interface WeatherData {
     co?: number;
     so2?: number;
     khai?: number;
+    khaiGrade?: number;
     pty?: number;
     rn1?: number;
     vec?: number;
@@ -35,8 +44,36 @@ export interface WeatherData {
   metadata?: {
     dataSource: string;
     station?: string;
+    region?: string;
+    regionEn?: string;
+    regionKey?: string;
     lastUpdate: string | { kma: string; air: string };
     intervals: { kma: string; air: string };
+    cachePolicy?: {
+      weatherMinutes: number;
+      airMinutes: number;
+      alertMinutes: number;
+      forecastHours: number;
+    };
+    scoreBreakdown?: {
+      air: number;
+      temperature: number;
+      sky: number;
+      wind: number;
+      knockout: string;
+      total: number;
+    };
+    bulletin?: {
+      summary?: string;
+      warningStatus?: string;
+      updatedAt?: string;
+    };
+    alertSummary?: {
+      warningTitle?: string;
+      warningUpdatedAt?: string;
+      earthquakeTitle?: string;
+      earthquakeUpdatedAt?: string;
+    };
   };
 }
 
@@ -53,7 +90,7 @@ export interface Insight {
 
 export const dataService = {
   // 실시간 날씨 및 피크닉 지수 가져오기
-  getWeatherData: async (): Promise<WeatherData> => {
+  getWeatherData: async (lat?: number, lon?: number): Promise<WeatherData> => {
     try {
       if (MOCK_MODE) {
         await new Promise(resolve => setTimeout(resolve, 800));
@@ -77,7 +114,8 @@ export const dataService = {
         };
       }
       
-      const response = await fetch(`${API_BASE}/current`, { next: { revalidate: 60 } });
+      const query = (lat && lon) ? `?lat=${lat}&lon=${lon}` : '';
+      const response = await fetch(`${API_BASE}/current${query}`, { next: { revalidate: 60 } });
       if (!response.ok) throw new Error("Weather API error");
       return await response.json();
     } catch (error) {

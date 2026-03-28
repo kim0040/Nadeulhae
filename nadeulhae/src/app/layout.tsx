@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "전주 나들해 | Jeonju Nadeulhae",
-  description: "날씨 기반 전주 피크닉 & 반나절 코스 추천 서비스",
+  title: "나들해 | Nadeulhae",
+  description: "날씨 기반 피크닉 지수와 지역별 나들이 브리핑 서비스",
 };
 
 import { Navbar } from "@/components/navbar";
@@ -43,7 +42,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <Navbar />
-            <div className="relative pt-12">
+            <div className="relative">
               {children}
             </div>
           </ThemeProvider>
@@ -53,6 +52,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
-

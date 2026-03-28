@@ -40,9 +40,9 @@ export const ShimmerButton = React.forwardRef<
     }, [])
 
     const isDark = mounted && resolvedTheme === "dark"
-    const defaultBackground = isDark ? "rgba(0, 0, 0, 1)" : "rgba(135, 206, 235, 1)"
+    const defaultBackground = isDark ? "rgba(8, 25, 36, 0.95)" : "rgba(47, 111, 228, 0.96)"
     const bg = background ?? defaultBackground
-    const defaultShimmerColor = isDark ? "#ffffff" : "#87CEEB"
+    const defaultShimmerColor = isDark ? "#d8ecff" : "#9ad0ff"
     const shimmer = shimmerColor ?? defaultShimmerColor
 
     return (

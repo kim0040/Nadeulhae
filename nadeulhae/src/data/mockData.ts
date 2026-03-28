@@ -7,6 +7,14 @@ export const mockWeatherData = {
   score: 95,
   status: "status_excellent",
   message: "msg_excellent",
+  // Knock-out 시스템 목업 (UI 데모용 토글 가능)
+  eventData: {
+    isEarthquake: false,
+    isWeatherWarning: false, // 혹은 true로 테스트
+    isRain: false, // 만약 PTY가 1,2,3,4라면 true. 테스트 시 true/false 변경
+    warningMessage: "" // "태풍주의보 발효 중" 등
+  },
+  isFallback: false, // 타 지역 API 한도 초과 시 Fallback 플래그 표시
   details: {
     temp: 22,
     humidity: 45,

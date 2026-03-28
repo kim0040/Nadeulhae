@@ -1,13 +1,11 @@
 "use client"
 
-import Link from "next/link"
-import { ArrowLeft, Calendar as CalendarIcon, History, Zap, Sparkles, Lightbulb } from "lucide-react"
+import { Calendar as CalendarIcon, History, Zap } from "lucide-react"
 import { PicnicCalendar } from "@/components/picnic-calendar"
 import { PicnicArchiveCalendar } from "@/components/picnic-archive-calendar"
 import { useLanguage } from "@/context/LanguageContext"
 import { Particles } from "@/components/magicui/particles"
 import { useTheme } from "next-themes"
-import { MagicCard } from "@/components/magicui/magic-card"
 
 export default function CalendarPage() {
   const { t } = useLanguage()
@@ -18,15 +16,10 @@ export default function CalendarPage() {
       <Particles
         className="absolute inset-0 z-0"
         quantity={100}
-        color={resolvedTheme === "dark" ? "#ffffff" : "#87CEEB"}
+        color={resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"}
       />
       
       <div className="container max-w-5xl mx-auto relative z-10">
-        <Link href="/" className="inline-flex items-center gap-2 text-neutral-500 hover:text-sky-blue mb-12 transition-colors font-bold group">
-          <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-          {t("nav_home")}
-        </Link>
-
         <div className="mb-16">
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 rounded-[1.5rem] bg-sky-blue/10 text-sky-blue border border-sky-blue/20">
@@ -44,8 +37,8 @@ export default function CalendarPage() {
         {/* 실시간 피크닉 캘린더 섹션 */}
         <div className="mb-32">
           <div className="flex items-center gap-4 mb-8">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-teal-500/10 to-sky-blue/10 border border-teal-500/20">
-              <Zap size={24} className="text-teal-500" />
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-nature-green/10 to-sky-blue/10 border border-nature-green/20">
+              <Zap size={24} className="text-nature-green" />
             </div>
             <div>
               <h2 className="text-2xl sm:text-3xl font-black text-foreground">{t("cal_realtime_title")}</h2>
@@ -55,31 +48,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="lg:col-span-3">
-              <PicnicCalendar />
-            </div>
-            <div className="lg:col-span-1 space-y-6">
-              <MagicCard className="p-8 rounded-[2.5rem] bg-sky-blue text-white shadow-2xl shadow-sky-blue/20 border-transparent" gradientColor="rgba(255,255,255,0.2)">
-                <div className="flex items-center gap-3 mb-4">
-                  <Lightbulb size={24} className="text-white" />
-                  <h3 className="font-black text-xl">{t("cal_insight_title")}</h3>
-                </div>
-                <p className="text-white/90 font-bold leading-relaxed">
-                  {t("cal_insight_text")}
-                </p>
-              </MagicCard>
-              <MagicCard className="p-8 rounded-[2.5rem] bg-[var(--card)] border border-[var(--card-border)]">
-                <div className="flex items-start gap-4 mb-4">
-                  <Sparkles className="text-sky-blue shrink-0" size={24} />
-                  <h3 className="font-black text-lg text-foreground">{t("cal_realtime_status")}</h3>
-                </div>
-                <p className="text-neutral-500 dark:text-neutral-400 text-xs font-medium leading-relaxed">
-                  {t("cal_realtime_note")}
-                </p>
-              </MagicCard>
-            </div>
-          </div>
+          <PicnicCalendar />
         </div>
 
         {/* 아카이브 섹션 */}

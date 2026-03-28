@@ -1,362 +1,205 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { 
-  CalendarIcon, 
-  ThermometerIcon, 
-  MapPinIcon, 
-  ClockIcon,
-  SunIcon,
+import { useEffect, useState } from "react"
+import {
+  AlertTriangle,
   CloudIcon,
-  WindIcon,
   DropletsIcon,
-  ArrowRight,
-  Sparkles
+  Info,
+  SunIcon,
+  ThermometerIcon,
+  WindIcon,
 } from "lucide-react"
-
 import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
+import { mockWeatherData } from "@/data/mockData"
+import { dataService, type WeatherData } from "@/services/dataService"
+import { useLanguage } from "@/context/LanguageContext"
 import { Particles } from "@/components/magicui/particles"
 import { Meteors } from "@/components/magicui/meteors"
 import { WordPullUp } from "@/components/magicui/word-pull-up"
-import { NumberTicker } from "@/components/magicui/number-ticker"
-import { BentoGrid, BentoCard } from "@/components/magicui/bento-grid"
-import { Marquee } from "@/components/magicui/marquee"
-import { ShimmerButton } from "@/components/magicui/shimmer-button"
-import AnimatedCircularProgressBar from "@/components/magicui/animated-circular-progress-bar"
 import { ShineBorder } from "@/components/magicui/shine-border"
 import { BorderBeam } from "@/components/magicui/border-beam"
-import { AnimatedList } from "@/components/magicui/animated-list"
 import { PicnicBriefing } from "@/components/picnic-briefing"
-
-// [BACKEND_LINK]: 아래 모든 가짜 데이터(mockData)는 백엔드 API 연결 시 실제 DB 데이터로 대체됩니다.
-import { mockWeatherData, mockInsights, mockTrends, mockCourse } from "@/data/mockData"
-import { dataService } from "@/services/dataService"
-import { useLanguage } from "@/context/LanguageContext"
-
-const icons = {
-  CalendarIcon,
-  ThermometerIcon,
-  MapPinIcon,
-}
 
 export default function Home() {
   const { resolvedTheme } = useTheme()
   const { language, t } = useLanguage()
-  const [particleColor, setParticleColor] = useState("#87CEEB")
-  const [isLoading, setIsLoading] = useState(false)
-  const [showResult, setShowResult] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  
-  const [weatherData, setWeatherData] = useState<any>(null)
-  const [insights, setInsights] = useState<any[]>([])
-  const [trends, setTrends] = useState<string[]>([])
-  const [recommendedCourse, setRecommendedCourse] = useState<any[]>([])
-  
-  const [location, setLocation] = useState(t("ai_loc_val"))
-  const [isLocating, setIsLocating] = useState(false)
+
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
+  const [heroMessageSeed] = useState(() => Math.floor(Math.random() * 1_000_000))
+  const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
 
   useEffect(() => {
-    setMounted(true)
     const loadInitialData = async () => {
-      try {
-        const [w, i, tData] = await Promise.all([
-          dataService.getWeatherData(),
-          dataService.getInsights(),
-          dataService.getTrends()
-        ])
-        setWeatherData(w)
-        setInsights(i)
-        setTrends(tData)
-        setLocation(t("ai_loc_val"))
-      } catch (error) {
-        console.error("Initial data load failed:", error)
-        // Fallback to mock data directly to avoid stuck loading
-        setWeatherData(mockWeatherData)
-        setInsights(mockInsights)
-        setTrends(mockTrends)
+      const loadFallback = async () => {
+        try {
+          const data = await dataService.getWeatherData()
+          setWeatherData(data)
+        } catch (error) {
+          console.error("Initial data load failed:", error)
+          setWeatherData(mockWeatherData)
+        }
       }
+
+      if (!navigator.geolocation) {
+        await loadFallback()
+        return
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const data = await dataService.getWeatherData(position.coords.latitude, position.coords.longitude)
+            setWeatherData(data)
+          } catch (error) {
+            console.error("Initial location-based load failed:", error)
+            await loadFallback()
+          }
+        },
+        async () => {
+          await loadFallback()
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      )
     }
     loadInitialData()
   }, [])
 
-  useEffect(() => {
-    if (mounted) {
-      setParticleColor(resolvedTheme === "dark" ? "#ffffff" : "#87CEEB")
-    }
-  }, [resolvedTheme, mounted])
-
-  const handleUseLocation = () => {
-    setIsLocating(true)
-    // Mocking browser geolocation delay
-    setTimeout(() => {
-      setLocation(t("ai_loc_mock"))
-      setIsLocating(false)
-    }, 1500)
+  if (!weatherData) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-background text-sky-blue animate-pulse font-bold">
+        {t("loading_weather")}
+      </div>
+    )
   }
 
-  // [BACKEND_LINK]: 사용자의 입력 데이터와 날씨 정보를 조합해 LLM API를 호출하는 로직이 들어갈 자리입니다.
-  const handleCreateCourse = async () => {
-    setIsLoading(true)
-    try {
-      const course = await dataService.generateCourse({ timeRange: "13:00~18:00", location: location })
-      setRecommendedCourse(course)
-      setShowResult(true)
-    } finally {
-      setIsLoading(false)
-    }
+  const scoreColors = weatherData.score >= 86
+    ? { primary: "#0b7d71", secondary: "#2f6fe4" }
+    : weatherData.score >= 66
+      ? { primary: "#2f6fe4", secondary: "#7db3ff" }
+      : weatherData.score >= 36
+        ? { primary: "#4d9a90", secondary: "#77b2f0" }
+        : { primary: "#ef4444", secondary: "#f87171" }
+
+  const quickMetrics = [
+    { icon: ThermometerIcon, label: t("hero_temp"), value: `${weatherData.details.temp ?? "--"}°C`, tone: "text-orange-400" },
+    { icon: DropletsIcon, label: t("hero_humidity"), value: `${weatherData.details.humidity ?? "--"}%`, tone: "text-blue-400" },
+    { icon: WindIcon, label: t("hero_wind"), value: `${weatherData.details.wind ?? "--"}m/s`, tone: "text-teal-400" },
+    {
+      icon: CloudIcon,
+      label: t("hero_dust"),
+      value: weatherData.details.dust,
+      tone: "text-neutral-400",
+      meta: weatherData.details.kr && weatherData.details.who
+        ? `KR ${weatherData.details.kr} · WHO ${weatherData.details.who}`
+        : null,
+    },
+    { icon: SunIcon, label: t("hero_uv"), value: weatherData.details.uv || "--", tone: "text-yellow-400" },
+  ]
+
+  const homeTexts = {
+    scorePaused: language === "ko" ? "피크닉 지수 산출 보류" : "Picnic score paused",
   }
-
-  if (!weatherData) return <div className="h-screen w-full flex items-center justify-center bg-background text-sky-blue animate-pulse font-bold">{t("loading_weather")}</div>
-
-
-  const getScoreColor = (s: number) => {
-    if (s >= 86) return { primary: "#2DD4BF", secondary: "#87CEEB", text: "text-teal-500", bg: "bg-teal-500/10", border: "border-teal-500/20" };
-    if (s >= 66) return { primary: "#10B981", secondary: "#34D399", text: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" };
-    if (s >= 36) return { primary: "#F59E0B", secondary: "#FBBF24", text: "text-orange-500", bg: "bg-orange-500/10", border: "border-orange-500/20" };
-    return { primary: "#EF4444", secondary: "#F87171", text: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/20" };
-  }
-
-  const scoreColors = getScoreColor(weatherData.score);
 
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden bg-background">
-      {/* Hero Section */}
       <section className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden py-24 sm:py-32">
-        {/* ... */}
-        <Particles
-          className="absolute inset-0 z-0"
-          quantity={100}
-          ease={80}
-          color={particleColor}
-          refresh
-        />
+        <Particles className="absolute inset-0 z-0 opacity-70" quantity={72} ease={80} color={particleColor} refresh />
         <Meteors number={10} className="z-0" />
-        
-        <div className="z-10 flex flex-col items-center gap-6 p-4 text-center">
+
+        <div className="z-10 flex max-w-6xl flex-col items-center gap-6 px-4 text-center">
+          {weatherData.isFallback && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-card rounded-full border border-card-border shadow-lg">
+              <Info className="text-sky-blue size-4 animate-pulse" />
+              <span className="text-[12px] sm:text-sm font-black text-foreground">{t("fallback_message")}</span>
+            </div>
+          )}
+
           <WordPullUp
-            words={t(weatherData.message)}
+            words={t(
+              weatherData.message,
+              `${weatherData.metadata?.regionKey ?? "default"}-${heroMessageSeed}-${language}`
+            )}
             className="text-4xl sm:text-5xl md:text-7xl text-sky-blue px-4 font-black tracking-tight"
           />
-          
-          <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-white/5 dark:bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-105 duration-500">
-            <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none group-hover/score:scale-105 transition-transform duration-500 z-30">
-               <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-1 drop-shadow-md">{t("hero_score_label")}</span>
-               <div className="flex items-baseline gap-1">
-                 <span className="text-6xl sm:text-8xl font-black tracking-tighter text-foreground drop-shadow-[0_0_30px_rgba(135,206,235,0.3)] select-none transition-all">{weatherData.score}</span>
-                 <span className="text-sm sm:text-xl font-black text-foreground/70 drop-shadow-sm">{t("hero_unit")}</span>
-               </div>
-               {weatherData.score >= 80 && (
-                 <div className="mt-2 text-[10px] sm:text-xs font-black text-sky-blue bg-sky-blue/10 px-3 py-1 rounded-full border border-sky-blue/20 backdrop-blur-md animate-pulse z-40">
-                   {t("hero_best_day")}
-                 </div>
-               )}
+
+          {(weatherData.eventData?.isEarthquake || weatherData.eventData?.isWeatherWarning || weatherData.eventData?.isRain) ? (
+            <div className="relative w-full max-w-md flex flex-col items-center justify-center p-8 rounded-3xl bg-red-500/10 border border-red-500/40 shadow-2xl mt-4 overflow-hidden">
+              <BorderBeam duration={8} borderWidth={3} colorFrom="#ef4444" colorTo="#b91c1c" />
+              <AlertTriangle className="size-16 sm:size-20 text-red-500 mb-4 animate-bounce" />
+              <h3 className="text-xl sm:text-2xl font-black text-red-500 mb-2">
+                {weatherData.eventData?.isEarthquake ? t("alert_earthquake_title") :
+                  weatherData.eventData?.isWeatherWarning ? t("alert_weather_wrn_title") :
+                  t("alert_heavy_rain_title")}
+              </h3>
+              <p className="text-sm font-bold text-red-400">
+                {weatherData.eventData?.isEarthquake ? t("alert_earthquake_desc") :
+                  weatherData.eventData?.isWeatherWarning ? t("alert_weather_wrn_desc") :
+                  t("alert_heavy_rain_desc")}
+              </p>
+              {weatherData.eventData?.warningMessage && (
+                <p className="mt-4 text-xs sm:text-sm font-bold text-red-200 max-w-xs leading-relaxed">
+                  {weatherData.eventData.warningMessage}
+                </p>
+              )}
+              <div className="mt-4 px-3 py-1 bg-red-500/20 rounded-full border border-red-500/30 text-[10px] font-black uppercase text-red-300">
+                {homeTexts.scorePaused}
+              </div>
             </div>
-          </div>
-          
-          <div className="flex flex-wrap items-start justify-center gap-y-12 sm:gap-10 mt-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 text-foreground w-full max-w-4xl mx-auto px-4">
-             {/* Row 1 for Mobile (3 items, 33% each) */}
-             <div className="flex flex-col items-center basis-1/3 xl:basis-auto transition-transform hover:scale-105 duration-300">
-               <ThermometerIcon className="text-orange-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_temp")}</span>
-               <span className="font-black text-xl sm:text-3xl leading-tight text-center">{weatherData.details.temp ?? "--"}°C</span>
-             </div>
-             <div className="flex flex-col items-center basis-1/3 xl:basis-auto transition-transform hover:scale-105 duration-300">
-               <DropletsIcon className="text-blue-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_humidity")}</span>
-               <span className="font-black text-xl sm:text-3xl leading-tight text-center">{weatherData.details.humidity ?? "--"}%</span>
-             </div>
-             <div className="flex flex-col items-center basis-1/3 xl:basis-auto transition-transform hover:scale-105 duration-300">
-               <WindIcon className="text-teal-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_wind")}</span>
-               <span className="font-black text-xl sm:text-3xl leading-tight text-center">{weatherData.details.wind ?? "--"}m/s</span>
-             </div>
+          ) : (
+            <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card border border-card-border shadow-2xl transition-all hover:scale-105 duration-500">
+              <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
+                <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-1">{t("hero_score_label")}</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-6xl sm:text-8xl font-black tracking-tighter text-foreground">{weatherData.score}</span>
+                  <span className="text-sm sm:text-xl font-black text-foreground/70">{t("hero_unit")}</span>
+                </div>
+                {weatherData.score >= 80 && (
+                  <div className="mt-2 text-[10px] sm:text-xs font-black text-sky-blue bg-sky-blue/10 px-3 py-1 rounded-full border border-sky-blue/20 animate-pulse">
+                    {t("hero_best_day")}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-             {/* Row 2 for Mobile (2 items, 50% each) */}
-             <div className="flex flex-col items-center basis-1/2 xl:basis-auto transition-transform hover:scale-105 duration-300">
-               <CloudIcon className="text-neutral-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_dust")}</span>
-               <div className="flex flex-col items-center">
-                 <span className="font-black text-xl sm:text-3xl whitespace-nowrap leading-tight text-center">{weatherData.details.dust}</span>
-                 <div className="flex gap-2 mt-3">
-                   {weatherData.details.kr && (
-                     <>
-                       <div className="px-2 sm:px-3 py-1 rounded-full bg-sky-blue/10 text-sky-blue text-[9px] sm:text-[10px] font-black border border-sky-blue/20 backdrop-blur-md shadow-sm">
-                         {t("label_domestic")}: {weatherData.details.kr}
-                       </div>
-                       <div className="px-2 sm:px-3 py-1 rounded-full bg-purple-500/10 text-purple-500 text-[9px] sm:text-[10px] font-black border border-purple-500/20 backdrop-blur-md shadow-sm">
-                         {t("label_who")}: {weatherData.details.who}
-                       </div>
-                     </>
-                   )}
-                 </div>
-               </div>
-             </div>
-
-             <div className="flex flex-col items-center basis-1/2 xl:basis-auto transition-transform hover:scale-105 duration-300">
-               <SunIcon className="text-yellow-400 mb-2 size-6 sm:size-8" />
-               <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{t("hero_uv")}</span>
-               <span className="font-black text-xl sm:text-3xl leading-tight text-center">{weatherData.details.uv || t("status_normal")}</span>
-             </div>
+          <div className="flex flex-wrap items-start justify-center gap-y-12 sm:gap-10 mt-12 text-foreground w-full max-w-4xl mx-auto px-4">
+            {quickMetrics.map((item) => (
+              <div key={item.label} className="flex flex-col items-center basis-1/2 sm:basis-1/3 xl:basis-auto transition-transform hover:scale-105 duration-300 max-w-[180px]">
+                <item.icon className={cn(item.tone, "mb-2 size-6 sm:size-8")} />
+                <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{item.label}</span>
+                <span className="font-black text-xl sm:text-3xl leading-tight text-center">{item.value}</span>
+                {"meta" in item && item.meta ? (
+                  <span className="mt-1 text-[10px] sm:text-[11px] font-bold leading-relaxed text-muted-foreground text-center break-keep">
+                    {item.meta}
+                  </span>
+                ) : null}
+              </div>
+            ))}
           </div>
         </div>
-
       </section>
 
-      {/* Briefing Section */}
-      <div className="container mx-auto px-4 relative z-20 pb-24 sm:pb-32">
+      <div className="container mx-auto px-4 relative z-20 pb-24 sm:pb-28">
         <PicnicBriefing weatherData={weatherData} />
       </div>
 
-      {/* Statistics Section */}
-      <section id="statistics" className="container mx-auto py-24 sm:py-32 px-4 bg-sky-blue/5 dark:bg-white/5 border border-sky-blue/10 dark:border-white/5 rounded-[2.5rem] mt-8 transition-colors">
-        <div className="text-center mb-16">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <h2 className="text-3xl sm:text-5xl font-black text-foreground tracking-tight">{t("stats_title")}</h2>
-            <span className="px-2 py-0.5 rounded-md bg-orange-400/10 text-orange-500 text-[10px] font-black border border-orange-400/20">{t("status_coming_soon")}</span>
-          </div>
-          <p className="text-neutral-500 dark:text-neutral-400 mt-4 text-lg">{t("stats_desc")}</p>
+      <footer className="py-12 border-t border-neutral-100 dark:border-neutral-800 text-center transition-colors">
+        <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 px-4">
+          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+            {t("footer_copy")}
+          </p>
+          <p className="max-w-3xl text-xs leading-relaxed text-neutral-400 dark:text-neutral-500">
+            {t("footer_notice")}
+          </p>
         </div>
-        <BentoGrid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-rows-auto lg:auto-rows-[18rem] gap-6">
-          {insights.map((insight) => (
-            <BentoCard 
-              key={insight.name} 
-              {...insight} 
-              name={t(insight.name)}
-              description={t(insight.description)}
-              cta={t(insight.cta)}
-              Icon={icons[insight.icon as keyof typeof icons]} 
-              className={cn(insight.className, "min-h-[14rem] transition-all hover:shadow-2xl")}
-            />
-          ))}
-        </BentoGrid>
-      </section>
-
-      {/* Marquee Section */}
-      <section className="w-full py-8 sm:py-12 bg-background border-y border-sky-blue/10 transition-colors">
-        <div className="container mx-auto px-4 mb-6 flex flex-col items-center">
-          <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-2 drop-shadow-sm opacity-80">
-            {t("trend_header")}
-          </span>
-          <div className="h-px w-12 bg-sky-blue/30 mb-2" />
-        </div>
-        <Marquee pauseOnHover className="[--duration:25s]">
-          {trends.map((trend, i) => (
-            <span key={i} className="text-xl sm:text-3xl font-black text-sky-blue/90 mx-8 flex items-center gap-3 hover:scale-110 transition-transform cursor-default">
-              <span className="size-2 rounded-full bg-sky-blue/40 shadow-[0_0_8px_rgba(135,206,235,0.5)]" />
-              #{t("trend_title").replace("{spot}", trend)}
-            </span>
-          ))}
-        </Marquee>
-      </section>
-
-      {/* AI Action Section */}
-      <section id="ai-generator" className="container mx-auto py-24 sm:py-32 px-4 flex flex-col items-center max-w-5xl">
-        <div className="flex items-center gap-3 mb-6">
-          <h2 className="text-4xl sm:text-6xl font-black text-foreground tracking-tight">{t("ai_title")}</h2>
-          <span className="px-3 py-1 rounded-full bg-orange-400/10 text-orange-500 text-xs font-black border border-orange-400/20">{t("status_coming_soon")}</span>
-        </div>
-        <p className="text-neutral-500 dark:text-neutral-400 mb-12 text-center max-w-2xl px-2 leading-relaxed text-xl font-medium">
-          {t("ai_desc")}
-        </p>
-        
-        <div className="w-full max-w-xl p-10 sm:12 rounded-[3.5rem] bg-[var(--card)] backdrop-blur-xl shadow-[0_30px_100px_rgba(135,206,235,0.15)] dark:shadow-[0_30px_100px_rgba(0,0,0,0.5)] border border-[var(--card-border)] relative overflow-hidden group transition-all hover:scale-[1.01]">
-          <BorderBeam size={400} duration={12} delay={5} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
-          
-          <div className="space-y-10">
-            <div className="flex flex-col gap-4">
-              <label className="text-[12px] font-black text-sky-blue uppercase tracking-[0.3em] ml-2">{t("ai_time_label")}</label>
-              <div className="flex items-center gap-5 bg-[var(--interactive)] p-5 rounded-[2rem] border border-[var(--interactive-border)] hover:border-sky-blue/50 transition-all cursor-pointer group/item">
-                <ClockIcon size={28} className="text-sky-blue group-hover/item:scale-110 transition-transform" />
-                <span className="font-black text-foreground text-xl">{t("ai_time_val")}</span>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-4">
-              <label className="text-[12px] font-black text-sky-blue uppercase tracking-[0.3em] ml-2">{t("ai_loc_label")}</label>
-              <div 
-                className={cn(
-                  "flex items-center gap-5 bg-[var(--interactive)] p-5 rounded-[2rem] border border-[var(--interactive-border)] hover:border-sky-blue/50 transition-all cursor-pointer group/item relative overflow-hidden",
-                  isLocating && "animate-pulse"
-                )}
-                onClick={handleUseLocation}
-              >
-                <MapPinIcon size={28} className={cn("text-sky-blue group-hover/item:scale-110 transition-transform", isLocating && "animate-bounce")} />
-                <span className="font-black text-foreground text-xl">{isLocating ? t("loading_locating") : location}</span>
-                {isLocating && <BorderBeam size={100} duration={2} />}
-              </div>
-              <button 
-                onClick={handleUseLocation}
-                className="text-[10px] font-black text-neutral-400 hover:text-sky-blue dark:text-neutral-500 dark:hover:text-sky-blue text-left ml-4 flex items-center gap-1 transition-colors uppercase tracking-widest"
-              >
-                <Sparkles size={12} />
-                {t("ai_loc_current")}
-              </button>
-            </div>
-
-            <ShimmerButton 
-              className="w-full py-6 text-2xl font-black shadow-sky-blue/40 shadow-2xl hover:brightness-110 transition-all rounded-[1.5rem]" 
-              onClick={handleCreateCourse}
-              disabled={isLoading}
-            >
-              {isLoading ? t("ai_loading") : t("ai_button")}
-            </ShimmerButton>
-          </div>
-        </div>
-        
-        {isLoading && (
-          <div className="mt-16 flex flex-col items-center gap-8 animate-in fade-in zoom-in duration-700">
-            <AnimatedCircularProgressBar value={85} gaugePrimaryColor="#87CEEB" />
-            <div className="flex flex-col items-center bg-sky-blue/10 dark:bg-sky-blue/20 px-10 py-5 rounded-[2.5rem] border border-sky-blue/30 backdrop-blur-xl">
-              <p className="text-sky-blue font-black italic text-center text-xl animate-pulse">&quot;{t("ai_loading_detail")}&quot;</p>
-              <p className="text-[12px] text-neutral-400 mt-2 font-bold uppercase tracking-[0.2em]">{t("ai_processing_label")}</p>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Result Timeline Section */}
-      {showResult && (
-        <section id="course" className="container mx-auto py-24 sm:py-32 px-4 pb-64 animate-in fade-in slide-in-from-bottom-20 duration-1000">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl sm:text-6xl font-black text-foreground tracking-tight">{t("result_title")}</h2>
-            <p className="text-neutral-500 dark:text-neutral-400 mt-4 italic text-xl font-medium">{t("result_desc")}</p>
-          </div>
-          <div className="max-w-2xl mx-auto">
-            <AnimatedList>
-              {recommendedCourse.map((item, i) => (
-                <div 
-                  key={i} 
-                  className="relative w-full p-8 rounded-2xl bg-[var(--card)] backdrop-blur-xl border border-[var(--card-border)] shadow-xl flex flex-col gap-4 overflow-hidden transition-all hover:border-sky-blue/30"
-                >
-                  <BorderBeam size={250} duration={20} colorFrom={item.type === "야외" ? "var(--beam-from)" : "var(--beam-to)"} />
-                  <div className="flex justify-between items-center text-foreground">
-                    <span className="px-4 py-1.5 rounded-full bg-sky-blue/10 text-sky-blue text-xs font-black uppercase">
-                      {item.time}
-                    </span>
-                    <div className="flex items-center gap-2">
-                       {item.type === "야외" ? <SunIcon size={18} className="text-orange-400" /> : <CloudIcon size={18} className="text-sky-blue" />}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-foreground mb-1">{t(item.title)}</h3>
-                    <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed text-sm">
-                      {t(item.description)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </AnimatedList>
-          </div>
-        </section>
-      )}
-
-
-      {/* Footer */}
-      <footer className="py-12 border-t border-neutral-100 dark:border-neutral-800 text-center text-neutral-400 text-sm transition-colors">
-        {t("footer_copy")}
       </footer>
     </main>
   )

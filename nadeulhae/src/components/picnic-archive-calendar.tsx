@@ -10,7 +10,6 @@ import {
   startOfWeek, 
   endOfWeek, 
   isSameMonth, 
-  isSameDay, 
   eachDayOfInterval
 } from "date-fns"
 import { ko, enUS } from "date-fns/locale"
@@ -77,13 +76,13 @@ export function PicnicArchiveCalendar() {
         <div className="flex gap-4">
           <button 
             onClick={prevMonth}
-            className="p-4 rounded-2xl bg-white/50 dark:bg-white/5 hover:bg-sky-blue/15 hover:text-sky-blue transition-all active:scale-95 shadow-lg border border-neutral-100 dark:border-white/5"
+            className="p-4 rounded-2xl bg-card hover:bg-sky-blue/10 hover:text-sky-blue transition-all active:scale-95 shadow-lg border border-card-border"
           >
             <ChevronLeft size={28} />
           </button>
           <button 
             onClick={nextMonth}
-            className="p-4 rounded-2xl bg-white/50 dark:bg-white/5 hover:bg-sky-blue/15 hover:text-sky-blue transition-all active:scale-95 shadow-lg border border-neutral-100 dark:border-white/5"
+            className="p-4 rounded-2xl bg-card hover:bg-sky-blue/10 hover:text-sky-blue transition-all active:scale-95 shadow-lg border border-card-border"
           >
             <ChevronRight size={28} />
           </button>
@@ -120,7 +119,7 @@ export function PicnicArchiveCalendar() {
                   className={cn(
                     "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-center rounded-[2rem] sm:rounded-[2.5rem] text-sm sm:text-xl font-black transition-all border group",
                     !isCurrentMonth ? "text-neutral-200 dark:text-neutral-800 border-transparent opacity-30" : "text-foreground/80 border-transparent",
-                    highlighted && "bg-sky-blue/10 text-sky-blue border-sky-blue/20 shadow-blue shadow-sky-blue/5"
+                    highlighted && "bg-gradient-to-br from-nature-green/10 to-active-blue/10 text-sky-blue border-sky-blue/20 shadow-blue shadow-sky-blue/5"
                   )}
                 >
                   <span className="relative z-10">{format(day, "d")}</span>
