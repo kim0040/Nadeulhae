@@ -47,11 +47,17 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
 
   const localizeBulletinLabel = (label: string) => {
     if (language === "ko") return label
-    return label
+    const dayMatch = label.match(/(\d{1,2})일/)
+    const dayNumber = dayMatch?.[1]
+
+    const withoutDaySuffix = label.replace(/,\s*\d{1,2}일/g, "").replace(/\d{1,2}일/g, "").trim()
+    const mapped = withoutDaySuffix
       .replace(/오늘/g, "Today")
       .replace(/내일/g, "Tomorrow")
       .replace(/모레/g, "Day after tomorrow")
       .replace(/글피/g, "In 3 days")
+
+    return dayNumber ? `${mapped}, ${dayNumber}` : mapped
   }
 
   const parseBulletinSummary = (summary: string) => {
@@ -451,14 +457,23 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                 <div
                   key={`${segment.label}-${segment.text}`}
                   className={cn(
-                    "flex items-start gap-3 rounded-2xl border px-4 py-3",
+                    "flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 rounded-2xl border px-4 py-3 min-w-0",
                     getToneClasses(getBulletinTone(segment.text))
                   )}
                 >
-                  <span className="shrink-0 rounded-full border border-current/10 bg-background/95 px-3.5 py-1.5 text-sm sm:text-base font-black uppercase tracking-widest text-current shadow-sm dark:bg-background/60">
-                    {segment.label}
+                  <span className="inline-flex self-start sm:self-auto sm:shrink-0 w-fit max-w-[82%] sm:max-w-none rounded-2xl sm:rounded-full border border-current/10 bg-background/95 px-3 py-1.5 sm:px-3.5 text-current shadow-sm dark:bg-background/60">
+                    <span
+                      className={cn(
+                        "block max-w-full break-words whitespace-normal text-left leading-snug",
+                        language === "en"
+                          ? "normal-case tracking-tight text-[11px] sm:text-sm font-extrabold"
+                          : "tracking-[0.08em] text-[11px] sm:text-sm font-black"
+                      )}
+                    >
+                      {segment.label}
+                    </span>
                   </span>
-                  <span className="text-base sm:text-lg font-bold leading-relaxed break-words text-current">
+                  <span className="min-w-0 text-base sm:text-lg font-bold leading-relaxed break-words text-current">
                     {segment.text}
                   </span>
                 </div>
