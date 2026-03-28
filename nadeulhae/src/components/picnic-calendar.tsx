@@ -88,17 +88,32 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
               const isToday = isSameDay(dayDate, today)
               const isRecommended = dayForecast.score >= 80
               const isWetDay = dayForecast.sky?.includes("비") || dayForecast.sky?.includes("눈") || dayForecast.precipChance >= 60
-              const advice = isWetDay
-                ? language === "ko"
-                  ? "우산 또는 실내 대안 추천"
-                  : "Carry an umbrella or consider indoors"
-                : dayForecast.score >= 80
-                  ? language === "ko"
-                    ? "장시간 산책하기 좋은 날"
-                    : "Great for a long outdoor stroll"
-                  : language === "ko"
-                    ? "가벼운 야외 일정 권장"
-                    : "Best for a lighter outdoor plan"
+              let advice = ""
+              if (isWetDay) {
+                advice = language === "ko"
+                  ? "우산은 필수! 비 오는 창밖 풍경을 즐길 수 있는 카페를 추천해요."
+                  : "Stay dry! How about a cafe with a nice rain view?"
+              } else if (dayForecast.tempMax > 28) {
+                advice = language === "ko"
+                  ? "날씨가 꽤 더워요. 시원한 실내 전시회나 쇼핑몰 나들이는 어떨까요?"
+                  : "It's quite hot. Consider visiting a cool exhibition or a shopping mall."
+              } else if (dayForecast.tempMax < 12) {
+                advice = language === "ko"
+                  ? "찬바람이 불어요. 따뜻한 차 한 잔과 함께 실내에서 여유를 즐겨보세요."
+                  : "Cold winds expected. Enjoy some warm tea or indoor relaxation."
+              } else if (dayForecast.score >= 85) {
+                advice = language === "ko"
+                  ? "피크닉 가기 최적의 날! 돗자리를 챙겨 공원으로 지금 바로 떠나보세요."
+                  : "Ideal for a picnic! Head to the park with a picnic mat right now."
+              } else if (dayForecast.score >= 70) {
+                advice = language === "ko"
+                  ? "산책이나 가벼운 야외 활동을 하기에 딱 좋은 날씨입니다."
+                  : "Great weather for a stroll or light outdoor activities."
+              } else {
+                advice = language === "ko"
+                  ? "가벼운 외출을 즐기기에 적합한 날씨입니다. 즐거운 하루 되세요!"
+                  : "Suitable for a quick outing. Have a great day!"
+              }
 
               const cardContent = (
                 <div className={cn(
@@ -149,10 +164,10 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                         {dayForecast.sky?.includes("맑음") ? <Sun size={36} strokeWidth={2.5} /> : dayForecast.sky?.includes("비") || dayForecast.sky?.includes("눈") ? <CloudRain size={36} strokeWidth={2.5} /> : <Cloud size={36} strokeWidth={2.5} />}
                       </div>
                     </div>
-                    <span className="text-lg font-black mt-4 text-foreground text-center break-words line-clamp-2 min-h-[3.25rem]">
+                    <span className="text-2xl sm:text-3xl font-black mt-4 text-foreground text-center break-words line-clamp-2 min-h-[4rem]">
                       {dayForecast.sky}
                     </span>
-                    <span className="text-sm font-bold mt-1 text-muted-foreground text-center break-words line-clamp-2 min-h-[2.75rem]">
+                    <span className="text-sm font-bold mt-1 text-muted-foreground text-center break-words min-h-[3.25rem]">
                       {advice}
                     </span>
                   </div>
@@ -180,7 +195,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
 
                     <div className="rounded-[1.35rem] border border-border bg-[var(--interactive)] px-4 py-3">
                       <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{outdoorTipLabel}</div>
-                      <div className="text-xs sm:text-sm font-bold text-foreground/80 break-words line-clamp-2">
+                      <div className="text-xs sm:text-sm font-bold text-foreground/80 break-words">
                         {advice}
                       </div>
                     </div>

@@ -398,7 +398,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                 {card.icon}
                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">{card.label}</span>
               </div>
-              <div className={cn("text-sm sm:text-base font-black leading-relaxed break-words", card.tone)}>
+              <div className={cn("text-xl sm:text-4xl font-black leading-tight break-words", card.tone)}>
                 {card.title}
               </div>
               <div className="mt-2 text-xs font-bold leading-relaxed text-muted-foreground break-words">
@@ -425,7 +425,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                   <span
                     key={`${tag.label}-${tag.tone}`}
                     className={cn(
-                      "rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest",
+                      "rounded-full border px-4 py-1.5 text-xs sm:text-base font-black uppercase tracking-widest",
                       getToneClasses(tag.tone)
                     )}
                   >
@@ -445,10 +445,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                     getToneClasses(getBulletinTone(segment.text))
                   )}
                 >
-                  <span className="shrink-0 rounded-full border border-current/10 bg-background/95 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-current shadow-sm dark:bg-background/60">
+                  <span className="shrink-0 rounded-full border border-current/10 bg-background/95 px-3.5 py-1.5 text-sm sm:text-base font-black uppercase tracking-widest text-current shadow-sm dark:bg-background/60">
                     {segment.label}
                   </span>
-                  <span className="text-sm font-bold leading-relaxed break-words text-current">
+                  <span className="text-base sm:text-lg font-bold leading-relaxed break-words text-current">
                     {segment.text}
                   </span>
                 </div>
@@ -490,7 +490,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="flex items-center justify-between mb-8 relative z-10">
             <div className="flex items-center gap-2">
               <div className="size-2 rounded-full bg-sky-blue animate-pulse" />
-              <h4 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">{t("brief_observation_grid")}</h4>
+              <h4 className="text-xs sm:text-lg font-black uppercase tracking-[0.2em] text-muted-foreground">{t("brief_observation_grid")}</h4>
             </div>
             <span className="text-[8px] sm:text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.15em]">{t("brief_nrs_protocol")}</span>
           </div>
@@ -502,7 +502,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                   <div className="p-1 rounded-md bg-[var(--interactive)] border border-[var(--interactive-border)] transition-colors group-hover:bg-sky-blue/10">
                     {item.icon}
                   </div>
-                  <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
+                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest">{item.label}</span>
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl sm:text-2xl font-black text-foreground tabular-nums tracking-tighter break-words">

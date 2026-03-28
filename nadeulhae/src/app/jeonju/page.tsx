@@ -202,7 +202,7 @@ export default function JeonjuPage() {
                   {language === "ko" ? "Live Layer" : "Live Layer"}
                 </div>
                 <h3 className="mt-3 text-2xl font-black tracking-tight text-foreground break-keep">{liveContent[index].title}</h3>
-                <p className="mt-4 text-sm sm:text-base font-semibold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
+                <p className="mt-4 text-base sm:text-lg font-bold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
                   {liveContent[index].desc}
                 </p>
                 {weatherData && index === 0 && (
@@ -259,7 +259,7 @@ export default function JeonjuPage() {
                 </span>
                 <h3 className="mt-4 text-2xl font-black tracking-tight text-foreground break-keep">{item.title}</h3>
               </div>
-              <p className="mt-4 text-sm sm:text-base font-semibold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
+              <p className="mt-4 text-base sm:text-lg font-bold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
                 {item.desc}
               </p>
             </div>
@@ -280,9 +280,9 @@ export default function JeonjuPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
             {stepContent.map((step, index) => (
               <div key={step.title} className="rounded-[2rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5 min-w-0">
-                <div className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-blue">{devSteps[index]}</div>
-                <h3 className="mt-3 text-lg font-black leading-snug text-foreground break-keep">{step.title}</h3>
-                <p className="mt-3 text-sm font-semibold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
+                <div className="text-sm font-black uppercase tracking-[0.24em] text-sky-blue">{devSteps[index]}</div>
+                <h3 className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground break-keep">{step.title}</h3>
+                <p className="mt-3 text-base font-bold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
                   {step.desc}
                 </p>
               </div>

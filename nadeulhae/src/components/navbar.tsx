@@ -53,23 +53,25 @@ export function Navbar() {
       "pointer-events-none"
     )}>
       {/* Logo on the far left */}
-      <Link href="/" className="pointer-events-auto flex items-center gap-2.5 sm:gap-3 group shrink-0">
-        <div className="size-10 sm:size-12 lg:size-13 bg-[var(--card)] backdrop-blur-xl border border-[var(--card-border)] rounded-2xl flex items-center justify-center p-2 sm:p-2.5 shadow-xl group-hover:scale-105 transition-transform">
-          <Image src="/logo.png" alt="Nadeulhae Logo" width={36} height={36} className="w-full h-full object-contain" />
+      <Link href="/" className="pointer-events-auto flex items-center gap-2 group shrink-0">
+        <div className="size-9 sm:size-12 lg:size-13 bg-[var(--card)] backdrop-blur-xl border border-[var(--card-border)] rounded-2xl flex items-center justify-center p-1.5 sm:p-2.5 shadow-xl group-hover:scale-105 transition-transform">
+          <Image src="/logo.png" alt="Nadeulhae Logo" width={32} height={32} className="w-full h-full object-contain" priority />
         </div>
         <span className={cn(
           "text-base sm:text-2xl lg:text-[1.7rem] font-black tracking-tighter text-foreground group-hover:text-sky-blue transition-colors",
-          language === "en" ? "hidden lg:block" : "hidden sm:block"
+          mounted ? (language === "en" ? "hidden lg:block" : "hidden sm:block") : "hidden sm:block"
         )}>{t("logo_text")}</span>
       </Link>
 
       {/* Navigation Pill (Centered on Large / Compact on Small) */}
-      <nav className="absolute left-1/2 -translate-x-1/2 pointer-events-auto z-50 transition-all">
+      <nav className="absolute left-1/2 -translate-x-1/2 pointer-events-auto z-50 transition-all max-w-[95vw]">
         <div className={cn(
-          "bg-[var(--card)] backdrop-blur-2xl border border-[var(--card-border)] rounded-full flex items-center shadow-xl shadow-active-blue/10 max-w-[96vw] sm:max-w-none transition-all",
-          language === "en" ? "px-2 sm:px-7 lg:px-8 py-2 sm:py-3 gap-1 sm:gap-7" : "px-2.5 sm:px-7 lg:px-8 py-2 sm:py-3 gap-1.5 sm:gap-7"
+          "bg-[var(--card)] backdrop-blur-2xl border border-[var(--card-border)] rounded-full flex items-center shadow-xl shadow-active-blue/10 transition-all",
+          mounted 
+            ? (language === "en" ? "px-1.5 sm:px-7 lg:px-8 py-1.5 sm:py-3 gap-0.5 sm:gap-7" : "px-2 sm:px-7 lg:px-8 py-1.5 sm:py-3 gap-1 sm:gap-7")
+            : "px-2 sm:px-7 lg:px-8 py-1.5 sm:py-3 gap-1 sm:gap-7"
         )}>
-        <div className="flex items-center gap-3 sm:gap-6 lg:gap-7 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 sm:gap-6 lg:gap-7 overflow-x-auto no-scrollbar">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -79,8 +81,11 @@ export function Navbar() {
                 pathname === item.href ? "text-sky-blue scale-105" : "text-neutral-500 dark:text-neutral-400 hover:scale-105"
               )}
             >
-              <item.icon size={18} className="shrink-0" />
-              <span className={cn(item.href === "/login" && "hidden sm:inline")}>{item.name}</span>
+              <item.icon size={16} className="sm:size-[18px] shrink-0" />
+              <span className={cn(
+                (item.href === "/login" || item.href === "/about") && "hidden sm:inline",
+                "xs:inline" // Standard fallback
+              )}>{item.name}</span>
               {item.href === "/login" && (
                 <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-active-blue text-[8px] text-white px-1.5 py-0.5 rounded-full opacity-0 group-hover/nav:opacity-100 transition-opacity whitespace-nowrap font-black">
                   {t("nav_login_unsupported")}
@@ -90,7 +95,7 @@ export function Navbar() {
           ))}
         </div>
         
-        <div className="flex items-center gap-2 sm:gap-4 lg:gap-5 border-l border-neutral-200 dark:border-neutral-800 pl-3 sm:pl-5 lg:pl-6 ml-2 sm:ml-5 lg:ml-6">
+        <div className="flex items-center gap-1 sm:gap-4 lg:gap-5 border-l border-neutral-200 dark:border-neutral-800 pl-2 sm:pl-5 lg:pl-6 ml-1.5 sm:ml-5 lg:ml-6">
            {mounted && (
              <button 
                onClick={() => {
