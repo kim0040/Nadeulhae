@@ -14,7 +14,7 @@ const translations: Record<Language, Record<string, string | string[]>> = {
   ko: {
     // Navbar
     nav_home: "홈",
-    nav_jeonju: "전주 특화",
+    nav_jeonju: "전주+",
     nav_about: "소개",
     nav_stats: "통계 달력",
     nav_calendar: "달력",

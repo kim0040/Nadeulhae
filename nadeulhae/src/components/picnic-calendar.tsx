@@ -167,9 +167,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                     <span className="text-2xl sm:text-3xl font-black mt-4 text-foreground text-center break-words line-clamp-2 min-h-[4rem]">
                       {dayForecast.sky}
                     </span>
-                    <span className="text-sm font-bold mt-1 text-muted-foreground text-center break-words min-h-[3.25rem]">
-                      {advice}
-                    </span>
+
                   </div>
 
                   {/* Bottom: Temp and Details */}
