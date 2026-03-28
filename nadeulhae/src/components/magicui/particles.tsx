@@ -1,6 +1,7 @@
 "use client"
 
 import React, {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -90,7 +91,7 @@ export const Particles: React.FC<ParticlesProps> = ({
   const rafID = useRef<number | null>(null)
   const rgb = useRef<number[]>(hexToRgb(color))
 
-  const circleParams = (): Circle => {
+  const circleParams = useCallback((): Circle => {
     const x = Math.floor(Math.random() * canvasSize.current.w)
     const y = Math.floor(Math.random() * canvasSize.current.h)
     const translateX = 0
@@ -102,9 +103,9 @@ export const Particles: React.FC<ParticlesProps> = ({
     const dy = (Math.random() - 0.5) * 0.1
     const magnetism = 0.1 + Math.random() * 4
     return { x, y, translateX, translateY, size: pSize, alpha, targetAlpha, dx, dy, magnetism }
-  }
+  }, [size])
 
-  const drawCircle = (circle: Circle, update = false) => {
+  const drawCircle = useCallback((circle: Circle, update = false) => {
     if (context.current) {
       const { x, y, translateX, translateY, size, alpha } = circle
       context.current.translate(translateX, translateY)
@@ -115,41 +116,18 @@ export const Particles: React.FC<ParticlesProps> = ({
       context.current.setTransform(dpr, 0, 0, dpr, 0, 0)
       if (!update) circles.current.push(circle)
     }
-  }
+  }, [dpr])
 
-  const animate = () => {
-    if (context.current) {
-      context.current.clearRect(0, 0, canvasSize.current.w, canvasSize.current.h)
-      circles.current.forEach((circle, i) => {
-        circle.x += circle.dx + vx
-        circle.y += circle.dy + vy
-        circle.translateX += (mouse.current.x / (staticity / circle.magnetism) - circle.translateX) / ease
-        circle.translateY += (mouse.current.y / (staticity / circle.magnetism) - circle.translateY) / ease
-        
-        // Simple alpha animation
-        if (circle.alpha < circle.targetAlpha) circle.alpha += 0.01
-        
-        drawCircle(circle, true)
-
-        if (circle.x < -circle.size || circle.x > canvasSize.current.w + circle.size ||
-            circle.y < -circle.size || circle.y > canvasSize.current.h + circle.size) {
-          circles.current[i] = circleParams()
-        }
-      })
-    }
-    rafID.current = window.requestAnimationFrame(animate)
-  }
-
-  const drawParticles = () => {
+  const drawParticles = useCallback(() => {
     if (context.current) {
       context.current.clearRect(0, 0, canvasSize.current.w, canvasSize.current.h)
       for (let i = 0; i < quantity; i++) {
         drawCircle(circleParams())
       }
     }
-  }
+  }, [circleParams, drawCircle, quantity])
 
-  const resizeCanvas = () => {
+  const resizeCanvas = useCallback(() => {
     if (canvasContainerRef.current && canvasRef.current && context.current) {
       canvasSize.current.w = canvasContainerRef.current.offsetWidth
       canvasSize.current.h = canvasContainerRef.current.offsetHeight
@@ -164,14 +142,14 @@ export const Particles: React.FC<ParticlesProps> = ({
         drawCircle(circle)
       }
     }
-  }
+  }, [circleParams, dpr, drawCircle, quantity])
 
-  const initCanvas = () => {
+  const initCanvas = useCallback(() => {
     resizeCanvas()
     drawParticles()
-  }
+  }, [drawParticles, resizeCanvas])
 
-  const onMouseMove = () => {
+  const onMouseMove = useCallback(() => {
     if (canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect()
       const { w, h } = canvasSize.current
@@ -183,37 +161,52 @@ export const Particles: React.FC<ParticlesProps> = ({
         mouse.current.y = y
       }
     }
-  }
-
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true)
-  }, [])
+  }, [mousePosition.x, mousePosition.y])
 
   useEffect(() => {
     if (canvasRef.current) {
       context.current = canvasRef.current.getContext("2d")
     }
     rgb.current = hexToRgb(color)
+    const handleResize = () => initCanvas()
+    const tick = () => {
+      if (context.current) {
+        context.current.clearRect(0, 0, canvasSize.current.w, canvasSize.current.h)
+        circles.current.forEach((circle, i) => {
+          circle.x += circle.dx + vx
+          circle.y += circle.dy + vy
+          circle.translateX += (mouse.current.x / (staticity / circle.magnetism) - circle.translateX) / ease
+          circle.translateY += (mouse.current.y / (staticity / circle.magnetism) - circle.translateY) / ease
+          if (circle.alpha < circle.targetAlpha) circle.alpha += 0.01
+          drawCircle(circle, true)
+
+          if (
+            circle.x < -circle.size || circle.x > canvasSize.current.w + circle.size ||
+            circle.y < -circle.size || circle.y > canvasSize.current.h + circle.size
+          ) {
+            circles.current[i] = circleParams()
+          }
+        })
+      }
+      rafID.current = window.requestAnimationFrame(tick)
+    }
+
     initCanvas()
-    animate()
-    window.addEventListener("resize", initCanvas)
+    tick()
+    window.addEventListener("resize", handleResize)
     return () => {
       if (rafID.current != null) window.cancelAnimationFrame(rafID.current)
-      window.removeEventListener("resize", initCanvas)
+      window.removeEventListener("resize", handleResize)
     }
-  }, [color])
+  }, [circleParams, color, drawCircle, ease, initCanvas, staticity, vx, vy])
 
   useEffect(() => {
     onMouseMove()
-  }, [mousePosition.x, mousePosition.y])
+  }, [onMouseMove])
 
   useEffect(() => {
     initCanvas()
-  }, [refresh])
-
-  if (!mounted) return null
+  }, [initCanvas, refresh])
 
   return (
     <div className={cn("pointer-events-none", className)} ref={canvasContainerRef} aria-hidden="true" {...props}>

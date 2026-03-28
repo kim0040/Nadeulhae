@@ -1,89 +1,241 @@
-<div align="center">
-  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white" />
-  <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
-  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" />
-</div>
+# 나들해 (Nadeulhae)
 
-<h1 align="center">🧺 나들해 (Nadeulhae)</h1>
-<p align="center"><strong>기상/환경 데이터 기반 인공지능 피크닉 지수 분석 & 추천 서비스</strong></p>
+공공 기상/환경 데이터를 기반으로 현재 위치의 나들이 적합도를 계산하고, 브리핑/예보/기상 이미지를 제공하는 Next.js 애플리케이션입니다.
 
----
+## 1. 프로젝트 개요
 
-## 📖 프로젝트 개요
+이 저장소는 다음 두 레이어로 구성됩니다.
 
-**나들해**는 기상청 및 에어코리아의 실시간 공공 기상/대기오염 데이터를 종합하여, 당신이 있는 지역에서 **"지금 피크닉 가기 얼마나 좋은 날씨인지"**를 0점부터 100점의 고도화된 '피크닉 지수'로 환산해주는 스마트 플랫폼입니다.
+- 웹 앱: `/nadeulhae` (Next.js App Router)
+- 문서/데이터: 루트의 `api_data_list.md`, 기획 문서들
 
-복잡한 온도, 강수, 오존, 미세먼지 수치를 직접 파악할 필요 없이, 가장 직관적인 형태의 메시지와 UI로 완벽한 나들이 타이밍을 알려드립니다.
+핵심 사용자 흐름은 다음과 같습니다.
 
----
+1. 사용자 위치(허용 시) 또는 기본 위치(전주)로 날씨 요청
+2. 서버 API(`/api/weather/current`)가 외부 API를 호출하고 캐시/검증/점수 계산 수행
+3. 메인 페이지에서 브리핑 + 기상 이미지 + 다국어 메시지 렌더링
+4. 캘린더 페이지에서 단기/중기 예보를 합성해 10일 예보 제공
 
-## ⚡ 주요 기능 (Key Features)
+## 2. 기술 스택
 
-### 1. 🌡️ 고도화된 '피크닉 지수' 알고리즘 (Knock-out System 도입)
-단순한 기온/점수 합산 방식이 아닌, **다단계 Knock-out(즉시 탈락) 기반 점수 시스템**을 구축했습니다.
-- **🚨 1단계 우선 검증 조건(즉시 탈락 필터)**: 비/눈이 오거나, 지역에 **태풍·호우·지진해일 등 기상 특보**가 발효 중인 경우 *무조건 0점 또는 최소점*을 부여하며 렌더링 UI 자체를 **위험(적색) 배너**로 긴급 교체(Event-Driven Architecture)합니다.
-- **✅ 2단계 세부 가중치 계산 (100점 만점)**: 미세먼지(통합대기환경지수 Khai 기반 40점), 1시간 단위 기온 변화(30점), 풍속 및 습도(각 15점)를 합산하여 최종 점수를 제공합니다.
+- Next.js 16 (App Router)
+- React 19 + TypeScript
+- Tailwind CSS v4
+- Framer Motion
+- Lucide Icons
+- `proj4` (WGS84 → TM 좌표 변환)
+- `next-themes` (라이트/다크 모드)
 
-### 2. 🛡️ 서버사이드 프록시 & 인메모리 Rate Limiting
-- 민감한 공공데이터 포털 API KEY 및 APIHub 인증 스펙의 탈취를 막기 위해 클라이언트 통신을 배제하였습니다.
-- Next.js 서버 라우트(`route.ts`)를 활용한 프록시 구조로 설계되었으며, `In-memory Rate Limiting`을 통해 IP 당 1분 30회 초과 시 429 에러(Too Many Requests)를 반환하도록 트래픽을 완벽하게 통제합니다. 
+## 3. 주요 기능
 
-### 3. 💬 다국어 및 랜덤 브리핑 언어
-- 사용자가 접속할 때마다 단조로운 고정 멘트가 나오는 것을 지양합니다.
-- 한국어(`ko`), 영어(`en`)로 구성된 수십 가지의 상황별 번역 문구(`msg_excellent`, `msg_fair` 등) 중 매번 **랜덤한 문구를 뽑아 노출**시킵니다. 
-- API 백엔드는 추상적인 Key(예: `msg_good`)만 응답하며, 브라우저가 다국어 Context를 이용해 랜덤 변동을 부여하여 SSR Mismatch 문제를 근절했습니다.
+### 3.1 피크닉 지수 계산 (Knock-out + 가중치)
 
-### 4. 🎨 Magic UI와 결합한 '선택적 노출 디자인'
-- 정보의 피로도를 낮추기 위해 **상시 노출과 조건부 노출**을 완벽히 분리했습니다.
-- 평소에는 푸른 `ShineBorder`와 유리처럼 빛나는 `BorderBeam`을 이용한 영롱한 점수판이 나타나지만, 특정 Event(우천/특보)가 발동하는 즉시 애니메이션 코드가 모두 붉은색의 맥동형(Pulse) 🚨경보 알림 형태로 즉각 변화합니다 (`app/page.tsx` 및 `route.ts`).
-- 마우스 모션과 연동되는 Particles, 마스킹된 Hero Image, Word Pull-Up 등 최고급 **Framer Motion 애니메이션과 Magic UI 컴포넌트**가 전체 웹 경험을 끌어올립니다.
+`/api/weather/current`에서 점수를 계산합니다.
 
----
+- 즉시 탈락(Knock-out)
+  - 지진/기상특보/지진해일/화산 활성 시: `0점`
+  - 현재 강수(PTY>0 또는 RN1>0) 시: `10점`
+- 일반 계산(100점 만점)
+  - 대기질(KHAI 등급): 40점
+  - 기온(T1H): 30점
+  - 하늘(SKY): 20점
+  - 풍속(WSD): 10점
 
-## 🚀 시작 가이드 (Getting Started)
+### 3.2 위치 기반 관측소 매핑
 
-### 1단계: 저장소 복제 및 의존성 설치
+- 위치 허용 시 위경도 → TM 좌표 변환 후 인근 측정소 조회
+- 인근 측정소 결과를 캐시하여 같은 좌표권 재요청 비용 최소화
+- 위치 미허용 시 기본 프로필(전주) 사용
+
+### 3.3 위험 이벤트 감시
+
+다음 이벤트를 병합 판단합니다.
+
+- 기상특보
+- 지진
+- 지진해일
+- 화산
+- 강수
+
+이벤트 상태에 따라 메인 경고 UI, 브리핑 문구, 이미지 패널 상태 배지가 동적으로 바뀝니다.
+
+### 3.4 기상 이미지 패널
+
+`/api/weather/images`에서 이미지 URL을 수집합니다.
+
+- 기본: 레이더(합성영상 우선) + GK2A 위성
+- 조건부 extras:
+  - `dust` (황사/에어로졸)
+  - `lgt` (낙뢰)
+- 실제 접근 가능한 이미지 URL만 선택(HEAD 검사)
+
+### 3.5 다국어 및 랜덤 메시지
+
+- 한국어/영어 전환 (`LanguageContext`)
+- 점수/지역 조건 기반 메시지 풀에서 랜덤 문구 선택
+
+## 4. 실행 방법
+
+루트가 아닌 앱 디렉토리에서 실행합니다.
+
 ```bash
 cd nadeulhae
 npm install
+npm run dev
 ```
 
-### 2단계: 환경 변수 구성
-프로젝트 루트 디렉토리에 `.env.local` 파일을 생성하고 아래 양식에 맞추어 채워주세요. (보안상 절대 Git에 올라가지 않습니다.)
+기본 개발 URL: `http://localhost:3000`
+
+빌드/검증:
+
+```bash
+npm run lint
+npm run build
+npm run start
+```
+
+## 5. 환경 변수
+
+`/nadeulhae/.env.local`에 설정합니다.
+
+### 필수
+
+```env
+KMA_API_KEY=...
+AIRKOREA_API_KEY=...
+```
+
+### 선택
 
 ```env
 NEXT_PUBLIC_API_URL=/api/weather
-NEXT_PUBLIC_MOCK_MODE=false # 프론트엔드 목업 테스트 시 true
-
-# [공공데이터 API 설정]
-# 기상청 (KMA) 및 기상청 API 허브 (구 10000회/현 20000회)
-KMA_API_KEY=발급받은_당신의_기상청_API_허브_인증키
-# 에어코리아 환경공단 (AirKorea - data.go.kr)
-AIRKOREA_API_KEY=에어코리아_발급_인코딩_디코딩_동일_키
-
-# [위치 기반 기본 좌표 (전라북도 전주 덕진동 기준 셋업)]
+NEXT_PUBLIC_MOCK_MODE=false
 KMA_NX=63
 KMA_NY=89
 AIRKOREA_STATION_NAME=송천동
-MID_TERM_LAND_AREA_CODE=11F10000
-MID_TERM_TEMP_AREA_CODE=11F10201
+AIRKOREA_DAILY_LIMIT=500
 ```
 
-### 3단계: 로컬 개발 서버 시작
-```bash
-npm run dev
-# 포트 3000번 (http://localhost:3000) 에서 나들해 앱이 실행됩니다!
+설명:
+
+- `KMA_API_KEY`: 기상청(API Hub 포함) 호출 키
+- `AIRKOREA_API_KEY`: AirKorea/data.go.kr 호출 키
+- `KMA_NX`, `KMA_NY`: 위치 미허용 시 기본 격자
+- `AIRKOREA_DAILY_LIMIT`: 일일 대기 API 소비 상한(기본 500)
+- `NEXT_PUBLIC_MOCK_MODE=true`: 프론트 서비스 레이어에서 목업 데이터 우선
+
+## 6. 내부 API 명세
+
+### `GET /api/weather/current`
+
+- Query: `lat`, `lon` (옵션)
+- 역할:
+  - 실황/초단기예보 + 대기질 + UV + 통보/특보 + 지진/지진해일/화산 통합
+  - 점수 계산
+  - 브리핑용 메타데이터 생성
+- 주요 응답 필드:
+  - `score`, `status`, `message`
+  - `eventData.*` (위험 플래그)
+  - `details.*` (기온/습도/풍속/대기질 등)
+  - `metadata.scoreBreakdown`, `metadata.alertSummary`, `metadata.locationContext`
+
+### `GET /api/weather/forecast`
+
+- Query: `lat`, `lon` (옵션)
+- 역할:
+  - 단기(`VilageFcst`) + 중기(`MidFcst`)를 합성하여 10일 예보 구성
+- 주요 필드:
+  - `daily[].date/tempMin/tempMax/sky/precipChance/precipAmount/snowAmount/score`
+
+### `GET /api/weather/images`
+
+- Query: `extras=dust,lgt` (옵션)
+- 역할:
+  - 레이더/위성 이미지 + 조건부 extras 반환
+
+### 목업 API (DB/백엔드 연동 전)
+
+- `GET /api/weather/insights`
+- `GET /api/weather/trends`
+- `POST /api/weather/recommendations/generate`
+- `GET /api/weather/archives`
+
+위 4개는 현재 `mockData` 기반입니다.
+
+## 7. 캐시 및 호출 제어 정책
+
+현재는 인메모리 캐시(Map) 기반입니다.
+
+### `/api/weather/current`
+
+- 사용자 응답 캐시: 5분 (세션/위치/격자 기반)
+- 실황 공용 캐시: `nx,ny + baseDate/baseTime` 기반 공유 캐시
+- 대기질: 60분
+- UV: 60분
+- 통보/특보/지진/지진해일/화산: 15분
+- 인근측정소 매핑: 24시간
+- 레이트리밋: IP 기준 1분 60회
+
+### `/api/weather/forecast`
+
+- 사용자 응답 캐시: 5분
+- 단기예보 캐시: 3시간(스마트 만료)
+- 중기예보 캐시: 12시간(스마트 만료)
+- 레이트리밋: IP 기준 1분 30회
+
+### `/api/weather/images`
+
+- 레이더: 5분
+- 위성: 2분
+- extras: `dust` 10분, `lgt` 5분
+
+## 8. 외부 데이터 소스
+
+- 기상청 API Hub / 기상청 OpenAPI
+  - 초단기실황/예보, 단기/중기 예보, 지진해일, 화산
+- AirKorea / data.go.kr
+  - 실시간 대기질, 인근 측정소, UV, 기상통보/특보, 지진
+- weather.go.kr 이미지 REST
+  - 레이더/위성/황사/낙뢰 이미지
+
+## 9. 디렉토리 구조
+
+```text
+Nadeulhae/
+├─ README.md
+├─ api_data_list.md
+└─ nadeulhae/
+   ├─ src/
+   │  ├─ app/
+   │  │  ├─ page.tsx
+   │  │  ├─ about/page.tsx
+   │  │  ├─ statistics/calendar/page.tsx
+   │  │  └─ api/weather/*/route.ts
+   │  ├─ components/
+   │  │  ├─ picnic-briefing.tsx
+   │  │  ├─ picnic-calendar.tsx
+   │  │  ├─ weather-image-panel.tsx
+   │  │  └─ magicui/*
+   │  ├─ context/LanguageContext.tsx
+   │  ├─ lib/weather-utils.ts
+   │  ├─ lib/coords-utils.ts
+   │  └─ services/dataService.ts
+   ├─ package.json
+   └─ .env.local
 ```
 
----
+## 10. 현재 상태와 확장 포인트
 
-## 📁 주요 파일 구조 분석
+- 구현 완료:
+  - 실시간/예보/이벤트 감시/이미지 패널/다국어/캐시/레이트리밋
+- 미구현(목업):
+  - 로그인/회원 기능 백엔드
+  - 추천 코스 생성 LLM 실제 연동
+  - 아카이브/인사이트/트렌드 DB 연동
 
-- `src/app/api/weather/current/route.ts`: 나들해의 코어 심장입니다. KMA 와 AirKorea 데이터를 묶어 패치하고 자체 Rate Limit 검사 및 100점 만점 평가 알고리즘을 계산/응답합니다.
-- `src/data/mockData.ts`: API 연결이 어렵거나 `.env.local` 을 구성하지 않았을 경우 (`NEXT_PUBLIC_MOCK_MODE=true` 지정 시) 디자인 렌더링에 필요한 테스트 데이터를 공급합니다. `eventData`를 `true`로 바꿔 즉시 화면 구조가 무너지고 경고 배너가 등장하는지 테스트할 수 있습니다.
-- `src/context/LanguageContext.tsx`: 시스템의 모든 하드코딩된 단어를 제거하고, 다국어 처리(EN/KO) 및 배열 형태의 번역 값 랜덤 반환 기능을 수행합니다.
+## 11. 운영 시 주의사항
 
----
-
-## ⚖️ License
-This project is open-source and meant for educational and environment-planning purposes. Not guaranteed for life-critical weather emergencies.
+- 현재 캐시는 서버 프로세스 메모리 기반입니다.
+  - 멀티 인스턴스/서버리스 환경에서는 캐시 일관성이 보장되지 않습니다.
+  - 운영에서는 Redis 같은 외부 캐시 계층을 권장합니다.
+- 본 서비스 정보는 참고용이며, 재난 대응은 반드시 공식 기관 안내를 우선해야 합니다.

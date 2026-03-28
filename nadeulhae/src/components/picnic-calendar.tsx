@@ -175,7 +175,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="rounded-[1.35rem] border border-border bg-[var(--interactive)] px-4 py-3">
                         <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Min / Max</div>
-                        <div className="flex items-center justify-between text-sm font-black">
+                        <div className="flex items-center justify-between text-base sm:text-lg font-black">
                           <span className="text-blue-500 dark:text-blue-400">{dayForecast.tempMin}°</span>
                           <span className="text-red-500 dark:text-red-400">{dayForecast.tempMax}°</span>
                         </div>

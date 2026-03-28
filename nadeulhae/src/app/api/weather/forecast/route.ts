@@ -3,32 +3,131 @@ import {
   HOME_REGION,
   dfsToGrid,
   getMidForecastBase,
+  getVillageForecastBase,
   getStableForecastSeed,
   resolveRegionProfile,
+  getKstCompactDate,
+  getNextUpdateTimestamp,
 } from "@/lib/weather-utils"
+import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 
 type CacheEntry<T> = {
   data: T
   lastUpdate: number
 }
 
-const forecastCache = new Map<string, CacheEntry<unknown>>()
+type UserCacheEntry<T> = {
+  data: T
+  expiry: number
+}
+
+const villageCache = new Map<string, CacheEntry<any>>()
+const midCache = new Map<string, CacheEntry<any>>()
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
+const forecastResponseCache = new Map<string, UserCacheEntry<any>>()
 
 const CACHE_DURATION = 3 * 60 * 60 * 1000
+const MID_CACHE_DURATION = 12 * 60 * 60 * 1000
+const USER_RESPONSE_CACHE_DURATION = 5 * 60 * 1000
 const RATE_LIMIT_WINDOW = 60 * 1000
 const MAX_REQUESTS_PER_WINDOW = 30
+const CACHE_SWEEP_INTERVAL = 5 * 60 * 1000
+let lastMaintenanceSweep = 0
 
-function getCachedForecast<T>(key: string) {
-  const cached = forecastCache.get(key)
-  if (!cached) return null
-  if (Date.now() - cached.lastUpdate > CACHE_DURATION) return null
-  return cached.data as T
+/**
+ * Smart cache check aligned with update cycles
+ */
+function getSmartCachedValue<T>(map: Map<string, CacheEntry<T>>, key: string, type: 'village' | 'mid', defaultTtl: number) {
+  const entry = map.get(key)
+  if (!entry) return null
+  const now = Date.now()
+  if (now - entry.lastUpdate > defaultTtl * 2) return null
+  const nextUpdate = getNextUpdateTimestamp(type, new Date(entry.lastUpdate))
+  if (now >= nextUpdate) return null
+  return entry.data
+}
+
+function getClientIp(request: Request) {
+  const forwarded = request.headers.get("x-forwarded-for")
+  if (forwarded) {
+    return forwarded.split(",")[0].trim()
+  }
+  const realIp = request.headers.get("x-real-ip")
+  return realIp?.trim() || "127.0.0.1"
+}
+
+function cleanupLastUpdateCache<T>(map: Map<string, CacheEntry<T>>, maxAgeMs: number, now: number) {
+  for (const [key, value] of map.entries()) {
+    if (now - value.lastUpdate > maxAgeMs) {
+      map.delete(key)
+    }
+  }
+}
+
+function cleanupExpiringCache<T extends { expiry: number }>(map: Map<string, T>, now: number) {
+  for (const [key, value] of map.entries()) {
+    if (value.expiry <= now) {
+      map.delete(key)
+    }
+  }
+}
+
+function cleanupRateLimitMap(map: Map<string, { count: number; lastReset: number }>, windowMs: number, now: number) {
+  for (const [key, value] of map.entries()) {
+    if (now - value.lastReset > windowMs * 5) {
+      map.delete(key)
+    }
+  }
+}
+
+function runMaintenanceSweepIfNeeded() {
+  const now = Date.now()
+  if (now - lastMaintenanceSweep < CACHE_SWEEP_INTERVAL) {
+    return
+  }
+
+  cleanupLastUpdateCache(villageCache, CACHE_DURATION * 3, now)
+  cleanupLastUpdateCache(midCache, MID_CACHE_DURATION * 3, now)
+  cleanupExpiringCache(forecastResponseCache, now)
+  cleanupRateLimitMap(rateLimitMap, RATE_LIMIT_WINDOW, now)
+
+  lastMaintenanceSweep = now
+}
+
+async function fetchVillageData(nx: number, ny: number, serviceKey: string) {
+  const { baseDate, baseTime } = getVillageForecastBase()
+  const cacheKey = `${nx}_${ny}_${baseDate}_${baseTime}`
+  const cached = getSmartCachedValue(villageCache, cacheKey, 'village', CACHE_DURATION)
+  if (cached) return cached
+
+  const url = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getVilageFcst?authKey=${serviceKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=${nx}&ny=${ny}`
+  const data = await fetchJsonSafely(url)
+  if (data) villageCache.set(cacheKey, { data, lastUpdate: Date.now() })
+  return data
+}
+
+async function fetchMidData(profile: any, serviceKey: string) {
+  const { tmFc } = getMidForecastBase()
+  const cacheKey = `${profile.key}_${tmFc}`
+  const cached = getSmartCachedValue(midCache, cacheKey, 'mid', MID_CACHE_DURATION)
+  if (cached) return cached
+
+  const midLandUrl = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/getMidLandFcst?authKey=${serviceKey}&pageNo=1&numOfRows=10&dataType=JSON&regId=${profile.forecastLandReg}&tmFc=${tmFc}`
+  const midTempUrl = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/getMidTa?authKey=${serviceKey}&pageNo=1&numOfRows=10&dataType=JSON&regId=${profile.forecastTempReg}&tmFc=${tmFc}`
+
+  const [midLand, midTemp] = await Promise.all([
+    fetchJsonSafely(midLandUrl),
+    fetchJsonSafely(midTempUrl),
+  ])
+
+  const result = { midLand, midTemp, tmFc }
+  if (midLand && midTemp) midCache.set(cacheKey, { data: result, lastUpdate: Date.now() })
+  return result
 }
 
 async function fetchJsonSafely(url: string) {
   try {
-    const response = await fetch(url, { cache: "no-store" })
+    const response = await fetch(url, { cache: "no-store", next: { revalidate: 0 } })
     if (!response.ok) return null
     const text = await response.text()
     if (!text || text.trim().startsWith("<")) return null
@@ -76,13 +175,36 @@ function createStableFallbackForecast(startDate: Date, index: number) {
 }
 
 export async function GET(request: Request) {
+  runMaintenanceSweepIfNeeded()
   const url = new URL(request.url)
   const lat = url.searchParams.get("lat")
   const lon = url.searchParams.get("lon")
   const userLat = lat ? Number(lat) : null
   const userLon = lon ? Number(lon) : null
+  const { sessionId, shouldSetCookie } = getOrCreateSessionId(request)
+  const profile = resolveRegionProfile(userLat, userLon)
+  const grid = userLat != null && userLon != null
+    ? dfsToGrid(userLat, userLon)
+    : {
+        nx: Number(process.env.KMA_NX ?? 63),
+        ny: Number(process.env.KMA_NY ?? 89),
+      }
 
-  const ip = request.headers.get("x-forwarded-for") || "127.0.0.1"
+  const ip = getClientIp(request)
+  const userCacheKey = [
+    sessionId,
+    profile.key,
+    grid.nx,
+    grid.ny,
+    userLat != null ? Math.round(userLat * 100) : "home",
+    userLon != null ? Math.round(userLon * 100) : "home",
+  ].join(":")
+  const cachedResponse = forecastResponseCache.get(userCacheKey)
+  if (cachedResponse && cachedResponse.expiry > Date.now()) {
+    const response = NextResponse.json(cachedResponse.data)
+    return attachSessionCookie(response, sessionId, shouldSetCookie)
+  }
+
   const now = Date.now()
   const rateData = rateLimitMap.get(ip)
 
@@ -102,32 +224,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "KMA Key Missing" }, { status: 500 })
   }
 
-  const profile = resolveRegionProfile(userLat, userLon)
-  const grid = userLat != null && userLon != null
-    ? dfsToGrid(userLat, userLon)
-    : {
-        nx: Number(process.env.KMA_NX ?? 63),
-        ny: Number(process.env.KMA_NY ?? 89),
-      }
-
-  const cacheKey = `${grid.nx}_${grid.ny}_${profile.key}`
-  const cached = getCachedForecast<any>(cacheKey)
-  if (cached) {
-    return NextResponse.json(cached)
-  }
-
-  const { forecastDate, tmFc } = getMidForecastBase()
-  const villageUrl = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getVilageFcst?authKey=${kmaKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${forecastDate}&base_time=0500&nx=${grid.nx}&ny=${grid.ny}`
-  const midLandUrl = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/getMidLandFcst?authKey=${kmaKey}&pageNo=1&numOfRows=10&dataType=JSON&regId=${profile.forecastLandReg}&tmFc=${tmFc}`
-  const midTempUrl = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/getMidTa?authKey=${kmaKey}&pageNo=1&numOfRows=10&dataType=JSON&regId=${profile.forecastTempReg}&tmFc=${tmFc}`
-
-  const [villageData, midLandData, midTempData] = await Promise.all([
-    fetchJsonSafely(villageUrl),
-    fetchJsonSafely(midLandUrl),
-    fetchJsonSafely(midTempUrl),
+  const kstToday = getKstCompactDate()
+  
+  const [villageData, midForecast] = await Promise.all([
+    fetchVillageData(grid.nx, grid.ny, kmaKey),
+    fetchMidData(profile, kmaKey),
   ])
 
-  const dailyForecasts: Array<{
+  const { midLand: midLandData, midTemp: midTempData, tmFc } = midForecast
+
+  const dailyForecastMap = new Map<string, {
     date: string
     tempMin: number
     tempMax: number
@@ -137,13 +243,17 @@ export async function GET(request: Request) {
     snowAmount: string
     score: number
     isMock?: boolean
-  }> = []
-  const groupedDaily: Record<string, { temps: number[]; skies: number[]; ptys: number[]; pops: number[]; pcps: string[]; snos: string[] }> = {}
+  }>()
 
   const villageItems = villageData?.response?.body?.items?.item
   if (Array.isArray(villageItems)) {
+    const groupedDaily: Record<string, { temps: number[]; skies: number[]; ptys: number[]; pops: number[]; pcps: string[]; snos: string[] }> = {}
+    
     for (const item of villageItems) {
       const dateKey = item.fcstDate
+      // Skip dates before today in KST
+      if (dateKey < kstToday) continue
+      
       if (!groupedDaily[dateKey]) {
         groupedDaily[dateKey] = { temps: [], skies: [], ptys: [], pops: [], pcps: [], snos: [] }
       }
@@ -181,7 +291,7 @@ export async function GET(request: Request) {
       const precipAmount = bucket.pcps.find((value) => value && value !== "강수없음") || "0mm"
       const snowAmount = bucket.snos.find((value) => value && value !== "적설없음") || "0cm"
 
-      dailyForecasts.push({
+      dailyForecastMap.set(dateKey, {
         date: dateKey,
         tempMin,
         tempMax,
@@ -201,10 +311,13 @@ export async function GET(request: Request) {
 
   if (midLand && midTemp) {
     for (let index = 3; index <= 10; index += 1) {
-      const date = new Date()
-      date.setDate(date.getDate() + index)
-      const dateKey = date.toISOString().split("T")[0].replace(/-/g, "")
-      if (dailyForecasts.some((item) => item.date === dateKey)) continue
+      // Use KST-aware date calculation for consistency
+      const kstBase = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }))
+      kstBase.setHours(0, 0, 0, 0)
+      kstBase.setDate(kstBase.getDate() + index)
+      const dateKey = kstBase.toISOString().split("T")[0].replace(/-/g, "")
+      
+      if (dailyForecastMap.has(dateKey)) continue
 
       const sky = String(midLand[`wf${index}Am`] || midLand[`wf${index}`] || midLand[`wf${index}Pm`] || "맑음")
       const tempMin = Number(midTemp[`taMin${index}`])
@@ -219,7 +332,7 @@ export async function GET(request: Request) {
           : 10
 
       if (Number.isFinite(tempMin) && Number.isFinite(tempMax)) {
-        dailyForecasts.push({
+        dailyForecastMap.set(dateKey, {
           date: dateKey,
           tempMin,
           tempMax,
@@ -233,21 +346,51 @@ export async function GET(request: Request) {
     }
   }
 
-  const today = new Date()
-  while (dailyForecasts.length < 11) {
-    dailyForecasts.push(createStableFallbackForecast(today, dailyForecasts.length))
+  // Ensure 11 days (today + 10) starting from kstToday
+  const finalDaily: Array<{
+    date: string
+    tempMin: number
+    tempMax: number
+    sky: string
+    precipChance: number
+    precipAmount: string
+    snowAmount: string
+    score: number
+    isMock?: boolean
+  }> = []
+  
+  const todayDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }))
+  todayDate.setHours(0, 0, 0, 0)
+
+  for (let i = 0; i < 11; i++) {
+    const checkDate = new Date(todayDate)
+    checkDate.setDate(checkDate.getDate() + i)
+    const checkKey = checkDate.toISOString().split("T")[0].replace(/-/g, "")
+    
+    const existing = dailyForecastMap.get(checkKey)
+    if (existing) {
+      finalDaily.push(existing)
+    } else {
+      finalDaily.push(createStableFallbackForecast(todayDate, i))
+    }
   }
 
   const finalResult = {
     location: userLat != null && userLon != null ? profile.displayName : HOME_REGION.displayName,
-    daily: dailyForecasts.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 11),
+    daily: finalDaily,
     metadata: {
       dataSource: "기상청",
-      lastUpdate: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }),
-      info: dailyForecasts.some((day) => day.isMock) ? "Partial data generated" : "Real-time sync",
+      lastUpdate: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Seoul" }),
+      info: finalDaily.some((day) => day.isMock) ? "Partial data generated" : "Real-time sync",
+      baseTime: `V:${tmFc} M:${tmFc}`, // tmFc used as unified marker for consistency
     },
   }
 
-  forecastCache.set(cacheKey, { data: finalResult, lastUpdate: now })
-  return NextResponse.json(finalResult)
+  forecastResponseCache.set(userCacheKey, {
+    data: finalResult,
+    expiry: Date.now() + USER_RESPONSE_CACHE_DURATION,
+  })
+
+  const response = NextResponse.json(finalResult)
+  return attachSessionCookie(response, sessionId, shouldSetCookie)
 }

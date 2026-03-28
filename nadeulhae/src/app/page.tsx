@@ -22,12 +22,14 @@ import { WordPullUp } from "@/components/magicui/word-pull-up"
 import { ShineBorder } from "@/components/magicui/shine-border"
 import { BorderBeam } from "@/components/magicui/border-beam"
 import { PicnicBriefing } from "@/components/picnic-briefing"
+import { WeatherImagePanel, type WeatherImageData } from "@/components/weather-image-panel"
 
 export default function Home() {
   const { resolvedTheme } = useTheme()
   const { language, t } = useLanguage()
 
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
+  const [weatherImages, setWeatherImages] = useState<WeatherImageData>(null)
   const [heroMessageSeed] = useState(() => Math.floor(Math.random() * 1_000_000))
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
 
@@ -71,6 +73,39 @@ export default function Home() {
     loadInitialData()
   }, [])
 
+  useEffect(() => {
+    if (!weatherData) return
+
+    const loadWeatherImages = async () => {
+      try {
+        const extras = new Set<string>()
+        const hasDustIssue = Boolean(
+          (weatherData.details.pm10 ?? 0) >= 81
+          || (weatherData.details.pm25 ?? 0) >= 36
+          || /나쁨|매우|bad|very/i.test(String(weatherData.details.dust || ""))
+        )
+        const hasSevereSignal = Boolean(
+          weatherData.eventData?.isWeatherWarning
+          || weatherData.eventData?.isTyphoon
+          || weatherData.eventData?.isTsunami
+        )
+
+        if (hasDustIssue) extras.add("dust")
+        if (hasSevereSignal) extras.add("lgt")
+
+        const query = extras.size > 0 ? `?extras=${encodeURIComponent(Array.from(extras).join(","))}` : ""
+        const response = await fetch(`/api/weather/images${query}`, { cache: "no-store" })
+        if (!response.ok) return
+        const data = await response.json()
+        setWeatherImages(data)
+      } catch (error) {
+        console.error("Failed to load weather images:", error)
+      }
+    }
+
+    loadWeatherImages()
+  }, [weatherData])
+
   if (!weatherData) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-background text-sky-blue animate-pulse font-bold">
@@ -107,6 +142,42 @@ export default function Home() {
     scorePaused: language === "ko" ? "피크닉 지수 산출 보류" : "Picnic score paused",
   }
 
+  const emergencyType = weatherData.eventData?.isEarthquake
+    ? "earthquake"
+    : weatherData.eventData?.isTsunami
+      ? "tsunami"
+      : weatherData.eventData?.isVolcano
+        ? "volcano"
+        : weatherData.eventData?.isWeatherWarning
+          ? "warning"
+          : weatherData.eventData?.isRain
+            ? "rain"
+            : "none"
+
+  const emergencyTitle = emergencyType === "earthquake"
+    ? t("alert_earthquake_title")
+    : emergencyType === "tsunami"
+      ? (language === "ko" ? "🚨 지진해일 경보 감시" : "🚨 Tsunami Alert")
+      : emergencyType === "volcano"
+        ? (language === "ko" ? "🚨 화산 정보 감시" : "🚨 Volcanic Activity Alert")
+        : emergencyType === "warning"
+          ? t("alert_weather_wrn_title")
+          : emergencyType === "rain"
+            ? t("alert_heavy_rain_title")
+            : ""
+
+  const emergencyDesc = emergencyType === "earthquake"
+    ? t("alert_earthquake_desc")
+    : emergencyType === "tsunami"
+      ? (language === "ko" ? "지진해일 관련 통보가 감지되었습니다. 해안가 접근을 피하고 최신 안내를 확인하세요." : "A tsunami-related bulletin was detected. Avoid coastal areas and follow official updates.")
+      : emergencyType === "volcano"
+        ? (language === "ko" ? "화산 관련 통보가 감지되었습니다. 항공/외부 활동 전 최신 통보를 확인하세요." : "A volcanic bulletin was detected. Check the latest official advisory before travel or outdoor activity.")
+        : emergencyType === "warning"
+          ? t("alert_weather_wrn_desc")
+          : emergencyType === "rain"
+            ? t("alert_heavy_rain_desc")
+            : ""
+
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden bg-background">
       <section className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden py-24 sm:py-32">
@@ -129,19 +200,15 @@ export default function Home() {
             className="text-4xl sm:text-5xl md:text-7xl text-sky-blue px-4 font-black tracking-tight"
           />
 
-          {(weatherData.eventData?.isEarthquake || weatherData.eventData?.isWeatherWarning || weatherData.eventData?.isRain) ? (
+          {(weatherData.eventData?.isEarthquake || weatherData.eventData?.isTsunami || weatherData.eventData?.isVolcano || weatherData.eventData?.isWeatherWarning || weatherData.eventData?.isRain) ? (
             <div className="relative w-full max-w-md flex flex-col items-center justify-center p-8 rounded-3xl bg-red-500/10 border border-red-500/40 shadow-2xl mt-4 overflow-hidden">
               <BorderBeam duration={8} borderWidth={3} colorFrom="#ef4444" colorTo="#b91c1c" />
               <AlertTriangle className="size-16 sm:size-20 text-red-500 mb-4 animate-bounce" />
               <h3 className="text-xl sm:text-2xl font-black text-red-500 mb-2">
-                {weatherData.eventData?.isEarthquake ? t("alert_earthquake_title") :
-                  weatherData.eventData?.isWeatherWarning ? t("alert_weather_wrn_title") :
-                  t("alert_heavy_rain_title")}
+                {emergencyTitle}
               </h3>
               <p className="text-sm font-bold text-red-400">
-                {weatherData.eventData?.isEarthquake ? t("alert_earthquake_desc") :
-                  weatherData.eventData?.isWeatherWarning ? t("alert_weather_wrn_desc") :
-                  t("alert_heavy_rain_desc")}
+                {emergencyDesc}
               </p>
               {weatherData.eventData?.warningMessage && (
                 <p className="mt-4 text-xs sm:text-sm font-bold text-red-200 max-w-xs leading-relaxed">
@@ -189,6 +256,7 @@ export default function Home() {
 
       <div className="container mx-auto px-4 relative z-20 pb-24 sm:pb-28">
         <PicnicBriefing weatherData={weatherData} />
+        <WeatherImagePanel data={weatherImages} weather={weatherData} />
       </div>
 
       <footer className="py-12 border-t border-neutral-100 dark:border-neutral-800 text-center transition-colors">

@@ -12,6 +12,9 @@ export const mockWeatherData = {
     isEarthquake: false,
     isWeatherWarning: false, // 혹은 true로 테스트
     isRain: false, // 만약 PTY가 1,2,3,4라면 true. 테스트 시 true/false 변경
+    isTyphoon: false,
+    isTsunami: false,
+    isVolcano: false,
     warningMessage: "" // "태풍주의보 발효 중" 등
   },
   isFallback: false, // 타 지역 API 한도 초과 시 Fallback 플래그 표시
@@ -40,7 +43,29 @@ export const mockWeatherData = {
     dataSource: "data_source_combined",
     station: "Dukjin-dong",
     lastUpdate: "14:10",
-    intervals: { kma: "interval_45m", air: "interval_0m" }
+    intervals: { kma: "interval_45m", air: "interval_0m" },
+    alertSummary: {
+      hazardTags: [],
+    },
+    locationContext: {
+      coordinates: { lat: 35.8242, lon: 127.1480, source: "default" },
+      grid: { nx: 63, ny: 89 },
+      tm: { x: 180750, y: 358250 },
+      stationMap: {
+        selected: "덕진동",
+        source: "profile",
+        candidates: [
+          { name: "덕진동", distanceKm: 2.1 },
+          { name: "송천동", distanceKm: 4.7 },
+        ],
+      },
+      profile: {
+        key: "jeonju",
+        weatherStationId: "146",
+        forecastLandReg: "11F10000",
+        forecastTempReg: "11F10201",
+      },
+    },
   }
 };
 
@@ -115,4 +140,3 @@ export const mockCalendarData: Record<string, number[]> = {
   "2026-04": [4, 5, 11, 12, 18, 19, 25, 26],
   "2026-05": [2, 3, 5, 9, 10, 16, 17, 23, 24, 30, 31],
 };
-

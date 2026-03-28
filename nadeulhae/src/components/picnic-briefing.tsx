@@ -28,11 +28,6 @@ type BulletinSegment = {
 
 type BulletinTagTone = "danger" | "caution" | "info" | "neutral"
 
-type BulletinTag = {
-  label: string
-  tone: BulletinTagTone
-}
-
 export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   const { t, language } = useLanguage()
   const { details, metadata, eventData, isFallback } = weatherData
@@ -48,6 +43,15 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       text = text.replace(`{${k}}`, String(v))
     })
     return text
+  }
+
+  const localizeBulletinLabel = (label: string) => {
+    if (language === "ko") return label
+    return label
+      .replace(/오늘/g, "Today")
+      .replace(/내일/g, "Tomorrow")
+      .replace(/모레/g, "Day after tomorrow")
+      .replace(/글피/g, "In 3 days")
   }
 
   const parseBulletinSummary = (summary: string) => {
@@ -68,7 +72,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           }
         }
         return {
-          label: match[1],
+          label: localizeBulletinLabel(match[1]),
           text: match[2],
         }
       })
@@ -323,11 +327,17 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   })()
   const hazardTitle = eventData?.isEarthquake
     ? (language === "ko" ? "지진 정보 감지" : "Earthquake bulletin detected")
-    : eventData?.isWeatherWarning
-      ? (language === "ko" ? "기상특보 발효" : "Active weather warning")
-      : (language === "ko" ? "활성 특보 없음" : "No active warning")
+    : eventData?.isTsunami
+      ? (language === "ko" ? "지진해일 정보 감지" : "Tsunami bulletin detected")
+      : eventData?.isVolcano
+        ? (language === "ko" ? "화산 정보 감지" : "Volcano bulletin detected")
+        : eventData?.isWeatherWarning
+          ? (language === "ko" ? "기상특보 발효" : "Active weather warning")
+          : (language === "ko" ? "활성 특보 없음" : "No active warning")
   const hazardDetail = metadata?.alertSummary?.warningTitle
     || metadata?.alertSummary?.earthquakeTitle
+    || metadata?.alertSummary?.tsunamiTitle
+    || metadata?.alertSummary?.volcanoTitle
     || (language === "ko" ? "평시 모니터링 중" : "Monitoring in normal state")
   const signalCards = [
     {
@@ -347,8 +357,8 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       label: language === "ko" ? "위험 상태" : "Hazard Status",
       title: hazardTitle,
       detail: hazardDetail,
-      icon: <TriangleAlert size={16} className={cn(eventData?.isEarthquake || eventData?.isWeatherWarning ? "text-red-500" : "text-nature-green")} />,
-      tone: eventData?.isEarthquake || eventData?.isWeatherWarning ? "text-red-500" : "text-nature-green",
+      icon: <TriangleAlert size={16} className={cn(eventData?.isEarthquake || eventData?.isWeatherWarning || eventData?.isTsunami || eventData?.isVolcano ? "text-red-500" : "text-nature-green")} />,
+      tone: eventData?.isEarthquake || eventData?.isWeatherWarning || eventData?.isTsunami || eventData?.isVolcano ? "text-red-500" : "text-nature-green",
     },
   ]
 

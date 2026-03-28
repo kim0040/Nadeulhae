@@ -18,6 +18,9 @@ export interface WeatherData {
     isEarthquake: boolean;
     isWeatherWarning: boolean;
     isRain: boolean;
+    isTyphoon?: boolean;
+    isTsunami?: boolean;
+    isVolcano?: boolean;
     warningMessage?: string;
   };
   details: {
@@ -54,6 +57,7 @@ export interface WeatherData {
       airMinutes: number;
       alertMinutes: number;
       forecastHours: number;
+      userMinutes?: number;
     };
     scoreBreakdown?: {
       air: number;
@@ -73,6 +77,37 @@ export interface WeatherData {
       warningUpdatedAt?: string;
       earthquakeTitle?: string;
       earthquakeUpdatedAt?: string;
+      tsunamiTitle?: string;
+      tsunamiUpdatedAt?: string;
+      volcanoTitle?: string;
+      volcanoUpdatedAt?: string;
+      hazardTags?: string[];
+    };
+    locationContext?: {
+      coordinates?: {
+        lat?: number | null;
+        lon?: number | null;
+        source?: string;
+      };
+      grid?: {
+        nx?: number;
+        ny?: number;
+      };
+      tm?: {
+        x?: number | null;
+        y?: number | null;
+      };
+      stationMap?: {
+        selected?: string;
+        source?: string;
+        candidates?: Array<{ name: string; distanceKm?: number }>;
+      };
+      profile?: {
+        key?: string;
+        weatherStationId?: string;
+        forecastLandReg?: string;
+        forecastTempReg?: string;
+      };
     };
   };
 }

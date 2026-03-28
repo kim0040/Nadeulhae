@@ -6,17 +6,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const month = searchParams.get("month"); // e.g., "2026-03"
 
-  // 시뮬레이션 지연
-  await new Promise(resolve => setTimeout(resolve, 500));
-
   if (month && mockCalendarData[month]) {
     return NextResponse.json({
       month,
       highlightedDays: mockCalendarData[month],
       metadata: {
         dataSource: "Nadeulhae Archives (Historical)",
-        lastUpdate: "2026-01-01"
+        lastUpdate: "2026-01-01",
+        mode: "mock"
       }
+    }, {
+      headers: { "x-nadeulhae-data-mode": "mock" },
     });
   }
 
@@ -24,6 +24,8 @@ export async function GET(request: Request) {
   return NextResponse.json({
     month: month || "Unknown",
     highlightedDays: [],
-    metadata: { dataSource: "Nadeulhae Archives", lastUpdate: "N/A" }
+    metadata: { dataSource: "Nadeulhae Archives", lastUpdate: "N/A", mode: "mock" }
+  }, {
+    headers: { "x-nadeulhae-data-mode": "mock" },
   });
 }
