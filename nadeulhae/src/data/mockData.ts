@@ -38,6 +38,9 @@ export const mockWeatherData = {
     uv: "보통",
     kr: "좋음",
     who: "보통",
+    feelsLike: 21.4,
+    thermalKrLevel: "good" as const,
+    thermalWhoLevel: "good" as const,
   },
   metadata: {
     dataSource: "data_source_combined",

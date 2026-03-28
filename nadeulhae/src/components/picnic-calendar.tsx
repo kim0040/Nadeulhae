@@ -75,11 +75,8 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
       </div>
 
       {/* Horizontal Scroll Container */}
-      <div className="relative w-full overflow-hidden rounded-[2.5rem]">
-        {/* Magic gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-nature-green/8 via-transparent to-active-blue/8 pointer-events-none" />
-
-        <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6 px-4 py-8 relative z-10">
+      <div className="relative w-full">
+        <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6 py-6 relative z-10">
           <AnimatePresence>
             {isLoading ? (
                <div className="w-full flex justify-center py-20 text-nature-green animate-pulse font-bold tracking-widest uppercase">{language === "ko" ? "예보 불러오는 중..." : "Loading Forecast..."}</div>

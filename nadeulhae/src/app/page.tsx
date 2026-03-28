@@ -120,10 +120,18 @@ export default function Home() {
       ? { primary: "#2f6fe4", secondary: "#7db3ff" }
       : weatherData.score >= 36
         ? { primary: "#4d9a90", secondary: "#77b2f0" }
-        : { primary: "#ef4444", secondary: "#f87171" }
+      : { primary: "#ef4444", secondary: "#f87171" }
+
+  const feelsLikeValue = weatherData.details.feelsLike ?? weatherData.details.temp
 
   const quickMetrics = [
-    { icon: ThermometerIcon, label: t("hero_temp"), value: `${weatherData.details.temp ?? "--"}°C`, tone: "text-orange-400" },
+    {
+      icon: ThermometerIcon,
+      label: t("hero_temp"),
+      value: `${weatherData.details.temp ?? "--"}°C`,
+      tone: "text-orange-400",
+      meta: `${language === "ko" ? "체감" : "Feels"} ${feelsLikeValue ?? "--"}°C`,
+    },
     { icon: DropletsIcon, label: t("hero_humidity"), value: `${weatherData.details.humidity ?? "--"}%`, tone: "text-blue-400" },
     { icon: WindIcon, label: t("hero_wind"), value: `${weatherData.details.wind ?? "--"}m/s`, tone: "text-teal-400" },
     {

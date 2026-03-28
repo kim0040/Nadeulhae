@@ -424,11 +424,11 @@ const translations: Record<Language, Record<string, string | string[]>> = {
 
     // Statistics Page Extra
     cal_archive_title: "피크닉 아카이브",
-    cal_archive_desc: "지난 몇 년의 흐름을 기준으로 계절별 나들이 패턴을 살펴봅니다.",
+    cal_archive_desc: "월 단위 달력에서 피크닉 지수 상위 추천일 패턴을 한눈에 확인합니다.",
     cal_insight_title: "인사이트",
     cal_insight_text: "전주는 전통적으로 5월 2~3주차 주말이 가장 쾌적한 피크닉 지수를 기록했습니다.",
     cal_origin_title: "데이터 출처",
-    cal_origin_desc: "위 데이터는 최근 3년간의 공공 기상 데이터와 자체 대기질 관측 결과를 결합한 나들해 나들이 수치입니다.",
+    cal_origin_desc: "반짝 아이콘 날짜는 피크닉 지수 80점 이상인 추천일을 뜻합니다.",
   },
 
   en: {
@@ -842,11 +842,11 @@ const translations: Record<Language, Record<string, string | string[]>> = {
 
     // Statistics Page Extra
     cal_archive_title: "Picnic Archive",
-    cal_archive_desc: "Review seasonal outing patterns based on the flow of the past few years.",
+    cal_archive_desc: "Check high-score picnic day patterns in a monthly calendar view.",
     cal_insight_title: "Insight",
     cal_insight_text: "In Jeonju, the 2nd and 3rd weekends of May have traditionally recorded the most pleasant picnic index.",
     cal_origin_title: "Data Origin",
-    cal_origin_desc: "This data is a combined metric from public weather data and local air quality observations over the last 3 years.",
+    cal_origin_desc: "Dates with the sparkle icon indicate recommended days with picnic score 80+.",
   }
 }
 

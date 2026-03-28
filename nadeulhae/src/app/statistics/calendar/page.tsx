@@ -19,7 +19,7 @@ export default function CalendarPage() {
         color={resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"}
       />
       
-      <div className="container max-w-5xl mx-auto relative z-10">
+      <div className="container max-w-7xl mx-auto relative z-10">
         <div className="mb-16">
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 rounded-[1.5rem] bg-sky-blue/10 text-sky-blue border border-sky-blue/20">

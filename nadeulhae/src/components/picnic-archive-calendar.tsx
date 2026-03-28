@@ -20,7 +20,7 @@ import { useLanguage } from "@/context/LanguageContext"
 
 export function PicnicArchiveCalendar() {
   const { language, t } = useLanguage()
-  const [currentMonth, setCurrentMonth] = useState(subMonths(new Date(), 1)) // Start from last month
+  const [currentMonth, setCurrentMonth] = useState(new Date())
   const [archiveData, setArchiveData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const locale = language === "ko" ? ko : enUS
@@ -137,9 +137,14 @@ export function PicnicArchiveCalendar() {
 
       {/* Info Footnote */}
       <div className="mt-12 pt-8 border-t border-neutral-100 dark:border-white/5">
-        <p className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest leading-relaxed text-center sm:text-left">
+        <p className="text-xs sm:text-sm font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest leading-relaxed text-center sm:text-left">
           {t("cal_origin_desc")}
         </p>
+        {archiveData?.metadata?.note && (
+          <p className="mt-3 text-xs font-bold text-neutral-500 dark:text-neutral-400 leading-relaxed text-center sm:text-left">
+            {archiveData.metadata.note}
+          </p>
+        )}
       </div>
     </div>
   )

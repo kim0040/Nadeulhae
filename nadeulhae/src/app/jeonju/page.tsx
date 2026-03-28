@@ -16,6 +16,7 @@ import { Particles } from "@/components/magicui/particles"
 import { WordPullUp } from "@/components/magicui/word-pull-up"
 import { BorderBeam } from "@/components/magicui/border-beam"
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text"
+import { Marquee } from "@/components/magicui/marquee"
 import { PicnicBriefing } from "@/components/picnic-briefing"
 import { PicnicCalendar } from "@/components/picnic-calendar"
 
@@ -158,6 +159,60 @@ export default function JeonjuPage() {
     },
   ]
 
+  const jeonjuPlaces = language === "ko"
+    ? [
+        "#전주한옥마을",
+        "#경기전",
+        "#덕진공원",
+        "#전동성당",
+        "#남부시장",
+        "#객리단길",
+        "#아중호수",
+        "#오목대",
+        "#풍남문",
+        "#자만벽화마을",
+        "#전주수목원",
+        "#전주천",
+        "#전주동물원",
+        "#완산공원",
+        "#한벽당",
+        "#세병호",
+        "#삼천변",
+        "#한국도로공원",
+        "#전라감영",
+        "#조경단",
+        "#금암동",
+        "#서신동",
+        "#효자동",
+        "#송천동",
+      ]
+    : [
+        "#JeonjuHanokVillage",
+        "#Gyeonggijeon",
+        "#DeokjinPark",
+        "#JeondongCathedral",
+        "#NambuMarket",
+        "#GaekridanGil",
+        "#AjungLake",
+        "#Omokdae",
+        "#Pungnammun",
+        "#JamanMuralVillage",
+        "#JeonjuArboretum",
+        "#JeonjuStream",
+        "#JeonjuZoo",
+        "#WansanPark",
+        "#Hanbyeokdang",
+        "#SebyeonghoLake",
+        "#SamcheonRiverside",
+        "#JeonjuHyanggyo",
+        "#JeollaGamyeong",
+        "#Jogyeongdan",
+        "#GeumamDong",
+        "#SeosinDong",
+        "#HyojaDong",
+        "#SongcheonDong",
+      ]
+
   return (
     <main className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <section className="relative overflow-hidden px-4 pt-36 pb-20">
@@ -174,6 +229,28 @@ export default function JeonjuPage() {
             {texts.heroDesc}
           </p>
         </div>
+      </section>
+
+      <section className="py-14 relative overflow-hidden">
+        <div className="container mx-auto max-w-6xl px-4 mb-6 text-center">
+          <AnimatedGradientText
+            className="text-base sm:text-xl font-black tracking-tight"
+            colorFrom="#0b7d71"
+            colorTo="#2f6fe4"
+            speed={1.2}
+          >
+            {language === "ko" ? "전주 사람들이 자주 찾는 장소" : "Places locals in Jeonju often visit"}
+          </AnimatedGradientText>
+        </div>
+        <Marquee pauseOnHover className="[--duration:42s]">
+          {jeonjuPlaces.map((place) => (
+            <div key={place} className="mx-12 flex items-center justify-center group">
+              <span className="text-2xl sm:text-3xl font-black text-neutral-400 dark:text-neutral-700 group-hover:text-foreground transition-colors tracking-tight italic text-center">
+                {place}
+              </span>
+            </div>
+          ))}
+        </Marquee>
       </section>
 
       <section className="container mx-auto px-4 pb-20">

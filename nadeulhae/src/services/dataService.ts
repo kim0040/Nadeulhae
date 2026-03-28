@@ -43,6 +43,9 @@ export interface WeatherData {
     uv: string;
     kr?: string;
     who?: string;
+    feelsLike?: number;
+    thermalKrLevel?: "good" | "moderate" | "caution" | "danger";
+    thermalWhoLevel?: "good" | "moderate" | "caution" | "danger";
   };
   metadata?: {
     dataSource: string;

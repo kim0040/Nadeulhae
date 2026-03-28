@@ -120,6 +120,8 @@ type ScoreBreakdown = {
   total: number
 }
 
+type ThermalLevel = "good" | "moderate" | "caution" | "danger"
+
 type HazardFlags = {
   typhoon: boolean
   tsunami: boolean
@@ -369,6 +371,61 @@ function getWindScore(wind: number) {
   if (wind <= 3) return 10
   if (wind <= 6) return 5
   return 0
+}
+
+function roundToOne(value: number) {
+  return Math.round(value * 10) / 10
+}
+
+function calculateHeatIndexC(tempC: number, humidity: number) {
+  const tempF = tempC * 9 / 5 + 32
+  const hiF =
+    -42.379
+    + 2.04901523 * tempF
+    + 10.14333127 * humidity
+    - 0.22475541 * tempF * humidity
+    - 6.83783e-3 * tempF * tempF
+    - 5.481717e-2 * humidity * humidity
+    + 1.22874e-3 * tempF * tempF * humidity
+    + 8.5282e-4 * tempF * humidity * humidity
+    - 1.99e-6 * tempF * tempF * humidity * humidity
+
+  return (hiF - 32) * 5 / 9
+}
+
+function calculateFeelsLike(tempC: number, humidity: number, windMs: number) {
+  const windKmh = windMs * 3.6
+
+  if (tempC <= 10 && windKmh >= 4.8) {
+    const chill =
+      13.12
+      + 0.6215 * tempC
+      - 11.37 * Math.pow(windKmh, 0.16)
+      + 0.3965 * tempC * Math.pow(windKmh, 0.16)
+    return roundToOne(chill)
+  }
+
+  if (tempC >= 27 && humidity >= 40) {
+    return roundToOne(calculateHeatIndexC(tempC, humidity))
+  }
+
+  const vaporPressure = (humidity / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC))
+  const apparentTemp = tempC + 0.33 * vaporPressure - 0.7 * windMs - 4
+  return roundToOne(apparentTemp)
+}
+
+function getKrThermalLevel(feelsLike: number): ThermalLevel {
+  if (feelsLike >= 18 && feelsLike <= 24) return "good"
+  if ((feelsLike >= 12 && feelsLike < 18) || (feelsLike > 24 && feelsLike <= 28)) return "moderate"
+  if ((feelsLike >= 5 && feelsLike < 12) || (feelsLike > 28 && feelsLike <= 32)) return "caution"
+  return "danger"
+}
+
+function getWhoThermalLevel(feelsLike: number): ThermalLevel {
+  if (feelsLike >= 18 && feelsLike <= 26) return "good"
+  if ((feelsLike >= 10 && feelsLike < 18) || (feelsLike > 26 && feelsLike <= 30)) return "moderate"
+  if ((feelsLike >= 0 && feelsLike < 10) || (feelsLike > 30 && feelsLike <= 35)) return "caution"
+  return "danger"
 }
 
 async function fetchJsonSafely(url: string) {
@@ -944,6 +1001,9 @@ export async function GET(req: Request) {
 
   const locationLabel = isFallback ? HOME_REGION.displayName : profile.displayName
   const locationLabelEn = isFallback ? HOME_REGION.englishName : profile.englishName
+  const feelsLike = calculateFeelsLike(weatherData.temp, weatherData.humidity, weatherData.wind)
+  const thermalKrLevel = getKrThermalLevel(feelsLike)
+  const thermalWhoLevel = getWhoThermalLevel(feelsLike)
 
   const responsePayload = {
     score,
@@ -963,6 +1023,9 @@ export async function GET(req: Request) {
       ...weatherData,
       ...airQuality,
       uv: uvIndex,
+      feelsLike,
+      thermalKrLevel,
+      thermalWhoLevel,
     },
     metadata: {
       dataSource: "기상청, 한국환경공단 API (KMA, AirKorea)",
