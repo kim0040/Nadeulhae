@@ -7,6 +7,7 @@ import {
   getKstCompactDate,
   getKstDateLabel,
   getRegionProfileByKey,
+  getRegionProfiles,
   pickStationByKeywords,
   resolveRegionProfile,
   stripHtmlTags,
@@ -135,6 +136,46 @@ const warningCache = new Map<string, CacheEntry<RegionalWarningSnapshot>>()
 const earthquakeCache = new Map<string, CacheEntry<EarthquakeSnapshot>>()
 const tsunamiCache = new Map<string, CacheEntry<TsunamiSnapshot>>()
 const volcanoCache = new Map<string, CacheEntry<VolcanoSnapshot>>()
+
+const BULLETIN_FALLBACK_STATION_IDS: Partial<Record<string, string>> = {
+  gwangyang: "156",
+}
+
+function getDistanceSq(latA: number, lonA: number, latB: number, lonB: number) {
+  const dLat = latA - latB
+  const dLon = lonA - lonB
+  return dLat * dLat + dLon * dLon
+}
+
+function getBulletinFallbackStationIds(profileKey: string) {
+  const profile = getRegionProfileByKey(profileKey)
+  const profiles = getRegionProfiles()
+  const seen = new Set<string>([profile.weatherStationId])
+  const candidates: string[] = []
+
+  const pushStationId = (stationId?: string) => {
+    if (!stationId || seen.has(stationId)) return
+    seen.add(stationId)
+    candidates.push(stationId)
+  }
+
+  pushStationId(BULLETIN_FALLBACK_STATION_IDS[profile.key])
+
+  const byDistance = [...profiles]
+    .filter((candidate) => candidate.key !== profile.key)
+    .sort((a, b) => (
+      getDistanceSq(profile.lat, profile.lon, a.lat, a.lon)
+      - getDistanceSq(profile.lat, profile.lon, b.lat, b.lon)
+    ))
+
+  byDistance
+    .filter((candidate) => candidate.airSidoName === profile.airSidoName)
+    .forEach((candidate) => pushStationId(candidate.weatherStationId))
+
+  byDistance.forEach((candidate) => pushStationId(candidate.weatherStationId))
+
+  return candidates.slice(0, 5)
+}
 const currentWeatherCache = new Map<string, CacheEntry<CurrentWeatherSnapshot>>()
 const currentResponseCache = new Map<string, UserCacheEntry<any>>()
 
@@ -633,9 +674,21 @@ async function fetchRegionalBulletin(profileKey: string, serviceKey: string) {
   const cached = getCachedValue(bulletinCache, profile.key, ALERT_CACHE_DURATION)
   if (cached) return cached
 
-  const url = `https://apis.data.go.kr/1360000/VilageFcstMsgService/getWthrSituation?serviceKey=${serviceKey}&pageNo=1&numOfRows=10&dataType=JSON&stnId=${profile.weatherStationId}`
-  const data = await fetchJsonSafely(url)
-  const item = toArray(data?.response?.body?.items?.item)[0]
+  const fetchBulletinItem = async (stationId: string) => {
+    const url = `https://apis.data.go.kr/1360000/VilageFcstMsgService/getWthrSituation?serviceKey=${serviceKey}&pageNo=1&numOfRows=10&dataType=JSON&stnId=${stationId}`
+    const data = await fetchJsonSafely(url)
+    return toArray(data?.response?.body?.items?.item)[0]
+  }
+
+  let item = await fetchBulletinItem(profile.weatherStationId)
+  if (!item) {
+    for (const fallbackStationId of getBulletinFallbackStationIds(profile.key)) {
+      item = await fetchBulletinItem(fallbackStationId)
+      if (item) {
+        break
+      }
+    }
+  }
 
   const summary = truncateText(
     stripHtmlTags(String(item?.wfSv1 || item?.wfSv || item?.wn || "")).replace(/\s+/g, " ").trim(),

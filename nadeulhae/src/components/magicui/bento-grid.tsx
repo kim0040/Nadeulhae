@@ -15,7 +15,7 @@ export const BentoGrid = ({
   return (
     <div
       className={cn(
-        "grid w-full auto-rows-min sm:auto-rows-[22rem] grid-cols-1 md:grid-cols-3 gap-4",
+        "grid w-full auto-rows-min lg:auto-rows-[22rem] grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4",
         className
       )}
     >
@@ -77,7 +77,7 @@ export const BentoCard = ({
       <h3 className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter mt-2">
         {name}
       </h3>
-      <p className="max-w-xs text-foreground/60 text-base sm:text-lg font-medium leading-relaxed">{description}</p>
+      <p className="max-w-sm text-foreground/60 text-base sm:text-lg font-medium leading-relaxed">{description}</p>
     </div>
 
     <div

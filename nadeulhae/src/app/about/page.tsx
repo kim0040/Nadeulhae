@@ -151,7 +151,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <BentoGrid className="md:grid-cols-3 gap-4 sm:gap-8">
+        <BentoGrid className="gap-4 sm:gap-8">
           {features.map((feature, i) => (
             <div key={i} className="relative group">
               <BentoCard 
@@ -331,22 +331,25 @@ export default function AboutPage() {
 
       {/* Contributors Section */}
       <section id="contributors" className="container mx-auto py-32 px-4 bg-sky-blue/5 dark:bg-white/5 border-y border-sky-blue/10 dark:border-white/5 relative overflow-hidden">
-        <div className="absolute top-0 right-0 px-8 py-2 bg-sky-blue/10 border-l border-b border-sky-blue/20 rounded-bl-3xl text-[10px] font-black uppercase tracking-[0.3em] text-sky-blue">
+        <div className="hidden xl:block absolute top-0 right-0 px-8 py-2 bg-sky-blue/10 border-l border-b border-sky-blue/20 rounded-bl-3xl text-[10px] font-black uppercase tracking-[0.3em] text-sky-blue">
           The Engineering Team
         </div>
         
         <div className="text-center mb-20">
           <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">{t("about_contributors_title")}</h2>
           <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-3xl mx-auto">
-            {t("about_philosophy_desc")}
+            {t("about_contributors_desc")}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 sm:gap-12 max-w-6xl mx-auto">
           {contributors.map((person, i) => (
             <div
               key={i}
-              className="group relative h-full overflow-hidden rounded-[3rem] sm:rounded-[4rem] border border-card-border bg-card shadow-[0_24px_70px_-48px_rgba(47,111,228,0.22)] transition-transform duration-300 hover:-translate-y-1"
+              className={cn(
+                "group relative h-full overflow-hidden rounded-[3rem] sm:rounded-[4rem] border border-card-border bg-card shadow-[0_24px_70px_-48px_rgba(47,111,228,0.22)] transition-transform duration-300 hover:-translate-y-1",
+                i === contributors.length - 1 && "md:col-span-2 md:mx-auto md:max-w-[34rem] xl:col-span-1 xl:max-w-none"
+              )}
             >
               <BorderBeam
                 size={320}

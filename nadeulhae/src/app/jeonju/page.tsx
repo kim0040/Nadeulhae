@@ -66,6 +66,10 @@ export default function JeonjuPage() {
     liveDesc: language === "ko"
       ? "현재는 전주 기준 실시간 점수, 브리핑, 예보 캘린더까지 동작합니다."
       : "Right now, Jeonju already has a live score, briefing, and forecast calendar.",
+    fixedTitle: language === "ko" ? "전주 고정 브리핑 & 피크닉 캘린더" : "Jeonju-fixed briefing & picnic calendar",
+    fixedDesc: language === "ko"
+      ? "이 구역의 나들이 브리핑과 10일 캘린더는 위치 추적 없이 항상 전주 기준으로만 계산하고 표시합니다."
+      : "The outing briefing and 10-day calendar in this section are always calculated and displayed for Jeonju only, without geolocation.",
     futureTitle: language === "ko" ? "추후 열릴 전주 전용 기능" : "Jeonju features opening later",
     futureDesc: language === "ko"
       ? "전주만의 깊이 있는 경험을 위해, 서버 시스템과 데이터베이스 구축 단계에 맞춰 다음 기능들을 순차적으로 선보일 예정입니다."
@@ -75,10 +79,6 @@ export default function JeonjuPage() {
       ? "나들해의 진화는 단순히 화면을 늘리는 것이 아닙니다. 데이터 수집부터 체계적인 저장, 서버 처리, 그리고 AI 생성에 이르는 철저한 데이터 파이프라인을 구축해 나갑니다."
       : "Nadeulhae's evolution is more than just UI. We are building a robust data pipeline that encompasses everything from collection and structured storage to server-side processing and AI generation.",
     openLater: language === "ko" ? "추후 오픈" : "Opens Later",
-    calendarTitle: language === "ko" ? "전주 기준 피크닉 캘린더" : "Jeonju Picnic Calendar",
-    calendarDesc: language === "ko"
-      ? "이 페이지에서는 위치 추적 없이 항상 전주 기준 예보와 점수를 보여줍니다."
-      : "This page always shows Jeonju-based forecast and scoring without geolocation.",
   }
 
   const liveContent = [
@@ -89,10 +89,10 @@ export default function JeonjuPage() {
         : "Combines KMA, AirKorea, and weather bulletin data to compute Jeonju's picnic score.",
     },
     {
-      title: language === "ko" ? "전주 예보 캘린더" : "Jeonju forecast calendar",
+      title: language === "ko" ? "전주 고정 브리핑·캘린더" : "Jeonju-fixed briefing and calendar",
       desc: language === "ko"
-        ? "전주 10일 예보를 강수확률과 야외 팁 중심으로 읽을 수 있습니다."
-        : "Reads Jeonju's 10-day forecast with rain chance and outdoor tips.",
+        ? "나들이 브리핑과 10일 예보 캘린더를 모두 위치 추적 없이 전주 기준으로만 보여줍니다."
+        : "Shows both the outing briefing and the 10-day forecast calendar strictly in Jeonju mode, without geolocation.",
     },
     {
       title: language === "ko" ? "로컬 fallback 경험" : "Local fallback experience",
@@ -299,19 +299,18 @@ export default function JeonjuPage() {
         </div>
       </section>
 
-      {weatherData && (
-        <section className="container mx-auto px-4 pb-20">
-          <PicnicBriefing weatherData={weatherData} />
-        </section>
-      )}
-
       <section className="container mx-auto px-4 pb-20">
         <div className="mb-8 max-w-3xl">
-          <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">{texts.calendarTitle}</h2>
+          <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">{texts.fixedTitle}</h2>
           <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
-            {texts.calendarDesc}
+            {texts.fixedDesc}
           </p>
         </div>
+        {weatherData && (
+          <div className="pb-12">
+            <PicnicBriefing weatherData={weatherData} />
+          </div>
+        )}
         <PicnicCalendar useGeolocation={false} />
       </section>
 

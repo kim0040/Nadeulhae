@@ -347,6 +347,10 @@ const REGION_ALIASES: RegionProfile[] = [
 
 const REGION_PROFILES: RegionProfile[] = [...HUB_REGION_PROFILES, ...REGION_ALIASES, HOME_REGION]
 
+export function getRegionProfiles() {
+  return REGION_PROFILES
+}
+
 export function getRegionProfileByKey(key: string) {
   return REGION_PROFILES.find((profile) => profile.key === key) ?? HOME_REGION
 }
