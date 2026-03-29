@@ -14,7 +14,7 @@ import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
 import { mockWeatherData } from "@/data/mockData"
-import { dataService, type WeatherData } from "@/services/dataService"
+import { dataService, type FireSummaryData, type WeatherData } from "@/services/dataService"
 import { useLanguage } from "@/context/LanguageContext"
 import { Particles } from "@/components/magicui/particles"
 import { Meteors } from "@/components/magicui/meteors"
@@ -23,6 +23,7 @@ import { ShineBorder } from "@/components/magicui/shine-border"
 import { BorderBeam } from "@/components/magicui/border-beam"
 import { PicnicBriefing } from "@/components/picnic-briefing"
 import { WeatherImagePanel, type WeatherImageData } from "@/components/weather-image-panel"
+import { FireInsightPanel } from "@/components/fire-insight-panel"
 
 export default function Home() {
   const { resolvedTheme } = useTheme()
@@ -30,6 +31,7 @@ export default function Home() {
 
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [weatherImages, setWeatherImages] = useState<WeatherImageData>(null)
+  const [fireSummary, setFireSummary] = useState<FireSummaryData | null>(null)
   const [heroMessageSeed] = useState(() => Math.floor(Math.random() * 1_000_000))
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
 
@@ -105,6 +107,19 @@ export default function Home() {
 
     loadWeatherImages()
   }, [weatherData])
+
+  useEffect(() => {
+    if (!weatherData?.metadata?.regionKey) return
+
+    const loadFireSummary = async () => {
+      const summary = await dataService.getFireSummary({
+        regionKey: weatherData.metadata?.regionKey,
+      })
+      setFireSummary(summary)
+    }
+
+    loadFireSummary()
+  }, [weatherData?.metadata?.regionKey])
 
   if (!weatherData) {
     return (
@@ -264,6 +279,11 @@ export default function Home() {
 
       <div className="container mx-auto px-4 relative z-20 pb-24 sm:pb-28">
         <PicnicBriefing weatherData={weatherData} />
+        {fireSummary?.overview?.showOnHome && (
+          <div className="mt-6">
+            <FireInsightPanel data={fireSummary} language={language} variant="compact" />
+          </div>
+        )}
         <WeatherImagePanel data={weatherImages} weather={weatherData} />
       </div>
 

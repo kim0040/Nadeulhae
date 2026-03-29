@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 
 import { useLanguage } from "@/context/LanguageContext"
-import { dataService, type WeatherData } from "@/services/dataService"
+import { dataService, type FireSummaryData, type WeatherData } from "@/services/dataService"
 import { mockWeatherData } from "@/data/mockData"
 import { Particles } from "@/components/magicui/particles"
 import { WordPullUp } from "@/components/magicui/word-pull-up"
@@ -19,6 +19,7 @@ import { AnimatedGradientText } from "@/components/magicui/animated-gradient-tex
 import { Marquee } from "@/components/magicui/marquee"
 import { PicnicBriefing } from "@/components/picnic-briefing"
 import { PicnicCalendar } from "@/components/picnic-calendar"
+import { FireInsightPanel } from "@/components/fire-insight-panel"
 
 const liveCards = [
   { icon: Waves, key: "live-weather" },
@@ -42,12 +43,17 @@ const JEONJU_COORDS = {
 export default function JeonjuPage() {
   const { language } = useLanguage()
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
+  const [fireSummary, setFireSummary] = useState<FireSummaryData | null>(null)
 
   useEffect(() => {
     const loadJeonjuData = async () => {
       try {
-        const data = await dataService.getWeatherData(JEONJU_COORDS.lat, JEONJU_COORDS.lon)
+        const [data, fire] = await Promise.all([
+          dataService.getWeatherData(JEONJU_COORDS.lat, JEONJU_COORDS.lon),
+          dataService.getFireSummary({ regionKey: "jeonju" }),
+        ])
         setWeatherData(data)
+        setFireSummary(fire)
       } catch (error) {
         console.error("Failed to load Jeonju data:", error)
         setWeatherData(mockWeatherData)
@@ -313,6 +319,12 @@ export default function JeonjuPage() {
         )}
         <PicnicCalendar useGeolocation={false} />
       </section>
+
+      {fireSummary && (
+        <section className="container mx-auto px-4 pb-20">
+          <FireInsightPanel data={fireSummary} language={language} />
+        </section>
+      )}
 
       <section className="container mx-auto px-4 pb-20">
         <div className="mb-8 max-w-3xl">

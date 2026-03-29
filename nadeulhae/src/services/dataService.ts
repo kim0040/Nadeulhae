@@ -126,6 +126,43 @@ export interface Insight {
   cta: string;
 }
 
+export interface FireSummaryData {
+  regionKey: string;
+  regionName: string;
+  fireSidoName: string;
+  metadata: {
+    source: string;
+    latestDate: string;
+    coverageDays: number;
+    cacheHours: number;
+  };
+  overview: {
+    latestFireReceipt: number;
+    latestInProgress: number;
+    latestSituationEnd: number;
+    sevenDayAverage: number;
+    sevenDayTotal: number;
+    peakDate: string;
+    peakFireReceipt: number;
+    cautionLevel: "low" | "moderate" | "high";
+    showOnHome: boolean;
+    shortMessageKo: string;
+    shortMessageEn: string;
+  };
+  dailyTrend: Array<{
+    date: string;
+    fireReceipt: number;
+    inProgress: number;
+  }>;
+  topPlaces: Array<{
+    name: string;
+    count: number;
+    propertyDamage: number;
+    casualties: number;
+    outdoor: boolean;
+  }>;
+}
+
 export const dataService = {
   // 실시간 날씨 및 피크닉 지수 가져오기
   getWeatherData: async (lat?: number, lon?: number): Promise<WeatherData> => {
@@ -209,5 +246,24 @@ export const dataService = {
       console.error("Failed to generate course:", error);
       return mockCourse;
     }
-  }
+  },
+
+  getFireSummary: async (params?: { regionKey?: string; lat?: number; lon?: number; days?: number }): Promise<FireSummaryData | null> => {
+    try {
+      const query = new URLSearchParams()
+      if (params?.regionKey) query.set("regionKey", params.regionKey)
+      if (params?.lat != null) query.set("lat", String(params.lat))
+      if (params?.lon != null) query.set("lon", String(params.lon))
+      if (params?.days != null) query.set("days", String(params.days))
+
+      const response = await fetch(`/api/fire/summary${query.toString() ? `?${query.toString()}` : ""}`, {
+        next: { revalidate: 60 * 60 },
+      })
+      if (!response.ok) return null
+      return await response.json()
+    } catch (error) {
+      console.error("Failed to fetch fire summary:", error)
+      return null
+    }
+  },
 };
