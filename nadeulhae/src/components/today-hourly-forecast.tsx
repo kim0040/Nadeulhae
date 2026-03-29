@@ -117,9 +117,9 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
             ) : null}
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-[2rem] border border-border/80 bg-[var(--interactive)] px-4 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] transition-colors dark:border-white/10 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <div className="relative">
-              <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar sm:gap-0">
+          <div className="mt-5">
+            <div className="-mx-2 overflow-x-auto pb-2 hide-scrollbar sm:mx-0">
+              <div className="flex gap-3 px-2 sm:gap-0 sm:px-0">
                 {items.map((item, index) => {
                   const night = parseHour(item.time) >= 18 || parseHour(item.time) <= 5
                   const hasRain = item.precipChance >= 50 || /비|눈|소나기/.test(item.sky)
@@ -129,21 +129,21 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
                     <div
                       key={`${item.date}-${item.time}`}
                       className={cn(
-                        "relative min-w-[128px] shrink-0 px-3 sm:min-w-[140px]",
+                        "relative min-w-[148px] shrink-0 px-2 sm:min-w-[176px] sm:px-3",
                         index !== items.length - 1 && "after:absolute after:right-0 after:top-4 after:hidden after:h-[70%] after:w-px after:bg-border after:opacity-80 sm:after:block dark:after:bg-white/12"
                       )}
                     >
                       <div className={cn(
-                        "rounded-[1.6rem] border px-3 py-3 transition-colors",
+                        "min-h-[238px] rounded-[1.7rem] border px-4 py-5 transition-colors sm:min-h-[220px] sm:px-3 sm:py-3",
                         isLead
-                          ? "border-active-blue/22 bg-card shadow-[0_18px_44px_-34px_rgba(47,111,228,0.24)]"
+                          ? "border-slate-300 bg-card shadow-[0_18px_44px_-34px_rgba(47,111,228,0.24)] dark:border-active-blue/30"
                           : night
-                            ? "border-border/85 bg-foreground/[0.03] dark:border-white/10 dark:bg-white/[0.04]"
-                            : "border-border/85 bg-card/70 dark:border-white/10"
+                            ? "border-slate-300 bg-muted/40 dark:border-white/10 dark:bg-white/[0.04]"
+                            : "border-slate-300 bg-card dark:border-white/10"
                       )}>
                         <div className="flex items-center justify-between gap-2">
                           <span className={cn(
-                            "text-[11px] font-black uppercase tracking-[0.18em]",
+                            "text-xs sm:text-[11px] font-black uppercase tracking-[0.16em] sm:tracking-[0.18em]",
                             hasRain
                               ? "text-active-blue"
                               : night
@@ -162,37 +162,37 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
                           )} />
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between gap-3">
+                        <div className="mt-4 flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-base sm:text-lg font-black text-foreground">
+                            <div className="text-lg sm:text-lg font-black text-foreground">
                               {formatTime(item.time, language)}
                             </div>
-                            <div className="mt-1 text-xs sm:text-sm font-bold text-muted-foreground">
+                            <div className="mt-1 text-sm sm:text-sm font-bold text-muted-foreground">
                               {localizeSky(item.sky, language)}
                             </div>
                           </div>
                           <div className={cn(
                             "flex size-10 items-center justify-center rounded-[1rem] border",
                             hasRain
-                              ? "border-active-blue/20 bg-active-blue/10"
+                              ? "border-active-blue/25 bg-active-blue/10"
                               : night
-                                ? "border-border bg-card/80 dark:bg-white/[0.04]"
-                                : "border-border bg-card/80"
+                                ? "border-slate-300 bg-card dark:border-white/10 dark:bg-white/[0.04]"
+                                : "border-slate-300 bg-card dark:border-white/10"
                           )}>
                             <WeatherIcon sky={item.sky} night={night} />
                           </div>
                         </div>
 
-                        <div className="mt-4 text-[1.8rem] sm:text-[2.1rem] font-black tracking-tight text-foreground">
+                        <div className="mt-6 text-[2rem] sm:text-[2.1rem] font-black tracking-tight text-foreground">
                           {item.temp}°
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between gap-2">
-                          <div className="text-xs sm:text-sm font-bold text-muted-foreground">
+                        <div className="mt-5 flex items-center justify-between gap-2">
+                          <div className="text-sm sm:text-sm font-bold text-muted-foreground">
                             {language === "ko" ? `강수 ${item.precipChance}%` : `Rain ${item.precipChance}%`}
                           </div>
                           <div className={cn(
-                            "text-xs sm:text-sm font-black",
+                            "text-sm sm:text-sm font-black",
                             hasRain ? "text-active-blue" : "text-muted-foreground"
                           )}>
                             {item.precipAmount}
