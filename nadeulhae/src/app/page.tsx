@@ -24,6 +24,27 @@ import { BorderBeam } from "@/components/magicui/border-beam"
 import { PicnicBriefing } from "@/components/picnic-briefing"
 import { WeatherImagePanel, type WeatherImageData } from "@/components/weather-image-panel"
 import { FireInsightPanel } from "@/components/fire-insight-panel"
+import { TodayHourlyForecast, type HourlyForecastItem } from "@/components/today-hourly-forecast"
+
+function localizeUvLabel(value: string | undefined, language: "ko" | "en") {
+  if (!value) return "--"
+  if (language === "ko") return value
+
+  switch (value.replace(/\s+/g, "")) {
+    case "낮음":
+      return "Low"
+    case "보통":
+      return "Moderate"
+    case "높음":
+      return "High"
+    case "매우높음":
+      return "Very High"
+    case "위험":
+      return "Extreme"
+    default:
+      return value
+  }
+}
 
 export default function Home() {
   const { resolvedTheme } = useTheme()
@@ -32,6 +53,7 @@ export default function Home() {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [weatherImages, setWeatherImages] = useState<WeatherImageData>(null)
   const [fireSummary, setFireSummary] = useState<FireSummaryData | null>(null)
+  const [hourlyForecast, setHourlyForecast] = useState<HourlyForecastItem[]>([])
   const [heroMessageSeed] = useState(() => Math.floor(Math.random() * 1_000_000))
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
 
@@ -78,13 +100,33 @@ export default function Home() {
   useEffect(() => {
     if (!weatherData) return
 
+    const loadHourlyForecast = async () => {
+      try {
+        const lat = weatherData.metadata?.locationContext?.coordinates?.lat
+        const lon = weatherData.metadata?.locationContext?.coordinates?.lon
+        const query = lat != null && lon != null ? `?lat=${lat}&lon=${lon}` : ""
+        const response = await fetch(`/api/weather/forecast${query}`, { cache: "no-store" })
+        if (!response.ok) return
+        const data = await response.json()
+        setHourlyForecast(Array.isArray(data?.todayHourly) ? data.todayHourly : [])
+      } catch (error) {
+        console.error("Failed to load hourly forecast:", error)
+      }
+    }
+
     const loadWeatherImages = async () => {
       try {
         const extras = new Set<string>()
+        const bulletinSummary = String(weatherData.metadata?.bulletin?.summary || "")
         const hasDustIssue = Boolean(
-          (weatherData.details.pm10 ?? 0) >= 81
-          || (weatherData.details.pm25 ?? 0) >= 36
+          (weatherData.details.pm10 ?? 0) >= 51
+          || (weatherData.details.pm25 ?? 0) >= 26
           || /나쁨|매우|bad|very/i.test(String(weatherData.details.dust || ""))
+          || /황사|dust/i.test(bulletinSummary)
+        )
+        const hasFogSignal = Boolean(
+          (weatherData.details.humidity ?? 0) >= 90
+          || /안개|fog/i.test(bulletinSummary)
         )
         const hasSevereSignal = Boolean(
           weatherData.eventData?.isWeatherWarning
@@ -93,6 +135,7 @@ export default function Home() {
         )
 
         if (hasDustIssue) extras.add("dust")
+        if (hasFogSignal) extras.add("fog")
         if (hasSevereSignal) extras.add("lgt")
 
         const query = extras.size > 0 ? `?extras=${encodeURIComponent(Array.from(extras).join(","))}` : ""
@@ -105,6 +148,7 @@ export default function Home() {
       }
     }
 
+    loadHourlyForecast()
     loadWeatherImages()
   }, [weatherData])
 
@@ -158,7 +202,7 @@ export default function Home() {
         ? `KR ${weatherData.details.kr} · WHO ${weatherData.details.who}`
         : null,
     },
-    { icon: SunIcon, label: t("hero_uv"), value: weatherData.details.uv || "--", tone: "text-yellow-400" },
+    { icon: SunIcon, label: t("hero_uv"), value: localizeUvLabel(weatherData.details.uv, language), tone: "text-yellow-400" },
   ]
 
   const homeTexts = {
@@ -247,6 +291,7 @@ export default function Home() {
               <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
               <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
                 <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-1">{t("hero_score_label")}</span>
+                <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.22em] text-foreground/45 mb-2">{t("hero_score_subtitle")}</span>
                 <div className="flex items-baseline gap-1">
                   <span className="text-6xl sm:text-8xl font-black tracking-tighter text-foreground">{weatherData.score}</span>
                   <span className="text-sm sm:text-xl font-black text-foreground/70">{t("hero_unit")}</span>
@@ -278,6 +323,7 @@ export default function Home() {
       </section>
 
       <div className="container mx-auto px-4 relative z-20 pb-24 sm:pb-28">
+        <TodayHourlyForecast items={hourlyForecast} />
         <PicnicBriefing weatherData={weatherData} />
         {fireSummary?.overview?.showOnHome && (
           <div className="mt-6">

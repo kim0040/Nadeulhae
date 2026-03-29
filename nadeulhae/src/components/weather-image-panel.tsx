@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, CloudRain, Orbit, Sparkles, Zap } from "lucide-react"
+import { AlertTriangle, Cloud, CloudRain, Orbit, Sparkles, Zap } from "lucide-react"
 import Image from "next/image"
 
 import { MagicCard } from "@/components/magicui/magic-card"
@@ -13,6 +13,7 @@ export type WeatherImageData = {
   extras?: {
     dust?: { name: string; tm: string; url: string } | null
     lgt?: { name: string; tm: string; url: string } | null
+    fog?: { name: string; tm: string; url: string } | null
   }
   metadata?: {
     dataSource?: string
@@ -90,16 +91,17 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
   const labels = language === "ko"
     ? {
         title: "기상 이미지",
-        subtitle: "기상청 레이더·위성 최신 프레임",
-        radar: "레이더 합성영상",
-        satellite: "천리안 위성",
+        subtitle: "기상청 예측·위성 기반 최신 이미지",
+        radar: "1시간 강수 예측",
+        satellite: "천리안 구름 강조",
         empty: "표시 가능한 최신 이미지가 없습니다.",
         source: "출처",
         contextTitle: "상황 모니터",
         weatherWarning: "기상특보 감시",
         earthquake: "지진 통보 감시",
         rain: "강수 추적",
-        dust: "황사·에어로졸",
+        fog: "안개 신호",
+        dust: "황사 탐지",
         lgt: "낙뢰 분포",
         typhoon: "태풍 감시",
         tsunami: "지진해일 감시",
@@ -107,16 +109,17 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
       }
     : {
         title: "Weather Images",
-        subtitle: "Latest KMA radar and satellite frames",
-        radar: "Radar Composite",
-        satellite: "GK2A Satellite",
+        subtitle: "Latest KMA forecast and satellite imagery",
+        radar: "1h Rain Forecast",
+        satellite: "GK2A RGB Cloud",
         empty: "No latest image is available right now.",
         source: "Source",
         contextTitle: "Situation Monitor",
         weatherWarning: "Weather Warning",
         earthquake: "Earthquake Bulletin",
         rain: "Precipitation Tracking",
-        dust: "Dust / Aerosol",
+        fog: "Fog Signal",
+        dust: "Dust Detection",
         lgt: "Lightning",
         typhoon: "Typhoon",
         tsunami: "Tsunami",
@@ -172,6 +175,14 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
       image: data.extras.dust,
     })
   }
+  if (data?.extras?.fog?.url) {
+    cards.push({
+      key: "fog",
+      title: labels.fog,
+      icon: <Cloud size={16} className="text-neutral-500 dark:text-neutral-300" />,
+      image: data.extras.fog,
+    })
+  }
   if (data?.extras?.lgt?.url) {
     cards.push({
       key: "lgt",
@@ -195,7 +206,7 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
             <p className="mt-2 text-sm sm:text-base font-medium text-muted-foreground">{labels.subtitle}</p>
           </div>
           <span className="text-[11px] font-black uppercase tracking-widest text-sky-blue">
-            {labels.source}: {data?.metadata?.dataSource || "KMA"}
+            {labels.source}: {language === "ko" ? "기상청" : "KMA"}
           </span>
         </div>
 

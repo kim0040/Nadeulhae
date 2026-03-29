@@ -12,7 +12,7 @@ type WeatherImageSnapshot = {
   url: string
 }
 
-type ExtraImageKey = "dust" | "lgt"
+type ExtraImageKey = "dust" | "lgt" | "fog"
 
 type ImageCacheEntry = {
   data: WeatherImageSnapshot | null
@@ -44,11 +44,7 @@ const SATELLITE_CACHE_MINUTES = 2
 const RADAR_CACHE_TTL = RADAR_CACHE_MINUTES * 60 * 1000
 const SATELLITE_CACHE_TTL = SATELLITE_CACHE_MINUTES * 60 * 1000
 
-const EXTRA_IMAGE_CONFIG: Record<ExtraImageKey, { endpoint: string; cacheMinutes: number }> = {
-  dust: {
-    endpoint: "https://www.weather.go.kr/w/wnuri-img/rest/sat/images/dust.do",
-    cacheMinutes: 10,
-  },
+const EXTRA_IMAGE_CONFIG: Record<Exclude<ExtraImageKey, "fog" | "dust">, { endpoint: string; cacheMinutes: number }> = {
   lgt: {
     endpoint: "https://www.weather.go.kr/w/wnuri-img/rest/lgt/images.do",
     cacheMinutes: 5,
@@ -60,6 +56,7 @@ let satelliteCache: ImageCacheEntry | null = null
 const extraImageCaches: Record<ExtraImageKey, ImageCacheEntry | null> = {
   dust: null,
   lgt: null,
+  fog: null,
 }
 
 function resolveImageUrl(url: string) {
@@ -67,6 +64,25 @@ function resolveImageUrl(url: string) {
   if (url.startsWith("http://") || url.startsWith("https://")) return url
   if (url.startsWith("/")) return `https://www.weather.go.kr${url}`
   return `https://www.weather.go.kr/${url}`
+}
+
+function replaceQueryParam(url: string, key: string, value: string) {
+  if (!url) return url
+  const pattern = new RegExp(`([?&])${key}=[^&]*`)
+  if (pattern.test(url)) {
+    return url.replace(pattern, `$1${key}=${value}`)
+  }
+  const separator = url.includes("?") ? "&" : "?"
+  return `${url}${separator}${key}=${value}`
+}
+
+function getQueryParam(url: string, key: string) {
+  try {
+    const resolved = url.startsWith("http") ? new URL(url) : new URL(resolveImageUrl(url))
+    return resolved.searchParams.get(key)
+  } catch {
+    return null
+  }
 }
 
 async function fetchJsonArray(url: string) {
@@ -84,6 +100,23 @@ async function fetchJsonArray(url: string) {
     return Array.isArray(parsed) ? (parsed as KmaImageItem[]) : []
   } catch {
     return [] as KmaImageItem[]
+  }
+}
+
+async function fetchJsonObject(url: string) {
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Nadeulhae/1.0)",
+      },
+    })
+    if (!response.ok) return null
+    const text = await response.text()
+    if (!text || text.trim().startsWith("<")) return null
+    return JSON.parse(text)
+  } catch {
+    return null
   }
 }
 
@@ -134,14 +167,31 @@ async function pickLatestReachableItem(items: KmaImageItem[], maxCandidates = 8)
 }
 
 async function fetchRadarImage() {
-  // Prefer current composite radar first. It is generally more informative than forecast-only frames.
+  // Prefer short-term rainfall forecast because it is more actionable for outdoor planning.
+  const qpfItems = await fetchJsonArray("https://www.weather.go.kr/w/wnuri-img/rest/radar/qpf/images.do")
+  const qpfLatest = await pickLatestReachableItem(qpfItems)
+  if (qpfLatest) {
+    const baseTime = getQueryParam(qpfLatest.url, "tm")
+    const forecastMinute = getQueryParam(qpfLatest.url, "ef")
+    const paddedForecastMinute = forecastMinute?.padStart(3, "0")
+    return {
+      ...qpfLatest,
+      name: "1시간 강수 예측",
+      url: baseTime && paddedForecastMinute
+        ? `https://vapi.kma.go.kr/BUFD/qpf_ana_img_${baseTime}_m${paddedForecastMinute}_1453.png`
+        : resolveImageUrl(replaceQueryParam(qpfLatest.url, "map", "HB")),
+    }
+  }
+
   const cmpItems = await fetchJsonArray("https://www.weather.go.kr/w/wnuri-img/rest/radar/cmp/images.do")
   const cmpLatest = await pickLatestReachableItem(cmpItems)
-  if (cmpLatest) return cmpLatest
+  if (!cmpLatest) return null
 
-  // Fall back to short-term rainfall forecast radar when composite is unavailable.
-  const qpfItems = await fetchJsonArray("https://www.weather.go.kr/w/wnuri-img/rest/radar/qpf/images.do")
-  return pickLatestReachableItem(qpfItems)
+  return {
+    ...cmpLatest,
+    name: "레이더 강수 합성",
+    url: resolveImageUrl(replaceQueryParam(cmpLatest.url, "map", "HB")),
+  }
 }
 
 async function fetchSatelliteImage() {
@@ -149,6 +199,72 @@ async function fetchSatelliteImage() {
   const reachable = await pickLatestReachableItem(items, 5)
   if (reachable) return reachable
   return pickLatestItem(items)
+}
+
+function getUtcDateOffsetLabel(offsetMinutes = 0) {
+  const date = new Date(Date.now() + offsetMinutes * 60 * 1000)
+  const yyyy = date.getUTCFullYear()
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0")
+  const dd = String(date.getUTCDate()).padStart(2, "0")
+  const hh = String(date.getUTCHours()).padStart(2, "0")
+  const mi = String(date.getUTCMinutes()).padStart(2, "0")
+  return `${yyyy}${mm}${dd}${hh}${mi}`
+}
+
+async function fetchFogImage() {
+  const authKey = process.env.APIHUB_KEY || process.env.KMA_API_KEY
+  if (!authKey) return null
+
+  const end = getUtcDateOffsetLabel(0)
+  const start = getUtcDateOffsetLabel(-180)
+  const url = new URL("https://apihub.kma.go.kr/api/typ05/api/GK2A/LE2/FOG/KO/imageList")
+  url.searchParams.set("sDate", start)
+  url.searchParams.set("eDate", end)
+  url.searchParams.set("authKey", authKey)
+
+  const data = await fetchJsonObject(url.toString())
+  const items = Array.isArray(data?.list) ? data.list : []
+  const latest = items
+    .map((item: { item?: string }) => String(item?.item || ""))
+    .filter(Boolean)
+    .sort()
+    .pop()
+
+  if (!latest) return null
+
+  return {
+    name: "GK2A 안개 산출물",
+    tm: latest,
+    url: `/api/weather/images/asset?kind=fog&tm=${latest}`,
+  } satisfies WeatherImageSnapshot
+}
+
+async function fetchAdpsImage() {
+  const authKey = process.env.APIHUB_KEY || process.env.KMA_API_KEY
+  if (!authKey) return null
+
+  const end = getUtcDateOffsetLabel(0)
+  const start = getUtcDateOffsetLabel(-360)
+  const url = new URL("https://apihub.kma.go.kr/api/typ05/api/GK2A/LE2/ADPS/KO/imageList")
+  url.searchParams.set("sDate", start)
+  url.searchParams.set("eDate", end)
+  url.searchParams.set("authKey", authKey)
+
+  const data = await fetchJsonObject(url.toString())
+  const items = Array.isArray(data?.list) ? data.list : []
+  const latest = items
+    .map((item: { item?: string }) => String(item?.item || ""))
+    .filter(Boolean)
+    .sort()
+    .pop()
+
+  if (!latest) return null
+
+  return {
+    name: "GK2A 황사 탐지",
+    tm: latest,
+    url: `/api/weather/images/asset?kind=dust&tm=${latest}`,
+  } satisfies WeatherImageSnapshot
 }
 
 function parseRequestedExtras(request: NextRequest): ExtraImageKey[] {
@@ -159,7 +275,7 @@ function parseRequestedExtras(request: NextRequest): ExtraImageKey[] {
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean)
   const unique = Array.from(new Set(candidates))
-  return unique.filter((item): item is ExtraImageKey => item === "dust" || item === "lgt")
+  return unique.filter((item): item is ExtraImageKey => item === "dust" || item === "lgt" || item === "fog")
 }
 
 export async function GET(request: NextRequest) {
@@ -203,12 +319,16 @@ export async function GET(request: NextRequest) {
   const extraFetchedAt: Partial<Record<ExtraImageKey, string>> = {}
 
   for (const key of requestedExtras) {
-    const config = EXTRA_IMAGE_CONFIG[key]
-    const ttl = config.cacheMinutes * 60 * 1000
     const cached = extraImageCaches[key]
+    const cacheMinutes = key === "fog" || key === "dust" ? 10 : EXTRA_IMAGE_CONFIG[key].cacheMinutes
+    const ttl = cacheMinutes * 60 * 1000
 
     if (!cached || cached.expiry <= now) {
-      const latest = pickLatestItem(await fetchJsonArray(config.endpoint))
+      const latest = key === "fog"
+        ? await fetchFogImage()
+        : key === "dust"
+          ? await fetchAdpsImage()
+          : pickLatestItem(await fetchJsonArray(EXTRA_IMAGE_CONFIG[key].endpoint))
       if (latest || !cached) {
         extraImageCaches[key] = {
           data: latest,
@@ -224,7 +344,7 @@ export async function GET(request: NextRequest) {
     }
 
     extras[key] = extraImageCaches[key]?.data ?? null
-    extraCacheMinutes[key] = config.cacheMinutes
+    extraCacheMinutes[key] = cacheMinutes
     extraFetchedAt[key] = extraImageCaches[key]?.fetchedAt ?? new Date(0).toISOString()
   }
 
@@ -233,7 +353,7 @@ export async function GET(request: NextRequest) {
     satellite: satelliteCache?.data ?? null,
     extras: requestedExtras.length > 0 ? extras : undefined,
     metadata: {
-      dataSource: "KMA Weather Image REST (weather.go.kr)",
+      dataSource: "KMA Weather Image REST + API Hub",
       cache: {
         radarMinutes: RADAR_CACHE_MINUTES,
         satelliteMinutes: SATELLITE_CACHE_MINUTES,

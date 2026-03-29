@@ -19,7 +19,7 @@ import { AnimatedGradientText } from "@/components/magicui/animated-gradient-tex
 import { Marquee } from "@/components/magicui/marquee"
 import { PicnicBriefing } from "@/components/picnic-briefing"
 import { PicnicCalendar } from "@/components/picnic-calendar"
-import { FireInsightPanel } from "@/components/fire-insight-panel"
+import { JeonjuSafetyPanel } from "@/components/jeonju-safety-panel"
 
 const liveCards = [
   { icon: Waves, key: "live-weather" },
@@ -224,14 +224,14 @@ export default function JeonjuPage() {
       <section className="relative overflow-hidden px-4 pt-36 pb-20">
         <Particles className="absolute inset-0 z-0 opacity-60" quantity={48} color="#2f6fe4" />
         <div className="relative z-10 container mx-auto max-w-6xl">
-          <div className="rounded-full border border-nature-green/20 bg-nature-green/10 px-5 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-nature-green inline-flex">
+          <div className="mx-auto inline-flex rounded-full border border-nature-green/20 bg-nature-green/10 px-5 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-nature-green">
             {texts.heroTag}
           </div>
           <WordPullUp
             words={texts.heroTitle}
             className="mt-8 text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-foreground"
           />
-          <p className="mt-8 max-w-4xl text-base sm:text-xl font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
+          <p className="mx-auto mt-8 max-w-4xl text-center text-base sm:text-xl font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
             {texts.heroDesc}
           </p>
         </div>
@@ -288,17 +288,6 @@ export default function JeonjuPage() {
                 <p className="mt-4 text-base sm:text-lg font-bold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
                   {liveContent[index].desc}
                 </p>
-                {weatherData && index === 0 && (
-                  <div className="mt-6 rounded-[1.5rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-4 py-4">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      {language === "ko" ? "현재 전주 점수" : "Current Jeonju score"}
-                    </div>
-                    <div className="mt-2 text-4xl font-black tracking-tight text-foreground">{weatherData.score}</div>
-                    <div className="mt-2 text-xs font-bold text-muted-foreground break-keep">
-                      {weatherData.metadata?.station} · {weatherData.details.temp}°C · {weatherData.details.dust}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ))}
@@ -320,9 +309,9 @@ export default function JeonjuPage() {
         <PicnicCalendar useGeolocation={false} />
       </section>
 
-      {fireSummary && (
+      {weatherData && (
         <section className="container mx-auto px-4 pb-20">
-          <FireInsightPanel data={fireSummary} language={language} />
+          <JeonjuSafetyPanel weatherData={weatherData} fireSummary={fireSummary} language={language} />
         </section>
       )}
 

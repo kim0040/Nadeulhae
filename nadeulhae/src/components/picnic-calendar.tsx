@@ -114,8 +114,12 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
 
               const cardContent = (
                 <div className={cn(
-                  "h-full flex flex-col justify-between p-6 bg-card border rounded-[2.5rem] shadow-[0_22px_55px_-32px_rgba(47,111,228,0.22)] overflow-hidden",
-                  isRecommended ? "border-nature-green/30" : "border-card-border"
+                  "h-full flex flex-col justify-between p-6 bg-card border rounded-[2.5rem] shadow-[0_22px_55px_-32px_rgba(47,111,228,0.22)] overflow-hidden transition-colors",
+                  isToday
+                    ? "border-active-blue/35 bg-gradient-to-b from-active-blue/8 via-card to-card shadow-[0_24px_60px_-34px_rgba(47,111,228,0.35)]"
+                    : isRecommended
+                      ? "border-nature-green/30"
+                      : "border-card-border"
                 )}>
                   {/* Top: Date & Today Badge */}
                   <div className="w-full flex justify-between items-start mb-5 gap-3">
@@ -130,7 +134,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                     {(isToday || isRecommended) && (
                       <div className="flex flex-col items-end gap-2 shrink-0">
                         {isToday && (
-                          <span className="px-2.5 py-1 rounded-full bg-nature-green/20 text-nature-green text-[9px] font-black uppercase tracking-widest border border-nature-green/30">
+                          <span className="px-2.5 py-1 rounded-full bg-active-blue/12 text-active-blue text-[9px] font-black uppercase tracking-widest border border-active-blue/25 shadow-sm">
                             {todayLabel}
                           </span>
                         )}

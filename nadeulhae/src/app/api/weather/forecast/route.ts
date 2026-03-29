@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import {
   HOME_REGION,
   dfsToGrid,
+  getCurrentNowcastBase,
   getMidForecastBase,
   getVillageForecastBase,
   getStableForecastSeed,
@@ -23,11 +24,13 @@ type UserCacheEntry<T> = {
 
 const villageCache = new Map<string, CacheEntry<any>>()
 const midCache = new Map<string, CacheEntry<any>>()
+const ultraCache = new Map<string, CacheEntry<any>>()
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
 const forecastResponseCache = new Map<string, UserCacheEntry<any>>()
 
 const CACHE_DURATION = 3 * 60 * 60 * 1000
 const MID_CACHE_DURATION = 12 * 60 * 60 * 1000
+const ULTRA_CACHE_DURATION = 60 * 60 * 1000
 const USER_RESPONSE_CACHE_DURATION = 5 * 60 * 1000
 const RATE_LIMIT_WINDOW = 60 * 1000
 const MAX_REQUESTS_PER_WINDOW = 30
@@ -88,6 +91,7 @@ function runMaintenanceSweepIfNeeded() {
 
   cleanupLastUpdateCache(villageCache, CACHE_DURATION * 3, now)
   cleanupLastUpdateCache(midCache, MID_CACHE_DURATION * 3, now)
+  cleanupLastUpdateCache(ultraCache, ULTRA_CACHE_DURATION * 3, now)
   cleanupExpiringCache(forecastResponseCache, now)
   cleanupRateLimitMap(rateLimitMap, RATE_LIMIT_WINDOW, now)
 
@@ -103,6 +107,18 @@ async function fetchVillageData(nx: number, ny: number, serviceKey: string) {
   const url = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getVilageFcst?authKey=${serviceKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=${nx}&ny=${ny}`
   const data = await fetchJsonSafely(url)
   if (data) villageCache.set(cacheKey, { data, lastUpdate: Date.now() })
+  return data
+}
+
+async function fetchUltraForecastData(nx: number, ny: number, serviceKey: string) {
+  const { baseDate, baseTime } = getCurrentNowcastBase()
+  const cacheKey = `${nx}_${ny}_${baseDate}_${baseTime}`
+  const cached = getSmartCachedValue(ultraCache, cacheKey, 'village', ULTRA_CACHE_DURATION)
+  if (cached) return cached
+
+  const url = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getUltraSrtFcst?authKey=${serviceKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=${nx}&ny=${ny}`
+  const data = await fetchJsonSafely(url)
+  if (data) ultraCache.set(cacheKey, { data, lastUpdate: Date.now() })
   return data
 }
 
@@ -174,6 +190,16 @@ function createStableFallbackForecast(startDate: Date, index: number) {
   }
 }
 
+function getKstNow() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }))
+}
+
+function getKstTimeLabel(date: Date) {
+  const hour = String(date.getHours()).padStart(2, "0")
+  const minute = String(date.getMinutes()).padStart(2, "0")
+  return `${hour}${minute}`
+}
+
 export async function GET(request: Request) {
   runMaintenanceSweepIfNeeded()
   const url = new URL(request.url)
@@ -226,8 +252,9 @@ export async function GET(request: Request) {
 
   const kstToday = getKstCompactDate()
   
-  const [villageData, midForecast] = await Promise.all([
+  const [villageData, ultraForecastData, midForecast] = await Promise.all([
     fetchVillageData(grid.nx, grid.ny, kmaKey),
+    fetchUltraForecastData(grid.nx, grid.ny, kmaKey),
     fetchMidData(profile, kmaKey),
   ])
 
@@ -243,6 +270,15 @@ export async function GET(request: Request) {
     snowAmount: string
     score: number
     isMock?: boolean
+  }>()
+  const hourlyTimelineMap = new Map<string, {
+    date: string
+    time: string
+    temp?: number
+    sky?: number
+    pty?: number
+    precipChance?: number
+    precipAmount?: string
   }>()
 
   const villageItems = villageData?.response?.body?.items?.item
@@ -263,6 +299,30 @@ export async function GET(request: Request) {
       if (item.category === "POP") groupedDaily[dateKey].pops.push(Number(item.fcstValue))
       if (item.category === "PCP" && item.fcstValue) groupedDaily[dateKey].pcps.push(String(item.fcstValue))
       if (item.category === "SNO" && item.fcstValue) groupedDaily[dateKey].snos.push(String(item.fcstValue))
+
+      if (dateKey >= kstToday) {
+        const hourlyKey = `${item.fcstDate}${item.fcstTime}`
+        const existing: {
+          date: string
+          time: string
+          temp?: number
+          sky?: number
+          pty?: number
+          precipChance?: number
+          precipAmount?: string
+        } = hourlyTimelineMap.get(hourlyKey) || {
+          date: item.fcstDate,
+          time: item.fcstTime,
+        }
+
+        if (item.category === "TMP") existing.temp = Number(item.fcstValue)
+        if (item.category === "SKY") existing.sky = Number(item.fcstValue)
+        if (item.category === "PTY") existing.pty = Number(item.fcstValue)
+        if (item.category === "POP") existing.precipChance = Number(item.fcstValue)
+        if (item.category === "PCP" && item.fcstValue) existing.precipAmount = String(item.fcstValue)
+
+        hourlyTimelineMap.set(hourlyKey, existing)
+      }
     }
 
     for (const dateKey of Object.keys(groupedDaily).sort()) {
@@ -361,6 +421,9 @@ export async function GET(request: Request) {
   
   const todayDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }))
   todayDate.setHours(0, 0, 0, 0)
+  const nowKst = getKstNow()
+  const currentTimeLabel = getKstTimeLabel(nowKst)
+  const currentDateTimeLabel = `${kstToday}${currentTimeLabel}`
 
   for (let i = 0; i < 11; i++) {
     const checkDate = new Date(todayDate)
@@ -375,9 +438,68 @@ export async function GET(request: Request) {
     }
   }
 
+  const ultraItems = ultraForecastData?.response?.body?.items?.item
+  if (Array.isArray(ultraItems)) {
+    for (const item of ultraItems) {
+      if (!item?.fcstDate || !item?.fcstTime) continue
+      const hourlyKey = `${item.fcstDate}${item.fcstTime}`
+      const existing: {
+        date: string
+        time: string
+        temp?: number
+        sky?: number
+        pty?: number
+        precipChance?: number
+        precipAmount?: string
+      } = hourlyTimelineMap.get(hourlyKey) || {
+        date: item.fcstDate,
+        time: item.fcstTime,
+      }
+
+      if (item.category === "T1H") existing.temp = Number(item.fcstValue)
+      if (item.category === "SKY") existing.sky = Number(item.fcstValue)
+      if (item.category === "PTY") existing.pty = Number(item.fcstValue)
+      if (item.category === "POP") existing.precipChance = Number(item.fcstValue)
+      if (item.category === "RN1" && item.fcstValue) existing.precipAmount = String(item.fcstValue)
+
+      hourlyTimelineMap.set(hourlyKey, existing)
+    }
+  }
+
+  const hourlyEntries = Array.from(hourlyTimelineMap.values())
+    .filter((entry) => `${entry.date}${entry.time}` >= currentDateTimeLabel || hourlyTimelineMap.size <= 4)
+    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
+    .slice(0, 18)
+    .map((entry) => {
+      const pty = entry.pty ?? 0
+      const skyCode = entry.sky ?? 1
+      const sky =
+        pty > 0
+          ? pty === 3
+            ? "눈"
+            : pty === 4
+              ? "소나기"
+              : "비"
+          : skyCode <= 1
+            ? "맑음"
+            : skyCode <= 3
+              ? "구름많음"
+              : "흐림"
+
+      return {
+        date: entry.date,
+        time: entry.time,
+        temp: Number.isFinite(entry.temp) ? entry.temp : finalDaily[0]?.tempMax ?? 20,
+        sky,
+        precipChance: Number.isFinite(entry.precipChance) ? entry.precipChance : pty > 0 ? 60 : 0,
+        precipAmount: entry.precipAmount && entry.precipAmount !== "강수없음" ? entry.precipAmount : "0mm",
+      }
+    })
+
   const finalResult = {
     location: userLat != null && userLon != null ? profile.displayName : HOME_REGION.displayName,
     daily: finalDaily,
+    todayHourly: hourlyEntries,
     metadata: {
       dataSource: "기상청",
       lastUpdate: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Seoul" }),
