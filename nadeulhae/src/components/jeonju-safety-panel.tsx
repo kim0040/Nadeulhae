@@ -295,6 +295,74 @@ function getFirePlaceNarrative(fireSummary: FireSummaryData | null, language: "k
   }
 }
 
+function getOverallSafetyGuide(weatherData: WeatherData, fireSummary: FireSummaryData | null, language: "ko" | "en") {
+  if (weatherData.eventData?.isEarthquake || weatherData.eventData?.isTsunami || weatherData.eventData?.isVolcano) {
+    return {
+      tone: "danger" as const,
+      title: language === "ko" ? "오늘은 전주 안전 안내를 먼저 확인하는 편이 좋습니다" : "Today is a day to check Jeonju safety notices first",
+      text: weatherData.eventData.warningMessage || (language === "ko"
+        ? "재난 신호가 감지된 날에는 외부 일정 확대보다 공식 안내와 이동 안전을 우선으로 보는 편이 좋습니다."
+        : "With a hazard signal active, official guidance and movement safety should come before expanding outdoor plans."),
+      chips: [
+        language === "ko" ? "공식 통보 우선" : "Official bulletin first",
+        language === "ko" ? "이동 재검토" : "Recheck movement",
+      ],
+    }
+  }
+
+  if (weatherData.eventData?.isWeatherWarning) {
+    return {
+      tone: "danger" as const,
+      title: language === "ko" ? "오늘은 특보 내용까지 보고 움직이는 편이 안전합니다" : "Today is safer if you move with the warning details in mind",
+      text: weatherData.eventData.warningMessage || (language === "ko"
+        ? "전주 기준 특보가 감지된 상태라 실시간 점수보다 통보 내용과 바람·강수 흐름을 함께 보는 편이 좋습니다."
+        : "A warning is active for Jeonju, so the bulletin plus wind and rain signals matter more than the score alone."),
+      chips: [
+        language === "ko" ? "기상특보" : "Weather warning",
+        language === "ko" ? "야외 일정 축소" : "Scale back plans",
+      ],
+    }
+  }
+
+  if (weatherData.eventData?.isRain) {
+    return {
+      tone: "caution" as const,
+      title: language === "ko" ? "비가 이어져 오늘 전주 일정은 보수적으로 보는 편이 좋습니다" : "Rain is active, so it is better to read today's Jeonju plans conservatively",
+      text: language === "ko"
+        ? "현재 강수 또는 가까운 시간대 비 신호가 있어 이동 속도와 야외 체류 시간을 줄이는 쪽이 무난합니다."
+        : "Current or near-term rain is active, so slower movement and shorter outdoor stays are the safer call.",
+      chips: [
+        language === "ko" ? "우산 준비" : "Umbrella ready",
+        language === "ko" ? "젖은 노면 주의" : "Wet roads",
+      ],
+    }
+  }
+
+  if (fireSummary?.overview.cautionLevel === "high") {
+    return {
+      tone: "caution" as const,
+      title: language === "ko" ? "날씨는 무난하지만 최근 화재 흐름은 한 번 더 볼 만합니다" : "Weather looks steady, but recent fire flow is worth a second look",
+      text: language === "ko"
+        ? "전북 화재 접수가 평균보다 올라간 흐름이라 야외 화기 사용이나 건조한 장소에서는 조금 더 조심하는 편이 좋습니다."
+        : "Recent fire reports in Jeonbuk are above baseline, so extra care around dry outdoor spots and open flames makes sense.",
+      chips: [
+        language === "ko" ? "전북 화재 흐름 높음" : "Fire flow elevated",
+      ],
+    }
+  }
+
+  return {
+    tone: "safe" as const,
+    title: language === "ko" ? "오늘은 전주 흐름을 비교적 편하게 읽어볼 수 있습니다" : "Today looks fairly easy to read for Jeonju plans",
+    text: language === "ko"
+      ? "실시간 위험 신호가 크지 않아 체감 기온, 바람, 전북 화재 흐름 정도를 함께 보며 일정을 정하기 좋습니다."
+      : "No major active signal is standing out, so temperature feel, wind, and fire flow should be enough to shape today's plans.",
+    chips: [
+      language === "ko" ? "실시간 신호 안정" : "Signals steady",
+    ],
+  }
+}
+
 export function JeonjuSafetyPanel({
   weatherData,
   fireSummary,
@@ -318,6 +386,7 @@ export function JeonjuSafetyPanel({
   const topFirePlace = fireSummary?.topPlaces?.[0]
   const fireFlowBadge = getFireFlowBadge(fireSummary, language)
   const firePlaceNarrative = getFirePlaceNarrative(fireSummary, language)
+  const overallGuide = getOverallSafetyGuide(weatherData, fireSummary, language)
 
   return (
     <section className="relative overflow-hidden rounded-[3rem] border border-card-border bg-card p-8 sm:p-12 shadow-[0_24px_80px_-50px_rgba(47,111,228,0.34)]">
@@ -349,6 +418,32 @@ export function JeonjuSafetyPanel({
               {language === "ko" ? "전북 광역 화재 흐름" : "Jeonbuk fire flow"}
             </span>
           )}
+        </div>
+
+        <div className={cn("mt-6 rounded-[2rem] border px-5 py-5 sm:px-6", toneClasses(overallGuide.tone))}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
+                {language === "ko" ? "오늘의 종합 안내" : "Today's guidance"}
+              </div>
+              <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-keep">
+                {overallGuide.title}
+              </div>
+              <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-foreground/80 dark:text-current break-words">
+                {overallGuide.text}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 lg:max-w-[280px] lg:justify-end">
+              {overallGuide.chips.map((chip) => (
+                <span
+                  key={chip}
+                  className="inline-flex rounded-full border border-current/15 bg-background/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-current dark:bg-background/20"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">

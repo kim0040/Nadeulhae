@@ -49,6 +49,9 @@ type CurrentWeatherSnapshot = {
   wind: number
   pty: number
   rn1: number
+  forecastPty: number
+  forecastRn1: number
+  forecastTime: string
   vec: number
   sky: number
   lastUpdate: string
@@ -228,6 +231,24 @@ function setCacheWithLimit<T>(map: Map<string, CacheEntry<T>>, key: string, valu
     if (!oldestKey) break
     map.delete(oldestKey)
   }
+}
+
+function getKstComparableDateTime(dateValue?: string, timeValue?: string) {
+  if (!dateValue || !timeValue || dateValue.length !== 8 || timeValue.length !== 4) return null
+  return Number(`${dateValue}${timeValue}`)
+}
+
+function getKstCompactTime() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date())
+
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00"
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00"
+  return `${hour}${minute}`
 }
 
 function getClientIp(req: Request) {
@@ -547,11 +568,28 @@ async function fetchCurrentWeather(nx: number, ny: number, apiKey: string) {
   }, {})
 
   const skyItems = forecastData?.response?.body?.items?.item
+  const forecastDateTimeThreshold = Number(`${getKstCompactDate()}${getKstCompactTime()}`)
+  const sortedForecastItems = Array.isArray(skyItems)
+    ? [...skyItems].sort((a, b) => `${a.fcstDate}${a.fcstTime}`.localeCompare(`${b.fcstDate}${b.fcstTime}`))
+    : []
   const sky = Array.isArray(skyItems)
-    ? skyItems
+    ? sortedForecastItems
         .filter((item) => item.category === "SKY")
-        .sort((a, b) => `${a.fcstDate}${a.fcstTime}`.localeCompare(`${b.fcstDate}${b.fcstTime}`))[0]?.fcstValue
+        .find((item) => (getKstComparableDateTime(item.fcstDate, item.fcstTime) ?? 0) >= forecastDateTimeThreshold)?.fcstValue
+      ?? sortedForecastItems.find((item) => item.category === "SKY")?.fcstValue
     : null
+  const nearestForecastPty = sortedForecastItems
+    .filter((item) => item.category === "PTY")
+    .find((item) => {
+      const dateTime = getKstComparableDateTime(item.fcstDate, item.fcstTime)
+      return dateTime != null && dateTime >= forecastDateTimeThreshold
+    }) ?? sortedForecastItems.find((item) => item.category === "PTY")
+  const nearestForecastRn1 = sortedForecastItems
+    .filter((item) => item.category === "RN1")
+    .find((item) => {
+      const dateTime = getKstComparableDateTime(item.fcstDate, item.fcstTime)
+      return dateTime != null && dateTime >= forecastDateTimeThreshold
+    }) ?? sortedForecastItems.find((item) => item.category === "RN1")
 
   const snapshot: CurrentWeatherSnapshot = {
     temp: parseNumber(byCategory.T1H),
@@ -559,6 +597,9 @@ async function fetchCurrentWeather(nx: number, ny: number, apiKey: string) {
     wind: parseNumber(byCategory.WSD),
     pty: parseNumber(byCategory.PTY),
     rn1: parseNumber(byCategory.RN1),
+    forecastPty: parseNumber(nearestForecastPty?.fcstValue),
+    forecastRn1: parseNumber(nearestForecastRn1?.fcstValue),
+    forecastTime: String(nearestForecastPty?.fcstTime || nearestForecastRn1?.fcstTime || ""),
     vec: parseNumber(byCategory.VEC),
     sky: parseNumber(sky, 3),
     lastUpdate: formatKmaDateTime(baseDate, baseTime),
@@ -959,7 +1000,12 @@ export async function GET(req: Request) {
 
   const airQuality = airResponse.data
   const isFallback = airResponse.isFallback
-  const isRain = weatherData.pty > 0 || weatherData.rn1 > 0
+  const isRain = (
+    weatherData.pty > 0
+    || weatherData.rn1 > 0
+    || weatherData.forecastPty > 0
+    || weatherData.forecastRn1 > 0
+  )
   const isEarthquake = earthquake.active
   const isTsunami = tsunami.active
   const isVolcano = volcano.active

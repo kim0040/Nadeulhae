@@ -7,12 +7,14 @@ import { cn } from "@/lib/utils"
 import {
   Sparkles, CheckCircle2, AlertCircle, Wind, Thermometer,
   Info, Clock, Database, Droplets, Cloud, CloudRain, ShieldCheck, Zap,
-  Navigation, Sun, TriangleAlert
+  Navigation, Sun, TriangleAlert, MapPin
 } from "lucide-react"
 
 interface PicnicBriefingProps {
   weatherData: WeatherData
 }
+
+type GuideTone = "danger" | "caution" | "safe"
 
 interface BriefingPoint {
   icon: React.ReactNode
@@ -45,6 +47,52 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     return text
   }
 
+  const translateBulletinText = (text: string) => {
+    if (language === "ko") return text
+
+    const replacements: Array<[RegExp, string]> = [
+      [/전북/g, "Jeonbuk"],
+      [/전주/g, "Jeonju"],
+      [/오늘/g, "today"],
+      [/내일/g, "tomorrow"],
+      [/모레/g, "the day after tomorrow"],
+      [/글피/g, "in 3 days"],
+      [/오전/g, "morning"],
+      [/오후/g, "afternoon"],
+      [/새벽/g, "early morning"],
+      [/밤/g, "night"],
+      [/비와 눈/g, "rain and snow"],
+      [/소나기/g, "showers"],
+      [/비/g, "rain"],
+      [/눈/g, "snow"],
+      [/안개/g, "fog"],
+      [/황사/g, "dust"],
+      [/미세먼지/g, "fine dust"],
+      [/건조/g, "dry"],
+      [/강풍/g, "strong wind"],
+      [/호우/g, "heavy rain"],
+      [/대설/g, "heavy snow"],
+      [/폭염/g, "heat"],
+      [/한파/g, "cold wave"],
+      [/흐림/g, "cloudy"],
+      [/구름많음/g, "mostly cloudy"],
+      [/맑음/g, "clear"],
+      [/기온/g, "temperature"],
+      [/강수확률/g, "rain chance"],
+      [/강수/g, "precipitation"],
+      [/특보/g, "warning"],
+      [/전망/g, "outlook"],
+      [/예보/g, "forecast"],
+      [/부터/g, "from"],
+    ]
+
+    let translated = text
+    for (const [pattern, replacement] of replacements) {
+      translated = translated.replace(pattern, replacement)
+    }
+    return translated
+  }
+
   const localizeBulletinLabel = (label: string) => {
     if (language === "ko") return label
     const dayMatch = label.match(/(\d{1,2})일/)
@@ -66,7 +114,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     const splitItems = cleanedSummary.split(/\s(?=○\s*\()/).filter(Boolean)
     const headline = splitItems[0]?.startsWith("○")
       ? (language === "ko" ? "현재 공식 통보 요약입니다." : "This is the latest official bulletin summary.")
-      : splitItems.shift() || (language === "ko" ? "현재 공식 통보에 특이사항이 없습니다." : "No notable official bulletin right now.")
+      : translateBulletinText(splitItems.shift() || (language === "ko" ? "현재 공식 통보에 특이사항이 없습니다." : "No notable official bulletin right now."))
     const segments: BulletinSegment[] = splitItems
       .map((item) => item.replace(/^○\s*/, "").trim())
       .map((item) => {
@@ -74,12 +122,12 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
         if (!match) {
           return {
             label: language === "ko" ? "안내" : "Note",
-            text: item,
+            text: translateBulletinText(item),
           }
         }
         return {
           label: localizeBulletinLabel(match[1]),
-          text: match[2],
+          text: translateBulletinText(match[2]),
         }
       })
 
@@ -200,12 +248,201 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     }
   }
 
+  const getPrecipitationGuide = () => {
+    const precipitationActive = eventData?.isRain || ((details.pty ?? 0) > 0)
+    if (!precipitationActive) return null
+
+    const pty = details.pty ?? 0
+    if (pty === 3) {
+      return {
+        title: language === "ko" ? "눈 신호가 있어 오늘 점수는 보수적으로 반영됩니다" : "Snow is active, so today's score is kept conservative",
+        text: language === "ko"
+          ? "현재 눈이나 가까운 시간대의 적설 신호가 있어 바깥 일정은 짧고 안전하게 보는 편이 좋습니다. 공식 통보와 시간대별 흐름을 함께 확인하세요."
+          : "Snow or near-term wintry precipitation is active, so outdoor plans should stay short and cautious. Use the bulletin and hourly flow together.",
+        chips: [
+          language === "ko" ? "눈 · 결빙 주의" : "Snow / ice watch",
+          language === "ko" ? "보행 안전 우선" : "Watch footing",
+        ],
+      }
+    }
+
+    if (pty === 2) {
+      return {
+        title: language === "ko" ? "비와 눈이 섞여 있어 오늘 점수는 보수적으로 반영됩니다" : "Mixed precipitation is active, so today's score is kept conservative",
+        text: language === "ko"
+          ? "비·눈이 섞인 신호가 있어 체감이 급격히 떨어질 수 있습니다. 우산과 미끄럼 주의를 함께 챙기는 편이 좋습니다."
+          : "Mixed precipitation can make conditions deteriorate quickly. An umbrella and extra caution on slippery ground both matter.",
+        chips: [
+          language === "ko" ? "비·눈 혼합" : "Rain / snow mix",
+          language === "ko" ? "노면 주의" : "Watch surfaces",
+        ],
+      }
+    }
+
+    if (pty === 4) {
+      return {
+        title: language === "ko" ? "소나기 신호가 있어 오늘 점수는 보수적으로 반영됩니다" : "Showers are active, so today's score is kept conservative",
+        text: language === "ko"
+          ? "짧게 지나가는 강수라도 바깥 체류감은 크게 달라질 수 있습니다. 시간대별 강수 가능성을 함께 보는 편이 좋습니다."
+          : "Even short showers can change the outdoor feel quickly. Use the hourly precipitation windows for a better call.",
+        chips: [
+          language === "ko" ? "소나기 가능" : "Passing showers",
+          language === "ko" ? "짧은 외출 추천" : "Shorter trips",
+        ],
+      }
+    }
+
+    return {
+      title: language === "ko" ? "비 신호가 있어 오늘 점수는 보수적으로 반영됩니다" : "Rain is active, so today's score is kept conservative",
+      text: language === "ko"
+        ? "현재 비나 가까운 시간대 강수 신호가 있어 피크닉 지수는 낮게 계산됩니다. 아래 통보와 시간대별 날씨를 함께 보면 판단이 더 쉽습니다."
+        : "Current or near-term rain is active, so the picnic score is intentionally kept low. Use the bulletin and hourly forecast below for context.",
+      chips: [
+        language === "ko" ? "현재·근접 강수" : "Current / near-term rain",
+        language === "ko" ? "우산 준비" : "Umbrella ready",
+      ],
+    }
+  }
+
+  const getAirGuide = () => {
+    const pm10 = details.pm10 ?? 0
+    const pm25 = details.pm25 ?? 0
+    const bulletinText = `${metadata?.bulletin?.summary || ""} ${metadata?.bulletin?.warningStatus || ""}`
+    const hasDustSignal = /황사|미세먼지/.test(bulletinText)
+
+    if (pm10 >= 81 || pm25 >= 36 || hasDustSignal) {
+      return {
+        tone: "caution" as GuideTone,
+        icon: <Sparkles size={18} />,
+        title: language === "ko" ? "대기질 변수를 함께 보고 움직이는 편이 좋습니다" : "Air quality deserves a closer look today",
+        text: language === "ko"
+          ? "미세먼지 또는 황사 신호가 있어 바깥 체류감을 크게 바꿀 수 있습니다. 짧은 외출 위주로 보고, 이미지 섹션의 황사 흐름도 함께 확인해보세요."
+          : "Fine dust or dust signals can change outdoor comfort noticeably. Keep plans lighter and check the dust imagery below as well.",
+        chips: [
+          language === "ko" ? "대기질 주의" : "Air quality watch",
+          language === "ko" ? "마스크 판단" : "Mask check",
+        ],
+      }
+    }
+
+    return null
+  }
+
+  const getDryGuide = () => {
+    const bulletinText = `${metadata?.bulletin?.summary || ""} ${metadata?.bulletin?.warningStatus || ""}`
+    const drySignal = (details.humidity ?? 0) < 30 || /건조|산불|화재/.test(bulletinText)
+    if (!drySignal) return null
+
+    return {
+      tone: "caution" as GuideTone,
+      icon: <Droplets size={18} />,
+      title: language === "ko" ? "건조한 공기라 화기와 수분 관리가 중요합니다" : "Dry air means hydration and fire caution matter today",
+      text: language === "ko"
+        ? "습도나 공식 통보상 건조 신호가 보여 작은 불씨나 장시간 노출에 더 민감한 날입니다. 따뜻한 음료나 물을 챙기고, 화기는 특히 조심하세요."
+        : "Humidity and bulletin signals both suggest a drier day. Carry water, avoid long dry exposure, and be extra careful with fire sources.",
+      chips: [
+        language === "ko" ? "건조 신호" : "Dry signal",
+        language === "ko" ? "수분 보충" : "Hydrate",
+      ],
+    }
+  }
+
+  const getFogGuide = () => {
+    const bulletinText = `${metadata?.bulletin?.summary || ""} ${metadata?.bulletin?.warningStatus || ""}`
+    const fogSignal = (details.humidity ?? 0) >= 90 || /안개/.test(bulletinText)
+    if (!fogSignal) return null
+
+    return {
+      tone: "caution" as GuideTone,
+      icon: <Cloud size={18} />,
+      title: language === "ko" ? "안개 가능성이 있어 이동 전 시야를 함께 확인하세요" : "Fog is possible, so visibility matters before moving",
+      text: language === "ko"
+        ? "습도나 통보문상 안개 신호가 보여 이른 시간 이동 체감이 달라질 수 있습니다. 차량 이동이나 강변 산책 전 시야를 먼저 확인하는 편이 좋습니다."
+        : "Humidity and bulletin text both suggest fog risk. Visibility can change fast, especially for early movement or waterside walks.",
+      chips: [
+        language === "ko" ? "안개 가능" : "Fog signal",
+        language === "ko" ? "시야 확인" : "Check visibility",
+      ],
+    }
+  }
+
+  const getIntegratedGuide = () => {
+    const alertTitle = metadata?.alertSummary?.warningTitle
+      || metadata?.alertSummary?.earthquakeTitle
+      || metadata?.alertSummary?.tsunamiTitle
+      || metadata?.alertSummary?.volcanoTitle
+      || eventData?.warningMessage
+      || metadata?.bulletin?.summary
+
+    if (eventData?.isEarthquake || eventData?.isTsunami || eventData?.isVolcano) {
+      return {
+        tone: "danger" as const,
+        icon: <TriangleAlert size={18} />,
+        title: language === "ko" ? "오늘은 공식 재난 안내를 먼저 확인하세요" : "Check the official hazard bulletin first today",
+        text: alertTitle || (language === "ko"
+          ? "재난 신호가 감지된 날에는 피크닉 지수보다 공식 통보와 이동 안전을 우선으로 보는 편이 좋습니다."
+          : "When a hazard signal is active, official bulletins should take priority over the picnic score."),
+        chips: [
+          language === "ko" ? "실시간 재난 감지" : "Live hazard",
+          language === "ko" ? "공식 통보 우선" : "Official bulletin first",
+        ],
+      }
+    }
+
+    if (eventData?.isWeatherWarning) {
+      return {
+        tone: "danger" as GuideTone,
+        icon: <AlertCircle size={18} />,
+        title: language === "ko" ? "오늘은 특보 내용을 함께 보고 움직이세요" : "Move with the warning details in mind today",
+        text: alertTitle || (language === "ko"
+          ? "기상특보가 발효된 상태라 점수만 보기보다 공식 통보와 시간대별 변화를 같이 확인하는 편이 안전합니다."
+          : "A weather warning is active, so the official bulletin and hourly changes matter more than the score alone."),
+        chips: [
+          language === "ko" ? "기상특보" : "Weather warning",
+          language === "ko" ? "바깥 일정 재점검" : "Recheck plans",
+        ],
+      }
+    }
+
+    const precipitationGuide = getPrecipitationGuide()
+    if (precipitationGuide) {
+      return {
+        tone: "caution" as GuideTone,
+        icon: <CloudRain size={18} />,
+        title: precipitationGuide.title,
+        text: precipitationGuide.text,
+        chips: precipitationGuide.chips,
+      }
+    }
+
+    const airGuide = getAirGuide()
+    if (airGuide) return airGuide
+
+    const fogGuide = getFogGuide()
+    if (fogGuide) return fogGuide
+
+    const dryGuide = getDryGuide()
+    if (dryGuide) return dryGuide
+
+    return {
+      tone: "safe" as GuideTone,
+      icon: <ShieldCheck size={18} />,
+      title: language === "ko" ? "오늘은 큰 위험 신호 없이 흐름을 읽기 좋은 날입니다" : "Today looks steady enough to read the flow at a glance",
+      text: language === "ko"
+        ? "지수와 공식 통보, 시간대별 날씨를 함께 보면 오늘 움직이기 좋은 시간대를 비교적 편하게 판단할 수 있습니다."
+        : "The score, bulletin, and hourly forecast should be enough to judge today's best outdoor windows without major hazard signals.",
+      chips: [
+        language === "ko" ? "지수 + 통보 + 시간대" : "Score + bulletin + hourly",
+      ],
+    }
+  }
+
   // 1. 풍부한 상황별 나들이 멘트 (Enhanced Logic)
   const getBriefingQuotes = (): BriefingPoint[] => {
     const points: BriefingPoint[] = []
     const scoreNarrative = getScoreNarrative()
 
-    if (scoreNarrative) {
+    if (scoreNarrative?.type === "neutral") {
       points.push(scoreNarrative)
     }
     
@@ -219,8 +456,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       points.push({ text: formatBriefing("brief_temp_mild", { temp }), type: "success", icon: <Thermometer size={18} /> })
     } else if (temp <= 25) {
       points.push({ text: formatBriefing("brief_temp_perfect", { temp }), type: "success", icon: <CheckCircle2 size={18} /> })
-    } else if (temp <= 30) {
+    } else if (temp <= 28) {
       points.push({ text: formatBriefing("brief_temp_warm", { temp }), type: "success", icon: <Sun size={18} /> })
+    } else if (temp <= 31) {
+      points.push({ text: formatBriefing("brief_temp_hot", { temp }), type: "info", icon: <Sun size={18} /> })
     } else {
       points.push({ text: formatBriefing("brief_temp_v_hot", { temp }), type: "warning", icon: <AlertCircle size={18} /> })
     }
@@ -255,6 +494,16 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       }
     }
 
+    if ((details.pm25 ?? 0) >= 36) {
+      points.push({
+        text: language === "ko"
+          ? `${regionLabel}의 초미세먼지 농도는 ${details.pm25}µg/m³로 높습니다. 짧은 외출이나 마스크 착용을 권장합니다.`
+          : `PM2.5 in ${regionLabel} is ${details.pm25}µg/m³, which is high. Shorter outdoor stays or a mask are recommended.`,
+        type: "warning",
+        icon: <AlertCircle size={18} />,
+      })
+    }
+
     // -- Wind --
     const wind = details.wind
     if (wind < 1.5) {
@@ -269,28 +518,44 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     const humi = details.humidity
     if (humi < 30) {
       points.push({ text: formatBriefing("brief_humi_dry", { humi }), type: "info", icon: <Droplets size={18} /> })
+    } else if (humi <= 60) {
+      points.push({ text: formatBriefing("brief_humi_comfort", { humi }), type: "success", icon: <Droplets size={18} /> })
     } else if (humi > 70) {
       points.push({ text: formatBriefing("brief_humi_humid", { humi }), type: "info", icon: <Droplets size={18} /> })
     }
 
-    // -- Precipitation --
-    if (details.pty && details.pty > 0) {
+    const bulletinText = `${metadata?.bulletin?.summary || ""} ${metadata?.bulletin?.warningStatus || ""}`
+    if (/안개/.test(bulletinText)) {
       points.push({
-        text: details.pty === 3 ? t("brief_pty_snow") : t("brief_pty_rain"),
-        type: "warning",
-        icon: <CloudRain size={18} />,
+        text: language === "ko"
+          ? "공식 통보문에 안개 신호가 있어 이른 시간 이동 전 시야를 한 번 더 확인하는 편이 좋습니다."
+          : "The official bulletin mentions fog, so it is worth checking visibility before early movement.",
+        type: "info",
+        icon: <Cloud size={18} />,
       })
     }
 
-    if (eventData?.isWeatherWarning && eventData.warningMessage) {
+    if (/황사/.test(bulletinText)) {
       points.push({
-        text: eventData.warningMessage,
+        text: language === "ko"
+          ? "공식 통보문에 황사 언급이 있습니다. 공기질 수치와 함께 황사 이미지를 같이 보는 편이 좋습니다."
+          : "The official bulletin mentions dust. It is better to read the air values together with the dust imagery.",
+        type: "warning",
+        icon: <Sparkles size={18} />,
+      })
+    }
+
+    if (/건조|산불|화재/.test(bulletinText) && humi >= 30) {
+      points.push({
+        text: language === "ko"
+          ? "공식 통보문상 건조·화재 주의 신호가 있습니다. 화기 사용과 장시간 야외 체류를 조금 더 보수적으로 보세요."
+          : "The official bulletin carries a dry or fire caution signal. Be more conservative with fire sources and long outdoor stays.",
         type: "warning",
         icon: <AlertCircle size={18} />,
-        fullWidth: true,
       })
     }
 
+    // -- Precipitation --
     if (isFallback) {
       points.push({
         text: t("fallback_message"),
@@ -318,6 +583,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   ]
 
   const quotes = getBriefingQuotes()
+  const integratedGuide = getIntegratedGuide()
   const techData = getTechnicalPoints()
   const bulletinSummary = metadata?.bulletin?.summary || (
     language === "ko" ? "현재 공식 통보문에 특이사항이 없습니다." : "No notable official bulletin right now."
@@ -331,48 +597,37 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     if (/한국환경공단|AirKorea/i.test(sourceText)) labels.push(t("data_source_air"))
     return labels.length > 0 ? labels : [t("data_source_combined")]
   })()
-  const hazardTitle = eventData?.isEarthquake
-    ? (language === "ko" ? "지진 정보 감지" : "Earthquake bulletin detected")
-    : eventData?.isTsunami
-      ? (language === "ko" ? "지진해일 정보 감지" : "Tsunami bulletin detected")
-      : eventData?.isVolcano
-        ? (language === "ko" ? "화산 정보 감지" : "Volcano bulletin detected")
-        : eventData?.isWeatherWarning
-          ? (language === "ko" ? "기상특보 발효" : "Active weather warning")
-          : (language === "ko" ? "활성 특보 없음" : "No active warning")
-  const hazardDetail = metadata?.alertSummary?.warningTitle
-    || metadata?.alertSummary?.earthquakeTitle
-    || metadata?.alertSummary?.tsunamiTitle
-    || metadata?.alertSummary?.volcanoTitle
-    || (language === "ko" ? "평시 모니터링 중" : "Monitoring in normal state")
-  const signalCards = [
-    {
-      label: language === "ko" ? "지역 · 측정소" : "Region · Station",
-      title: language === "ko"
-        ? `${metadata?.region || "현재 지역"} · ${metadata?.station || t("station_dukjin")}`
-        : `${metadata?.regionEn || metadata?.region || "Current Area"} · ${metadata?.station || t("station_dukjin")}`,
-      detail: isFallback
-        ? t("fallback_message")
-        : language === "ko"
-          ? "현재 위치와 가장 가까운 권역 기준"
-          : "Matched to the nearest reporting region",
-      icon: <MapPinIcon size={16} className="text-sky-blue" />,
-      tone: "text-sky-blue",
-    },
-    {
-      label: language === "ko" ? "위험 상태" : "Hazard Status",
-      title: hazardTitle,
-      detail: hazardDetail,
-      icon: <TriangleAlert size={16} className={cn(eventData?.isEarthquake || eventData?.isWeatherWarning || eventData?.isTsunami || eventData?.isVolcano ? "text-red-500" : "text-nature-green")} />,
-      tone: eventData?.isEarthquake || eventData?.isWeatherWarning || eventData?.isTsunami || eventData?.isVolcano ? "text-red-500" : "text-nature-green",
-    },
-  ]
-
   const getUpdateTime = (type: 'kma' | 'air') => {
     if (typeof metadata?.lastUpdate === 'string') return metadata.lastUpdate
     if (type === 'kma') return (metadata?.lastUpdate as any)?.kma || "--:--"
     return (metadata?.lastUpdate as any)?.air || "--:--"
   }
+  const briefingMeta = [
+    {
+      label: language === "ko" ? "지역 기준" : "Region",
+      title: language === "ko"
+        ? `${metadata?.region || "현재 지역"} · ${metadata?.station || t("station_dukjin")}`
+        : `${metadata?.regionEn || metadata?.region || "Current Area"} · ${metadata?.station || t("station_dukjin")}`,
+      detail: isFallback
+        ? (language === "ko" ? "전주 홈 기준으로 안전 대체 중" : "Safely falling back to Jeonju home mode")
+        : (language === "ko" ? "가장 가까운 권역과 측정소 기준" : "Matched to the nearest region and station"),
+      icon: <MapPin size={15} className="text-sky-blue" />,
+    },
+    {
+      label: language === "ko" ? "판단 방식" : "Scoring Mode",
+      title: metadata?.scoreBreakdown?.knockout === "warning"
+        ? (language === "ko" ? "특보·재난 우선 모드" : "Warning-first mode")
+        : metadata?.scoreBreakdown?.knockout === "rain"
+          ? (language === "ko" ? "강수 보수 반영 모드" : "Precipitation-conservative mode")
+          : (language === "ko" ? "일반 합산 모드" : "Standard scoring mode"),
+      detail: metadata?.scoreBreakdown?.knockout === "warning"
+        ? (language === "ko" ? "점수보다 공식 통보를 먼저 봅니다." : "Official bulletins take priority over the score.")
+        : metadata?.scoreBreakdown?.knockout === "rain"
+          ? (language === "ko" ? "현재·근접 강수 신호를 먼저 반영합니다." : "Current and near-term precipitation is applied first.")
+          : (language === "ko" ? "대기질·기온·하늘·바람을 함께 읽습니다." : "Air, temperature, sky, and wind are combined together."),
+      icon: <ShieldCheck size={15} className="text-nature-green" />,
+    },
+  ]
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.98 }}
@@ -397,31 +652,70 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
              <div className="flex flex-col items-end">
                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest leading-none mb-1">{t("status_nearby_station")}</span>
                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--interactive)] border border-[var(--interactive-border)]">
-                 <MapPinIcon size={12} className="text-sky-blue" />
+                 <MapPin size={12} className="text-sky-blue" />
                  <span className="text-xs font-black text-foreground">{metadata?.station || t("station_dukjin")}</span>
                </div>
              </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          {signalCards.map((card) => (
-            <div
-              key={card.label}
-              className="rounded-[1.6rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5 min-w-0"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                {card.icon}
-                <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">{card.label}</span>
+        <div className="space-y-4 mb-4">
+          <div
+            className={cn(
+              "lg:col-span-2 rounded-[1.85rem] border px-5 py-5",
+              integratedGuide.tone === "danger"
+                ? "border-red-500/20 bg-red-500/8 text-red-600 dark:text-red-300"
+                : integratedGuide.tone === "caution"
+                  ? "border-orange-500/20 bg-orange-500/8 text-orange-600 dark:text-orange-300"
+                  : "border-nature-green/20 bg-nature-green/10 text-nature-green"
+            )}
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  {integratedGuide.icon}
+                  <span className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
+                    {language === "ko" ? "오늘의 종합 안내" : "Today's guidance"}
+                  </span>
+                </div>
+                <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-keep">
+                  {integratedGuide.title}
+                </div>
+                <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-foreground/80 dark:text-current break-words">
+                  {integratedGuide.text}
+                </p>
               </div>
-              <div className={cn("text-xl sm:text-4xl font-black leading-tight break-words", card.tone)}>
-                {card.title}
-              </div>
-              <div className="mt-2 text-xs font-bold leading-relaxed text-muted-foreground break-words">
-                {card.detail}
+              <div className="flex flex-wrap gap-2 lg:max-w-[280px] lg:justify-end">
+                {integratedGuide.chips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="inline-flex rounded-full border border-current/15 bg-background/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-current dark:bg-background/20"
+                  >
+                    {chip}
+                  </span>
+                ))}
               </div>
             </div>
-          ))}
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {briefingMeta.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[1.45rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-4 py-4 min-w-0"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  {item.icon}
+                  <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">{item.label}</span>
+                </div>
+                <div className="text-base sm:text-lg font-black leading-snug text-foreground break-words">
+                  {item.title}
+                </div>
+                <div className="mt-2 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground break-words">
+                  {item.detail}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="rounded-[1.85rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5 mb-8">
@@ -541,7 +835,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       </div>
 
       {/* Footer with Sync Status */}
-      <div className="bg-[var(--interactive)] px-8 sm:px-12 py-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row justify-between items-center gap-6">
+      <div className="bg-[var(--interactive)] px-8 sm:px-12 py-6 border-t border-[var(--card-border)]">
         <div className="flex flex-wrap items-center justify-center gap-6">
           <div className="flex items-center gap-3">
              <Clock size={14} className="text-sky-blue opacity-50" />
@@ -577,39 +871,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                      </span>
                    ))}
                </div>
-             </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-active-blue/5 border border-active-blue/20">
-            <AlertCircle size={10} className="text-active-blue" />
-            <span className="text-[8px] font-black text-active-blue uppercase tracking-widest">
-              {t("status_coming_soon")}: {t("brief_ai_db_archive")}
-            </span>
+              </div>
           </div>
         </div>
       </div>
     </motion.div>
-  )
-}
-
-// Helper for Lucide icon
-function MapPinIcon({ className, size }: { className?: string, size?: number }) {
-  return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width={size || 24} 
-      height={size || 24} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
-    </svg>
   )
 }

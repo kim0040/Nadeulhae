@@ -209,41 +209,13 @@ export default function Home() {
     scorePaused: language === "ko" ? "피크닉 지수 산출 보류" : "Picnic score paused",
   }
 
-  const emergencyType = weatherData.eventData?.isEarthquake
-    ? "earthquake"
-    : weatherData.eventData?.isTsunami
-      ? "tsunami"
-      : weatherData.eventData?.isVolcano
-        ? "volcano"
-        : weatherData.eventData?.isWeatherWarning
-          ? "warning"
-          : weatherData.eventData?.isRain
-            ? "rain"
-            : "none"
-
-  const emergencyTitle = emergencyType === "earthquake"
-    ? t("alert_earthquake_title")
-    : emergencyType === "tsunami"
-      ? (language === "ko" ? "🚨 지진해일 경보 감시" : "🚨 Tsunami Alert")
-      : emergencyType === "volcano"
-        ? (language === "ko" ? "🚨 화산 정보 감시" : "🚨 Volcanic Activity Alert")
-        : emergencyType === "warning"
-          ? t("alert_weather_wrn_title")
-          : emergencyType === "rain"
-            ? t("alert_heavy_rain_title")
-            : ""
-
-  const emergencyDesc = emergencyType === "earthquake"
-    ? t("alert_earthquake_desc")
-    : emergencyType === "tsunami"
-      ? (language === "ko" ? "지진해일 관련 통보가 감지되었습니다. 해안가 접근을 피하고 최신 안내를 확인하세요." : "A tsunami-related bulletin was detected. Avoid coastal areas and follow official updates.")
-      : emergencyType === "volcano"
-        ? (language === "ko" ? "화산 관련 통보가 감지되었습니다. 항공/외부 활동 전 최신 통보를 확인하세요." : "A volcanic bulletin was detected. Check the latest official advisory before travel or outdoor activity.")
-        : emergencyType === "warning"
-          ? t("alert_weather_wrn_desc")
-          : emergencyType === "rain"
-            ? t("alert_heavy_rain_desc")
-            : ""
+  const hasBriefingAlert = Boolean(
+    weatherData.eventData?.isEarthquake
+    || weatherData.eventData?.isTsunami
+    || weatherData.eventData?.isVolcano
+    || weatherData.eventData?.isWeatherWarning
+    || weatherData.eventData?.isRain
+  )
 
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden bg-background">
@@ -267,43 +239,27 @@ export default function Home() {
             className="text-4xl sm:text-5xl md:text-7xl text-sky-blue px-4 font-black tracking-tight"
           />
 
-          {(weatherData.eventData?.isEarthquake || weatherData.eventData?.isTsunami || weatherData.eventData?.isVolcano || weatherData.eventData?.isWeatherWarning || weatherData.eventData?.isRain) ? (
-            <div className="relative w-full max-w-md flex flex-col items-center justify-center p-8 rounded-3xl bg-red-500/10 border border-red-500/40 shadow-2xl mt-4 overflow-hidden">
-              <BorderBeam duration={8} borderWidth={3} colorFrom="#ef4444" colorTo="#b91c1c" />
-              <AlertTriangle className="size-16 sm:size-20 text-red-500 mb-4 animate-bounce" />
-              <h3 className="text-xl sm:text-2xl font-black text-red-500 mb-2">
-                {emergencyTitle}
-              </h3>
-              <p className="text-sm font-bold text-red-400">
-                {emergencyDesc}
-              </p>
-              {weatherData.eventData?.warningMessage && (
-                <p className="mt-4 text-xs sm:text-sm font-bold text-red-200 max-w-xs leading-relaxed">
-                  {weatherData.eventData.warningMessage}
-                </p>
-              )}
-              <div className="mt-4 px-3 py-1 bg-red-500/20 rounded-full border border-red-500/30 text-[10px] font-black uppercase text-red-300">
-                {homeTexts.scorePaused}
+          <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card border border-card-border shadow-2xl transition-all hover:scale-105 duration-500">
+            <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
+              <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-1">{t("hero_score_label")}</span>
+              <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.22em] text-foreground/45 mb-2">{t("hero_score_subtitle")}</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-6xl sm:text-8xl font-black tracking-tighter text-foreground">{weatherData.score}</span>
+                <span className="text-sm sm:text-xl font-black text-foreground/70">{t("hero_unit")}</span>
               </div>
-            </div>
-          ) : (
-            <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card border border-card-border shadow-2xl transition-all hover:scale-105 duration-500">
-              <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
-                <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-1">{t("hero_score_label")}</span>
-                <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.22em] text-foreground/45 mb-2">{t("hero_score_subtitle")}</span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-6xl sm:text-8xl font-black tracking-tighter text-foreground">{weatherData.score}</span>
-                  <span className="text-sm sm:text-xl font-black text-foreground/70">{t("hero_unit")}</span>
+              {weatherData.score >= 80 && (
+                <div className="mt-2 text-[10px] sm:text-xs font-black text-sky-blue bg-sky-blue/10 px-3 py-1 rounded-full border border-sky-blue/20 animate-pulse">
+                  {t("hero_best_day")}
                 </div>
-                {weatherData.score >= 80 && (
-                  <div className="mt-2 text-[10px] sm:text-xs font-black text-sky-blue bg-sky-blue/10 px-3 py-1 rounded-full border border-sky-blue/20 animate-pulse">
-                    {t("hero_best_day")}
-                  </div>
-                )}
-              </div>
+              )}
+              {hasBriefingAlert && (
+                <div className="mt-3 rounded-full border border-orange-500/20 bg-orange-500/8 px-3 py-1 text-[10px] sm:text-xs font-black tracking-wide text-orange-600 dark:text-orange-300">
+                  {language === "ko" ? "세부 경고는 아래 브리핑에서 확인" : "See briefing below for active alerts"}
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="flex flex-wrap items-start justify-center gap-y-12 sm:gap-10 mt-12 text-foreground w-full max-w-4xl mx-auto px-4">
             {quickMetrics.map((item) => (

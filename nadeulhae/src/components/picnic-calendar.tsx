@@ -24,6 +24,48 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
   const outdoorTipLabel = language === "ko" ? "야외 팁" : "Outdoor Tip"
   const pointLabel = language === "ko" ? "점" : "Pts"
 
+  const translateWeatherText = (text?: string) => {
+    if (!text) return "--"
+    if (language === "ko") return text
+
+    return text
+      .replace(/구름많음/g, "Mostly Cloudy")
+      .replace(/흐림/g, "Cloudy")
+      .replace(/맑음/g, "Clear")
+      .replace(/비\/눈/g, "Rain / Snow")
+      .replace(/비와 눈/g, "Rain / Snow")
+      .replace(/소나기/g, "Showers")
+      .replace(/비/g, "Rain")
+      .replace(/눈/g, "Snow")
+  }
+
+  const translatePrecipAmount = (value?: string) => {
+    const base = value || "0mm"
+    if (language === "ko") return base
+    return base
+      .replace(/강수없음/g, "No precipitation")
+      .replace(/없음/g, "None")
+      .replace(/1mm 미만/g, "<1mm")
+      .replace(/미만/g, "under")
+  }
+
+  const translateLocation = (value?: string) => {
+    if (!value) return "Loading..."
+    if (language === "ko") return value
+    return value
+      .replace(/전주/g, "Jeonju")
+      .replace(/서울/g, "Seoul")
+      .replace(/광주/g, "Gwangju")
+      .replace(/부산/g, "Busan")
+      .replace(/대전/g, "Daejeon")
+      .replace(/울산/g, "Ulsan")
+      .replace(/인천/g, "Incheon")
+      .replace(/대구/g, "Daegu")
+      .replace(/세종/g, "Sejong")
+      .replace(/광양/g, "Gwangyang")
+      .replace(/제주/g, "Jeju")
+  }
+
   useEffect(() => {
     const fetchForecast = async (lat?: number, lon?: number) => {
       try {
@@ -65,7 +107,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
             {forecastTitle}
           </h2>
           <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-            {forecast?.location || "Loading..."}
+            {translateLocation(forecast?.location)}
           </p>
         </div>
         <div className="flex items-center gap-2 text-nature-green bg-nature-green/10 px-4 py-1.5 rounded-full border border-nature-green/20">
@@ -84,6 +126,8 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
               const dayDate = new Date(dayForecast.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'))
               const isToday = isSameDay(dayDate, today)
               const isRecommended = dayForecast.score >= 80
+              const localizedSky = translateWeatherText(dayForecast.sky)
+              const localizedPrecipAmount = translatePrecipAmount(dayForecast.precipAmount)
               const isWetDay = dayForecast.sky?.includes("비") || dayForecast.sky?.includes("눈") || dayForecast.precipChance >= 60
               let advice = ""
               if (isWetDay) {
@@ -166,7 +210,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                       </div>
                     </div>
                     <span className="text-2xl sm:text-3xl font-black mt-4 text-foreground text-center break-words line-clamp-2 min-h-[4rem]">
-                      {dayForecast.sky}
+                      {localizedSky}
                     </span>
 
                   </div>
@@ -189,7 +233,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
 
                     <div className="rounded-[1.35rem] border border-border bg-[var(--interactive)] px-4 py-3">
                       <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{rainAmountLabel}</div>
-                      <div className="text-base font-black text-foreground break-words">{dayForecast.precipAmount || "0mm"}</div>
+                      <div className="text-base font-black text-foreground break-words">{localizedPrecipAmount}</div>
                     </div>
 
                     <div className="rounded-[1.35rem] border border-border bg-[var(--interactive)] px-4 py-3">
@@ -229,7 +273,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
       <div className="mt-8 flex justify-end items-center gap-2 px-4 opacity-50">
         <div className="size-2 rounded-full bg-nature-green animate-pulse" />
         <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-muted-foreground">
-          Source: {forecast?.metadata?.dataSource || "기상청"} (Updated: {forecast?.metadata?.lastUpdate || "--:--"})
+          {language === "ko" ? "출처" : "Source"}: {language === "ko" ? (forecast?.metadata?.dataSource || "기상청") : "KMA"} ({language === "ko" ? "업데이트" : "Updated"}: {forecast?.metadata?.lastUpdate || "--:--"})
         </span>
       </div>
 

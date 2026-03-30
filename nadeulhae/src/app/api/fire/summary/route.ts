@@ -75,8 +75,22 @@ type CacheEntry = {
   data: FireSummaryResponse
 }
 
+type DailySummaryCacheEntry = {
+  expiry: number
+  items: FireSummaryItem[]
+}
+
+type DailyPlaceCacheEntry = {
+  expiry: number
+  items: FirePlaceItem[]
+}
+
 const fireCache = new Map<string, CacheEntry>()
-const FIRE_CACHE_TTL = 12 * 60 * 60 * 1000
+const dailySummaryCache = new Map<string, DailySummaryCacheEntry>()
+const dailyPlaceCache = new Map<string, DailyPlaceCacheEntry>()
+
+const FIRE_TODAY_CACHE_TTL = 2 * 60 * 60 * 1000
+const FIRE_HISTORY_CACHE_TTL = 30 * 24 * 60 * 60 * 1000
 
 const FIRE_SIDO_NAME_MAP: Record<string, string> = {
   서울: "서울특별시",
@@ -116,6 +130,10 @@ function isOutdoorPlace(name: string) {
   return OUTDOOR_PLACE_KEYWORDS.some((keyword) => name.includes(keyword))
 }
 
+function getDateCacheTtl(dateKey: string) {
+  return dateKey === getKstDateOffsetLabel(0) ? FIRE_TODAY_CACHE_TTL : FIRE_HISTORY_CACHE_TTL
+}
+
 async function fetchJsonSafely(url: string) {
   try {
     const response = await fetch(url, { cache: "no-store", next: { revalidate: 0 } })
@@ -127,6 +145,56 @@ async function fetchJsonSafely(url: string) {
     console.error("Fire API fetch failed:", error)
     return null
   }
+}
+
+async function getDailySummaryItems(dateKey: string, serviceKey: string) {
+  const cached = dailySummaryCache.get(dateKey)
+  if (cached && cached.expiry > Date.now()) {
+    return cached.items
+  }
+
+  const endpoint = "https://apis.data.go.kr/1661000/FireInformationService/getOcBysidoFireSmrzPcnd"
+  const query = new URLSearchParams({
+    pageNo: "1",
+    numOfRows: "30",
+    resultType: "json",
+    ocrn_ymd: dateKey,
+    ServiceKey: serviceKey,
+  })
+  const data = await fetchJsonSafely(`${endpoint}?${query.toString()}`)
+  const items = Array.isArray(data?.body?.items) ? data.body.items : []
+
+  dailySummaryCache.set(dateKey, {
+    items,
+    expiry: Date.now() + getDateCacheTtl(dateKey),
+  })
+
+  return items
+}
+
+async function getDailyPlaceItems(dateKey: string, serviceKey: string) {
+  const cached = dailyPlaceCache.get(dateKey)
+  if (cached && cached.expiry > Date.now()) {
+    return cached.items
+  }
+
+  const endpoint = "https://apis.data.go.kr/1661000/FireInformationService/getArFireByplceFpcnd"
+  const query = new URLSearchParams({
+    pageNo: "1",
+    numOfRows: "300",
+    resultType: "json",
+    ocrn_ymd: dateKey,
+    ServiceKey: serviceKey,
+  })
+  const data = await fetchJsonSafely(`${endpoint}?${query.toString()}`)
+  const items = Array.isArray(data?.body?.items) ? data.body.items : []
+
+  dailyPlaceCache.set(dateKey, {
+    items,
+    expiry: Date.now() + getDateCacheTtl(dateKey),
+  })
+
+  return items
 }
 
 function createFireNotice(
@@ -173,6 +241,8 @@ export async function GET(request: Request) {
 
   const fireSidoName = FIRE_SIDO_NAME_MAP[profile.airSidoName] || profile.displayName
   const cacheKey = `${profile.key}:${days}`
+  const todayKey = getKstDateOffsetLabel(0)
+  const includesToday = Array.from({ length: days }, (_, index) => getKstDateOffsetLabel(-index)).includes(todayKey)
   const cached = fireCache.get(cacheKey)
   if (cached && cached.expiry > Date.now()) {
     const response = NextResponse.json(cached.data)
@@ -188,16 +258,7 @@ export async function GET(request: Request) {
 
   const summaryResults = await Promise.all(
     summaryDates.map(async (dateKey) => {
-      const endpoint = "https://apis.data.go.kr/1661000/FireInformationService/getOcBysidoFireSmrzPcnd"
-      const query = new URLSearchParams({
-        pageNo: "1",
-        numOfRows: "30",
-        resultType: "json",
-        ocrn_ymd: dateKey,
-        ServiceKey: serviceKey,
-      })
-      const data = await fetchJsonSafely(`${endpoint}?${query.toString()}`)
-      const items = Array.isArray(data?.body?.items) ? data.body.items : []
+      const items = await getDailySummaryItems(dateKey, serviceKey)
       const match = items.find((item: any) => item?.SIDO_NM === fireSidoName)
       if (!match) return null
 
@@ -229,16 +290,8 @@ export async function GET(request: Request) {
   const sevenDayAverage = Math.round((sevenDayTotal / dailyTrend.length) * 10) / 10
   const peakDay = dailyTrend.reduce((peak, current) => current.fireReceipt > peak.fireReceipt ? current : peak, dailyTrend[0])
 
-  const placeEndpoint = "https://apis.data.go.kr/1661000/FireInformationService/getArFireByplceFpcnd"
-  const placeQuery = new URLSearchParams({
-    pageNo: "1",
-    numOfRows: "300",
-    resultType: "json",
-    ocrn_ymd: latest.date,
-    ServiceKey: serviceKey,
-  })
-  const placeData = await fetchJsonSafely(`${placeEndpoint}?${placeQuery.toString()}`)
-  const placeItems: FireTopPlace[] = (Array.isArray(placeData?.body?.items) ? placeData.body.items : [])
+  const placeData = await getDailyPlaceItems(latest.date, serviceKey)
+  const placeItems: FireTopPlace[] = placeData
     .filter((item: FirePlaceItem) => item?.SIDO_NM === fireSidoName)
     .map((item: FirePlaceItem) => ({
       name: String(item.FIRE_PLCE_SCTN_NM || "기타"),
@@ -268,7 +321,7 @@ export async function GET(request: Request) {
       source: "소방청 국가화재정보서비스",
       latestDate: latest.date,
       coverageDays: dailyTrend.length,
-      cacheHours: 12,
+      cacheHours: includesToday ? 2 : 24,
     },
     overview: {
       latestFireReceipt: latest.fireReceipt,
@@ -293,7 +346,7 @@ export async function GET(request: Request) {
 
   fireCache.set(cacheKey, {
     data: payload,
-    expiry: Date.now() + FIRE_CACHE_TTL,
+    expiry: Date.now() + (includesToday ? FIRE_TODAY_CACHE_TTL : FIRE_HISTORY_CACHE_TTL),
   })
 
   const response = NextResponse.json(payload)
