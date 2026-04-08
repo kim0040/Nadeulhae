@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 
+import { withApiAnalytics } from "@/lib/analytics/route"
+
 type ArchiveResponse = {
   month: string
   highlightedDays: number[]
@@ -45,7 +47,7 @@ function toDay(dateValue: string) {
   return Number(normalized.slice(6, 8))
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const url = new URL(request.url)
   const month = normalizeMonth(url.searchParams.get("month"))
   const lat = url.searchParams.get("lat")
@@ -136,3 +138,5 @@ export async function GET(request: Request) {
     })
   }
 }
+
+export const GET = withApiAnalytics(handleGET)

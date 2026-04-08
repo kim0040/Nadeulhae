@@ -10,6 +10,7 @@ import {
   getKstCompactDate,
   getNextUpdateTimestamp,
 } from "@/lib/weather-utils"
+import { withApiAnalytics } from "@/lib/analytics/route"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 
 type CacheEntry<T> = {
@@ -200,7 +201,7 @@ function getKstTimeLabel(date: Date) {
   return `${hour}${minute}`
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   runMaintenanceSweepIfNeeded()
   const url = new URL(request.url)
   const lat = url.searchParams.get("lat")
@@ -516,3 +517,5 @@ export async function GET(request: Request) {
   const response = NextResponse.json(finalResult)
   return attachSessionCookie(response, sessionId, shouldSetCookie)
 }
+
+export const GET = withApiAnalytics(handleGET)

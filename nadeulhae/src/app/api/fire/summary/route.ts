@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { withApiAnalytics } from "@/lib/analytics/route"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 import { getRegionProfileByKey, resolveRegionProfile } from "@/lib/weather-utils"
 
@@ -225,7 +226,7 @@ function createFireNotice(
   }
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const url = new URL(request.url)
   const regionKey = url.searchParams.get("regionKey")
   const lat = url.searchParams.get("lat")
@@ -352,3 +353,5 @@ export async function GET(request: Request) {
   const response = NextResponse.json(payload)
   return attachSessionCookie(response, sessionId, shouldSetCookie)
 }
+
+export const GET = withApiAnalytics(handleGET)

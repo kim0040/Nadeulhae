@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { withApiAnalytics } from "@/lib/analytics/route"
 
 type KmaImageItem = {
   name?: string
@@ -278,7 +279,7 @@ function parseRequestedExtras(request: NextRequest): ExtraImageKey[] {
   return unique.filter((item): item is ExtraImageKey => item === "dust" || item === "lgt" || item === "fog")
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const now = Date.now()
   const requestedExtras = parseRequestedExtras(request)
 
@@ -369,3 +370,5 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(payload)
 }
+
+export const GET = withApiAnalytics(handleGET)
