@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/context/AuthContext";
+import { AnalyticsConsentBanner } from "@/components/analytics/analytics-consent-banner";
 import { PageViewTracker } from "@/components/analytics/page-view-tracker";
 
 const geistSans = Geist({
@@ -44,7 +46,10 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <AuthProvider>
-              <PageViewTracker />
+              <Suspense fallback={null}>
+                <PageViewTracker />
+              </Suspense>
+              <AnalyticsConsentBanner />
               <Navbar />
               <div className="relative">
                 {children}

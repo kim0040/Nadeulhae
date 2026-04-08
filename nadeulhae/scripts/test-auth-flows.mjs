@@ -6,7 +6,17 @@ const origin = new URL(baseUrl).origin
 const clientIp = `203.0.113.${Math.floor(Math.random() * 200) + 10}`
 
 function createJar() {
-  return { cookie: "" }
+  return { cookies: new Map() }
+}
+
+function getCookieHeader(jar) {
+  return Array.from(jar.cookies.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ")
+}
+
+function getCookieValue(jar, name) {
+  return jar.cookies.get(name) ?? ""
 }
 
 function updateJarFromHeaders(jar, response) {
@@ -25,12 +35,16 @@ function updateJarFromHeaders(jar, response) {
     const cookieValue = pair.slice(separatorIndex + 1).trim()
     if (!name) continue
 
-    if (!cookieValue) {
-      jar.cookie = ""
+    const expiresMatch = value.match(/Expires=([^;]+)/i)
+    const expiresAt = expiresMatch ? new Date(expiresMatch[1]) : null
+    const isExpired = expiresAt instanceof Date && !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= Date.now()
+
+    if (!cookieValue || isExpired) {
+      jar.cookies.delete(name)
       continue
     }
 
-    jar.cookie = `${name}=${cookieValue}`
+    jar.cookies.set(name, cookieValue)
   }
 }
 
@@ -52,8 +66,9 @@ async function request(path, options = {}) {
     body = JSON.stringify(options.json)
   }
 
-  if (jar.cookie) {
-    headers.set("Cookie", jar.cookie)
+  const cookieHeader = getCookieHeader(jar)
+  if (cookieHeader) {
+    headers.set("Cookie", cookieHeader)
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
@@ -108,6 +123,7 @@ function buildRegisterPayload(email) {
     privacyAccepted: true,
     ageConfirmed: true,
     marketingAccepted: true,
+    analyticsAccepted: true,
   }
 }
 
@@ -121,6 +137,7 @@ function buildProfilePayload() {
     preferredTimeSlot: "afternoon",
     weatherSensitivity: ["heat", "fine_dust"],
     marketingAccepted: false,
+    analyticsAccepted: false,
   }
 }
 
@@ -130,6 +147,7 @@ async function main() {
   const anonJar = createJar()
   const primaryJar = createJar()
   const loginJar = createJar()
+  const analyticsJar = createJar()
   const email = `auth-smoke-${randomUUID()}@example.com`
   const rateLimitEmail = `auth-rate-${randomUUID()}@example.com`
 
@@ -175,7 +193,8 @@ async function main() {
     json: buildRegisterPayload(email),
   })
   assertCondition(registerResult.status === 201, "Valid register request should return 201")
-  assertCondition(Boolean(primaryJar.cookie), "Register should set an auth cookie")
+  assertCondition(Boolean(getCookieValue(primaryJar, "nadeulhae_auth")), "Register should set an auth cookie")
+  assertCondition(getCookieValue(primaryJar, "nadeulhae_analytics_consent") === "allow", "Register should sync the analytics consent cookie")
   assertCondition(registerResult.json?.user?.email === email, "Register response should include the created user")
   assertCondition(
     (registerResult.headers.get("set-cookie") ?? "").includes("Expires="),
@@ -215,6 +234,8 @@ async function main() {
   })
   assertCondition(validProfile.status === 200, "Valid profile update should return 200")
   assertCondition(validProfile.json?.user?.displayName === "Auth Tester Updated", "Profile update should persist the new name")
+  assertCondition(validProfile.json?.user?.analyticsAccepted === false, "Profile update should persist analytics consent changes")
+  assertCondition(getCookieValue(primaryJar, "nadeulhae_analytics_consent") === "essential", "Profile update should downgrade the analytics consent cookie")
   logStep("Valid profile update returned 200")
 
   const logoutResult = await request("/api/auth/logout", {
@@ -222,7 +243,7 @@ async function main() {
     jar: primaryJar,
   })
   assertCondition(logoutResult.status === 200, "Logout should return 200")
-  assertCondition(primaryJar.cookie === "", "Logout should clear the auth cookie")
+  assertCondition(!getCookieValue(primaryJar, "nadeulhae_auth"), "Logout should clear the auth cookie")
   logStep("Logout returned 200 and cleared the cookie")
 
   const meAfterLogout = await request("/api/auth/me", { jar: primaryJar })
@@ -243,8 +264,40 @@ async function main() {
     json: { email, password: "nadeulhae2026" },
   })
   assertCondition(loginResult.status === 200, "Correct login should return 200")
-  assertCondition(Boolean(loginJar.cookie), "Correct login should set an auth cookie")
+  assertCondition(Boolean(getCookieValue(loginJar, "nadeulhae_auth")), "Correct login should set an auth cookie")
+  assertCondition(getCookieValue(loginJar, "nadeulhae_analytics_consent") === "essential", "Login should restore the saved analytics consent preference")
   logStep("Correct login returned 200 and issued a cookie")
+
+  const consentResult = await request("/api/analytics/consent", {
+    method: "POST",
+    jar: analyticsJar,
+    json: {
+      preference: "allow",
+      locale: "ko",
+    },
+  })
+  assertCondition(consentResult.status === 200, "Analytics consent route should return 200")
+  assertCondition(getCookieValue(analyticsJar, "nadeulhae_analytics_consent") === "allow", "Analytics consent route should issue a consent cookie")
+  logStep("Analytics consent route returned 200 and issued a consent cookie")
+
+  const pageViewResult = await request("/api/analytics/page-view", {
+    method: "POST",
+    jar: analyticsJar,
+    json: {
+      path: "/dashboard",
+      locale: "ko",
+      theme: "dark",
+      viewportBucket: "desktop",
+      timeZone: "Asia/Seoul",
+      referrerHost: "google.com",
+      utmSource: "newsletter",
+      utmMedium: "email",
+      utmCampaign: "spring-open",
+      pageLoadMs: 321,
+    },
+  })
+  assertCondition(pageViewResult.status === 200, "Analytics page-view route should return 200")
+  logStep("Analytics page-view route returned 200")
 
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     const failure = await request("/api/auth/login", {
@@ -277,7 +330,7 @@ async function main() {
     json: { confirmText: "DELETE" },
   })
   assertCondition(deleteResult.status === 200, "Account delete should return 200")
-  assertCondition(loginJar.cookie === "", "Account delete should clear the auth cookie")
+  assertCondition(!getCookieValue(loginJar, "nadeulhae_auth"), "Account delete should clear the auth cookie")
   logStep("Account delete returned 200 and cleared the cookie")
 
   const meAfterDelete = await request("/api/auth/me", { jar: loginJar })

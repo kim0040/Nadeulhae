@@ -63,6 +63,57 @@ const createDailyActorActivityTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+const createDailyPageContextMetricsTableSql = `
+  CREATE TABLE IF NOT EXISTS analytics_daily_page_context_metrics (
+    metric_date DATE NOT NULL,
+    dimension_key CHAR(64) NOT NULL,
+    route_path VARCHAR(191) NOT NULL,
+    auth_state VARCHAR(16) NOT NULL,
+    device_type VARCHAR(16) NOT NULL,
+    locale VARCHAR(8) NOT NULL,
+    theme VARCHAR(16) NOT NULL,
+    viewport_bucket VARCHAR(16) NOT NULL,
+    time_zone VARCHAR(48) NOT NULL,
+    referrer_host VARCHAR(191) NOT NULL,
+    acquisition_channel VARCHAR(32) NOT NULL,
+    utm_source VARCHAR(80) NOT NULL,
+    utm_medium VARCHAR(80) NOT NULL,
+    utm_campaign VARCHAR(120) NOT NULL,
+    page_view_count BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    unique_visitors BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    unique_users BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    total_load_ms BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    peak_load_ms INT UNSIGNED NOT NULL DEFAULT 0,
+    first_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (metric_date, dimension_key),
+    KEY idx_page_context_route_date (route_path, metric_date),
+    KEY idx_page_context_channel_date (acquisition_channel, metric_date),
+    KEY idx_page_context_last_seen (last_seen_at)
+  ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`
+
+const createDailyConsentMetricsTableSql = `
+  CREATE TABLE IF NOT EXISTS analytics_daily_consent_metrics (
+    metric_date DATE NOT NULL,
+    dimension_key CHAR(64) NOT NULL,
+    decision_source VARCHAR(24) NOT NULL,
+    consent_state VARCHAR(16) NOT NULL,
+    auth_state VARCHAR(16) NOT NULL,
+    device_type VARCHAR(16) NOT NULL,
+    locale VARCHAR(8) NOT NULL,
+    decision_count BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    unique_visitors BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    unique_users BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    first_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (metric_date, dimension_key),
+    KEY idx_consent_source_date (decision_source, metric_date),
+    KEY idx_consent_state_date (consent_state, metric_date),
+    KEY idx_consent_last_seen (last_seen_at)
+  ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`
+
 export async function ensureAnalyticsSchema() {
   if (globalThis.__nadeulhaeAnalyticsSchemaPromise) {
     return globalThis.__nadeulhaeAnalyticsSchemaPromise
@@ -73,6 +124,8 @@ export async function ensureAnalyticsSchema() {
     await pool.query(createDailyRouteMetricsTableSql)
     await pool.query(createDailyUniqueEntitiesTableSql)
     await pool.query(createDailyActorActivityTableSql)
+    await pool.query(createDailyPageContextMetricsTableSql)
+    await pool.query(createDailyConsentMetricsTableSql)
   })()
 
   globalThis.__nadeulhaeAnalyticsSchemaPromise = bootstrapPromise.catch((error) => {

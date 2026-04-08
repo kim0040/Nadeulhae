@@ -18,6 +18,8 @@ import {
   getAuthenticatedSessionFromRequest,
 } from "@/lib/auth/session"
 import { validateUpdateProfilePayload } from "@/lib/auth/validation"
+import { recordDailyConsentDecisionSafely } from "@/lib/analytics/repository"
+import { attachAnalyticsConsentCookie } from "@/lib/analytics/consent"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
@@ -79,6 +81,7 @@ async function handlePATCH(request: NextRequest) {
       preferredTimeSlot: validation.data.preferredTimeSlot,
       weatherSensitivity: validation.data.weatherSensitivity,
       marketingAccepted: validation.data.marketingAccepted,
+      analyticsAccepted: validation.data.analyticsAccepted,
     })
 
     if (!updatedUser) {
@@ -95,7 +98,16 @@ async function handlePATCH(request: NextRequest) {
       userAgent,
     })
 
-    return attachRefreshedAuthCookie(
+    if (existingUser.analyticsAccepted !== updatedUser.analyticsAccepted) {
+      await recordDailyConsentDecisionSafely({
+        request,
+        preference: updatedUser.analyticsAccepted ? "allow" : "essential",
+        decisionSource: "profile",
+        locale: request.headers.get("accept-language"),
+      })
+    }
+
+    const response = attachRefreshedAuthCookie(
       createAuthJsonResponse({
         user: toPublicUser({
           id: updatedUser.id,
@@ -108,11 +120,17 @@ async function handlePATCH(request: NextRequest) {
           preferred_time_slot: updatedUser.preferredTimeSlot,
           weather_sensitivity: updatedUser.weatherSensitivity,
           marketing_accepted: updatedUser.marketingAccepted ? 1 : 0,
+          analytics_accepted: updatedUser.analyticsAccepted ? 1 : 0,
           created_at: updatedUser.createdAt,
         }),
       }),
       authenticatedSession
     )
+    attachAnalyticsConsentCookie(
+      response,
+      updatedUser.analyticsAccepted ? "allow" : "essential"
+    )
+    return response
   } catch (error) {
     console.error("Profile update API failed:", error)
     await recordAuthSecurityEventSafely({

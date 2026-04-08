@@ -34,6 +34,7 @@ type FormState = {
   privacyAccepted: boolean
   ageConfirmed: boolean
   marketingAccepted: boolean
+  analyticsAccepted: boolean
 }
 
 const SIGNUP_COPY = {
@@ -48,7 +49,7 @@ const SIGNUP_COPY = {
     stats: [
       { label: "필수 입력", value: "계정 + 프로필" },
       { label: "취미 선택", value: "최대 5개" },
-      { label: "동의 항목", value: "필수 3 + 선택 1" },
+      { label: "동의 항목", value: "필수 3 + 선택 2" },
     ],
     basicSection: "기본 계정 정보",
     personalSection: "맞춤 나들이 정보",
@@ -70,6 +71,9 @@ const SIGNUP_COPY = {
     privacyLabel: "개인정보 수집·이용 안내에 동의합니다. (필수)",
     ageConfirmLabel: "만 14세 이상입니다. (필수)",
     marketingLabel: "맞춤 추천/공지 알림 수신에 동의합니다. (선택)",
+    analyticsLabel: "서비스 개선을 위한 이용행태 분석에 동의합니다. (선택)",
+    analyticsHelper:
+      "동의 시 유입 채널, 방문 경로, 라이트/다크 테마, 기기 구간, 고유 방문자 수를 일별 집계로 저장합니다. 원문 IP와 전체 리퍼러 URL은 분석 테이블에 저장하지 않습니다.",
     termsLink: "약관 보기",
     submit: "가입하고 바로 시작하기",
     loginPrompt: "이미 계정이 있나요?",
@@ -87,7 +91,7 @@ const SIGNUP_COPY = {
     stats: [
       { label: "Inputs", value: "Account + profile" },
       { label: "Hobbies", value: "Up to 5" },
-      { label: "Consent", value: "3 required + 1 optional" },
+      { label: "Consent", value: "3 required + 2 optional" },
     ],
     basicSection: "Basic account details",
     personalSection: "Personalized outing profile",
@@ -109,6 +113,9 @@ const SIGNUP_COPY = {
     privacyLabel: "I agree to the privacy collection and use notice. (Required)",
     ageConfirmLabel: "I confirm I am at least 14 years old. (Required)",
     marketingLabel: "I agree to receive optional recommendation notices. (Optional)",
+    analyticsLabel: "I agree to analytics for service improvement. (Optional)",
+    analyticsHelper:
+      "When enabled, Nadeulhae stores daily aggregates for acquisition source, page path, light or dark theme, device bucket, and unique visitor counts. Raw IP addresses and full referrer URLs are not stored in analytics tables.",
     termsLink: "Read terms",
     submit: "Create account",
     loginPrompt: "Already have an account?",
@@ -237,6 +244,7 @@ export default function SignupPage() {
     privacyAccepted: false,
     ageConfirmed: false,
     marketingAccepted: false,
+    analyticsAccepted: false,
   })
 
   useEffect(() => {
@@ -552,6 +560,23 @@ export default function SignupPage() {
               className="mt-1 size-4 rounded border-card-border accent-sky-blue"
             />
             <span>{copy.marketingLabel}</span>
+          </label>
+          <label className="flex items-start gap-3 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={form.analyticsAccepted}
+              onChange={(event) => setForm((current) => ({ ...current, analyticsAccepted: event.target.checked }))}
+              className="mt-1 size-4 rounded border-card-border accent-sky-blue"
+            />
+            <span>
+              {copy.analyticsLabel}
+              <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                {copy.analyticsHelper}{" "}
+                <Link href="/terms#analytics" className="font-black text-sky-blue hover:underline">
+                  {copy.termsLink}
+                </Link>
+              </span>
+            </span>
           </label>
         </section>
 

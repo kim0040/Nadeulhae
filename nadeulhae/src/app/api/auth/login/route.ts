@@ -27,6 +27,10 @@ import {
 } from "@/lib/auth/request-security"
 import { attachAuthCookie, startAuthenticatedSession } from "@/lib/auth/session"
 import { validateLoginPayload } from "@/lib/auth/validation"
+import {
+  attachAnalyticsConsentCookie,
+  getAnalyticsConsentPreferenceFromRequest,
+} from "@/lib/analytics/consent"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
@@ -233,10 +237,20 @@ async function handlePOST(request: NextRequest) {
         preferred_time_slot: authenticatedUser.preferredTimeSlot,
         weather_sensitivity: authenticatedUser.weatherSensitivity,
         marketing_accepted: authenticatedUser.marketingAccepted ? 1 : 0,
+        analytics_accepted: authenticatedUser.analyticsAccepted ? 1 : 0,
         created_at: authenticatedUser.createdAt,
       }) }
     )
-    return attachAuthCookie(response, session.token, session.expiresAt)
+    attachAuthCookie(response, session.token, session.expiresAt)
+
+    if (!getAnalyticsConsentPreferenceFromRequest(request)) {
+      attachAnalyticsConsentCookie(
+        response,
+        authenticatedUser.analyticsAccepted ? "allow" : "essential"
+      )
+    }
+
+    return response
   } catch (error) {
     console.error("Login API failed:", error)
     await recordAuthSecurityEventSafely({

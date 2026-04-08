@@ -48,6 +48,7 @@ type ProfileFormState = {
   preferredTimeSlot: string
   weatherSensitivity: string[]
   marketingAccepted: boolean
+  analyticsAccepted: boolean
 }
 
 type ChatMessage =
@@ -105,6 +106,9 @@ const DASHBOARD_COPY = {
     interests: "취미·관심사",
     sensitivity: "민감한 날씨 요소",
     marketing: "알림 수신 동의",
+    analytics: "서비스 개선 분석 동의",
+    analyticsHint:
+      "동의 시 유입 채널, 페이지 경로, 라이트/다크 테마, 기기 구간, 고유 방문자 수를 일별 집계로 저장합니다.",
     yes: "동의",
     no: "미동의",
     score: "피크닉 지수",
@@ -178,6 +182,9 @@ const DASHBOARD_COPY = {
     interests: "Interests",
     sensitivity: "Weather sensitivities",
     marketing: "Notification consent",
+    analytics: "Improvement analytics",
+    analyticsHint:
+      "When enabled, Nadeulhae stores daily aggregates for acquisition source, page path, light or dark theme, device bucket, and unique visitor counts.",
     yes: "Enabled",
     no: "Disabled",
     score: "Picnic score",
@@ -226,6 +233,7 @@ function createProfileFormState(user: AuthUser): ProfileFormState {
     preferredTimeSlot: user.preferredTimeSlot,
     weatherSensitivity: user.weatherSensitivity,
     marketingAccepted: user.marketingAccepted,
+    analyticsAccepted: user.analyticsAccepted,
   }
 }
 
@@ -657,7 +665,7 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <StatusMetric
                 label={copy.location}
                 value={getOptionLabel(PRIMARY_REGION_OPTIONS, user.primaryRegion, language)}
@@ -672,6 +680,11 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
                 label={copy.marketing}
                 value={user.marketingAccepted ? copy.yes : copy.no}
                 meta={copy.accountTitle}
+              />
+              <StatusMetric
+                label={copy.analytics}
+                value={user.analyticsAccepted ? copy.yes : copy.no}
+                meta={copy.analyticsHint}
               />
             </div>
           </div>
@@ -1026,6 +1039,21 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
                   <span>{copy.marketing}</span>
                 </label>
 
+                <label className="flex items-start gap-3 rounded-[1.3rem] border border-card-border/70 bg-background/75 px-4 py-3 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={form.analyticsAccepted}
+                    onChange={(event) => setForm((current) => ({ ...current, analyticsAccepted: event.target.checked }))}
+                    className="mt-1 size-4 rounded border-card-border accent-sky-blue"
+                  />
+                  <span>
+                    {copy.analytics}
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                      {copy.analyticsHint}
+                    </span>
+                  </span>
+                </label>
+
                 {saveMessage ? (
                   <div
                     className={cn(
@@ -1075,6 +1103,10 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
                 <StatusMetric
                   label={copy.sensitivity}
                   value={weatherSensitivityLabels.join(" · ")}
+                />
+                <StatusMetric
+                  label={copy.analytics}
+                  value={user.analyticsAccepted ? copy.yes : copy.no}
                 />
               </div>
 
