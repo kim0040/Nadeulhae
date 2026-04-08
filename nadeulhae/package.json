@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:auth:init": "node scripts/bootstrap-auth-db.mjs",
-    "test:auth": "node scripts/test-auth-flows.mjs"
+    "test:auth": "node scripts/test-auth-flows.mjs",
+    "test:chat": "node scripts/test-chat-flow.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

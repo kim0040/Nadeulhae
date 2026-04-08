@@ -3,6 +3,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise"
 import { MAX_ACTIVE_SESSIONS_PER_USER } from "@/lib/auth/guardrails"
 import { ensureAuthSchema } from "@/lib/auth/schema"
 import type { AuthUser } from "@/lib/auth/types"
+import { deleteChatDataForUser } from "@/lib/chat/repository"
 import { executeStatement, getDbPool, queryRows } from "@/lib/db"
 
 interface UserRow extends RowDataPacket {
@@ -480,6 +481,7 @@ export async function updateUserAnalyticsConsent(input: {
 export async function deleteUserAccount(userId: string) {
   await ensureAuthSchema()
 
+  await deleteChatDataForUser(userId)
   await executeStatement("DELETE FROM user_sessions WHERE user_id = ?", [userId])
   await executeStatement("DELETE FROM users WHERE id = ?", [userId])
 }

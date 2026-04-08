@@ -51,7 +51,7 @@ export function AuthShell({
   const [primaryRow, secondaryRow] = chunkItems(marqueeItems)
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-12 pt-28 sm:px-6 lg:px-8">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-14 pt-24 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
       <Particles
         className="absolute inset-0 z-0 opacity-75"
         quantity={84}
@@ -61,39 +61,39 @@ export function AuthShell({
       />
       <Meteors number={12} className="z-0" />
 
-      <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-8 xl:grid-cols-[1.05fr_minmax(0,0.95fr)] xl:items-center">
-        <section className="order-2 flex flex-col justify-center gap-8 xl:order-1 xl:pr-8">
-          <div className="space-y-5">
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-6 xl:grid-cols-[1.02fr_minmax(0,0.98fr)] xl:items-center">
+        <section className="order-2 flex flex-col justify-center gap-6 xl:order-1 xl:pr-8">
+          <div className="space-y-4">
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-active-blue/20 bg-active-blue/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.3em] text-active-blue">
               <Sparkles className="size-3.5" />
               {sideEyebrow}
             </span>
-            <div className="max-w-2xl space-y-4">
+            <div className="max-w-2xl space-y-3">
               <p className="text-sm font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                 Nadeulhae Auth Flow
               </p>
-              <h1 className="text-4xl font-black tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+              <h1 className="text-3xl font-black tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                 {sideTitle}
               </h1>
-              <p className="max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+              <p className="max-w-xl text-sm leading-7 text-muted-foreground sm:text-base lg:text-lg">
                 {sideDescription}
               </p>
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             {statItems.map((item) => (
               <MagicCard
                 key={item.label}
-                className="rounded-[2rem]"
+                className="rounded-[1.7rem]"
                 gradientSize={220}
                 gradientOpacity={0.65}
               >
-                <div className="h-full rounded-[inherit] border border-card-border/70 bg-card/90 p-5 backdrop-blur-xl">
+                <div className="h-full rounded-[inherit] border border-card-border/70 bg-card/90 p-4 backdrop-blur-xl">
                   <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
                     {item.label}
                   </p>
-                  <p className="mt-3 text-2xl font-black tracking-tight text-foreground">
+                  <p className="mt-2 text-xl font-black tracking-tight text-foreground sm:text-2xl">
                     {item.value}
                   </p>
                 </div>
@@ -101,7 +101,7 @@ export function AuthShell({
             ))}
           </div>
 
-          <div className="overflow-hidden rounded-[2rem] border border-card-border/70 bg-card/70 p-3 backdrop-blur-xl">
+          <div className="hidden overflow-hidden rounded-[2rem] border border-card-border/70 bg-card/70 p-3 backdrop-blur-xl sm:block">
             <Marquee pauseOnHover className="[--duration:28s]">
               {primaryRow.map((item) => (
                 <span
@@ -128,14 +128,14 @@ export function AuthShell({
         <section className="order-1 xl:order-2">
           <MagicCard
             mode="orb"
-            className={cn("overflow-hidden rounded-[2.5rem]", panelClassName)}
+            className={cn("overflow-hidden rounded-[2.1rem] sm:rounded-[2.5rem]", panelClassName)}
             glowSize={360}
             glowBlur={70}
             glowOpacity={0.48}
             glowFrom="#0b7d71"
             glowTo="#2f6fe4"
           >
-            <div className="relative rounded-[2.5rem] border border-card-border/70 bg-card/90 p-6 shadow-[0_24px_120px_rgba(17,32,39,0.16)] backdrop-blur-2xl sm:p-8">
+            <div className="relative rounded-[2.1rem] border border-card-border/70 bg-card/90 p-5 shadow-[0_24px_120px_rgba(17,32,39,0.16)] backdrop-blur-2xl sm:rounded-[2.5rem] sm:p-8">
               <BorderBeam
                 size={220}
                 duration={10}
@@ -144,12 +144,12 @@ export function AuthShell({
                 colorTo="var(--beam-to)"
               />
 
-              <div className="relative z-10 mb-8 space-y-4">
+              <div className="relative z-10 mb-6 space-y-4 sm:mb-8">
                 <span className="inline-flex rounded-full border border-active-blue/20 bg-active-blue/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.35em] text-active-blue">
                   {badge}
                 </span>
                 <div className="space-y-3">
-                  <AnimatedGradientText className="text-3xl font-black tracking-tight sm:text-4xl">
+                  <AnimatedGradientText className="text-2xl font-black tracking-tight sm:text-4xl">
                     {title}
                   </AnimatedGradientText>
                   <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">

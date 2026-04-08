@@ -25,6 +25,8 @@ const POLICY_CONTENT: Record<
     description: string
     effectiveDate: string
     legalNote: string
+    contentsTitle: string
+    summaryTitle: string
     summary: Array<{
       label: string
       value: string
@@ -41,6 +43,8 @@ const POLICY_CONTENT: Record<
     effectiveDate: "시행 기준일: 2026년 4월 8일",
     legalNote:
       "개인정보 보호법, 위치정보 관련 규정, 국외 이전 고지 의무를 반영해 작성했지만 공개 전에는 반드시 최종 법률 검토를 권장합니다.",
+    contentsTitle: "빠른 이동",
+    summaryTitle: "핵심 요약",
     summary: [
       {
         label: "필수 수집",
@@ -159,6 +163,8 @@ const POLICY_CONTENT: Record<
     effectiveDate: "Effective basis: April 8, 2026",
     legalNote:
       "This draft reflects Korean privacy, location-related, and cross-border notice considerations, but it still requires final legal review before public launch.",
+    contentsTitle: "Quick navigation",
+    summaryTitle: "Key summary",
     summary: [
       {
         label: "Required data",
@@ -277,7 +283,7 @@ export default function TermsPage() {
   const copy = POLICY_CONTENT[language]
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-20 pt-28 sm:px-6 lg:px-8">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-20 pt-24 sm:px-6 sm:pt-28 lg:px-8">
       <Particles
         className="absolute inset-0 z-0 opacity-75"
         quantity={72}
@@ -287,9 +293,9 @@ export default function TermsPage() {
       />
       <Meteors number={10} className="z-0" />
 
-      <div className="relative z-10 mx-auto max-w-6xl space-y-8">
+      <div className="relative z-10 mx-auto max-w-6xl space-y-6 sm:space-y-8">
         <MagicCard className="overflow-hidden rounded-[2.6rem]" gradientSize={240}>
-          <div className="relative rounded-[2.6rem] border border-card-border/70 bg-card/90 p-8 backdrop-blur-2xl sm:p-10">
+          <div className="relative rounded-[2.2rem] border border-card-border/70 bg-card/90 p-6 backdrop-blur-2xl sm:rounded-[2.6rem] sm:p-10">
             <BorderBeam
               size={220}
               duration={10}
@@ -322,11 +328,37 @@ export default function TermsPage() {
           </div>
         </MagicCard>
 
+        <MagicCard className="rounded-[2rem]" gradientSize={220} gradientOpacity={0.7}>
+          <div className="rounded-[inherit] border border-card-border/70 bg-card/85 p-5 backdrop-blur-xl sm:p-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
+                  {copy.contentsTitle}
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground">
+                  {copy.summaryTitle}
+                </h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {copy.sections.map((section) => (
+                  <a
+                    key={section.id}
+                    href={`#${section.id}`}
+                    className="rounded-full border border-card-border/70 bg-background/70 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
+                  >
+                    {section.title}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </MagicCard>
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {copy.summary.map((item) => (
             <MagicCard
               key={item.label}
-              className="rounded-[1.9rem]"
+              className="rounded-[1.7rem]"
               gradientSize={200}
               gradientOpacity={0.7}
             >
@@ -345,7 +377,7 @@ export default function TermsPage() {
           ))}
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-5 sm:gap-6">
           {copy.sections.map((section) => (
             <MagicCard
               key={section.id}
@@ -355,28 +387,33 @@ export default function TermsPage() {
             >
               <section
                 id={section.id}
-                className="rounded-[inherit] border border-card-border/70 bg-card/85 p-6 backdrop-blur-xl sm:p-8"
+                className="scroll-mt-32 rounded-[inherit] border border-card-border/70 bg-card/85 p-5 backdrop-blur-xl sm:scroll-mt-36 sm:p-8"
               >
-                <div className="space-y-3">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-background/70 px-4 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
-                    <ShieldCheck className="size-3.5 text-sky-blue" />
-                    {section.eyebrow}
-                  </span>
-                  <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-                    {section.title}
-                  </h2>
-                </div>
+                <div className="grid gap-5 lg:grid-cols-[0.33fr_1fr] lg:gap-8">
+                  <div className="space-y-3 lg:sticky lg:top-28 lg:self-start">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-background/70 px-4 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
+                      <ShieldCheck className="size-3.5 text-sky-blue" />
+                      {section.eyebrow}
+                    </span>
+                    <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+                      {section.title}
+                    </h2>
+                  </div>
 
-                <ul className="mt-5 space-y-3">
-                  {section.items.map((item) => (
-                    <li
-                      key={item}
-                      className="rounded-[1.4rem] border border-card-border/70 bg-background/70 px-4 py-3 text-sm leading-6 text-foreground"
-                    >
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                  <ul className="space-y-3">
+                    {section.items.map((item, index) => (
+                      <li
+                        key={item}
+                        className="flex gap-3 rounded-[1.25rem] border border-card-border/70 bg-background/70 px-4 py-3.5 text-sm leading-6 text-foreground"
+                      >
+                        <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-blue/10 text-[11px] font-black text-sky-blue">
+                          {index + 1}
+                        </span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </section>
             </MagicCard>
           ))}

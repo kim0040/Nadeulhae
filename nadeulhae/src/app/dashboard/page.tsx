@@ -10,7 +10,6 @@ import {
   MapPinned,
   Navigation,
   RefreshCcw,
-  Send,
   ShieldAlert,
   Sparkles,
   Trash2,
@@ -22,6 +21,7 @@ import { BorderBeam } from "@/components/magicui/border-beam"
 import { Meteors } from "@/components/magicui/meteors"
 import { Particles } from "@/components/magicui/particles"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
+import { DashboardChatPanel } from "@/components/chat/dashboard-chat-panel"
 import { TodayHourlyForecast, type HourlyForecastItem } from "@/components/today-hourly-forecast"
 import { PicnicBriefing } from "@/components/picnic-briefing"
 import { useAuth } from "@/context/AuthContext"
@@ -51,10 +51,6 @@ type ProfileFormState = {
   analyticsAccepted: boolean
 }
 
-type ChatMessage =
-  | { id: string; role: "assistant"; kind: "intro" | "pending" }
-  | { id: string; role: "user"; kind: "text"; text: string }
-
 const DASHBOARD_COPY = {
   ko: {
     badge: "user cockpit",
@@ -63,6 +59,10 @@ const DASHBOARD_COPY = {
     heroLead: "오늘의 사용자 워크스페이스",
     heroDescription:
       "실시간 날씨 상세, 저장된 취향 프로필, 계정 제어와 LLM 챗봇 UI 스캐폴드를 하나의 대시보드에 모았습니다.",
+    heroMetricsLocation: "기본 프로필 지역",
+    heroMetricsInterests: "저장된 취미 개수",
+    heroMetricsMarketing: "알림 수신 여부",
+    heroMetricsAnalytics: "개선 분석 참여 상태",
     redirecting: "로그인이 필요합니다. 로그인 페이지로 이동합니다.",
     weatherTitle: "실시간 날씨 상세",
     weatherDescription: "현재 위치 또는 기본 지역 기준으로 실시간 수치와 시간대별 흐름을 확인합니다.",
@@ -139,6 +139,10 @@ const DASHBOARD_COPY = {
     heroLead: "Today’s user workspace",
     heroDescription:
       "This dashboard combines detailed live weather, saved outing preferences, account controls, and a UI scaffold for the future LLM chatbot.",
+    heroMetricsLocation: "Saved home region",
+    heroMetricsInterests: "Saved interest count",
+    heroMetricsMarketing: "Notice preference",
+    heroMetricsAnalytics: "Analytics participation",
     redirecting: "You need to log in first. Redirecting to login.",
     weatherTitle: "Live weather detail",
     weatherDescription: "Review current metrics and hourly flow using your current location or the default region.",
@@ -208,19 +212,6 @@ const DASHBOARD_COPY = {
     dashboardNav: "Dashboard",
     backHome: "Go home",
   },
-} as const
-
-const CHAT_SUGGESTIONS = {
-  ko: [
-    "이번 주말 전주 나들이 코스 추천해줘",
-    "오후에 비 오면 대체 코스는 뭐가 좋아?",
-    "미세먼지 높은 날 갈만한 실내 장소 알려줘",
-  ],
-  en: [
-    "Recommend a Jeonju outing route for this weekend",
-    "What is a good backup plan if it rains this afternoon?",
-    "Suggest indoor places for a high fine-dust day",
-  ],
 } as const
 
 function createProfileFormState(user: AuthUser): ProfileFormState {
@@ -329,39 +320,10 @@ function StatusMetric({
   meta?: string
 }) {
   return (
-    <div className="rounded-[1.4rem] border border-card-border/70 bg-background/75 p-4">
+    <div className="rounded-[1.3rem] border border-card-border/70 bg-background/75 p-4">
       <p className="text-[11px] font-black uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
-      <p className="mt-3 text-2xl font-black tracking-tight text-foreground">{value}</p>
-      {meta ? <p className="mt-2 text-sm text-muted-foreground">{meta}</p> : null}
-    </div>
-  )
-}
-
-function ChatBubble({
-  message,
-  introText,
-  pendingText,
-}: {
-  message: ChatMessage
-  introText: string
-  pendingText: string
-}) {
-  const content = message.kind === "text"
-    ? message.text
-    : message.kind === "intro"
-      ? introText
-      : pendingText
-
-  return (
-    <div
-      className={cn(
-        "max-w-[88%] rounded-[1.4rem] px-4 py-3 text-sm leading-6",
-        message.role === "assistant"
-          ? "border border-card-border/70 bg-background/75 text-foreground"
-          : "ml-auto bg-sky-blue text-white"
-      )}
-    >
-      {content}
+      <p className="mt-3 break-words text-xl font-black tracking-tight text-foreground sm:text-2xl">{value}</p>
+      {meta ? <p className="mt-2 text-xs leading-5 text-muted-foreground sm:text-sm">{meta}</p> : null}
     </div>
   )
 }
@@ -383,10 +345,6 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
   const [deleteConfirm, setDeleteConfirm] = useState("")
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
-  const [chatInput, setChatInput] = useState("")
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { id: "intro", role: "assistant", kind: "intro" },
-  ])
 
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
 
@@ -612,29 +570,8 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
     }
   }
 
-  const handleSendChat = () => {
-    const text = chatInput.trim()
-    if (!text) return
-
-    setChatMessages((current) => [
-      ...current,
-      {
-        id: `user-${Date.now()}`,
-        role: "user",
-        kind: "text",
-        text,
-      },
-      {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        kind: "pending",
-      },
-    ])
-    setChatInput("")
-  }
-
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-28 sm:px-6 lg:px-8">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-32 sm:px-6 sm:pt-36 lg:px-8">
       <Particles
         className="absolute inset-0 z-0 opacity-70"
         quantity={80}
@@ -669,22 +606,22 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
               <StatusMetric
                 label={copy.location}
                 value={getOptionLabel(PRIMARY_REGION_OPTIONS, user.primaryRegion, language)}
-                meta={copy.subtitle}
+                meta={copy.heroMetricsLocation}
               />
               <StatusMetric
                 label={copy.interests}
                 value={`${profileInterestLabels.length}`}
-                meta={profileInterestLabels.join(" · ")}
+                meta={copy.heroMetricsInterests}
               />
               <StatusMetric
                 label={copy.marketing}
                 value={user.marketingAccepted ? copy.yes : copy.no}
-                meta={copy.accountTitle}
+                meta={copy.heroMetricsMarketing}
               />
               <StatusMetric
                 label={copy.analytics}
                 value={user.analyticsAccepted ? copy.yes : copy.no}
-                meta={copy.analyticsHint}
+                meta={copy.heroMetricsAnalytics}
               />
             </div>
           </div>
@@ -835,79 +772,7 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
             </SectionCard>
 
             <SectionCard>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
-                    {copy.chatbotTitle}
-                  </p>
-                  <h2 className="text-3xl font-black tracking-tight text-foreground">
-                    {copy.chatbotTitle}
-                  </h2>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    {copy.chatbotDescription}
-                  </p>
-                </div>
-                <span className="rounded-full border border-warning/20 bg-warning/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.28em] text-warning">
-                  UI Only
-                </span>
-              </div>
-
-              <div className="mt-5 rounded-[1.5rem] border border-card-border/70 bg-background/75 p-4 text-sm text-muted-foreground">
-                {copy.chatbotNotice}
-              </div>
-
-              <div className="mt-5">
-                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
-                  {copy.chatbotSuggestedLabel}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {CHAT_SUGGESTIONS[language].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => setChatInput(suggestion)}
-                      className="rounded-full border border-card-border/70 bg-background/75 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-sky-blue/25 hover:text-sky-blue"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-[1.7rem] border border-card-border/70 bg-background/80 p-4">
-                <div className="space-y-3">
-                  {chatMessages.map((message) => (
-                    <ChatBubble
-                      key={message.id}
-                      message={message}
-                      introText={copy.chatbotIntro}
-                      pendingText={copy.chatbotPending}
-                    />
-                  ))}
-                </div>
-
-                <div className="mt-4 flex flex-col gap-3">
-                  <textarea
-                    value={chatInput}
-                    onChange={(event) => setChatInput(event.target.value)}
-                    placeholder={copy.chatbotPlaceholder}
-                    className="min-h-[110px] rounded-[1.4rem] border border-card-border/70 bg-card px-4 py-3 text-sm text-foreground outline-none transition focus:border-sky-blue/30"
-                  />
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold text-muted-foreground">
-                      {copy.chatbotNotice}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleSendChat}
-                      className="inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-4 py-2 text-sm font-black text-sky-blue transition hover:border-sky-blue/35"
-                    >
-                      <Send className="size-4" />
-                      {copy.chatbotSend}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <DashboardChatPanel user={user} />
             </SectionCard>
           </section>
 

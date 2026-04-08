@@ -54,6 +54,7 @@ const SIGNUP_COPY = {
     basicSection: "기본 계정 정보",
     personalSection: "맞춤 나들이 정보",
     consentSection: "필수·선택 동의",
+    consentHelper: "필수 항목은 계정 생성에 필요하고, 선택 항목은 언제든 대시보드에서 변경할 수 있습니다.",
     nameLabel: "이름",
     namePlaceholder: "홍길동",
     emailLabel: "이메일",
@@ -96,6 +97,7 @@ const SIGNUP_COPY = {
     basicSection: "Basic account details",
     personalSection: "Personalized outing profile",
     consentSection: "Required and optional consent",
+    consentHelper: "Required items are needed to create the account. Optional items can be changed later from the dashboard.",
     nameLabel: "Name",
     namePlaceholder: "Your name",
     emailLabel: "Email",
@@ -510,6 +512,9 @@ export default function SignupPage() {
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.32em] text-muted-foreground">
               {copy.consentSection}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {copy.consentHelper}
             </p>
           </div>
           <label className="flex items-start gap-3 text-sm text-foreground">
