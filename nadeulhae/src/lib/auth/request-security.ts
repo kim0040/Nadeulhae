@@ -24,7 +24,7 @@ export function getUserAgent(request: NextRequest) {
 }
 
 export function createAuthJsonResponse(
-  body: Record<string, unknown>,
+  body: unknown,
   init?: {
     status?: number
     retryAfterSeconds?: number
