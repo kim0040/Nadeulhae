@@ -24,6 +24,7 @@ interface ChatMessage {
   nicknameTag: string
   content: string
   isAnonymous: boolean
+  isMine: boolean
   createdAt: string
 }
 
@@ -67,6 +68,8 @@ const COPY = {
     anonymous: "Anonymous",
   },
 } as const
+
+const CHAT_POLL_INTERVAL_MS = 8_000
 
 function formatChatTime(iso: string, language: "ko" | "en") {
   const safeIso = iso.endsWith("Z") ? iso : `${iso}Z`
@@ -195,11 +198,13 @@ export function JeonjuChatPanel() {
   const [isAnonymous, setIsAnonymous] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastMessageIdRef = useRef<number | null>(null)
   const didInitScrollRef = useRef(false)
   const previousMessageCountRef = useRef(0)
   const shouldStickToBottomRef = useRef(true)
+  const isComposingRef = useRef(false)
 
   const loadMessages = useCallback(async () => {
     try {
@@ -258,7 +263,7 @@ export function JeonjuChatPanel() {
     }
 
     runPoll()
-    pollingRef.current = setInterval(runPoll, 5000)
+    pollingRef.current = setInterval(runPoll, CHAT_POLL_INTERVAL_MS)
     document.addEventListener("visibilitychange", onVisibilityChange)
 
     return () => {
@@ -300,13 +305,32 @@ export function JeonjuChatPanel() {
     lastMessageIdRef.current = messages[messages.length - 1]?.id ?? null
   }, [messages])
 
+  const focusInputWithoutScroll = useCallback(() => {
+    const element = inputRef.current
+    if (!element) {
+      return
+    }
+
+    requestAnimationFrame(() => {
+      try {
+        element.focus({ preventScroll: true })
+      } catch {
+        element.focus()
+      }
+    })
+  }, [])
+
   const handleSend = async () => {
-    if (!input.trim() || isSending || !user) return
+    if (isSending || !user || isComposingRef.current) return
+
+    const rawInput = input
+    const msgText = rawInput.trim()
+    if (!msgText) return
 
     setSendError(null)
     setIsSending(true)
-    const msgText = input.trim()
     setInput("")
+    focusInputWithoutScroll()
 
     try {
       const res = await fetch("/api/jeonju-chat", {
@@ -338,7 +362,7 @@ export function JeonjuChatPanel() {
   }
 
   return (
-    <section className="relative mt-12 overflow-hidden rounded-[3rem] border border-card-border bg-card p-8 shadow-[0_24px_80px_-50px_rgba(47,111,228,0.34)] sm:mt-16 sm:p-12">
+    <section className="relative overflow-hidden rounded-[3rem] border border-card-border bg-card p-8 shadow-[0_24px_80px_-50px_rgba(47,111,228,0.34)] sm:p-12">
       <BorderBeam
         size={280}
         duration={14}
@@ -375,8 +399,7 @@ export function JeonjuChatPanel() {
         </div>
 
         {/* Chat body */}
-        <div className="mt-6 rounded-[2.2rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-3 sm:p-4">
-          <div className="overflow-hidden rounded-[1.7rem] border border-card-border/70 bg-card/80">
+        <div className="mt-6 overflow-hidden rounded-[1.8rem] border border-card-border/70 bg-card/70 shadow-sm">
             <div
               ref={scrollRef}
               onScroll={handleScroll}
@@ -400,11 +423,16 @@ export function JeonjuChatPanel() {
               ) : (
                 messages.map((msg, index) => {
                   const prev = messages[index - 1]
+                  const prevIsMine = prev?.isMine ?? (user?.id === prev?.userId)
+                  const currentIsMine = msg.isMine ?? (user?.id === msg.userId)
                   const isSameUser =
                     prev &&
+                    !prev.isAnonymous &&
+                    !msg.isAnonymous &&
                     prev.userId === msg.userId &&
                     prev.isAnonymous === msg.isAnonymous &&
-                    prev.nickname === msg.nickname
+                    prev.nickname === msg.nickname &&
+                    prevIsMine === currentIsMine
                   const timeA = prev ? new Date(prev.createdAt.endsWith("Z") ? prev.createdAt : `${prev.createdAt}Z`).getTime() : 0
                   const timeB = new Date(msg.createdAt.endsWith("Z") ? msg.createdAt : `${msg.createdAt}Z`).getTime()
                   const timeDiff = timeB - timeA
@@ -415,7 +443,7 @@ export function JeonjuChatPanel() {
                     <ChatBubble
                       key={msg.id}
                       message={msg}
-                      isMine={user?.id === msg.userId}
+                      isMine={currentIsMine}
                       language={language}
                       showProfile={showProfile}
                     />
@@ -450,13 +478,25 @@ export function JeonjuChatPanel() {
                   <div className="flex items-end gap-2">
                     <div className="flex-1 space-y-2">
                       <textarea
+                        ref={inputRef}
                         value={input}
                         onChange={(e) => setInput(e.target.value.slice(0, 500))}
+                        onCompositionStart={() => {
+                          isComposingRef.current = true
+                        }}
+                        onCompositionEnd={() => {
+                          isComposingRef.current = false
+                        }}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            void handleSend()
-                          }
+                          if (e.key !== "Enter" || e.shiftKey) return
+
+                          const isImeComposing =
+                            isComposingRef.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229
+
+                          if (isImeComposing) return
+
+                          e.preventDefault()
+                          void handleSend()
                         }}
                         placeholder={copy.placeholder}
                         rows={1}
@@ -482,6 +522,7 @@ export function JeonjuChatPanel() {
                     <ShimmerButton
                       type="button"
                       onClick={() => void handleSend()}
+                      onMouseDown={(event) => event.preventDefault()}
                       disabled={!input.trim() || isSending}
                       className="mb-7 shrink-0 rounded-xl px-4 py-2.5 text-sm font-black"
                     >
@@ -494,7 +535,6 @@ export function JeonjuChatPanel() {
                 </div>
               )}
             </div>
-          </div>
         </div>
       </div>
     </section>

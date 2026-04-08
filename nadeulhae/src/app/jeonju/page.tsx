@@ -159,7 +159,7 @@ export default function JeonjuPage() {
         </Marquee>
       </section>
 
-      <section className="container mx-auto px-4 pb-20">
+      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <div className="mb-8 max-w-3xl">
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">{texts.fixedTitle}</h2>
           <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
@@ -175,14 +175,14 @@ export default function JeonjuPage() {
       </section>
 
       {weatherData && (
-        <section className="container mx-auto px-4 pb-20">
+        <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
           <JeonjuSafetyPanel weatherData={weatherData} fireSummary={fireSummary} language={language} />
         </section>
       )}
 
 
       {/* Jeonju Community Chat */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6">
+      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <JeonjuChatPanel />
       </section>
     </main>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { validateAuthMutationRequest } from "@/lib/auth/request-security"
 import { getAuthenticatedSessionFromRequest } from "@/lib/auth/session"
 import { containsProfanity, maskProfanity } from "@/lib/jeonju-chat/profanity-filter"
 import {
@@ -12,6 +13,7 @@ export const runtime = "nodejs"
 
 const RATE_LIMIT_WINDOW_MS = 5_000
 const rateLimitMap = new Map<string, number>()
+const RATE_LIMIT_MAP_MAX_KEYS = 6_000
 
 function isRateLimited(userId: string): boolean {
   const now = Date.now()
@@ -20,20 +22,39 @@ function isRateLimited(userId: string): boolean {
     return true
   }
   rateLimitMap.set(userId, now)
+  pruneRateLimitMap(rateLimitMap)
   return false
+}
+
+function pruneRateLimitMap(map: Map<string, number>) {
+  if (map.size <= RATE_LIMIT_MAP_MAX_KEYS) {
+    return
+  }
+
+  const overflow = map.size - RATE_LIMIT_MAP_MAX_KEYS
+  let removed = 0
+  for (const key of map.keys()) {
+    map.delete(key)
+    removed += 1
+    if (removed >= overflow) {
+      break
+    }
+  }
 }
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getAuthenticatedSessionFromRequest(request)
+    const viewerUserId = session?.user.id ?? null
     const afterIdParam = request.nextUrl.searchParams.get("after_id")
     const afterId = afterIdParam ? parseInt(afterIdParam, 10) : null
 
     if (afterId && afterId > 0) {
-      const messages = await getMessagesSince(afterId)
+      const messages = await getMessagesSince(afterId, viewerUserId)
       return NextResponse.json({ messages })
     }
 
-    const messages = await getRecentMessages(50)
+    const messages = await getRecentMessages(50, viewerUserId)
     return NextResponse.json({ messages })
   } catch (error) {
     console.error("Jeonju chat GET failed:", error)
@@ -46,6 +67,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const requestViolation = validateAuthMutationRequest(request)
+    if (requestViolation) {
+      return requestViolation
+    }
+
     const session = await getAuthenticatedSessionFromRequest(request)
     if (!session) {
       return NextResponse.json(
@@ -102,7 +128,7 @@ export async function POST(request: NextRequest) {
       isAnonymous,
     })
 
-    return NextResponse.json({ message: created }, { status: 201 })
+    return NextResponse.json({ message: { ...created, isMine: true } }, { status: 201 })
   } catch (error) {
     console.error("Jeonju chat POST failed:", error)
     return NextResponse.json(

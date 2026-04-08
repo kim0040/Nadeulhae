@@ -1134,9 +1134,9 @@ async function handleGET(req: Request) {
       regionEn: locationLabelEn,
       regionKey: isFallback ? HOME_REGION.key : profile.key,
       lastUpdate: { kma: weatherData.lastUpdate, air: airQuality.lastUpdate },
-      intervals: { kma: "interval_45m", air: "interval_0m" },
+      intervals: { kma: "interval_45m", air: "interval_60m" },
       cachePolicy: {
-        weatherMinutes: 0,
+        weatherMinutes: 45,
         airMinutes: 60,
         alertMinutes: 15,
         forecastHours: 3,

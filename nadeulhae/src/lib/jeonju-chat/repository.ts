@@ -11,6 +11,7 @@ export interface JeonjuChatMessageRow extends RowDataPacket {
   nickname_tag: string
   content: string
   is_anonymous: number
+  is_mine?: number
   created_at: Date | string
 }
 
@@ -21,7 +22,86 @@ export interface JeonjuChatMessage {
   nicknameTag: string
   content: string
   isAnonymous: boolean
+  isMine: boolean
   createdAt: string
+}
+
+interface JeonjuChatCacheEntry {
+  data: JeonjuChatMessage[]
+  expiresAt: number
+}
+
+const JEONJU_RECENT_CACHE_TTL_MS = 3_000
+const JEONJU_DELTA_CACHE_TTL_MS = 1_500
+const JEONJU_CHAT_CACHE_MAX_KEYS = 600
+
+declare global {
+  var __nadeulhaeJeonjuRecentMessagesCache: Map<string, JeonjuChatCacheEntry> | undefined
+  var __nadeulhaeJeonjuDeltaMessagesCache: Map<string, JeonjuChatCacheEntry> | undefined
+  var __nadeulhaeJeonjuRecentMessagesInFlight: Map<string, Promise<JeonjuChatMessage[]>> | undefined
+  var __nadeulhaeJeonjuDeltaMessagesInFlight: Map<string, Promise<JeonjuChatMessage[]>> | undefined
+}
+
+function getRecentMessagesCache() {
+  if (!globalThis.__nadeulhaeJeonjuRecentMessagesCache) {
+    globalThis.__nadeulhaeJeonjuRecentMessagesCache = new Map()
+  }
+  return globalThis.__nadeulhaeJeonjuRecentMessagesCache
+}
+
+function getDeltaMessagesCache() {
+  if (!globalThis.__nadeulhaeJeonjuDeltaMessagesCache) {
+    globalThis.__nadeulhaeJeonjuDeltaMessagesCache = new Map()
+  }
+  return globalThis.__nadeulhaeJeonjuDeltaMessagesCache
+}
+
+function getRecentMessagesInFlight() {
+  if (!globalThis.__nadeulhaeJeonjuRecentMessagesInFlight) {
+    globalThis.__nadeulhaeJeonjuRecentMessagesInFlight = new Map()
+  }
+  return globalThis.__nadeulhaeJeonjuRecentMessagesInFlight
+}
+
+function getDeltaMessagesInFlight() {
+  if (!globalThis.__nadeulhaeJeonjuDeltaMessagesInFlight) {
+    globalThis.__nadeulhaeJeonjuDeltaMessagesInFlight = new Map()
+  }
+  return globalThis.__nadeulhaeJeonjuDeltaMessagesInFlight
+}
+
+function cloneMessages(messages: JeonjuChatMessage[]) {
+  return messages.map((message) => ({ ...message }))
+}
+
+function pruneCache<T extends { expiresAt: number }>(map: Map<string, T>, maxKeys: number) {
+  const now = Date.now()
+  for (const [key, entry] of map.entries()) {
+    if (entry.expiresAt <= now) {
+      map.delete(key)
+    }
+  }
+
+  if (map.size <= maxKeys) {
+    return
+  }
+
+  const overflow = map.size - maxKeys
+  let removed = 0
+  for (const key of map.keys()) {
+    map.delete(key)
+    removed += 1
+    if (removed >= overflow) {
+      break
+    }
+  }
+}
+
+function invalidateMessageCaches() {
+  getRecentMessagesCache().clear()
+  getDeltaMessagesCache().clear()
+  getRecentMessagesInFlight().clear()
+  getDeltaMessagesInFlight().clear()
 }
 
 function toPublicMessage(row: JeonjuChatMessageRow): JeonjuChatMessage {
@@ -36,6 +116,7 @@ function toPublicMessage(row: JeonjuChatMessageRow): JeonjuChatMessage {
     nicknameTag: row.is_anonymous ? "" : row.nickname_tag,
     content: decryptDatabaseValue(row.content, "jeonju.chat.content"),
     isAnonymous: row.is_anonymous === 1,
+    isMine: row.is_mine === 1,
     createdAt,
   }
 }
@@ -47,38 +128,121 @@ const MESSAGE_SELECT_COLS = `
 /**
  * 최근 N개의 메시지를 가져옵니다.
  */
-export async function getRecentMessages(limit: number = 50): Promise<JeonjuChatMessage[]> {
+export async function getRecentMessages(limit: number = 50, viewerUserId?: string | null): Promise<JeonjuChatMessage[]> {
   await ensureJeonjuChatSchema()
+  const normalizedLimit = Math.min(limit, 100)
+  const normalizedViewer = viewerUserId?.trim() || "anon"
+  const cacheKey = `${normalizedLimit}:${normalizedViewer}`
+  const now = Date.now()
+  const cache = getRecentMessagesCache()
+  const cached = cache.get(cacheKey)
+  if (cached && cached.expiresAt > now) {
+    return cloneMessages(cached.data)
+  }
 
-  const rows = await queryRows<JeonjuChatMessageRow[]>(
-    `SELECT ${MESSAGE_SELECT_COLS}
-     FROM jeonju_chat_messages
-     WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-     ORDER BY created_at DESC
-     LIMIT ?`,
-    [Math.min(limit, 100)]
-  )
+  if (cached) {
+    cache.delete(cacheKey)
+  }
 
-  // Reverse so oldest messages come first
-  return rows.reverse().map(toPublicMessage)
+  const inFlight = getRecentMessagesInFlight().get(cacheKey)
+  if (inFlight) {
+    return cloneMessages(await inFlight)
+  }
+
+  const pending = (async () => {
+    const withMineExpr = viewerUserId
+      ? "CASE WHEN user_id = ? THEN 1 ELSE 0 END AS is_mine"
+      : "0 AS is_mine"
+
+    const params: unknown[] = viewerUserId
+      ? [viewerUserId, normalizedLimit]
+      : [normalizedLimit]
+
+    const rows = await queryRows<JeonjuChatMessageRow[]>(
+      `SELECT ${MESSAGE_SELECT_COLS}, ${withMineExpr}
+       FROM jeonju_chat_messages
+       WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+       ORDER BY created_at DESC
+       LIMIT ?`,
+      params
+    )
+
+    const messages = rows.reverse().map(toPublicMessage)
+    cache.set(cacheKey, {
+      data: messages,
+      expiresAt: Date.now() + JEONJU_RECENT_CACHE_TTL_MS,
+    })
+    pruneCache(cache, JEONJU_CHAT_CACHE_MAX_KEYS)
+    return messages
+  })()
+
+  const inFlightMap = getRecentMessagesInFlight()
+  inFlightMap.set(cacheKey, pending)
+  try {
+    return cloneMessages(await pending)
+  } finally {
+    inFlightMap.delete(cacheKey)
+  }
 }
 
 /**
  * 특정 ID 이후의 새 메시지들을 가져옵니다 (polling용).
  */
-export async function getMessagesSince(afterId: number): Promise<JeonjuChatMessage[]> {
+export async function getMessagesSince(afterId: number, viewerUserId?: string | null): Promise<JeonjuChatMessage[]> {
   await ensureJeonjuChatSchema()
+  const normalizedAfterId = Math.max(0, Math.floor(afterId))
+  const normalizedViewer = viewerUserId?.trim() || "anon"
+  const cacheKey = `${normalizedAfterId}:${normalizedViewer}`
+  const now = Date.now()
+  const cache = getDeltaMessagesCache()
+  const cached = cache.get(cacheKey)
+  if (cached && cached.expiresAt > now) {
+    return cloneMessages(cached.data)
+  }
 
-  const rows = await queryRows<JeonjuChatMessageRow[]>(
-    `SELECT ${MESSAGE_SELECT_COLS}
-     FROM jeonju_chat_messages
-     WHERE id > ? AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-     ORDER BY created_at ASC
-     LIMIT 50`,
-    [afterId]
-  )
+  if (cached) {
+    cache.delete(cacheKey)
+  }
 
-  return rows.map(toPublicMessage)
+  const inFlight = getDeltaMessagesInFlight().get(cacheKey)
+  if (inFlight) {
+    return cloneMessages(await inFlight)
+  }
+
+  const pending = (async () => {
+    const withMineExpr = viewerUserId
+      ? "CASE WHEN user_id = ? THEN 1 ELSE 0 END AS is_mine"
+      : "0 AS is_mine"
+
+    const params: unknown[] = viewerUserId
+      ? [viewerUserId, normalizedAfterId]
+      : [normalizedAfterId]
+
+    const rows = await queryRows<JeonjuChatMessageRow[]>(
+      `SELECT ${MESSAGE_SELECT_COLS}, ${withMineExpr}
+       FROM jeonju_chat_messages
+       WHERE id > ? AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+       ORDER BY created_at ASC
+       LIMIT 50`,
+      params
+    )
+
+    const messages = rows.map(toPublicMessage)
+    cache.set(cacheKey, {
+      data: messages,
+      expiresAt: Date.now() + JEONJU_DELTA_CACHE_TTL_MS,
+    })
+    pruneCache(cache, JEONJU_CHAT_CACHE_MAX_KEYS)
+    return messages
+  })()
+
+  const inFlightMap = getDeltaMessagesInFlight()
+  inFlightMap.set(cacheKey, pending)
+  try {
+    return cloneMessages(await pending)
+  } finally {
+    inFlightMap.delete(cacheKey)
+  }
 }
 
 /**
@@ -121,8 +285,9 @@ export async function createChatMessage(input: {
   if (!rows[0]) {
     throw new Error("Could not reload inserted message")
   }
-
-  return toPublicMessage(rows[0])
+  const created = toPublicMessage(rows[0])
+  invalidateMessageCaches()
+  return created
 }
 
 /**
@@ -136,4 +301,5 @@ export async function cleanupOldMessages(): Promise<void> {
      WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)`,
     []
   )
+  invalidateMessageCaches()
 }
