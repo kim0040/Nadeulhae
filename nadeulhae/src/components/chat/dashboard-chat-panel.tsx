@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
-import { LoaderCircle, SendHorizonal, Sparkles } from "lucide-react"
+import { LoaderCircle, Plus, SendHorizonal, Sparkles, Trash2 } from "lucide-react"
 
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -27,6 +27,16 @@ const CHAT_PANEL_COPY = {
     pending: "열심히 계획 중이에요...",
     loadError: "메이트를 불러오지 못했어요.",
     sendError: "메시지를 보내지 못했어요. 다시 시도해 주세요.",
+    sessionLoadError: "세션을 불러오지 못했어요. 다시 시도해 주세요.",
+    sessionCreateError: "새 세션을 만들지 못했어요.",
+    sessionDeleteError: "세션을 삭제하지 못했어요.",
+    sessionDeleteConfirm: "현재 세션을 삭제할까요?",
+    sessionLabel: "대화 세션",
+    sessionCreate: "새 세션",
+    sessionDelete: "세션 삭제",
+    sessionHint: "세션을 나눠두면 일정별로 대화를 깔끔하게 관리할 수 있어요.",
+    sessionPlaceholder: "세션을 선택해 주세요",
+    sessionMessages: "메시지",
     limitReached: "오늘 가능한 대화는 모두 사용했어요. 내일 다시 이어서 도와드릴게요.",
     placeholder: "예: 비 오는 저녁에도 가능한 전주 데이트 코스 추천해줘",
     send: "보내기",
@@ -45,6 +55,16 @@ const CHAT_PANEL_COPY = {
     pending: "Planning your route...",
     loadError: "Failed to load the mate.",
     sendError: "Failed to send the message. Please try again.",
+    sessionLoadError: "Failed to load sessions. Please try again.",
+    sessionCreateError: "Failed to create a new session.",
+    sessionDeleteError: "Failed to delete the session.",
+    sessionDeleteConfirm: "Delete this session now?",
+    sessionLabel: "Conversation session",
+    sessionCreate: "New session",
+    sessionDelete: "Delete session",
+    sessionHint: "Use separate sessions to keep different outing plans organized.",
+    sessionPlaceholder: "Select a session",
+    sessionMessages: "messages",
     limitReached: "You have reached today’s chat limit. Come back tomorrow and we can continue.",
     placeholder: "Example: Recommend a Jeonju date course for a rainy evening",
     send: "Send",
@@ -141,8 +161,11 @@ export function DashboardChatPanel({
   const { language } = useLanguage()
   const copy = CHAT_PANEL_COPY[language]
   const [isPending, startTransition] = useTransition()
+  const [isSessionPending, startSessionTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)
   const [messages, setMessages] = useState<UiChatMessage[]>([])
+  const [sessions, setSessions] = useState<ChatStateResponse["sessions"]>([])
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [usage, setUsage] = useState<ChatStateResponse["usage"] | null>(null)
   const [policy, setPolicy] = useState<ChatStateResponse["policy"] | null>(null)
   const [chatInput, setChatInput] = useState("")
@@ -152,12 +175,21 @@ export function DashboardChatPanel({
   const previousMessageCountRef = useRef(0)
   const shouldStickToBottomRef = useRef(true)
 
-  const loadChatState = useCallback(async () => {
+  const applyPayload = useCallback((payload: ChatStateResponse) => {
+    setMessages(payload.messages)
+    setUsage(payload.usage)
+    setPolicy(payload.policy)
+    setSessions(payload.sessions)
+    setActiveSessionId(payload.activeSessionId)
+  }, [])
+
+  const loadChatState = useCallback(async (sessionId?: string | null) => {
     setIsLoading(true)
     setErrorMessage(null)
 
     try {
-      const response = await fetch("/api/chat", {
+      const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""
+      const response = await fetch(`/api/chat${query}`, {
         method: "GET",
         cache: "no-store",
         credentials: "include",
@@ -168,25 +200,31 @@ export function DashboardChatPanel({
 
       const data = await response.json().catch(() => null)
       if (!response.ok || !data) {
-        setErrorMessage(data?.error ?? copy.loadError)
+        setErrorMessage(data?.error ?? copy.sessionLoadError)
         return
       }
 
       const payload = data as ChatStateResponse
-      setMessages(payload.messages)
-      setUsage(payload.usage)
-      setPolicy(payload.policy)
+      applyPayload(payload)
     } catch (error) {
       console.error("Failed to load dashboard chat state:", error)
       setErrorMessage(copy.loadError)
     } finally {
       setIsLoading(false)
     }
-  }, [copy.loadError, language])
+  }, [applyPayload, copy.loadError, copy.sessionLoadError, language])
 
   useEffect(() => {
-    void loadChatState()
+    void loadChatState(null)
   }, [loadChatState, user.id])
+
+  const resolvedActiveSessionId = activeSessionId ?? sessions[0]?.id ?? null
+
+  useEffect(() => {
+    didInitScrollRef.current = false
+    previousMessageCountRef.current = 0
+    shouldStickToBottomRef.current = true
+  }, [resolvedActiveSessionId])
 
   const handleViewportScroll = useCallback(() => {
     const viewport = messageViewportRef.current
@@ -219,8 +257,83 @@ export function DashboardChatPanel({
 
   const remainingRequests = usage?.remainingRequests ?? policy?.dailyLimit ?? 0
   const isLimitReached = !isLoading && remainingRequests <= 0
-  const canSend = !isLoading && !isPending && !isLimitReached
+  const canSend = !isLoading && !isPending && !isSessionPending && !isLimitReached && Boolean(resolvedActiveSessionId)
   const maxInputCharacters = policy?.maxInputCharacters ?? 1600
+
+  const handleCreateSession = () => {
+    setErrorMessage(null)
+    startSessionTransition(async () => {
+      try {
+        const response = await fetch("/api/chat/sessions", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept-Language": language,
+          },
+          body: JSON.stringify({ locale: language }),
+        })
+
+        const data = await response.json().catch(() => null)
+        if (!response.ok || !data) {
+          setErrorMessage(data?.error ?? copy.sessionCreateError)
+          return
+        }
+
+        applyPayload(data as ChatStateResponse)
+        setChatInput("")
+      } catch (error) {
+        console.error("Failed to create dashboard chat session:", error)
+        setErrorMessage(copy.sessionCreateError)
+      }
+    })
+  }
+
+  const handleDeleteSession = () => {
+    if (!resolvedActiveSessionId || sessions.length <= 1 || isSessionPending) {
+      return
+    }
+
+    if (!window.confirm(copy.sessionDeleteConfirm)) {
+      return
+    }
+
+    setErrorMessage(null)
+    startSessionTransition(async () => {
+      try {
+        const response = await fetch(`/api/chat/sessions?sessionId=${encodeURIComponent(resolvedActiveSessionId)}`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            "Accept-Language": language,
+          },
+        })
+
+        const data = await response.json().catch(() => null)
+        if (!response.ok || !data) {
+          setErrorMessage(data?.error ?? copy.sessionDeleteError)
+          return
+        }
+
+        applyPayload(data as ChatStateResponse)
+      } catch (error) {
+        console.error("Failed to delete dashboard chat session:", error)
+        setErrorMessage(copy.sessionDeleteError)
+      }
+    })
+  }
+
+  const handleSessionSelect = (sessionId: string) => {
+    if (!sessionId || sessionId === resolvedActiveSessionId || isSessionPending) {
+      return
+    }
+
+    setActiveSessionId(sessionId)
+    setMessages([])
+    startSessionTransition(async () => {
+      await loadChatState(sessionId)
+    })
+  }
 
   const handleSend = () => {
     const nextMessage = chatInput.trim()
@@ -269,6 +382,7 @@ export function DashboardChatPanel({
             message: nextMessage,
             locale: language,
             weatherContext,
+            sessionId: resolvedActiveSessionId,
           }),
         })
 
@@ -279,6 +393,13 @@ export function DashboardChatPanel({
           ))
           setChatInput(nextMessage)
           setErrorMessage(data?.error ?? copy.sendError)
+          if (
+            Array.isArray(data?.messages)
+            && Array.isArray(data?.sessions)
+            && typeof data?.activeSessionId === "string"
+          ) {
+            applyPayload(data as ChatStateResponse)
+          }
           if (data?.usage) {
             setUsage(data.usage)
           }
@@ -289,9 +410,7 @@ export function DashboardChatPanel({
         }
 
         const payload = data as ChatStateResponse
-        setMessages(payload.messages)
-        setUsage(payload.usage)
-        setPolicy(payload.policy)
+        applyPayload(payload)
       } catch (error) {
         console.error("Failed to send dashboard chat message:", error)
         setMessages((current) => current.filter((item) =>
@@ -338,6 +457,49 @@ export function DashboardChatPanel({
               {suggestion}
             </button>
           ))}
+        </div>
+
+        <div className="mt-5 rounded-[1.3rem] border border-card-border/70 bg-card/70 p-3 sm:p-4">
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-muted-foreground">{copy.sessionLabel}</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleCreateSession}
+              disabled={isSessionPending}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-card-border/70 bg-background/75 px-3 py-2 text-xs font-black text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue disabled:opacity-60"
+            >
+              {isSessionPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+              {copy.sessionCreate}
+            </button>
+
+            <select
+              value={resolvedActiveSessionId ?? ""}
+              onChange={(event) => handleSessionSelect(event.target.value)}
+              disabled={isSessionPending || isLoading || sessions.length === 0}
+              className="min-w-0 flex-1 rounded-full border border-card-border/70 bg-background/75 px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-sky-blue/30 disabled:opacity-60"
+            >
+              {sessions.length === 0 ? (
+                <option value="">{copy.sessionPlaceholder}</option>
+              ) : (
+                sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.title} · {session.messageCount} {copy.sessionMessages}
+                  </option>
+                ))
+              )}
+            </select>
+
+            <button
+              type="button"
+              onClick={handleDeleteSession}
+              disabled={isSessionPending || !resolvedActiveSessionId || sessions.length <= 1}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-danger/25 bg-danger/10 px-3 py-2 text-xs font-black text-danger transition hover:bg-danger/15 disabled:opacity-50"
+            >
+              {isSessionPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+              {copy.sessionDelete}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{copy.sessionHint}</p>
         </div>
       </div>
 

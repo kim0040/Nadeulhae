@@ -10,6 +10,7 @@ const createChatMessagesTableSql = `
   CREATE TABLE IF NOT EXISTS user_chat_messages (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id CHAR(36) NOT NULL,
+    session_id BIGINT NULL,
     role VARCHAR(16) NOT NULL,
     locale VARCHAR(8) NOT NULL DEFAULT 'und',
     content LONGTEXT NOT NULL,
@@ -23,7 +24,30 @@ const createChatMessagesTableSql = `
     included_in_memory_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_chat_messages_user_created (user_id, created_at),
-    KEY idx_chat_messages_user_memory (user_id, included_in_memory_at, id)
+    KEY idx_chat_messages_user_memory (user_id, included_in_memory_at, id),
+    KEY idx_chat_messages_user_session_created (user_id, session_id, created_at),
+    KEY idx_chat_messages_user_session_memory (user_id, session_id, included_in_memory_at, id)
+  ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`
+
+const createChatSessionsTableSql = `
+  CREATE TABLE IF NOT EXISTS user_chat_sessions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id CHAR(36) NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    locale VARCHAR(8) NOT NULL DEFAULT 'und',
+    is_auto_title TINYINT(1) NOT NULL DEFAULT 1,
+    memory_summary_text LONGTEXT NULL,
+    memory_token_estimate INT UNSIGNED NOT NULL DEFAULT 0,
+    summarized_message_count INT UNSIGNED NOT NULL DEFAULT 0,
+    memory_model_used VARCHAR(120) NULL,
+    last_compacted_at DATETIME NULL,
+    last_message_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_chat_sessions_user_updated (user_id, updated_at),
+    KEY idx_chat_sessions_user_created (user_id, created_at),
+    KEY idx_chat_sessions_user_last_message (user_id, last_message_at)
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
@@ -31,10 +55,14 @@ const createChatMemoryTableSql = `
   CREATE TABLE IF NOT EXISTS user_chat_memory (
     user_id CHAR(36) PRIMARY KEY,
     summary_text LONGTEXT NOT NULL,
+    assessment_text LONGTEXT NULL,
     summary_token_estimate INT UNSIGNED NOT NULL DEFAULT 0,
     summarized_message_count INT UNSIGNED NOT NULL DEFAULT 0,
+    last_profile_message_id BIGINT NULL,
     model_used VARCHAR(120) NULL,
+    profile_model_used VARCHAR(120) NULL,
     last_compacted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    profile_refreshed_at DATETIME NULL,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
@@ -66,6 +94,7 @@ const createChatRequestEventsTableSql = `
   CREATE TABLE IF NOT EXISTS user_chat_request_events (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id CHAR(36) NOT NULL,
+    session_id BIGINT NULL,
     request_kind VARCHAR(16) NOT NULL,
     status VARCHAR(24) NOT NULL,
     locale VARCHAR(8) NOT NULL DEFAULT 'und',
@@ -84,9 +113,55 @@ const createChatRequestEventsTableSql = `
     error_message VARCHAR(255) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_chat_events_user_created (user_id, created_at),
+    KEY idx_chat_events_user_session_created (user_id, session_id, created_at),
     KEY idx_chat_events_status_created (status, created_at),
     KEY idx_chat_events_kind_created (request_kind, created_at)
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`
+
+const addChatMessagesSessionIdColumnSql = `
+  ALTER TABLE user_chat_messages
+    ADD COLUMN IF NOT EXISTS session_id BIGINT NULL AFTER user_id
+`
+
+const addChatMessagesSessionCreatedIndexSql = `
+  ALTER TABLE user_chat_messages
+    ADD KEY idx_chat_messages_user_session_created (user_id, session_id, created_at)
+`
+
+const addChatMessagesSessionMemoryIndexSql = `
+  ALTER TABLE user_chat_messages
+    ADD KEY idx_chat_messages_user_session_memory (user_id, session_id, included_in_memory_at, id)
+`
+
+const addChatRequestEventsSessionIdColumnSql = `
+  ALTER TABLE user_chat_request_events
+    ADD COLUMN IF NOT EXISTS session_id BIGINT NULL AFTER user_id
+`
+
+const addChatRequestEventsSessionIndexSql = `
+  ALTER TABLE user_chat_request_events
+    ADD KEY idx_chat_events_user_session_created (user_id, session_id, created_at)
+`
+
+const addChatMemoryAssessmentTextColumnSql = `
+  ALTER TABLE user_chat_memory
+    ADD COLUMN IF NOT EXISTS assessment_text LONGTEXT NULL AFTER summary_text
+`
+
+const addChatMemoryLastProfileMessageIdColumnSql = `
+  ALTER TABLE user_chat_memory
+    ADD COLUMN IF NOT EXISTS last_profile_message_id BIGINT NULL AFTER summarized_message_count
+`
+
+const addChatMemoryProfileModelUsedColumnSql = `
+  ALTER TABLE user_chat_memory
+    ADD COLUMN IF NOT EXISTS profile_model_used VARCHAR(120) NULL AFTER model_used
+`
+
+const addChatMemoryProfileRefreshedAtColumnSql = `
+  ALTER TABLE user_chat_memory
+    ADD COLUMN IF NOT EXISTS profile_refreshed_at DATETIME NULL AFTER last_compacted_at
 `
 
 interface ChatMessageMigrationRow extends RowDataPacket {
@@ -100,7 +175,33 @@ interface ChatMemoryMigrationRow extends RowDataPacket {
   summary_text: string
 }
 
+interface ChatMemoryAssessmentMigrationRow extends RowDataPacket {
+  user_id: string
+  assessment_text: string | null
+}
+
+interface ChatSessionMemoryMigrationRow extends RowDataPacket {
+  id: number
+  memory_summary_text: string | null
+}
+
 const MAX_MIGRATION_BATCHES = 200
+
+async function runIgnoreDuplicateKey(sql: string) {
+  try {
+    await getDbPool().query(sql)
+  } catch (error) {
+    const code = typeof error === "object" && error && "code" in error
+      ? String((error as { code?: unknown }).code ?? "")
+      : ""
+
+    if (code === "ER_DUP_KEYNAME" || code === "ER_MULTIPLE_PRI_KEY") {
+      return
+    }
+
+    throw error
+  }
+}
 
 async function migrateChatMessageContents() {
   const pool = getDbPool()
@@ -174,6 +275,82 @@ async function migrateChatMemorySummaries() {
   }
 }
 
+async function migrateChatMemoryAssessments() {
+  const pool = getDbPool()
+
+  for (let i = 0; i < MAX_MIGRATION_BATCHES; i++) {
+    const [rows] = await pool.query<ChatMemoryAssessmentMigrationRow[]>(
+      `
+        SELECT user_id, assessment_text
+        FROM user_chat_memory
+        WHERE assessment_text IS NOT NULL
+          AND assessment_text <> ''
+          AND assessment_text NOT LIKE 'enc:v1:%'
+        LIMIT 200
+      `
+    )
+
+    if (rows.length === 0) {
+      return
+    }
+
+    for (const row of rows) {
+      const plain = decryptDatabaseValueSafely(row.assessment_text, "chat.profile.assessment") ?? row.assessment_text
+      await pool.execute(
+        `
+          UPDATE user_chat_memory
+          SET assessment_text = ?
+          WHERE user_id = ?
+        `,
+        [
+          row.assessment_text && isEncryptedDatabaseValue(row.assessment_text)
+            ? row.assessment_text
+            : encryptDatabaseValue(plain || "", "chat.profile.assessment"),
+          row.user_id,
+        ]
+      )
+    }
+  }
+}
+
+async function migrateChatSessionMemorySummaries() {
+  const pool = getDbPool()
+
+  for (let i = 0; i < MAX_MIGRATION_BATCHES; i++) {
+    const [rows] = await pool.query<ChatSessionMemoryMigrationRow[]>(
+      `
+        SELECT id, memory_summary_text
+        FROM user_chat_sessions
+        WHERE memory_summary_text IS NOT NULL
+          AND memory_summary_text <> ''
+          AND memory_summary_text NOT LIKE 'enc:v1:%'
+        LIMIT 200
+      `
+    )
+
+    if (rows.length === 0) {
+      return
+    }
+
+    for (const row of rows) {
+      const plain = decryptDatabaseValueSafely(row.memory_summary_text, "chat.session.memory") ?? row.memory_summary_text
+      await pool.execute(
+        `
+          UPDATE user_chat_sessions
+          SET memory_summary_text = ?
+          WHERE id = ?
+        `,
+        [
+          row.memory_summary_text && isEncryptedDatabaseValue(row.memory_summary_text)
+            ? row.memory_summary_text
+            : encryptDatabaseValue(plain || "", "chat.session.memory"),
+          row.id,
+        ]
+      )
+    }
+  }
+}
+
 export async function ensureChatSchema() {
   if (globalThis.__nadeulhaeChatSchemaPromise) {
     return globalThis.__nadeulhaeChatSchemaPromise
@@ -182,11 +359,27 @@ export async function ensureChatSchema() {
   const bootstrapPromise = (async () => {
     const pool = getDbPool()
     await pool.query(createChatMessagesTableSql)
+    await pool.query(createChatSessionsTableSql)
     await pool.query(createChatMemoryTableSql)
     await pool.query(createChatUsageDailyTableSql)
     await pool.query(createChatRequestEventsTableSql)
+
+    await pool.query(addChatMessagesSessionIdColumnSql)
+    await runIgnoreDuplicateKey(addChatMessagesSessionCreatedIndexSql)
+    await runIgnoreDuplicateKey(addChatMessagesSessionMemoryIndexSql)
+
+    await pool.query(addChatRequestEventsSessionIdColumnSql)
+    await runIgnoreDuplicateKey(addChatRequestEventsSessionIndexSql)
+
+    await pool.query(addChatMemoryAssessmentTextColumnSql)
+    await pool.query(addChatMemoryLastProfileMessageIdColumnSql)
+    await pool.query(addChatMemoryProfileModelUsedColumnSql)
+    await pool.query(addChatMemoryProfileRefreshedAtColumnSql)
+
     await migrateChatMessageContents()
     await migrateChatMemorySummaries()
+    await migrateChatMemoryAssessments()
+    await migrateChatSessionMemorySummaries()
   })()
 
   globalThis.__nadeulhaeChatSchemaPromise = bootstrapPromise.catch((error) => {
