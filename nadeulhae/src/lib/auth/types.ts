@@ -9,6 +9,7 @@ export interface AuthUser {
   preferredTimeSlot: string
   weatherSensitivity: string[]
   marketingAccepted: boolean
+  analyticsAccepted: boolean
   createdAt: string
 }
 
@@ -33,6 +34,7 @@ export interface RegisterPayload extends LoginPayload {
   privacyAccepted: boolean
   ageConfirmed: boolean
   marketingAccepted: boolean
+  analyticsAccepted: boolean
 }
 
 export interface UpdateProfilePayload {
@@ -44,4 +46,5 @@ export interface UpdateProfilePayload {
   preferredTimeSlot: string
   weatherSensitivity: string[]
   marketingAccepted: boolean
+  analyticsAccepted: boolean
 }

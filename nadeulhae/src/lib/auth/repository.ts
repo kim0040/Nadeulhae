@@ -19,6 +19,7 @@ interface UserRow extends RowDataPacket {
   preferred_time_slot: string
   weather_sensitivity: string | string[]
   marketing_accepted: number
+  analytics_accepted: number
   created_at: Date | string
 }
 
@@ -102,6 +103,7 @@ export function toPublicUser(row: Pick<
   | "preferred_time_slot"
   | "weather_sensitivity"
   | "marketing_accepted"
+  | "analytics_accepted"
   | "created_at"
 >): AuthUser {
   return {
@@ -115,6 +117,7 @@ export function toPublicUser(row: Pick<
     preferredTimeSlot: row.preferred_time_slot,
     weatherSensitivity: parseJsonArray(row.weather_sensitivity),
     marketingAccepted: row.marketing_accepted === 1,
+    analyticsAccepted: row.analytics_accepted === 1,
     createdAt: toIsoString(row.created_at),
   }
 }
@@ -153,6 +156,7 @@ export async function findUserByEmail(email: string) {
         preferred_time_slot,
         weather_sensitivity,
         marketing_accepted,
+        analytics_accepted,
         created_at
       FROM users
       WHERE email = ?
@@ -183,6 +187,7 @@ export async function findUserById(userId: string) {
         preferred_time_slot,
         weather_sensitivity,
         marketing_accepted,
+        analytics_accepted,
         created_at
       FROM users
       WHERE id = ?
@@ -208,6 +213,7 @@ export async function createUser(input: {
   preferredTimeSlot: string
   weatherSensitivity: string[]
   marketingAccepted: boolean
+  analyticsAccepted: boolean
   agreedAt: Date
 }) {
   await ensureAuthSchema()
@@ -231,8 +237,10 @@ export async function createUser(input: {
         privacy_agreed_at,
         age_confirmed_at,
         marketing_accepted,
-        marketing_agreed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        marketing_agreed_at,
+        analytics_accepted,
+        analytics_agreed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       input.id,
@@ -252,6 +260,8 @@ export async function createUser(input: {
       input.agreedAt,
       input.marketingAccepted ? 1 : 0,
       input.marketingAccepted ? input.agreedAt : null,
+      input.analyticsAccepted ? 1 : 0,
+      input.analyticsAccepted ? input.agreedAt : null,
     ]
   )
 
@@ -335,6 +345,7 @@ export async function findUserBySessionTokenHash(tokenHash: string) {
         u.preferred_time_slot,
         u.weather_sensitivity,
         u.marketing_accepted,
+        u.analytics_accepted,
         u.created_at
       FROM user_sessions s
       JOIN users u ON u.id = s.user_id
@@ -393,6 +404,7 @@ export async function updateUserProfile(input: {
   preferredTimeSlot: string
   weatherSensitivity: string[]
   marketingAccepted: boolean
+  analyticsAccepted: boolean
 }) {
   await ensureAuthSchema()
 
@@ -408,8 +420,13 @@ export async function updateUserProfile(input: {
         preferred_time_slot = ?,
         weather_sensitivity = ?,
         marketing_accepted = ?,
+        analytics_accepted = ?,
         marketing_agreed_at = CASE
           WHEN ? = 1 THEN COALESCE(marketing_agreed_at, NOW())
+          ELSE NULL
+        END,
+        analytics_agreed_at = CASE
+          WHEN ? = 1 THEN COALESCE(analytics_agreed_at, NOW())
           ELSE NULL
         END
       WHERE id = ?
@@ -423,7 +440,36 @@ export async function updateUserProfile(input: {
       input.preferredTimeSlot,
       JSON.stringify(input.weatherSensitivity),
       input.marketingAccepted ? 1 : 0,
+      input.analyticsAccepted ? 1 : 0,
       input.marketingAccepted ? 1 : 0,
+      input.analyticsAccepted ? 1 : 0,
+      input.userId,
+    ]
+  )
+
+  return findUserById(input.userId)
+}
+
+export async function updateUserAnalyticsConsent(input: {
+  userId: string
+  analyticsAccepted: boolean
+}) {
+  await ensureAuthSchema()
+
+  await executeStatement(
+    `
+      UPDATE users
+      SET
+        analytics_accepted = ?,
+        analytics_agreed_at = CASE
+          WHEN ? = 1 THEN COALESCE(analytics_agreed_at, NOW())
+          ELSE NULL
+        END
+      WHERE id = ?
+    `,
+    [
+      input.analyticsAccepted ? 1 : 0,
+      input.analyticsAccepted ? 1 : 0,
       input.userId,
     ]
   )

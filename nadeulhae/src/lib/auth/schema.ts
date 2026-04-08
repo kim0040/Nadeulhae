@@ -23,10 +23,22 @@ const createUsersTableSql = `
     age_confirmed_at DATETIME NOT NULL,
     marketing_accepted TINYINT(1) NOT NULL DEFAULT 0,
     marketing_agreed_at DATETIME NULL,
+    analytics_accepted TINYINT(1) NOT NULL DEFAULT 0,
+    analytics_agreed_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_users_email (email)
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`
+
+const addAnalyticsAcceptedColumnSql = `
+  ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS analytics_accepted TINYINT(1) NOT NULL DEFAULT 0 AFTER marketing_agreed_at
+`
+
+const addAnalyticsAgreedAtColumnSql = `
+  ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS analytics_agreed_at DATETIME NULL AFTER analytics_accepted
 `
 
 const createSessionsTableSql = `
@@ -88,6 +100,8 @@ export async function ensureAuthSchema() {
   const bootstrapPromise = (async () => {
     const pool = getDbPool()
     await pool.query(createUsersTableSql)
+    await pool.query(addAnalyticsAcceptedColumnSql)
+    await pool.query(addAnalyticsAgreedAtColumnSql)
     await pool.query(createSessionsTableSql)
     await pool.query(createAttemptBucketsTableSql)
     await pool.query(createSecurityEventsTableSql)

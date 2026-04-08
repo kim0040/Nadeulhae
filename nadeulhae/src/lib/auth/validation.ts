@@ -78,6 +78,7 @@ export function validateRegisterPayload(payload: unknown) {
     privacyAccepted,
     ageConfirmed,
     marketingAccepted,
+    analyticsAccepted,
   } = payload as Partial<RegisterPayload>
 
   const normalizedDisplayName = asTrimmedString(displayName)
@@ -149,6 +150,7 @@ export function validateRegisterPayload(payload: unknown) {
       privacyAccepted: true,
       ageConfirmed: true,
       marketingAccepted: asBoolean(marketingAccepted),
+      analyticsAccepted: asBoolean(analyticsAccepted),
     },
   }
 }
@@ -167,6 +169,7 @@ export function validateUpdateProfilePayload(payload: unknown) {
     preferredTimeSlot,
     weatherSensitivity,
     marketingAccepted,
+    analyticsAccepted,
   } = payload as Partial<UpdateProfilePayload>
 
   const normalizedDisplayName = asTrimmedString(displayName)
@@ -219,6 +222,7 @@ export function validateUpdateProfilePayload(payload: unknown) {
       preferredTimeSlot,
       weatherSensitivity: sanitizedWeatherSensitivity,
       marketingAccepted: asBoolean(marketingAccepted),
+      analyticsAccepted: asBoolean(analyticsAccepted),
     },
   }
 }

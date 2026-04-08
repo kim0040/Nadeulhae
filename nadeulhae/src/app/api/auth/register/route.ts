@@ -22,6 +22,8 @@ import {
 } from "@/lib/auth/request-security"
 import { attachAuthCookie, startAuthenticatedSession } from "@/lib/auth/session"
 import { validateRegisterPayload } from "@/lib/auth/validation"
+import { recordDailyConsentDecisionSafely } from "@/lib/analytics/repository"
+import { attachAnalyticsConsentCookie } from "@/lib/analytics/consent"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
@@ -210,6 +212,7 @@ async function handlePOST(request: NextRequest) {
       preferredTimeSlot: validation.data.preferredTimeSlot,
       weatherSensitivity: validation.data.weatherSensitivity,
       marketingAccepted: validation.data.marketingAccepted,
+      analyticsAccepted: validation.data.analyticsAccepted,
       agreedAt: new Date(),
     })
 
@@ -224,7 +227,15 @@ async function handlePOST(request: NextRequest) {
       userAgent,
       metadata: {
         marketingAccepted: createdUser.marketingAccepted,
+        analyticsAccepted: createdUser.analyticsAccepted,
       },
+    })
+
+    await recordDailyConsentDecisionSafely({
+      request,
+      preference: createdUser.analyticsAccepted ? "allow" : "essential",
+      decisionSource: "signup",
+      locale: request.headers.get("accept-language"),
     })
 
     const response = createAuthJsonResponse(
@@ -239,11 +250,17 @@ async function handlePOST(request: NextRequest) {
         preferred_time_slot: createdUser.preferredTimeSlot,
         weather_sensitivity: createdUser.weatherSensitivity,
         marketing_accepted: createdUser.marketingAccepted ? 1 : 0,
+        analytics_accepted: createdUser.analyticsAccepted ? 1 : 0,
         created_at: createdUser.createdAt,
       }) },
       { status: 201 }
     )
-    return attachAuthCookie(response, session.token, session.expiresAt)
+    attachAuthCookie(response, session.token, session.expiresAt)
+    attachAnalyticsConsentCookie(
+      response,
+      createdUser.analyticsAccepted ? "allow" : "essential"
+    )
+    return response
   } catch (error) {
     const duplicateEmail = typeof error === "object"
       && error !== null
