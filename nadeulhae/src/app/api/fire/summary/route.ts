@@ -91,7 +91,7 @@ const dailySummaryCache = new Map<string, DailySummaryCacheEntry>()
 const dailyPlaceCache = new Map<string, DailyPlaceCacheEntry>()
 
 const FIRE_TODAY_CACHE_TTL = 2 * 60 * 60 * 1000
-const FIRE_HISTORY_CACHE_TTL = 30 * 24 * 60 * 60 * 1000
+const FIRE_HISTORY_CACHE_TTL = 24 * 60 * 60 * 1000
 
 const FIRE_SIDO_NAME_MAP: Record<string, string> = {
   서울: "서울특별시",
