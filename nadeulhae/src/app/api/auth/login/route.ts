@@ -230,6 +230,8 @@ async function handlePOST(request: NextRequest) {
         id: authenticatedUser.id,
         email: authenticatedUser.email,
         display_name: authenticatedUser.displayName,
+        nickname: authenticatedUser.nickname,
+        nickname_tag: authenticatedUser.nicknameTag,
         age_band: authenticatedUser.ageBand,
         primary_region: authenticatedUser.primaryRegion,
         interest_tags: authenticatedUser.interestTags,

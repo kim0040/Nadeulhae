@@ -24,7 +24,6 @@ const POLICY_CONTENT: Record<
     title: string
     description: string
     effectiveDate: string
-    legalNote: string
     contentsTitle: string
     summaryTitle: string
     summary: Array<{
@@ -41,15 +40,13 @@ const POLICY_CONTENT: Record<
     description:
       "아래 문서는 회원가입, 로그인, 위치 기반 날씨 조회, 서비스 개선용 분석 수집까지 현재 구현 범위를 기준으로 정리한 운영 문안입니다.",
     effectiveDate: "시행 기준일: 2026년 4월 8일",
-    legalNote:
-      "개인정보 보호법, 위치정보 관련 규정, 국외 이전 고지 의무를 반영해 작성했지만 공개 전에는 반드시 최종 법률 검토를 권장합니다.",
     contentsTitle: "빠른 이동",
     summaryTitle: "핵심 요약",
     summary: [
       {
         label: "필수 수집",
         value: "계정 + 프로필 + 보안기록",
-        detail: "이메일, 이름, 비밀번호 해시/솔트, 연령대, 지역, 취미, 선호 시간대, 필수 동의 기록",
+        detail: "이메일, 이름, 닉네임, 비밀번호 해시/솔트, 연령대, 지역, 취미, 선호 시간대, 필수 동의 기록",
       },
       {
         label: "선택 수집",
@@ -71,86 +68,75 @@ const POLICY_CONTENT: Record<
       {
         id: "service",
         eyebrow: "service terms",
-        title: "1. 서비스 이용약관",
+        title: "1. 나들해 서비스 이용약관",
         items: [
-          "나들해는 날씨 브리핑, 피크닉 지수, 지역 기반 나들이 정보, 회원 프로필 저장, 개인화 추천을 제공하는 서비스입니다.",
-          "회원은 정확한 가입 정보를 입력해야 하며 타인의 정보를 도용하거나 자동화 공격, 계정 공유, 부정 이용을 해서는 안 됩니다.",
-          "운영자는 공공 데이터 중단, 유지보수, 보안 대응, 약관 위반이 있는 경우 서비스 일부를 제한하거나 계정을 보호 목적으로 정지할 수 있습니다.",
-          "로그인 보호를 위해 실패 횟수 제한, 세션 수 제한, 요청 출처 검증, 보안 이벤트 기록이 적용됩니다.",
+          "나들해는 기상청, 에어코리아 등 공공데이터를 취합하여 날씨 브리핑, 피크닉 지수, 전주 지역 커뮤니티 채팅, 개인화 맞춤형 나들이 코스를 제공하는 서비스입니다.",
+          "서비스 이용은 원칙적으로 무료이나, 사용자는 사실과 일치하는 정보를 입력해야 하며, 혐오 표현, 비속어, 무단 광고 송출, 트래픽 공격 등 서비스의 건전한 운영을 방해하는 행위를 할 수 없습니다. 약관 위반 시 사전 통보 없이 계정 이용이 정지 또는 접속이 차단될 수 있습니다.",
+          "불가항력적인 공공 API 장애 접속 폭주, 시스템 유지 보수 등의 사유로 인하여 서비스가 일시 중단될 수 있으며, 운영자는 별도 공지가 불가피한 상황의 장애 및 이로 인한 직간접적 손해에 대하여 고의 또는 중과실이 없는 한 책임을 지지 않습니다.",
         ],
       },
       {
         id: "privacy",
         eyebrow: "privacy notice",
-        title: "2. 수집 항목과 이용 목적",
+        title: "2. 개인정보 수집·이용 안내",
         items: [
-          "필수 항목: 이메일, 이름, 비밀번호 해시와 개별 솔트, 연령대, 주 사용 지역, 취미 선택, 선호 시간대, 필수 약관 동의 시각.",
-          "선택 항목: 기타 취미 설명, 민감한 날씨 요소, 추천 알림 동의 여부, 서비스 개선 분석 동의 여부.",
-          "보안 운영 항목: 로그인 세션 토큰 해시, 세션 만료 시각, 접속 기기 정보, 접속 IP 기반 보안 기록, 인증 실패 제한 기록.",
-          "이 정보는 회원 식별, 로그인 유지, 개인화 브리핑, 악성 접근 차단, 서비스 안정화, 고객 요청 대응을 위해 사용됩니다.",
-        ],
-      },
-      {
-        id: "analytics",
-        eyebrow: "analytics & cookies",
-        title: "3. 쿠키와 서비스 개선 분석",
-        items: [
-          "필수 쿠키: 로그인 유지용 인증 쿠키와 방문 세션 식별 쿠키를 사용합니다. 이 쿠키는 보안과 기본 동작에 필요합니다.",
-          "분석 동의 전에는 페이지/API 호출 수, 상태 코드, 응답 시간 같은 익명 일일 합계만 저장합니다. 이 집계에는 원문 비밀번호, 원문 IP, 전체 리퍼러 URL을 저장하지 않습니다.",
-          "분석 동의 시에는 경로, 유입 호스트, UTM source/medium/campaign, 라이트·다크 테마, 기기 구간, 시간대, 일별 고유 방문자 수와 고유 회원 수를 추가 집계할 수 있습니다.",
-          "분석은 일(day) 단위로 계속 누적되어 과거 날짜도 그대로 남습니다. 다만 개별 사용자를 직접 식별하기 위한 프로파일링 목적에는 사용하지 않습니다.",
-          "회원은 대시보드 또는 동의 배너에서 언제든지 분석 동의를 변경할 수 있습니다.",
+          "필수 수집 항목: 이메일, 이름, 닉네임, 해시 변환된 암호, 연령대, 주 사용 지역 선택, 취미, 선호 시간대, 필수 약관 동의 시각 및 접속 IP 보안 로그.",
+          "선택 수집 항목: 기타 자체 기재 취미, 민감 날씨 알림 요소, 마케팅/추천 팁 수신 동의, 서비스 운영 개선 통계 분석 허용 수집 로그.",
+          "수집 및 이용 목적: 회원 식별, 커뮤니티 내 표시 및 소통, 지역별·취향별 정밀 맞춤형 나들이 추천, 불법 및 반복적 비정상적인 로그인 접근 차단을 위한 보안 적용.",
+          "개인정보는 원칙적으로 본 동의 탈퇴 시까지 서비스 제공 목적으로만 보관되며, 해시와 개별 Salt 기법(Scrypt 등)을 적용해 원문을 알아낼 수 없게 암호화 등 안전한 보호 조치를 취하고 있습니다.",
         ],
       },
       {
         id: "location",
-        eyebrow: "location notice",
-        title: "4. 위치정보 안내",
+        eyebrow: "location privacy",
+        title: "3. 위치기반서비스 이용약관 의무 사항",
         items: [
-          "현재 위치 기반 날씨 조회는 브라우저 또는 기기 운영체제의 위치 권한을 사용해 현재 지역 날씨를 계산할 때만 활용합니다.",
-          "현재 구현 기준으로 정밀 위치 좌표를 회원 프로필이나 분석 테이블에 장기 저장하지 않습니다.",
-          "향후 위치 기반 추천 이력 저장, 친구 공유, 위치 알림 등 개인위치정보 기능이 추가되면 별도 위치정보 이용약관과 추가 고지를 제공합니다.",
+          "나들해의 위치정보 활용 서비스는 무료이며, 사용자가 허용한 기기 통신 환경(브라우저 Geolocation API)에서 제공받은 좌표를 기반으로 즉각적 날씨 정보 및 공기질, 인근 스팟을 필터링하여 응답합니다.",
+          "당사는 '위치정보의 보호 및 이용 등에 관한 법률' 제16조 등 법률에 명시된 규칙을 준수하여 현재 위치 데이터를 서버나 이용자의 프로필에 연속적 궤적의 형태로 절대 영구 보관/추적하지 않고 일회성 브리핑 연산 직후 즉시 파기합니다.",
+          "단, 법령에 따른 분쟁의 처리 및 이용자 보호 의무 증빙을 위해 최소한의 '위치정보 이용·제공 사실 확인자료'는 6개월간 보존하며 이 기간 만기 시 자동으로 파기합니다.",
+          "이용자는 서비스 내 환경 설정 또는 브라우저 권한 관리를 통해 언제든지 1회 제공 내역이 포함되는 본 위치정보 활용 제공 부분에 대한 전부 혹은 일부 동의를 즉시 철회할 권리가 있으며 관련 불만 및 고충은 고객 문의처를 통해 신속히 대응받을 수 있습니다.",
+        ],
+      },
+      {
+        id: "cross-border",
+        eyebrow: "cross-border transfer",
+        title: "4. 개인정보 국외 이전 고지 의무 명시",
+        items: [
+          "나들해의 모든 회원 서비스는 보안 강화 및 최신의 기술 집약적인 클라우드 데이터 관리 환경 하에서 제공되며, '개인정보 보호법 제28조의8' 및 정보통신망 이용촉진 등에 관한 규정을 준수하여 수집된 정보를 다음과 같이 물리적 서버가 국외에 존재하는 수탁업체로 안전히 이전(위탁 보관)하여 처리합니다.",
+          "① 국외 이전받는 자: PingCAP Inc (TiDB Cloud 데이터베이스 솔루션 운영사) 및 Vercel Inc (웹 호스팅 서버 운영사).",
+          "② 이전되는 국가 및 이전 일시/방법: 데이터를 전송 및 저장하는 물리적 주요 거점 국가는 일본(AWS ap-northeast 리전) 및 미국이며, 서비스 가입 또는 정보 갱신/채팅 발송 시 암호화된 전송망(TLS 지원)을 통해 자동 실시간으로 이전됩니다.",
+          "③ 이전되는 관련 정보 항목: 이메일, 개인 프로필(연령, 취미, 시간 등), 해시 암호, 작성한 채팅 메시지 등 나들해 서비스를 통해 가입 시 수집되거나 활동 시 생산된 전체 정보.",
+          "④ 이전의 목적 및 보유 기간: 글로벌 최고 수준의 고가용성 데이터베이스 저장 목적이며, 데이터는 회원의 탈퇴 등 법정 파기 사유 달성 시점(다만 채팅은 규정된 단기 보존 만료 시 파기)까지 안정적으로 이용 및 보유됩니다.",
+          "⑤ 처리 거부권 행사 및 불이익: 사용자는 본 국외 인프라 운영 방침에 동의하지 않을 권리가 있으나 나들해 서비스 아키텍처 상 클라우드 환경 없이 필수 정보 기록을 유지하고 원활하게 계정을 제공하는 것이 불가능하므로, 국외 이전을 거부하실 경우 서비스 이용 해지(회원 탈퇴) 절차가 필수적으로 요구됩니다.",
         ],
       },
       {
         id: "retention",
         eyebrow: "retention & deletion",
-        title: "5. 보관 및 파기 기준",
+        title: "5. 보관 및 파기 절차 및 기준",
         items: [
-          "회원 기본 정보는 탈퇴 시까지 보관하며, 탈퇴 요청이 처리되면 로그인 세션과 프로필을 우선 삭제합니다.",
-          "활성 세션 정보는 만료, 로그아웃, 탈퇴 시 정리됩니다. 인증 보호용 시도 기록과 보안 이벤트는 보안 목적 달성 범위 내에서 운영 관리됩니다.",
-          "일별 집계 통계는 서비스 품질 비교와 장기 개선을 위해 계속 보관될 수 있습니다. 이 통계는 직접 식별정보 대신 집계 또는 해시 기반 식별자를 사용합니다.",
-          "법령상 별도 보관이 필요한 경우에는 해당 기간 동안 분리 보관 후 파기합니다.",
+          "수집된 회원 정보는 목적 달성(회원 탈퇴)과 동시에 해당 데이터베이스 테이블에서 삭제 및 영구 삭제 플래그로 파기하여 데이터 복원이 불가하도록 안전하게 소거합니다.",
+          "통신비밀보호법 등 관련 법률 상 보존 의무가 명시적인 접속 이벤트, 로그인 정보 통계의 경우 관련 법에서 지정된 기간 한도로 제한적으로 분리 보관한 후에 파기될 수 있습니다.",
+          "단기 휘발성 보관 원칙에 따라 실시간 커뮤니티 채팅 서비스 상 작성한 메시지(닉네임 표시분 포함)는 서버 등록 기점 7일(168시간) 초과 시 어떠한 백업 저장분 없이 데이터베이스 상에서 원천 삭제됩니다.",
         ],
       },
       {
-        id: "sharing",
-        eyebrow: "processors & transfers",
-        title: "6. 제3자 제공, 위탁, 국외 인프라",
+        id: "analytics",
+        eyebrow: "analytics & cookies",
+        title: "6. 쿠키와 통계 운영 및 선택 제공 정책",
         items: [
-          "현재 구현 기준으로 회원 정보를 광고 사업자에게 판매하거나 맞춤형 광고 목적으로 제3자 제공하지 않습니다.",
-          "클라우드 인프라, 데이터베이스, 호스팅 운영 과정에서 외부 서비스형 인프라를 사용할 수 있으며, 실제 운영 전 수탁업체명과 처리 범위를 별도 문서에 확정해야 합니다.",
-          "국외 리전 인프라를 사용할 가능성이 있으므로, 공개 전에는 이전 국가, 이전 항목, 보관 기간, 거부권 및 불이익을 포함한 국외 이전 고지를 최종 반영해야 합니다.",
-        ],
-      },
-      {
-        id: "security",
-        eyebrow: "security measures",
-        title: "7. 보안 조치",
-        items: [
-          "비밀번호 원문은 저장하지 않고 scrypt 기반 해시와 개별 솔트를 사용합니다. 추가 비밀값(pepper)은 환경변수로 분리해 관리합니다.",
-          "인증 요청은 동일 출처 검사, 본문 크기 제한, 실패 지연, 이메일·IP 기준 로그인/회원가입 제한, 활성 세션 상한을 적용합니다.",
-          "분석 테이블에는 원문 IP, 전체 리퍼러 URL, 원문 비밀번호를 저장하지 않으며, 고유 수 집계는 해시 기반 식별자로 처리합니다.",
+          "안전한 로그인 상태 유지를 위해서는 무적권 필수적 쿠키를 시스템 차원에서 HTTP 보안 속성과 함께 운용합니다.",
+          "더욱 유용한 기능을 제작하기 위한 '사용성/UI 통계 동의'를 체크해주신 분들에 한정해 비식별화된 데이터(접속 URL, 버튼 클릭 수, 테마 설정 기호) 일별 합산 수치를 집계 분석합니다.",
+          "이 같은 분석 시 개인 단말기 원본 IP 주소나 사용자를 정밀 식별할 수 있는 브라우저 지문을 별도 프로파일링하거나 제 3자 마케팅 에이전시에 절대 대여/매매하지 않습니다.",
         ],
       },
       {
         id: "rights",
         eyebrow: "user rights",
-        title: "8. 이용자 권리와 문의",
+        title: "7. 이용자 권리와 구제(문의) 창구",
         items: [
-          "회원은 본인 정보의 열람, 정정, 삭제, 처리정지, 동의 철회를 요청할 수 있습니다.",
-          "대시보드에서 프로필 수정, 로그아웃, 탈퇴, 분석 동의 변경이 가능합니다. 다만 법령상 보관 의무가 있는 정보는 즉시 삭제되지 않을 수 있습니다.",
-          "운영 책임자 연락처, 수탁사 목록, 국외 이전 내역이 확정되면 이 문서에 즉시 갱신해야 합니다.",
+          "모든 회원은 서비스 메인 화면 내 대시보드의 계정 설정 항목에서 본인의 등록 정보를 언제든 열람, 수정, 파기(회원 탈퇴 처리) 할 권한을 자유롭게 가집니다.",
+          "개인정보 또는 위치정보 활용, 기타 시스템 장애와 관련해 발생하는 건의/민원 접수 및 법률 문의 대응은 서비스 내 명시된 공식 고객 지원 이메일을 통해 신속히 처리를 도모합니다.",
         ],
       },
     ],
@@ -161,15 +147,13 @@ const POLICY_CONTENT: Record<
     description:
       "This policy reflects the currently implemented scope of sign-up, login, location-based weather lookup, and service-improvement analytics.",
     effectiveDate: "Effective basis: April 8, 2026",
-    legalNote:
-      "This draft reflects Korean privacy, location-related, and cross-border notice considerations, but it still requires final legal review before public launch.",
     contentsTitle: "Quick navigation",
     summaryTitle: "Key summary",
     summary: [
       {
         label: "Required data",
         value: "Account, profile, and security logs",
-        detail: "Email, display name, password hash and salt, age range, region, interests, preferred time, and required consent records",
+        detail: "Email, display name, nickname, password hash and salt, age range, region, interests, preferred time, and required consent records",
       },
       {
         label: "Optional data",
@@ -191,86 +175,75 @@ const POLICY_CONTENT: Record<
       {
         id: "service",
         eyebrow: "service terms",
-        title: "1. Service Terms",
+        title: "1. Nadeulhae Terms of Service",
         items: [
-          "Nadeulhae provides weather briefings, outing scores, regional outing information, saved member profiles, and personalized recommendations.",
-          "Members must submit accurate registration details and must not impersonate others, automate abusive access, share accounts, or misuse the service.",
-          "The operator may limit part of the service during public-data outages, maintenance, security response, or confirmed policy violations.",
-          "Login protection includes failed-attempt limits, session caps, request-origin validation, and security event logging.",
+          "Nadeulhae is a service that aggregates public data (KMA, AirKorea etc) to provide weather briefings, picnic scores, the Jeonju community chat, and personalized local outing courses.",
+          "Access is generally free, but users must register with true and accurate information. Disruption of community operations through hate speech, abuse, profanity, or spam messaging is strictly prohibited, and may result in a ban or account termination without warning.",
+          "Service downtime may occur due to public API instability, high-traffic surge, or scheduled maintenance. The operator is not liable for indirect damages arising from unforeseen disruptions except in cases of gross negligence.",
         ],
       },
       {
         id: "privacy",
         eyebrow: "privacy notice",
-        title: "2. Collected Data and Purposes",
+        title: "2. Privacy Collection and Usage",
         items: [
-          "Required data: email, display name, password hash and per-user salt, age range, primary region, interest selections, preferred time slot, and required consent timestamps.",
-          "Optional data: custom interest text, weather sensitivities, notice consent, and analytics consent for service improvement.",
-          "Security and operations data: hashed session tokens, session expiry, device information, IP-based security records, and authentication attempt buckets.",
-          "These records support member identification, session management, personalized briefings, malicious-access blocking, service stability, and support requests.",
-        ],
-      },
-      {
-        id: "analytics",
-        eyebrow: "analytics & cookies",
-        title: "3. Cookies and Improvement Analytics",
-        items: [
-          "Essential cookies are used for authenticated sessions and anonymous visit sessions. These cookies are required for security and core functionality.",
-          "Before analytics consent, only anonymous daily aggregates such as page/API counts, status codes, and timing totals are stored. Raw passwords, raw IPs, and full referrer URLs are not stored in analytics tables.",
-          "With analytics consent, Nadeulhae may additionally aggregate route path, referrer host, UTM source/medium/campaign, light or dark theme, device bucket, time zone, and daily unique visitor or member counts.",
-          "Analytics are stored by daily unit and continue accumulating historically. They are not intended for direct personal profiling.",
-          "Members can change analytics consent at any time from the dashboard or the consent banner.",
+          "Required: Email, name, nickname, hashed password, age band, primary region, hobbies, time slot preference, consent timestamps, and security IP logs.",
+          "Optional: Custom hobby descriptions, weather-sensitive alerts preferences, marketing consent, and analytics data.",
+          "Purpose: Identity verification, community display, highly localized algorithm matching for recommendations, and security protection against unnatural login attempts.",
+          "Basic profile data is retained until account deletion. Passwords are encrypted uni-directionally using advanced Scrypt hashing making them permanently irrecoverable.",
         ],
       },
       {
         id: "location",
-        eyebrow: "location notice",
-        title: "4. Location Notice",
+        eyebrow: "location privacy",
+        title: "3. Location-Based Services Legal Policy",
         items: [
-          "Current-location weather lookup uses browser or device location permission only to calculate nearby weather and briefings.",
-          "Under the current implementation, precise latitude and longitude are not stored long-term in member profiles or analytics tables.",
-          "If future features store location history, sharing, or alerts, separate location terms and additional notice should be added before launch.",
+          "Nadeulhae Location features are free of charge. Utilizing browser/device Geolocation permissions, coordinates are momentarily used for hyper-local weather fetching and spot discovery.",
+          "Per Article 16 of the South Korean Location Data Act, Nadeulhae does not construct a permanent historical log or trajectory of user locations; coordinate data is immediately discarded or cached temporarily out of database reach purely for returning weather reports.",
+          "However, to comply with the legal obligations of user safety disputes, minimal 'verification records of location data utilization' may be retained for 6 months and inherently deleted thereafter.",
+          "Users retain the complete, unilateral right to disable or revoke geolocation consent anytime via browser preferences. Related grievances and requests are fulfilled via dedicated support.",
+        ],
+      },
+      {
+        id: "cross-border",
+        eyebrow: "cross-border transfer",
+        title: "4. Mandatory Notice on Cross-Border Data Transfer",
+        items: [
+          "Nadeulhae processes database structures utilizing cutting-edge global cloud technologies. Pursuant to the PIPA (Personal Information Protection Act) Article 28-8, paragraph 1, item 3, necessary records are securely transferred to overseas hosting vendors.",
+          "① Transferee: PingCAP Inc. (TiDB Cloud Infrastructure DB Solutions) and Vercel Inc. (Web Server Platform Provider).",
+          "② Country and Transfer Mechanics: Principal server facilities reside in Japan (AWS ap-northeast) and USA. Transmission happens automatically in real-time under robust TLS/SSL encryption when members update profiles or submit chats.",
+          "③ Processed Datasets: Names, emails, passwords (hashed), activity interests, and user-generated chat payloads created over Nadeulhae.",
+          "④ Objective and Retention duration: Assures high-availability and fault-tolerant retention across borders. Retained strictly until members legally delete accounts (minus community chats which auto-expire at exactly 7 days).",
+          "⑤ Refusal Consequences: Cross-border capabilities are architecturally foundational to the active service system. Accordingly, a user who expressly refuses their data transfer right cannot fundamentally exist on the database, thereby obligating permanent membership deletion as the only consequence."
         ],
       },
       {
         id: "retention",
         eyebrow: "retention & deletion",
-        title: "5. Retention and Deletion",
+        title: "5. Retention and Safe Disposal",
         items: [
-          "Core member data is retained until account deletion. When deletion is requested, sessions and saved profile data are removed first.",
-          "Active session records are cleaned up on expiry, logout, or account deletion. Security attempt logs and event logs are operated within the scope required for protection purposes.",
-          "Daily aggregated statistics may be retained long-term for service quality comparisons and trend analysis. Those statistics use aggregate or hashed identifiers instead of direct identifiers.",
-          "Where the law requires separate retention, the data should be retained separately for that legal period and then deleted.",
+          "Collected standard member data is instantly destructed and virtually voided (via permanent delete flags avoiding soft recoveries) synchronously upon an account deletion execution.",
+          "System logs mandated under localized ecommerce laws are quarantined separately for max 3 months if enforced.",
+          "As a strict privacy protocol, the 'Jeonju Real-Time Chat' data physically self-destructs precisely 168 hours (7 days) after a message has been sent; leaving no archived history nor identifiable residuals.",
         ],
       },
       {
-        id: "sharing",
-        eyebrow: "processors & transfers",
-        title: "6. Third-Party Sharing, Vendors, and Cross-Border Infrastructure",
+        id: "analytics",
+        eyebrow: "analytics & cookies",
+        title: "6. Cookies and Anonymous Analytics",
         items: [
-          "Under the current implementation, member data is not sold or shared with advertising partners for targeted advertising.",
-          "Cloud infrastructure, databases, and hosting vendors may process data on behalf of the service, and the final vendor list and processing scope should be fixed before public launch.",
-          "Because overseas regions may be used, the final public policy should explicitly disclose destination country, transferred items, retention period, and the user’s right to refuse where required.",
-        ],
-      },
-      {
-        id: "security",
-        eyebrow: "security measures",
-        title: "7. Security Measures",
-        items: [
-          "Raw passwords are never stored. Nadeulhae uses scrypt-based password hashing with per-user salts, while a separate pepper is stored in environment variables.",
-          "Authentication endpoints apply same-origin checks, body-size limits, failure delay, email and IP rate limits, and active-session caps.",
-          "Analytics tables do not store raw IP addresses, full referrer URLs, or raw passwords. Unique counts use hashed identifiers.",
+          "Essential cookies, absolutely necessary for authenticated logged-in states, persist alongside robust HTTP security defenses exclusively protecting user navigation.",
+          "For users explicitly affirming analytics, aggregate anonymous metrics (button interactions, UI theme preferences, traffic routes) are compiled entirely detached from identifying tracking capabilities.",
+          "Your underlying raw endpoint IPs, persistent hardware signatures, or behavioral footprints are deliberately prevented from third-party advertising pipelines.",
         ],
       },
       {
         id: "rights",
         eyebrow: "user rights",
-        title: "8. User Rights and Contact",
+        title: "7. User Claims and Remediation",
         items: [
-          "Members may request access, correction, deletion, suspension of processing, or withdrawal of consent for their own data.",
-          "The dashboard currently allows profile edits, logout, account deletion, and analytics-consent changes. Data subject to legal retention obligations may not be deleted immediately.",
-          "The contact point, vendor list, and cross-border transfer details should be updated in this document before public launch.",
+          "Members yield perpetual authority to review, amend, and immediately terminate their Nadeulhae registry and related records straight from the in-app active Settings dashboard.",
+          "For further inquiries entailing data infringement suspicions, geolocation inquiries, or service complaints, contact our official support email to prompt investigation workflows.",
         ],
       },
     ],
@@ -316,12 +289,9 @@ export default function TermsPage() {
                   {copy.description}
                 </p>
               </div>
-              <div className="grid gap-3 lg:grid-cols-[0.75fr_1.25fr]">
+              <div className="grid gap-3">
                 <div className="rounded-[1.5rem] border border-card-border/70 bg-background/70 px-5 py-4 text-sm font-semibold text-foreground">
                   {copy.effectiveDate}
-                </div>
-                <div className="rounded-[1.5rem] border border-warning/20 bg-warning/10 px-5 py-4 text-sm leading-6 text-warning">
-                  {copy.legalNote}
                 </div>
               </div>
             </div>

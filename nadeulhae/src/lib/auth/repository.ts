@@ -5,11 +5,20 @@ import { ensureAuthSchema } from "@/lib/auth/schema"
 import type { AuthUser } from "@/lib/auth/types"
 import { deleteChatDataForUser } from "@/lib/chat/repository"
 import { executeStatement, getDbPool, queryRows } from "@/lib/db"
+import {
+  createBlindIndex,
+  decryptDatabaseValueSafely,
+  encryptDatabaseValue,
+  encryptDatabaseValueSafely,
+} from "@/lib/security/data-protection"
 
 interface UserRow extends RowDataPacket {
   id: string
   email: string
+  email_hash: string | null
   display_name: string
+  nickname: string
+  nickname_tag: string
   password_hash: string
   password_salt: string
   password_algo: string
@@ -75,6 +84,10 @@ function parseJsonArray(value: unknown) {
   return []
 }
 
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase()
+}
+
 function toIsoString(value: Date | string) {
   if (value instanceof Date) {
     return value.toISOString()
@@ -97,6 +110,8 @@ export function toPublicUser(row: Pick<
   | "id"
   | "email"
   | "display_name"
+  | "nickname"
+  | "nickname_tag"
   | "age_band"
   | "primary_region"
   | "interest_tags"
@@ -107,14 +122,18 @@ export function toPublicUser(row: Pick<
   | "analytics_accepted"
   | "created_at"
 >): AuthUser {
+  const displayName = decryptDatabaseValueSafely(row.display_name, "users.display_name") ?? row.display_name
+
   return {
     id: row.id,
-    email: row.email,
-    displayName: row.display_name,
+    email: normalizeEmail(decryptDatabaseValueSafely(row.email, "users.email") ?? row.email),
+    displayName,
+    nickname: row.nickname ?? displayName,
+    nicknameTag: row.nickname_tag ?? "0000",
     ageBand: row.age_band,
     primaryRegion: row.primary_region,
     interestTags: parseJsonArray(row.interest_tags),
-    interestOther: row.interest_other,
+    interestOther: decryptDatabaseValueSafely(row.interest_other, "users.interest_other"),
     preferredTimeSlot: row.preferred_time_slot,
     weatherSensitivity: parseJsonArray(row.weather_sensitivity),
     marketingAccepted: row.marketing_accepted === 1,
@@ -140,13 +159,18 @@ function toStoredUser(row: UserRow): StoredUserRecord {
 
 export async function findUserByEmail(email: string) {
   await ensureAuthSchema()
+  const normalizedEmail = normalizeEmail(email)
+  const emailHash = createBlindIndex(normalizedEmail, "users.email")
 
   const rows = await queryRows<UserRow[]>(
     `
       SELECT
         id,
         email,
+        email_hash,
         display_name,
+        nickname,
+        nickname_tag,
         password_hash,
         password_salt,
         password_algo,
@@ -160,10 +184,11 @@ export async function findUserByEmail(email: string) {
         analytics_accepted,
         created_at
       FROM users
-      WHERE email = ?
+      WHERE email_hash = ?
+         OR email = ?
       LIMIT 1
     `,
-    [email]
+    [emailHash, normalizedEmail]
   )
 
   return rows[0] ? toStoredUser(rows[0]) : null
@@ -177,7 +202,10 @@ export async function findUserById(userId: string) {
       SELECT
         id,
         email,
+        email_hash,
         display_name,
+        nickname,
+        nickname_tag,
         password_hash,
         password_salt,
         password_algo,
@@ -200,10 +228,34 @@ export async function findUserById(userId: string) {
   return rows[0] ? toStoredUser(rows[0]) : null
 }
 
+async function generateUniqueNicknameTag(nickname: string): Promise<string> {
+  const maxAttempts = 20
+  for (let i = 0; i < maxAttempts; i++) {
+    const tag = String(Math.floor(Math.random() * 10000)).padStart(4, '0')
+    const existing = await queryRows<RowDataPacket[]>(
+      'SELECT 1 FROM users WHERE nickname = ? AND nickname_tag = ? LIMIT 1',
+      [nickname, tag]
+    )
+    if (existing.length === 0) return tag
+  }
+  // Fallback: sequential scan for available tag
+  const usedTags = await queryRows<RowDataPacket[]>(
+    'SELECT nickname_tag FROM users WHERE nickname = ?',
+    [nickname]
+  )
+  const usedSet = new Set(usedTags.map(r => r.nickname_tag))
+  for (let n = 0; n < 10000; n++) {
+    const tag = String(n).padStart(4, '0')
+    if (!usedSet.has(tag)) return tag
+  }
+  throw new Error('All nickname tags exhausted for this nickname')
+}
+
 export async function createUser(input: {
   id: string
   email: string
   displayName: string
+  nickname: string
   passwordHash: string
   passwordSalt: string
   passwordAlgorithm: string
@@ -219,12 +271,18 @@ export async function createUser(input: {
 }) {
   await ensureAuthSchema()
 
+  const normalizedEmail = normalizeEmail(input.email)
+  const nicknameTag = await generateUniqueNicknameTag(input.nickname)
+
   await executeStatement(
     `
       INSERT INTO users (
         id,
         email,
+        email_hash,
         display_name,
+        nickname,
+        nickname_tag,
         password_hash,
         password_salt,
         password_algo,
@@ -241,19 +299,22 @@ export async function createUser(input: {
         marketing_agreed_at,
         analytics_accepted,
         analytics_agreed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       input.id,
-      input.email,
-      input.displayName,
+      encryptDatabaseValue(normalizedEmail, "users.email"),
+      createBlindIndex(normalizedEmail, "users.email"),
+      encryptDatabaseValue(input.displayName, "users.display_name"),
+      input.nickname,
+      nicknameTag,
       input.passwordHash,
       input.passwordSalt,
       input.passwordAlgorithm,
       input.ageBand,
       input.primaryRegion,
       JSON.stringify(input.interestTags),
-      input.interestOther || null,
+      encryptDatabaseValueSafely(input.interestOther || null, "users.interest_other"),
       input.preferredTimeSlot,
       JSON.stringify(input.weatherSensitivity),
       input.agreedAt,
@@ -266,7 +327,7 @@ export async function createUser(input: {
     ]
   )
 
-  const created = await findUserByEmail(input.email)
+  const created = await findUserByEmail(normalizedEmail)
   if (!created) {
     throw new Error("User creation verification failed")
   }
@@ -302,8 +363,8 @@ export async function createSessionRecord(input: {
       input.userId,
       input.tokenHash,
       input.expiresAt,
-      input.userAgent,
-      input.ipAddress,
+      encryptDatabaseValueSafely(input.userAgent, "sessions.user_agent"),
+      encryptDatabaseValueSafely(input.ipAddress, "sessions.ip_address"),
     ]
   )
 
@@ -336,6 +397,8 @@ export async function findUserBySessionTokenHash(tokenHash: string) {
         u.id,
         u.email,
         u.display_name,
+        u.nickname,
+        u.nickname_tag,
         u.password_hash,
         u.password_salt,
         u.password_algo,
@@ -398,6 +461,7 @@ export async function deleteSessionByTokenHash(tokenHash: string) {
 export async function updateUserProfile(input: {
   userId: string
   displayName: string
+  nickname: string
   ageBand: string
   primaryRegion: string
   interestTags: string[]
@@ -409,11 +473,20 @@ export async function updateUserProfile(input: {
 }) {
   await ensureAuthSchema()
 
+  // Check if nickname changed and regenerate tag if needed
+  const currentUser = await findUserById(input.userId)
+  let nicknameTag = currentUser?.nicknameTag ?? '0000'
+  if (currentUser && currentUser.nickname !== input.nickname) {
+    nicknameTag = await generateUniqueNicknameTag(input.nickname)
+  }
+
   await executeStatement(
     `
       UPDATE users
       SET
         display_name = ?,
+        nickname = ?,
+        nickname_tag = ?,
         age_band = ?,
         primary_region = ?,
         interest_tags = ?,
@@ -433,11 +506,13 @@ export async function updateUserProfile(input: {
       WHERE id = ?
     `,
     [
-      input.displayName,
+      encryptDatabaseValue(input.displayName, "users.display_name"),
+      input.nickname,
+      nicknameTag,
       input.ageBand,
       input.primaryRegion,
       JSON.stringify(input.interestTags),
-      input.interestOther || null,
+      encryptDatabaseValueSafely(input.interestOther || null, "users.interest_other"),
       input.preferredTimeSlot,
       JSON.stringify(input.weatherSensitivity),
       input.marketingAccepted ? 1 : 0,
@@ -686,6 +761,7 @@ export async function clearAuthRateLimits(action: string, scopeKeys: string[]) {
 
 export async function recordAuthSecurityEvent(input: AuthSecurityEventInput) {
   await ensureAuthSchema()
+  const normalizedEmail = input.email?.trim().toLowerCase() || null
 
   await executeStatement(
     `
@@ -695,19 +771,21 @@ export async function recordAuthSecurityEvent(input: AuthSecurityEventInput) {
         outcome,
         user_id,
         email,
+        email_hash,
         ip_address,
         user_agent,
         metadata
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       input.eventType,
       input.action,
       input.outcome,
       input.userId ?? null,
-      input.email?.toLowerCase() ?? null,
-      input.ipAddress ?? null,
-      input.userAgent ?? null,
+      normalizedEmail ? encryptDatabaseValue(normalizedEmail, "auth.events.email") : null,
+      normalizedEmail ? createBlindIndex(normalizedEmail, "auth.events.email") : null,
+      encryptDatabaseValueSafely(input.ipAddress ?? null, "auth.events.ip_address"),
+      encryptDatabaseValueSafely(input.userAgent ?? null, "auth.events.user_agent"),
       input.metadata ? JSON.stringify(input.metadata) : null,
     ]
   )

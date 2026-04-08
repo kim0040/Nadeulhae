@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils"
 
 type FormState = {
   displayName: string
+  nickname: string
   email: string
   password: string
   ageBand: string
@@ -41,40 +42,43 @@ const SIGNUP_COPY = {
   ko: {
     badge: "profile onboarding",
     title: "회원가입",
-    description: "나이, 취미, 선호 시간대를 함께 저장해서 나들해가 더 정확한 나들이 기준을 보여주도록 설정합니다.",
+    description: "나이, 취미, 선호 시간대 등을 알려주시면 나들해가 딱 맞는 나들이 정보를 제안해 드릴게요.",
     sideEyebrow: "personal setup",
-    sideTitle: "나들해에 어울리는 기본 프로필을 먼저 구성하세요",
+    sideTitle: "나만의 맞춤 나들이 프로필을 만들어보세요",
     sideDescription:
-      "가입 시 수집한 정보는 지역 기준 브리핑, 선호 시간대 추천, 취미 기반 나들이 제안의 기본값으로 사용됩니다.",
+      "여기서 설정한 정보들은 나들해가 지역 브리핑과 취향 맞춤 코스를 추천할 때 소중하게 쓰입니다.",
     stats: [
       { label: "필수 입력", value: "계정 + 프로필" },
       { label: "취미 선택", value: "최대 5개" },
       { label: "동의 항목", value: "필수 3 + 선택 2" },
     ],
-    basicSection: "기본 계정 정보",
-    personalSection: "맞춤 나들이 정보",
-    consentSection: "필수·선택 동의",
-    consentHelper: "필수 항목은 계정 생성에 필요하고, 선택 항목은 언제든 대시보드에서 변경할 수 있습니다.",
+    basicSection: "기본 계정 설정",
+    personalSection: "나들이 취향 설정",
+    consentSection: "약관 동의",
+    consentHelper: "선택 항목은 나중에 대시보드에서 편하게 바꿀 수 있어요.",
     nameLabel: "이름",
     namePlaceholder: "홍길동",
+    nicknameLabel: "닉네임",
+    nicknamePlaceholder: "초코송이",
+    nicknameHint: "채팅에서 사용되는 별명입니다. (2~16자)",
     emailLabel: "이메일",
     passwordLabel: "비밀번호",
     passwordPlaceholder: "영문+숫자 포함 10자 이상",
     ageLabel: "연령대",
     regionLabel: "주 사용 지역",
     hobbyLabel: "취미·관심사",
-    hobbyHelper: "나들해가 추천 방향을 잡을 수 있도록 최대 5개까지 골라 주세요.",
+    hobbyHelper: "나들해가 즐거운 목적지를 추천해 드릴 수 있도록 최대 5개까지 골라주세요.",
     hobbyOtherPlaceholder: "기타 취미를 적어 주세요",
     timeLabel: "선호 시간대",
     sensitivityLabel: "민감한 날씨 요소",
-    sensitivityHelper: "선택 사항입니다. 민감한 요소는 브리핑 문구에 우선 반영됩니다.",
+    sensitivityHelper: "선택해 주시면 오늘 꼭 피해야 할 날씨를 알림 브리핑에서 먼저 알려드릴게요.",
     termsLabel: "서비스 이용약관에 동의합니다. (필수)",
     privacyLabel: "개인정보 수집·이용 안내에 동의합니다. (필수)",
     ageConfirmLabel: "만 14세 이상입니다. (필수)",
-    marketingLabel: "맞춤 추천/공지 알림 수신에 동의합니다. (선택)",
-    analyticsLabel: "서비스 개선을 위한 이용행태 분석에 동의합니다. (선택)",
+    marketingLabel: "나들이 맞춤 추천 및 꿀팁 알림 수신에 동의합니다. (선택)",
+    analyticsLabel: "더 나은 나들해를 만들기 위한 이용 통계 수집에 동의합니다. (선택)",
     analyticsHelper:
-      "동의 시 유입 채널, 방문 경로, 라이트/다크 테마, 기기 구간, 고유 방문자 수를 일별 집계로 저장합니다. 원문 IP와 전체 리퍼러 URL은 분석 테이블에 저장하지 않습니다.",
+      "어떤 화면을 좋아하시는지 통계를 내어 서비스를 개선하는 데 활용해요. 개인을 식별할 수 있는 민감한 정보는 절대 저장하지 않으니 안심하세요.",
     termsLink: "약관 보기",
     submit: "가입하고 바로 시작하기",
     loginPrompt: "이미 계정이 있나요?",
@@ -100,6 +104,9 @@ const SIGNUP_COPY = {
     consentHelper: "Required items are needed to create the account. Optional items can be changed later from the dashboard.",
     nameLabel: "Name",
     namePlaceholder: "Your name",
+    nicknameLabel: "Nickname",
+    nicknamePlaceholder: "CoolBeans",
+    nicknameHint: "Your chat display name. (2-16 chars)",
     emailLabel: "Email",
     passwordLabel: "Password",
     passwordPlaceholder: "At least 10 chars with letters and numbers",
@@ -234,6 +241,7 @@ export default function SignupPage() {
 
   const [form, setForm] = useState<FormState>({
     displayName: "",
+    nickname: "",
     email: "",
     password: "",
     ageBand: "20_29",
@@ -397,6 +405,19 @@ export default function SignupPage() {
               autoComplete="email"
               required
             />
+          </div>
+          <div className="space-y-1">
+            <AuthField
+              label={copy.nicknameLabel}
+              icon={User}
+              type="text"
+              value={form.nickname}
+              onChange={(event) => setForm((current) => ({ ...current, nickname: event.target.value.slice(0, 16) }))}
+              placeholder={copy.nicknamePlaceholder}
+              autoComplete="nickname"
+              required
+            />
+            <p className="ml-1 text-[10px] font-bold text-muted-foreground/60">{copy.nicknameHint}</p>
           </div>
           <AuthField
             label={copy.passwordLabel}

@@ -24,6 +24,10 @@ import type {
   FactChatUsage,
 } from "@/lib/chat/types"
 import { getDbPool, queryRows } from "@/lib/db"
+import {
+  decryptDatabaseValue,
+  encryptDatabaseValue,
+} from "@/lib/security/data-protection"
 
 interface ChatMessageRow extends RowDataPacket {
   id: number
@@ -59,11 +63,6 @@ interface ChatUsageRow extends RowDataPacket {
   summary_prompt_tokens: number
   summary_completion_tokens: number
   summary_total_tokens: number
-}
-
-interface MessageAggregateRow extends RowDataPacket {
-  message_count: number
-  estimated_tokens: number
 }
 
 function toIsoString(value: Date | string) {
@@ -131,7 +130,7 @@ function toConversationMessage(row: ChatMessageRow): ChatConversationMessage {
   return {
     id: String(row.id),
     role: row.role,
-    content: row.content,
+    content: decryptDatabaseValue(row.content, `chat.message.${row.role}`),
     createdAt: toIsoString(row.created_at),
     resolvedModel: row.resolved_model,
   }
@@ -143,7 +142,7 @@ function toMemorySnapshot(row: ChatMemoryRow | null): ChatMemorySnapshot | null 
   }
 
   return {
-    summary: row.summary_text,
+    summary: decryptDatabaseValue(row.summary_text, "chat.memory.summary"),
     updatedAt: toIsoString(row.updated_at),
     summarizedMessageCount: Math.max(0, row.summarized_message_count),
     modelUsed: row.model_used,
@@ -381,30 +380,6 @@ export function getChatPolicySnapshot(): ChatPolicySnapshot {
 export async function getCompactionCandidate(userId: string) {
   await ensureChatSchema()
 
-  const aggregateRows = await queryRows<MessageAggregateRow[]>(
-    `
-      SELECT
-        COUNT(*) AS message_count,
-        COALESCE(SUM(CEIL(CHAR_LENGTH(content) / 4)), 0) AS estimated_tokens
-      FROM user_chat_messages
-      WHERE user_id = ?
-        AND included_in_memory_at IS NULL
-    `,
-    [userId]
-  )
-
-  const aggregate = aggregateRows[0]
-  if (!aggregate) {
-    return null
-  }
-
-  const shouldCompact = aggregate.message_count >= CHAT_COMPACTION_TRIGGER_MESSAGE_COUNT
-    || aggregate.estimated_tokens >= CHAT_COMPACTION_TRIGGER_ESTIMATED_TOKENS
-
-  if (!shouldCompact || aggregate.message_count <= CHAT_COMPACTION_KEEP_MESSAGE_COUNT) {
-    return null
-  }
-
   const rows = await queryRows<ChatMessageRow[]>(
     `
       SELECT
@@ -428,11 +403,34 @@ export async function getCompactionCandidate(userId: string) {
     return null
   }
 
-  const compactRows = rows.slice(0, -CHAT_COMPACTION_KEEP_MESSAGE_COUNT)
+  const resolvedMessages = rows.map((row) => ({
+    row,
+    decryptedContent: decryptDatabaseValue(row.content, `chat.message.${row.role}`),
+  }))
+
+  const estimatedTokens = resolvedMessages.reduce(
+    (total, item) => total + estimateTextTokens(item.decryptedContent),
+    0
+  )
+
+  const shouldCompact = resolvedMessages.length >= CHAT_COMPACTION_TRIGGER_MESSAGE_COUNT
+    || estimatedTokens >= CHAT_COMPACTION_TRIGGER_ESTIMATED_TOKENS
+
+  if (!shouldCompact) {
+    return null
+  }
+
+  const compactRows = resolvedMessages.slice(0, -CHAT_COMPACTION_KEEP_MESSAGE_COUNT)
   return {
-    estimatedTokens: Math.max(0, aggregate.estimated_tokens),
-    messages: compactRows.map(toConversationMessage),
-    messageIds: compactRows.map((row) => row.id),
+    estimatedTokens: Math.max(0, estimatedTokens),
+    messages: compactRows.map((item) => ({
+      id: String(item.row.id),
+      role: item.row.role,
+      content: item.decryptedContent,
+      createdAt: toIsoString(item.row.created_at),
+      resolvedModel: item.row.resolved_model,
+    })),
+    messageIds: compactRows.map((item) => item.row.id),
   }
 }
 
@@ -537,6 +535,8 @@ export async function persistChatExchange(input: {
   contextMessageCount: number
 }) {
   await ensureChatSchema()
+  const encryptedUserMessage = encryptDatabaseValue(input.userMessage, "chat.message.user")
+  const encryptedAssistantMessage = encryptDatabaseValue(input.assistantMessage, "chat.message.assistant")
 
   const connection = await getDbPool().getConnection()
   try {
@@ -561,7 +561,7 @@ export async function persistChatExchange(input: {
       [
         input.userId,
         input.locale,
-        input.userMessage,
+        encryptedUserMessage,
         input.requestedModel,
         input.resolvedModel,
         userTokenEstimate,
@@ -589,7 +589,7 @@ export async function persistChatExchange(input: {
       [
         input.userId,
         input.locale,
-        input.assistantMessage,
+        encryptedAssistantMessage,
         input.providerRequestId,
         input.requestedModel,
         input.resolvedModel,
@@ -739,7 +739,10 @@ export async function persistCompactedMemory(input: {
       `,
       [
         input.userId,
-        input.summary.slice(0, CHAT_MEMORY_SUMMARY_MAX_CHARACTERS),
+        encryptDatabaseValue(
+          input.summary.slice(0, CHAT_MEMORY_SUMMARY_MAX_CHARACTERS),
+          "chat.memory.summary"
+        ),
         estimateTextTokens(input.summary),
         input.summarizedMessageCount,
         input.resolvedModel,

@@ -23,6 +23,10 @@ function asBoolean(value: unknown) {
   return value === true
 }
 
+const MAX_EMAIL_LENGTH = 254
+const MAX_PASSWORD_LENGTH = 256
+const MAX_INTEREST_OTHER_LENGTH = 120
+
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
@@ -47,8 +51,16 @@ export function validateLoginPayload(payload: unknown) {
     return { error: "올바른 이메일 형식을 입력해 주세요." }
   }
 
+  if (normalizedEmail.length > MAX_EMAIL_LENGTH) {
+    return { error: "이메일 길이가 너무 깁니다." }
+  }
+
   if (!normalizedPassword) {
     return { error: "비밀번호를 입력해 주세요." }
+  }
+
+  if (normalizedPassword.length > MAX_PASSWORD_LENGTH) {
+    return { error: "비밀번호 길이가 너무 깁니다." }
   }
 
   return {
@@ -66,6 +78,7 @@ export function validateRegisterPayload(payload: unknown) {
 
   const {
     displayName,
+    nickname,
     email,
     password,
     ageBand,
@@ -82,6 +95,7 @@ export function validateRegisterPayload(payload: unknown) {
   } = payload as Partial<RegisterPayload>
 
   const normalizedDisplayName = asTrimmedString(displayName)
+  const normalizedNickname = asTrimmedString(nickname)
   const normalizedEmail = asTrimmedString(email).toLowerCase()
   const normalizedPassword = asTrimmedString(password)
   const normalizedInterestOther = asTrimmedString(interestOther)
@@ -99,8 +113,24 @@ export function validateRegisterPayload(payload: unknown) {
     return { error: "이름은 2자 이상 32자 이하로 입력해 주세요." }
   }
 
+  if (normalizedNickname.length < 2 || normalizedNickname.length > 16) {
+    return { error: "닉네임은 2자 이상 16자 이하로 입력해 주세요." }
+  }
+
+  if (/[#@\s]/.test(normalizedNickname)) {
+    return { error: "닉네임에 #, @, 공백은 사용할 수 없습니다." }
+  }
+
   if (!isEmail(normalizedEmail)) {
     return { error: "올바른 이메일 형식을 입력해 주세요." }
+  }
+
+  if (normalizedEmail.length > MAX_EMAIL_LENGTH) {
+    return { error: "이메일 길이가 너무 깁니다." }
+  }
+
+  if (normalizedPassword.length > MAX_PASSWORD_LENGTH) {
+    return { error: "비밀번호는 256자 이하로 입력해 주세요." }
   }
 
   if (!hasPasswordStrength(normalizedPassword)) {
@@ -131,6 +161,10 @@ export function validateRegisterPayload(payload: unknown) {
     return { error: "기타 취미를 선택했다면 내용을 함께 적어 주세요." }
   }
 
+  if (normalizedInterestOther.length > MAX_INTEREST_OTHER_LENGTH) {
+    return { error: "기타 취미는 120자 이하로 입력해 주세요." }
+  }
+
   if (!asBoolean(termsAccepted) || !asBoolean(privacyAccepted) || !asBoolean(ageConfirmed)) {
     return { error: "필수 약관과 연령 확인에 모두 동의해 주세요." }
   }
@@ -138,6 +172,7 @@ export function validateRegisterPayload(payload: unknown) {
   return {
     data: {
       displayName: normalizedDisplayName,
+      nickname: normalizedNickname,
       email: normalizedEmail,
       password: normalizedPassword,
       ageBand,
@@ -162,6 +197,7 @@ export function validateUpdateProfilePayload(payload: unknown) {
 
   const {
     displayName,
+    nickname,
     ageBand,
     primaryRegion,
     interestTags,
@@ -173,6 +209,7 @@ export function validateUpdateProfilePayload(payload: unknown) {
   } = payload as Partial<UpdateProfilePayload>
 
   const normalizedDisplayName = asTrimmedString(displayName)
+  const normalizedNickname = asTrimmedString(nickname)
   const normalizedInterestOther = asTrimmedString(interestOther)
 
   const sanitizedInterestTags = filterAllowedValues(
@@ -186,6 +223,14 @@ export function validateUpdateProfilePayload(payload: unknown) {
 
   if (normalizedDisplayName.length < 2 || normalizedDisplayName.length > 32) {
     return { error: "이름은 2자 이상 32자 이하로 입력해 주세요." }
+  }
+
+  if (normalizedNickname.length < 2 || normalizedNickname.length > 16) {
+    return { error: "닉네임은 2자 이상 16자 이하로 입력해 주세요." }
+  }
+
+  if (/[#@\s]/.test(normalizedNickname)) {
+    return { error: "닉네임에 #, @, 공백은 사용할 수 없습니다." }
   }
 
   if (!ageBand || !isAllowedValue(ageBand, AGE_BAND_OPTIONS)) {
@@ -212,9 +257,14 @@ export function validateUpdateProfilePayload(payload: unknown) {
     return { error: "기타 취미를 선택했다면 내용을 함께 적어 주세요." }
   }
 
+  if (normalizedInterestOther.length > MAX_INTEREST_OTHER_LENGTH) {
+    return { error: "기타 취미는 120자 이하로 입력해 주세요." }
+  }
+
   return {
     data: {
       displayName: normalizedDisplayName,
+      nickname: normalizedNickname,
       ageBand,
       primaryRegion,
       interestTags: sanitizedInterestTags,

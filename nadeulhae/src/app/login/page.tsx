@@ -29,12 +29,12 @@ const LOGIN_COPY = {
   ko: {
     badge: "secure access",
     title: "로그인",
-    description: "저장된 취향과 지역 설정을 불러와 오늘의 나들이 흐름을 바로 이어갑니다.",
-    helper: "비밀번호는 서버에서 복호화되지 않는 해시로만 저장되고, 세션은 HttpOnly 쿠키로 유지됩니다.",
+    description: "로그인하면 저장된 설정으로 바로 시작할 수 있어요.",
+    helper: "안전한 방식으로 비밀번호를 보관하고 소중한 개인정보를 철저하게 지켜드립니다.",
     sideEyebrow: "nadeulhae account",
     sideTitle: "날씨 기록과 취향 프로필을 한 번에 다시 연결하세요",
     sideDescription:
-      "로그인 후에는 기본 지역, 선호 시간대, 취미 정보가 대시보드와 챗봇에 함께 반영됩니다.",
+      "로그인 후에는 기본 지역, 선호 시간대, 취미 정보가 대시보드와 챗봇에 매끄럽게 반영됩니다.",
     statCards: [
       { label: "세션 유지", value: "30일", meta: "활동 시 자동 연장" },
       { label: "비밀번호", value: "scrypt", meta: "salt + pepper 적용" },
@@ -43,15 +43,15 @@ const LOGIN_COPY = {
     points: [
       {
         title: "기본 지역 복원",
-        description: "전주 중심, 현재 위치 우선 등 저장된 기준을 바로 불러옵니다.",
+        description: "전주 중심, 현재 위치 우선 등 저장해둔 기준을 바로 불러옵니다.",
       },
       {
         title: "취미 기반 추천",
-        description: "산책, 카페, 자연, 가족 나들이 같은 선호가 다시 반영됩니다.",
+        description: "산책, 카페, 자연, 가족 나들이 같은 선호도가 자연스럽게 반영됩니다.",
       },
       {
         title: "안전한 인증 흐름",
-        description: "로그인 실패 제한, 세션 보호, 출처 검사까지 적용된 상태입니다.",
+        description: "로그인 실패 제한 등 안전한 보안 기준이 적용되어 있습니다.",
       },
     ],
     emailLabel: "이메일",
@@ -225,8 +225,8 @@ export default function LoginPage() {
       />
       <Meteors number={12} className="z-0" />
 
-      <div className="relative z-10 mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1.02fr)_minmax(18rem,0.84fr)] lg:items-center">
-        <section className="order-1">
+      <div className="relative z-10 mx-auto flex w-full max-w-md flex-col">
+        <section className="w-full">
           <MagicCard
             mode="orb"
             className="overflow-hidden rounded-[2rem] sm:rounded-[2.4rem]"
@@ -255,19 +255,6 @@ export default function LoginPage() {
                     <AnimatedGradientText className="text-3xl font-black tracking-tight sm:text-4xl">
                       {copy.title}
                     </AnimatedGradientText>
-                    <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                      {copy.description}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {copy.quickItems.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded-full border border-card-border/70 bg-background/75 px-3 py-1.5 text-xs font-bold text-foreground"
-                      >
-                        {item}
-                      </span>
-                    ))}
                   </div>
                 </div>
 
@@ -293,10 +280,6 @@ export default function LoginPage() {
                     autoComplete="current-password"
                     required
                   />
-
-                  <div className="rounded-[1.35rem] border border-card-border/70 bg-background/75 p-4 text-sm leading-6 text-muted-foreground">
-                    {copy.helper}
-                  </div>
 
                   {redirectMessage ? (
                     <div className="rounded-[1.3rem] border border-sky-blue/20 bg-sky-blue/10 px-4 py-3 text-sm font-semibold text-sky-blue">
@@ -336,67 +319,6 @@ export default function LoginPage() {
                     {copy.termsLink}
                   </Link>
                 </div>
-              </div>
-            </div>
-          </MagicCard>
-        </section>
-
-        <section className="order-2 space-y-4 lg:pl-2">
-          <MagicCard className="rounded-[1.9rem]" gradientSize={260} gradientOpacity={0.68}>
-            <div className="rounded-[1.9rem] border border-card-border/70 bg-card/88 p-5 backdrop-blur-2xl sm:p-6">
-              <div className="space-y-3">
-                <span className="inline-flex items-center gap-2 rounded-full border border-active-blue/20 bg-active-blue/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.32em] text-active-blue">
-                  <ShieldCheck className="size-3.5" />
-                  {copy.sideEyebrow}
-                </span>
-                <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-                  {copy.sideTitle}
-                </h1>
-                <p className="text-sm leading-6 text-muted-foreground sm:text-base">
-                  {copy.sideDescription}
-                </p>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                {copy.statCards.map((item) => (
-                  <StatCard
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    meta={item.meta}
-                  />
-                ))}
-              </div>
-            </div>
-          </MagicCard>
-
-          <MagicCard className="rounded-[1.9rem]" gradientSize={240} gradientOpacity={0.55}>
-            <div className="rounded-[1.9rem] border border-card-border/70 bg-card/84 p-5 backdrop-blur-2xl sm:p-6">
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground">
-                {copy.quickLabel}
-              </p>
-              <div className="mt-4 space-y-4">
-                {copy.points.map((point, index) => {
-                  const icons = [MapPinned, Sparkles, Clock3]
-                  const Icon = icons[index] ?? ShieldCheck
-
-                  return (
-                    <div
-                      key={point.title}
-                      className="rounded-[1.35rem] border border-card-border/70 bg-background/75 p-4"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-sky-blue/10 text-sky-blue">
-                          <Icon className="size-4" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <p className="text-sm font-black text-foreground">{point.title}</p>
-                          <p className="text-sm leading-6 text-muted-foreground">{point.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
               </div>
             </div>
           </MagicCard>
