@@ -1,0 +1,47 @@
+export interface AuthUser {
+  id: string
+  email: string
+  displayName: string
+  ageBand: string
+  primaryRegion: string
+  interestTags: string[]
+  interestOther: string | null
+  preferredTimeSlot: string
+  weatherSensitivity: string[]
+  marketingAccepted: boolean
+  createdAt: string
+}
+
+export interface AuthResponseBody {
+  user: AuthUser
+}
+
+export interface LoginPayload {
+  email: string
+  password: string
+}
+
+export interface RegisterPayload extends LoginPayload {
+  displayName: string
+  ageBand: string
+  primaryRegion: string
+  interestTags: string[]
+  interestOther: string
+  preferredTimeSlot: string
+  weatherSensitivity: string[]
+  termsAccepted: boolean
+  privacyAccepted: boolean
+  ageConfirmed: boolean
+  marketingAccepted: boolean
+}
+
+export interface UpdateProfilePayload {
+  displayName: string
+  ageBand: string
+  primaryRegion: string
+  interestTags: string[]
+  interestOther: string
+  preferredTimeSlot: string
+  weatherSensitivity: string[]
+  marketingAccepted: boolean
+}

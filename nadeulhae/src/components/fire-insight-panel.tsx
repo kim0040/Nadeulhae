@@ -24,7 +24,6 @@ export function FireInsightPanel({
   variant = "full",
 }: FireInsightPanelProps) {
   const isCompact = variant === "compact"
-  const PlaceIcon = topLevelPlaceIcon(data.topPlaces[0]?.outdoor)
   const cautionTone = data.overview.cautionLevel === "high"
     ? "text-red-500 border-red-500/20 bg-red-500/8"
     : data.overview.cautionLevel === "moderate"
@@ -112,7 +111,11 @@ export function FireInsightPanel({
 
           <div className="rounded-[1.9rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
-              <PlaceIcon size={14} className={topPlace?.outdoor ? "text-nature-green" : "text-active-blue"} />
+              {topPlace?.outdoor ? (
+                <Trees size={14} className="text-nature-green" />
+              ) : (
+                <Warehouse size={14} className="text-active-blue" />
+              )}
               {language === "ko" ? "눈에 띈 장소" : "Standout place"}
             </div>
             <div className="mt-3 text-2xl sm:text-3xl font-black tracking-tight text-foreground break-keep">
@@ -167,8 +170,4 @@ export function FireInsightPanel({
       </div>
     </section>
   )
-}
-
-function topLevelPlaceIcon(outdoor?: boolean) {
-  return outdoor ? Trees : Warehouse
 }

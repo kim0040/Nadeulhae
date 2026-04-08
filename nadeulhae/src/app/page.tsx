@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import {
-  AlertTriangle,
   CloudIcon,
   DropletsIcon,
   Info,
@@ -20,7 +19,6 @@ import { Particles } from "@/components/magicui/particles"
 import { Meteors } from "@/components/magicui/meteors"
 import { WordPullUp } from "@/components/magicui/word-pull-up"
 import { ShineBorder } from "@/components/magicui/shine-border"
-import { BorderBeam } from "@/components/magicui/border-beam"
 import { PicnicBriefing } from "@/components/picnic-briefing"
 import { WeatherImagePanel, type WeatherImageData } from "@/components/weather-image-panel"
 import { FireInsightPanel } from "@/components/fire-insight-panel"
@@ -204,10 +202,6 @@ export default function Home() {
     },
     { icon: SunIcon, label: t("hero_uv"), value: localizeUvLabel(weatherData.details.uv, language), tone: "text-yellow-400" },
   ]
-
-  const homeTexts = {
-    scorePaused: language === "ko" ? "피크닉 지수 산출 보류" : "Picnic score paused",
-  }
 
   const hasBriefingAlert = Boolean(
     weatherData.eventData?.isEarthquake

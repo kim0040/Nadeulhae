@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/context/AuthContext";
+import { PageViewTracker } from "@/components/analytics/page-view-tracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,10 +43,13 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <Navbar />
-            <div className="relative">
-              {children}
-            </div>
+            <AuthProvider>
+              <PageViewTracker />
+              <Navbar />
+              <div className="relative">
+                {children}
+              </div>
+            </AuthProvider>
           </ThemeProvider>
         </LanguageProvider>
 

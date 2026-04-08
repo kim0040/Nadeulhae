@@ -1,14 +1,12 @@
 "use client"
 
 import {
-  AlertTriangle,
   CloudRain,
   Flame,
   MapPinned,
   ShieldCheck,
   Siren,
   Thermometer,
-  TriangleAlert,
   Waves,
   Wind,
 } from "lucide-react"

@@ -13,6 +13,7 @@ import {
   stripHtmlTags,
   getNextUpdateTimestamp,
 } from "@/lib/weather-utils"
+import { withApiAnalytics } from "@/lib/analytics/route"
 import { wgs84ToTm } from "@/lib/coords-utils"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 
@@ -889,7 +890,7 @@ async function fetchVolcanoInfo(apiHubKey: string) {
   return snapshot
 }
 
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
   runMaintenanceSweepIfNeeded()
   const url = new URL(req.url)
   const lat = url.searchParams.get("lat")
@@ -1195,3 +1196,5 @@ export async function GET(req: Request) {
   const response = NextResponse.json(responsePayload)
   return attachSessionCookie(response, sessionId, shouldSetCookie)
 }
+
+export const GET = withApiAnalytics(handleGET)

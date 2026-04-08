@@ -1,94 +1,223 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { Mail, Lock } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Lock, Mail } from "lucide-react"
+
+import { AuthShell } from "@/components/auth/auth-shell"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
-import { Particles } from "@/components/magicui/particles"
-import { Meteors } from "@/components/magicui/meteors"
-import { BorderBeam } from "@/components/magicui/border-beam"
-import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text"
-import { useTheme } from "next-themes"
+import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
+import type { AuthResponseBody } from "@/lib/auth/types"
+
+const LOGIN_COPY = {
+  ko: {
+    badge: "secure access",
+    title: "로그인",
+    description: "저장된 취향과 지역 설정을 불러와 오늘의 나들이 판단을 바로 이어가세요.",
+    sideEyebrow: "auth ready",
+    sideTitle: "날씨 판단과 취향 기록을 한 번에 이어받는 로그인",
+    sideDescription:
+      "회원 정보를 DB에 안전하게 저장하고, 로그인 후에는 선호 시간대와 취미를 반영한 나들이 경험으로 이어집니다.",
+    stats: [
+      { label: "암호 처리", value: "scrypt + salt" },
+      { label: "세션 보안", value: "HttpOnly Cookie" },
+      { label: "프로필 연동", value: "지역·취미 반영" },
+    ],
+    emailLabel: "이메일",
+    passwordLabel: "비밀번호",
+    emailPlaceholder: "name@example.com",
+    passwordPlaceholder: "비밀번호 입력",
+    helper: "비밀번호는 서버에서 복호화되지 않는 해시 형태로만 저장됩니다.",
+    submit: "로그인하기",
+    signupPrompt: "아직 계정이 없나요?",
+    signupLink: "회원가입",
+    termsLink: "약관 보기",
+    pendingRedirect: "이미 로그인된 상태입니다. 계정 페이지로 이동합니다.",
+  },
+  en: {
+    badge: "secure access",
+    title: "Log in",
+    description: "Restore your saved outing profile and continue with today’s briefing immediately.",
+    sideEyebrow: "auth ready",
+    sideTitle: "Sign in to recover your weather profile and preferences",
+    sideDescription:
+      "The database stores profile preferences securely so the service can bring back your preferred time slots, region defaults, and interests.",
+    stats: [
+      { label: "Password", value: "scrypt + salt" },
+      { label: "Session", value: "HttpOnly Cookie" },
+      { label: "Profile", value: "Region + hobbies" },
+    ],
+    emailLabel: "Email",
+    passwordLabel: "Password",
+    emailPlaceholder: "name@example.com",
+    passwordPlaceholder: "Enter your password",
+    helper: "Passwords are stored only as non-reversible hashes on the server.",
+    submit: "Log in",
+    signupPrompt: "Need an account?",
+    signupLink: "Sign up",
+    termsLink: "View terms",
+    pendingRedirect: "You are already logged in. Redirecting to your account.",
+  },
+} as const
+
+const LOGIN_MARQUEE = [
+  "Jeonju default briefing",
+  "Fine dust aware",
+  "Picnic profile",
+  "Golden hour outings",
+  "Weather-safe planning",
+  "Cafe + park routes",
+  "Alert-ready sessions",
+  "Personalized timing",
+]
 
 export default function LoginPage() {
-  const { resolvedTheme } = useTheme()
-  const { t } = useLanguage()
+  const router = useRouter()
+  const { language } = useLanguage()
+  const { status, setAuthenticatedUser } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [message, setMessage] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const copy = LOGIN_COPY[language]
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      const timeout = window.setTimeout(() => {
+        router.replace("/account")
+      }, 400)
+
+      return () => window.clearTimeout(timeout)
+    }
+  }, [copy.pendingRedirect, router, status])
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setMessage(null)
+
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ email, password }),
+        })
+
+        const data = await response.json()
+        if (!response.ok) {
+          setMessage(
+            data.error ?? (language === "ko" ? "로그인에 실패했습니다." : "Login failed.")
+          )
+          return
+        }
+
+        setAuthenticatedUser((data as AuthResponseBody).user)
+        router.push("/account")
+        router.refresh()
+      } catch (error) {
+        console.error("Login request failed:", error)
+        setMessage(
+          language === "ko"
+            ? "로그인 요청 중 네트워크 오류가 발생했습니다."
+            : "A network error occurred while logging in."
+        )
+      }
+    })
+  }
+
+  const errorMessage = message
+  const redirectMessage = status === "authenticated" ? copy.pendingRedirect : null
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background px-4 relative overflow-hidden">
-      <Particles
-        className="absolute inset-0 z-0"
-        quantity={50}
-        color={resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"}
-      />
-      <Meteors number={20} />
-      
-      <div className="w-full max-w-md z-10">
-        <div className="bg-[var(--card)] backdrop-blur-2xl border border-[var(--card-border)] p-8 sm:p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
-          <BorderBeam size={200} duration={12} delay={9} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
-          
-          <div className="absolute top-4 right-4 z-20">
-            <span className="px-3 py-1 rounded-full bg-active-blue/10 text-active-blue border border-active-blue/20 text-[10px] sm:text-[11px] font-black uppercase tracking-widest backdrop-blur-md animate-pulse">
-               {t("login_badge")}
-            </span>
-          </div>
-
-          <div className="text-center mb-10 relative z-10">
-            <AnimatedGradientText className="text-3xl font-black tracking-tight">
-              {t("login_title")}
-            </AnimatedGradientText>
-            <p className="mt-3 text-neutral-500 dark:text-neutral-400 font-medium">{t("login_subtitle")}</p>
-          </div>
-          
-          <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-            <div className="space-y-2">
-              <label className="text-[11px] font-black text-sky-blue uppercase tracking-widest ml-2">{t("login_email")}</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
-                <input 
-                  type="email" 
-                  placeholder={t("login_email_placeholder")}
-                  className="w-full bg-[var(--interactive)] border border-[var(--interactive-border)] rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-sky-blue/50 transition-all font-medium text-foreground placeholder:text-muted-foreground"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-[11px] font-black text-sky-blue uppercase tracking-widest ml-2">{t("login_password")}</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
-                <input 
-                  type="password" 
-                  placeholder={t("login_password_placeholder")}
-                  className="w-full bg-[var(--interactive)] border border-[var(--interactive-border)] rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-sky-blue/50 transition-all font-medium text-foreground placeholder:text-muted-foreground"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end">
-              <button className="text-xs font-bold text-neutral-400 dark:text-neutral-500 hover:text-sky-blue transition-colors">{t("login_forgot")}</button>
-            </div>
-            
-            <ShimmerButton className="w-full py-4 rounded-2xl font-black text-lg shadow-sky-blue/20 shadow-xl opacity-50 cursor-not-allowed">
-              {t("login_cta_pending")}
-            </ShimmerButton>
-          </form>
-          
-          <div className="mt-8 pt-8 border-t border-neutral-100 dark:border-neutral-800 text-center">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">
-              {t("login_no_account")}{" "}
-              <Link href="/signup" className="text-sky-blue font-black hover:underline underline-offset-4">{t("login_go_signup")}</Link>
-            </p>
+    <AuthShell
+      badge={copy.badge}
+      title={copy.title}
+      description={copy.description}
+      sideEyebrow={copy.sideEyebrow}
+      sideTitle={copy.sideTitle}
+      sideDescription={copy.sideDescription}
+      marqueeItems={LOGIN_MARQUEE}
+      statItems={copy.stats}
+      footer={(
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-card-border/70 pt-6">
+          <p className="text-sm text-muted-foreground">
+            {copy.signupPrompt}{" "}
+            <Link href="/signup" className="font-black text-sky-blue hover:underline">
+              {copy.signupLink}
+            </Link>
+          </p>
+          <Link href="/terms" className="text-xs font-black uppercase tracking-[0.25em] text-muted-foreground hover:text-sky-blue">
+            {copy.termsLink}
+          </Link>
+        </div>
+      )}
+    >
+      <form className="space-y-6" onSubmit={handleSubmit}>
+        <div className="space-y-2">
+          <label className="ml-1 text-[11px] font-black uppercase tracking-[0.28em] text-sky-blue">
+            {copy.emailLabel}
+          </label>
+          <div className="relative">
+            <Mail className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder={copy.emailPlaceholder}
+              className="w-full rounded-[1.5rem] border border-interactive-border bg-interactive/70 py-4 pl-12 pr-4 text-sm font-medium text-foreground outline-none transition focus:border-sky-blue/50"
+              autoComplete="email"
+              required
+            />
           </div>
         </div>
-      </div>
-    </main>
+
+        <div className="space-y-2">
+          <label className="ml-1 text-[11px] font-black uppercase tracking-[0.28em] text-sky-blue">
+            {copy.passwordLabel}
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={copy.passwordPlaceholder}
+              className="w-full rounded-[1.5rem] border border-interactive-border bg-interactive/70 py-4 pl-12 pr-4 text-sm font-medium text-foreground outline-none transition focus:border-sky-blue/50"
+              autoComplete="current-password"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="rounded-[1.4rem] border border-card-border/70 bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
+          {copy.helper}
+        </div>
+
+        {redirectMessage ? (
+          <div className="rounded-[1.3rem] border border-sky-blue/20 bg-sky-blue/10 px-4 py-3 text-sm font-semibold text-sky-blue">
+            {redirectMessage}
+          </div>
+        ) : null}
+
+        {errorMessage ? (
+          <div className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
+            {errorMessage}
+          </div>
+        ) : null}
+
+        <ShimmerButton
+          type="submit"
+          className="w-full rounded-[1.5rem] py-4 text-base font-black"
+          disabled={isPending || status === "authenticated"}
+        >
+          {isPending ? "..." : copy.submit}
+        </ShimmerButton>
+      </form>
+    </AuthShell>
   )
 }

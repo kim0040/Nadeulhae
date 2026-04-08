@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
+import { withApiAnalytics } from "@/lib/analytics/route"
 
 function getContentType(headers: Headers) {
   return headers.get("content-type") || "image/png"
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const kind = request.nextUrl.searchParams.get("kind")
   const tm = request.nextUrl.searchParams.get("tm")
 
@@ -47,3 +48,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Asset proxy failed" }, { status: 502 })
   }
 }
+
+export const GET = withApiAnalytics(handleGET)
