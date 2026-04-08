@@ -4,32 +4,9 @@ import React, {
   useCallback,
   useEffect,
   useRef,
-  useState,
   type ComponentPropsWithoutRef,
 } from "react"
 import { cn } from "@/lib/utils"
-
-interface MousePosition {
-  x: number
-  y: number
-}
-
-function useMousePosition(): MousePosition {
-  const [mousePosition, setMousePosition] = useState<MousePosition>({
-    x: 0,
-    y: 0,
-  })
-
-  useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      setMousePosition({ x: event.clientX, y: event.clientY })
-    }
-    window.addEventListener("mousemove", handleMouseMove)
-    return () => window.removeEventListener("mousemove", handleMouseMove)
-  }, [])
-
-  return mousePosition
-}
 
 interface ParticlesProps extends ComponentPropsWithoutRef<"div"> {
   className?: string
@@ -68,6 +45,9 @@ type Circle = {
   magnetism: number
 }
 
+const FRAME_INTERVAL_MS = 1000 / 30
+const MAX_DPR = 1.5
+
 export const Particles: React.FC<ParticlesProps> = ({
   className = "",
   quantity = 100,
@@ -84,12 +64,23 @@ export const Particles: React.FC<ParticlesProps> = ({
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const context = useRef<CanvasRenderingContext2D | null>(null)
   const circles = useRef<Circle[]>([])
-  const mousePosition = useMousePosition()
   const mouse = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const canvasSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
-  const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1
+  const dpr = useRef(1)
   const rafID = useRef<number | null>(null)
+  const lastFrameTs = useRef(0)
+  const inView = useRef(true)
+  const pageVisible = useRef(true)
+  const reducedMotion = useRef(false)
   const rgb = useRef<number[]>(hexToRgb(color))
+
+  const refreshDpr = useCallback(() => {
+    if (typeof window === "undefined") {
+      dpr.current = 1
+      return
+    }
+    dpr.current = Math.min(window.devicePixelRatio || 1, MAX_DPR)
+  }, [])
 
   const circleParams = useCallback((): Circle => {
     const x = Math.floor(Math.random() * canvasSize.current.w)
@@ -113,14 +104,15 @@ export const Particles: React.FC<ParticlesProps> = ({
       context.current.arc(x, y, size, 0, 2 * Math.PI)
       context.current.fillStyle = `rgba(${rgb.current.join(", ")}, ${alpha})`
       context.current.fill()
-      context.current.setTransform(dpr, 0, 0, dpr, 0, 0)
+      context.current.setTransform(dpr.current, 0, 0, dpr.current, 0, 0)
       if (!update) circles.current.push(circle)
     }
-  }, [dpr])
+  }, [])
 
   const drawParticles = useCallback(() => {
     if (context.current) {
       context.current.clearRect(0, 0, canvasSize.current.w, canvasSize.current.h)
+      circles.current = []
       for (let i = 0; i < quantity; i++) {
         drawCircle(circleParams())
       }
@@ -131,82 +123,162 @@ export const Particles: React.FC<ParticlesProps> = ({
     if (canvasContainerRef.current && canvasRef.current && context.current) {
       canvasSize.current.w = canvasContainerRef.current.offsetWidth
       canvasSize.current.h = canvasContainerRef.current.offsetHeight
-      canvasRef.current.width = canvasSize.current.w * dpr
-      canvasRef.current.height = canvasSize.current.h * dpr
+      canvasRef.current.width = Math.floor(canvasSize.current.w * dpr.current)
+      canvasRef.current.height = Math.floor(canvasSize.current.h * dpr.current)
       canvasRef.current.style.width = `${canvasSize.current.w}px`
       canvasRef.current.style.height = `${canvasSize.current.h}px`
-      context.current.scale(dpr, dpr)
-      circles.current = []
-      for (let i = 0; i < quantity; i++) {
-        const circle = circleParams()
-        drawCircle(circle)
-      }
+      context.current.setTransform(dpr.current, 0, 0, dpr.current, 0, 0)
+      drawParticles()
     }
-  }, [circleParams, dpr, drawCircle, quantity])
+  }, [drawParticles])
 
   const initCanvas = useCallback(() => {
+    refreshDpr()
     resizeCanvas()
-    drawParticles()
-  }, [drawParticles, resizeCanvas])
+  }, [refreshDpr, resizeCanvas])
 
-  const onMouseMove = useCallback(() => {
-    if (canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect()
-      const { w, h } = canvasSize.current
-      const x = mousePosition.x - rect.left - w / 2
-      const y = mousePosition.y - rect.top - h / 2
-      const inside = x < w / 2 && x > -w / 2 && y < h / 2 && y > -h / 2
-      if (inside) {
-        mouse.current.x = x
-        mouse.current.y = y
-      }
+  const shouldAnimate = useCallback(() => {
+    return !reducedMotion.current && pageVisible.current && inView.current
+  }, [])
+
+  const renderFrame = useCallback(() => {
+    if (!context.current) {
+      return
     }
-  }, [mousePosition.x, mousePosition.y])
+
+    context.current.clearRect(0, 0, canvasSize.current.w, canvasSize.current.h)
+    circles.current.forEach((circle, i) => {
+      circle.x += circle.dx + vx
+      circle.y += circle.dy + vy
+      circle.translateX += (mouse.current.x / (staticity / circle.magnetism) - circle.translateX) / ease
+      circle.translateY += (mouse.current.y / (staticity / circle.magnetism) - circle.translateY) / ease
+      if (circle.alpha < circle.targetAlpha) circle.alpha += 0.01
+      drawCircle(circle, true)
+
+      if (
+        circle.x < -circle.size || circle.x > canvasSize.current.w + circle.size ||
+        circle.y < -circle.size || circle.y > canvasSize.current.h + circle.size
+      ) {
+        circles.current[i] = circleParams()
+      }
+    })
+  }, [circleParams, drawCircle, ease, staticity, vx, vy])
+
+  const stopAnimation = useCallback(() => {
+    if (rafID.current != null) {
+      window.cancelAnimationFrame(rafID.current)
+      rafID.current = null
+    }
+  }, [])
+
+  const startAnimation = useCallback(() => {
+    if (rafID.current != null || !shouldAnimate()) {
+      return
+    }
+
+    const tick = (timestamp: number) => {
+      if (!shouldAnimate()) {
+        stopAnimation()
+        return
+      }
+
+      if (timestamp - lastFrameTs.current >= FRAME_INTERVAL_MS) {
+        renderFrame()
+        lastFrameTs.current = timestamp
+      }
+      rafID.current = window.requestAnimationFrame(tick)
+    }
+
+    rafID.current = window.requestAnimationFrame(tick)
+  }, [renderFrame, shouldAnimate, stopAnimation])
 
   useEffect(() => {
     if (canvasRef.current) {
       context.current = canvasRef.current.getContext("2d")
     }
     rgb.current = hexToRgb(color)
-    const handleResize = () => initCanvas()
-    const tick = () => {
-      if (context.current) {
-        context.current.clearRect(0, 0, canvasSize.current.w, canvasSize.current.h)
-        circles.current.forEach((circle, i) => {
-          circle.x += circle.dx + vx
-          circle.y += circle.dy + vy
-          circle.translateX += (mouse.current.x / (staticity / circle.magnetism) - circle.translateX) / ease
-          circle.translateY += (mouse.current.y / (staticity / circle.magnetism) - circle.translateY) / ease
-          if (circle.alpha < circle.targetAlpha) circle.alpha += 0.01
-          drawCircle(circle, true)
 
-          if (
-            circle.x < -circle.size || circle.x > canvasSize.current.w + circle.size ||
-            circle.y < -circle.size || circle.y > canvasSize.current.h + circle.size
-          ) {
-            circles.current[i] = circleParams()
-          }
-        })
+    const onPointerMove = (event: MouseEvent) => {
+      if (!canvasRef.current) {
+        return
       }
-      rafID.current = window.requestAnimationFrame(tick)
+
+      const rect = canvasRef.current.getBoundingClientRect()
+      const { w, h } = canvasSize.current
+      const x = event.clientX - rect.left - w / 2
+      const y = event.clientY - rect.top - h / 2
+      const inside = x < w / 2 && x > -w / 2 && y < h / 2 && y > -h / 2
+      if (inside) {
+        mouse.current.x = x
+        mouse.current.y = y
+      }
+    }
+
+    const onResize = () => {
+      initCanvas()
+    }
+
+    const onVisibilityChange = () => {
+      pageVisible.current = !document.hidden
+      if (shouldAnimate()) {
+        startAnimation()
+      } else {
+        stopAnimation()
+      }
+    }
+
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const applyReducedMotion = () => {
+      reducedMotion.current = media.matches
+      if (shouldAnimate()) {
+        startAnimation()
+      } else {
+        stopAnimation()
+      }
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        inView.current = entries[0]?.isIntersecting ?? true
+        if (shouldAnimate()) {
+          startAnimation()
+        } else {
+          stopAnimation()
+        }
+      },
+      {
+        threshold: 0.01,
+      }
+    )
+
+    if (canvasContainerRef.current) {
+      observer.observe(canvasContainerRef.current)
     }
 
     initCanvas()
-    tick()
-    window.addEventListener("resize", handleResize)
+    window.addEventListener("mousemove", onPointerMove, { passive: true })
+    window.addEventListener("resize", onResize)
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    media.addEventListener("change", applyReducedMotion)
+
+    onVisibilityChange()
+    applyReducedMotion()
+    startAnimation()
+
     return () => {
-      if (rafID.current != null) window.cancelAnimationFrame(rafID.current)
-      window.removeEventListener("resize", handleResize)
+      stopAnimation()
+      observer.disconnect()
+      window.removeEventListener("mousemove", onPointerMove)
+      window.removeEventListener("resize", onResize)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+      media.removeEventListener("change", applyReducedMotion)
     }
-  }, [circleParams, color, drawCircle, ease, initCanvas, staticity, vx, vy])
+  }, [color, initCanvas, shouldAnimate, startAnimation, stopAnimation])
 
   useEffect(() => {
-    onMouseMove()
-  }, [onMouseMove])
-
-  useEffect(() => {
+    rgb.current = hexToRgb(color)
     initCanvas()
-  }, [initCanvas, refresh])
+  }, [color, initCanvas, refresh])
 
   return (
     <div className={cn("pointer-events-none", className)} ref={canvasContainerRef} aria-hidden="true" {...props}>

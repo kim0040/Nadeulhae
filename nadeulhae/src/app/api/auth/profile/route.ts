@@ -74,6 +74,7 @@ async function handlePATCH(request: NextRequest) {
     const updatedUser = await updateUserProfile({
       userId: sessionUser.id,
       displayName: validation.data.displayName,
+      nickname: validation.data.nickname,
       ageBand: validation.data.ageBand,
       primaryRegion: validation.data.primaryRegion,
       interestTags: validation.data.interestTags,
@@ -113,6 +114,8 @@ async function handlePATCH(request: NextRequest) {
           id: updatedUser.id,
           email: updatedUser.email,
           display_name: updatedUser.displayName,
+          nickname: updatedUser.nickname,
+          nickname_tag: updatedUser.nicknameTag,
           age_band: updatedUser.ageBand,
           primary_region: updatedUser.primaryRegion,
           interest_tags: updatedUser.interestTags,

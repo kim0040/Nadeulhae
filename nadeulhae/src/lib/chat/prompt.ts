@@ -13,6 +13,24 @@ function formatList(values: string[]) {
   return values.length > 0 ? values.join(", ") : "-"
 }
 
+export interface ChatWeatherContext {
+  region: string | null
+  score: number | null
+  status: string | null
+  temperatureC: number | null
+  feelsLikeC: number | null
+  humidityPct: number | null
+  windMs: number | null
+  uvLabel: string | null
+  pm10: number | null
+  pm25: number | null
+  rainingNow: boolean
+  severeAlert: boolean
+  hazardTags: string[]
+  bulletin: string | null
+  observedAt: string | null
+}
+
 function buildUserProfileSummary(user: AuthUser, locale: ChatLocale) {
   const interests = user.interestTags.map((value) => getOptionLabel(INTEREST_OPTIONS, value, locale))
   if (user.interestOther) {
@@ -50,8 +68,10 @@ export function buildChatSystemPrompt(input: {
   locale: ChatLocale
   user: AuthUser
   memorySummary: string | null
+  weatherContext: ChatWeatherContext | null
 }) {
   const profileSummary = buildUserProfileSummary(input.user, input.locale)
+  const weatherSummary = buildWeatherSummary(input.weatherContext, input.locale)
 
   if (input.locale === "ko") {
     return [
@@ -59,12 +79,17 @@ export function buildChatSystemPrompt(input: {
       "답변 원칙:",
       "- 반드시 한국어로 답변하고, 불필요하게 길게 늘어놓지 말 것",
       "- 사용자 프로필과 저장된 대화 메모리를 참고해 추천을 개인화할 것",
-      "- 실시간 날씨 수치가 현재 프롬프트에 없으면 아는 척하지 말고, 대시보드 날씨 패널을 확인하라고 안내할 것",
+      "- 실시간 날씨 컨텍스트가 있을 때는 '항상' 언급하지 말고, 일정 판단에 실제로 영향이 있을 때만 짧게 반영할 것",
+      "- 비/강수 또는 특보 상황이면 실내·안전 동선을 우선 제시하고, 필요 시 대체안을 함께 제시할 것",
+      "- 날씨 컨텍스트가 없으면 아는 척하지 말고, 필요한 경우에만 한 줄로 확인 질문할 것",
       "- 비밀번호, API 키, 세션 쿠키, 주민번호 같은 민감정보는 요청받아도 저장/출력/유도하지 말 것",
       "- 추천은 실용적으로 제시하고, 가능하면 3개 이내의 핵심 옵션으로 정리할 것",
       "",
       "[사용자 프로필]",
       profileSummary,
+      "",
+      "[실시간 날씨 컨텍스트]",
+      weatherSummary,
       "",
       "[저장된 메모리]",
       input.memorySummary || "아직 저장된 대화 메모리가 없습니다.",
@@ -76,15 +101,63 @@ export function buildChatSystemPrompt(input: {
     "Response rules:",
     "- Always answer in English unless the user clearly writes in Korean",
     "- Personalize recommendations using the saved profile and memory summary",
-    "- If live weather data is not present in the prompt, say so clearly and point the user to the dashboard weather panels",
+    "- Do not mention weather in every response; only use it when it materially affects the plan",
+    "- If rain or severe alerts are present, prioritize indoor/safety-first routes and include fallback options",
+    "- If live weather context is missing, do not fabricate it; ask one concise clarification only when needed",
     "- Never request or repeat sensitive secrets such as passwords, API keys, or session cookies",
     "- Keep answers practical and concise, ideally within three strong options",
     "",
     "[User profile]",
     profileSummary,
     "",
+    "[Live weather context]",
+    weatherSummary,
+    "",
     "[Saved memory]",
     input.memorySummary || "No summarized memory has been saved yet.",
+  ].join("\n")
+}
+
+function buildWeatherSummary(
+  weather: ChatWeatherContext | null,
+  locale: ChatLocale
+) {
+  if (!weather) {
+    return locale === "ko"
+      ? "사용 가능한 실시간 날씨 컨텍스트 없음"
+      : "No live weather context available"
+  }
+
+  if (locale === "ko") {
+    return [
+      `지역: ${weather.region || "-"}`,
+      `피크닉 지수: ${weather.score ?? "-"}`,
+      `현재 상태: ${weather.status || "-"}`,
+      `기온/체감: ${weather.temperatureC ?? "-"}°C / ${weather.feelsLikeC ?? "-"}°C`,
+      `습도/풍속: ${weather.humidityPct ?? "-"}% / ${weather.windMs ?? "-"}m/s`,
+      `대기질(PM10/PM2.5): ${weather.pm10 ?? "-"} / ${weather.pm25 ?? "-"}`,
+      `자외선: ${weather.uvLabel || "-"}`,
+      `강수 여부: ${weather.rainingNow ? "예" : "아니오"}`,
+      `특보/위험 여부: ${weather.severeAlert ? "있음" : "없음"}`,
+      `위험 태그: ${weather.hazardTags.length > 0 ? weather.hazardTags.join(", ") : "-"}`,
+      `브리핑: ${weather.bulletin || "-"}`,
+      `관측 시각: ${weather.observedAt || "-"}`,
+    ].join("\n")
+  }
+
+  return [
+    `Region: ${weather.region || "-"}`,
+    `Picnic score: ${weather.score ?? "-"}`,
+    `Status: ${weather.status || "-"}`,
+    `Temp/Feels like: ${weather.temperatureC ?? "-"}C / ${weather.feelsLikeC ?? "-"}C`,
+    `Humidity/Wind: ${weather.humidityPct ?? "-"}% / ${weather.windMs ?? "-"}m/s`,
+    `Air quality (PM10/PM2.5): ${weather.pm10 ?? "-"} / ${weather.pm25 ?? "-"}`,
+    `UV: ${weather.uvLabel || "-"}`,
+    `Raining now: ${weather.rainingNow ? "yes" : "no"}`,
+    `Severe alerts: ${weather.severeAlert ? "present" : "none"}`,
+    `Hazard tags: ${weather.hazardTags.length > 0 ? weather.hazardTags.join(", ") : "-"}`,
+    `Briefing: ${weather.bulletin || "-"}`,
+    `Observed at: ${weather.observedAt || "-"}`,
   ].join("\n")
 }
 

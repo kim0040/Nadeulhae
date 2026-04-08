@@ -12,7 +12,11 @@ import {
   CHAT_INPUT_MAX_CHARACTERS,
 } from "@/lib/chat/constants"
 import { FactChatError, createFactChatCompletion } from "@/lib/chat/factchat"
-import { buildChatSystemPrompt, buildSummaryPrompt } from "@/lib/chat/prompt"
+import {
+  buildChatSystemPrompt,
+  buildSummaryPrompt,
+  type ChatWeatherContext,
+} from "@/lib/chat/prompt"
 import {
   getChatMemorySnapshot,
   getChatPolicySnapshot,
@@ -67,6 +71,73 @@ function normalizeMessage(value: unknown) {
 
 function getErrorMessage(locale: ChatLocale, key: keyof typeof CHAT_ERRORS.ko) {
   return CHAT_ERRORS[locale][key]
+}
+
+function sanitizeText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const normalized = value.replace(/\s+/g, " ").trim()
+  if (!normalized) {
+    return null
+  }
+
+  return normalized.slice(0, maxLength)
+}
+
+function sanitizeNumber(value: unknown, min: number, max: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null
+  }
+  return Math.min(max, Math.max(min, value))
+}
+
+function sanitizeBoolean(value: unknown) {
+  return value === true
+}
+
+function sanitizeWeatherTags(value: unknown) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length > 0 && item.length <= 24 && /^[a-z0-9_-]+$/.test(item))
+    .slice(0, 6)
+}
+
+function sanitizeWeatherContext(value: unknown): ChatWeatherContext | null {
+  if (!value || typeof value !== "object") {
+    return null
+  }
+
+  const input = value as Record<string, unknown>
+
+  const observedAt = sanitizeText(input.observedAt, 64)
+  const observedDate = observedAt ? new Date(observedAt) : null
+
+  return {
+    region: sanitizeText(input.region, 64),
+    score: sanitizeNumber(input.score, 0, 100),
+    status: sanitizeText(input.status, 64),
+    temperatureC: sanitizeNumber(input.temperatureC, -50, 60),
+    feelsLikeC: sanitizeNumber(input.feelsLikeC, -60, 70),
+    humidityPct: sanitizeNumber(input.humidityPct, 0, 100),
+    windMs: sanitizeNumber(input.windMs, 0, 70),
+    uvLabel: sanitizeText(input.uvLabel, 32),
+    pm10: sanitizeNumber(input.pm10, 0, 1000),
+    pm25: sanitizeNumber(input.pm25, 0, 1000),
+    rainingNow: sanitizeBoolean(input.rainingNow),
+    severeAlert: sanitizeBoolean(input.severeAlert),
+    hazardTags: sanitizeWeatherTags(input.hazardTags),
+    bulletin: sanitizeText(input.bulletin, 220),
+    observedAt: observedDate && !Number.isNaN(observedDate.getTime())
+      ? observedDate.toISOString()
+      : null,
+  }
 }
 
 function buildChatPayload(messages: ChatConversationMessage[], systemPrompt: string, userMessage: string) {
@@ -174,7 +245,7 @@ async function handlePOST(request: NextRequest) {
     return invalidRequestResponse
   }
 
-  let body: { message?: string; locale?: ChatLocale } = {}
+  let body: { message?: string; locale?: ChatLocale; weatherContext?: unknown } = {}
   try {
     body = await request.json()
   } catch {
@@ -187,6 +258,7 @@ async function handlePOST(request: NextRequest) {
 
   const locale = getRequestLocale(request, body.locale)
   const message = normalizeMessage(body.message)
+  const weatherContext = sanitizeWeatherContext(body.weatherContext)
   if (!message) {
     return createAuthJsonResponse(
       { error: getErrorMessage(locale, "invalidMessage") },
@@ -256,6 +328,7 @@ async function handlePOST(request: NextRequest) {
           locale,
           user: authenticatedSession.user,
           memorySummary: memory?.summary ?? null,
+          weatherContext,
         }),
         message
       ),

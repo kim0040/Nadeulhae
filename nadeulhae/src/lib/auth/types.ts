@@ -2,6 +2,8 @@ export interface AuthUser {
   id: string
   email: string
   displayName: string
+  nickname: string
+  nicknameTag: string
   ageBand: string
   primaryRegion: string
   interestTags: string[]
@@ -24,6 +26,7 @@ export interface LoginPayload {
 
 export interface RegisterPayload extends LoginPayload {
   displayName: string
+  nickname: string
   ageBand: string
   primaryRegion: string
   interestTags: string[]
@@ -39,6 +42,7 @@ export interface RegisterPayload extends LoginPayload {
 
 export interface UpdateProfilePayload {
   displayName: string
+  nickname: string
   ageBand: string
   primaryRegion: string
   interestTags: string[]

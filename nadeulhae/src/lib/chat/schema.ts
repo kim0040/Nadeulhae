@@ -1,4 +1,6 @@
 import { getDbPool } from "@/lib/db"
+import { decryptDatabaseValueSafely, encryptDatabaseValue, isEncryptedDatabaseValue } from "@/lib/security/data-protection"
+import type { RowDataPacket } from "mysql2/promise"
 
 declare global {
   var __nadeulhaeChatSchemaPromise: Promise<void> | undefined
@@ -87,6 +89,91 @@ const createChatRequestEventsTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+interface ChatMessageMigrationRow extends RowDataPacket {
+  id: number
+  role: "user" | "assistant"
+  content: string
+}
+
+interface ChatMemoryMigrationRow extends RowDataPacket {
+  user_id: string
+  summary_text: string
+}
+
+const MAX_MIGRATION_BATCHES = 200
+
+async function migrateChatMessageContents() {
+  const pool = getDbPool()
+
+  for (let i = 0; i < MAX_MIGRATION_BATCHES; i++) {
+    const [rows] = await pool.query<ChatMessageMigrationRow[]>(
+      `
+        SELECT id, role, content
+        FROM user_chat_messages
+        WHERE content NOT LIKE 'enc:v1:%'
+        LIMIT 200
+      `
+    )
+
+    if (rows.length === 0) {
+      return
+    }
+
+    for (const row of rows) {
+      const plain = decryptDatabaseValueSafely(row.content, `chat.message.${row.role}`) ?? row.content
+      await pool.execute(
+        `
+          UPDATE user_chat_messages
+          SET content = ?
+          WHERE id = ?
+        `,
+        [
+          isEncryptedDatabaseValue(row.content)
+            ? row.content
+            : encryptDatabaseValue(plain, `chat.message.${row.role}`),
+          row.id,
+        ]
+      )
+    }
+  }
+}
+
+async function migrateChatMemorySummaries() {
+  const pool = getDbPool()
+
+  for (let i = 0; i < MAX_MIGRATION_BATCHES; i++) {
+    const [rows] = await pool.query<ChatMemoryMigrationRow[]>(
+      `
+        SELECT user_id, summary_text
+        FROM user_chat_memory
+        WHERE summary_text NOT LIKE 'enc:v1:%'
+        LIMIT 200
+      `
+    )
+
+    if (rows.length === 0) {
+      return
+    }
+
+    for (const row of rows) {
+      const plain = decryptDatabaseValueSafely(row.summary_text, "chat.memory.summary") ?? row.summary_text
+      await pool.execute(
+        `
+          UPDATE user_chat_memory
+          SET summary_text = ?
+          WHERE user_id = ?
+        `,
+        [
+          isEncryptedDatabaseValue(row.summary_text)
+            ? row.summary_text
+            : encryptDatabaseValue(plain, "chat.memory.summary"),
+          row.user_id,
+        ]
+      )
+    }
+  }
+}
+
 export async function ensureChatSchema() {
   if (globalThis.__nadeulhaeChatSchemaPromise) {
     return globalThis.__nadeulhaeChatSchemaPromise
@@ -98,6 +185,8 @@ export async function ensureChatSchema() {
     await pool.query(createChatMemoryTableSql)
     await pool.query(createChatUsageDailyTableSql)
     await pool.query(createChatRequestEventsTableSql)
+    await migrateChatMessageContents()
+    await migrateChatMemorySummaries()
   })()
 
   globalThis.__nadeulhaeChatSchemaPromise = bootstrapPromise.catch((error) => {

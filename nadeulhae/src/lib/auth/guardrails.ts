@@ -1,3 +1,5 @@
+import { createBlindIndex } from "@/lib/security/data-protection"
+
 export const AUTH_BODY_LIMIT_BYTES = 16 * 1024
 export const AUTH_FAILURE_DELAY_MS = 450
 export const MAX_ACTIVE_SESSIONS_PER_USER = Number(
@@ -33,7 +35,8 @@ export const REGISTER_EMAIL_LIMIT = {
 } as const
 
 export function getAuthScopeKey(type: "ip" | "email", value: string) {
-  return `${type}:${value.trim().toLowerCase()}`
+  const normalized = value.trim().toLowerCase()
+  return `${type}:${createBlindIndex(normalized, `auth.scope.${type}`)}`
 }
 
 export function sleep(ms: number) {
