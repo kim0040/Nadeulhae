@@ -14,19 +14,24 @@ import {
 import { FactChatError, createFactChatCompletion } from "@/lib/chat/factchat"
 import {
   buildChatSystemPrompt,
+  buildProfileMemoryPrompt,
   buildSummaryPrompt,
   type ChatWeatherContext,
 } from "@/lib/chat/prompt"
 import {
   getChatMemorySnapshot,
   getChatPolicySnapshot,
+  getChatSessionMemorySnapshot,
   getChatState,
   getCompactionCandidate,
+  getProfileMemoryRefreshCandidate,
   getRecentContextMessages,
   logChatRequestEvent,
   markDailyChatFailure,
+  persistUserProfileMemory,
   persistChatExchange,
   persistCompactedMemory,
+  resolveChatSession,
   reserveDailyChatRequest,
 } from "@/lib/chat/repository"
 import type { ChatConversationMessage, ChatLocale } from "@/lib/chat/types"
@@ -140,6 +145,61 @@ function sanitizeWeatherContext(value: unknown): ChatWeatherContext | null {
   }
 }
 
+function sanitizeSessionId(value: unknown) {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const normalized = value.trim()
+  if (!/^\d+$/.test(normalized)) {
+    return null
+  }
+
+  return normalized
+}
+
+function parseProfileMemoryPayload(content: string) {
+  const text = content.trim()
+  if (!text) {
+    return null
+  }
+
+  const tryParse = (source: string) => {
+    try {
+      const parsed = JSON.parse(source) as { summary?: unknown; assessment?: unknown }
+      const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : ""
+      const assessment = typeof parsed.assessment === "string" ? parsed.assessment.trim() : null
+      if (!summary) {
+        return null
+      }
+      return {
+        summary,
+        assessment: assessment || null,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  const direct = tryParse(text)
+  if (direct) {
+    return direct
+  }
+
+  const jsonLike = text.match(/\{[\s\S]*\}/)
+  if (jsonLike) {
+    const extracted = tryParse(jsonLike[0])
+    if (extracted) {
+      return extracted
+    }
+  }
+
+  return {
+    summary: text.slice(0, 1200),
+    assessment: null,
+  }
+}
+
 function buildChatPayload(messages: ChatConversationMessage[], systemPrompt: string, userMessage: string) {
   return [
     { role: "system" as const, content: systemPrompt },
@@ -153,10 +213,11 @@ function buildChatPayload(messages: ChatConversationMessage[], systemPrompt: str
 
 async function compactUserMemory(input: {
   userId: string
+  sessionId: number
   locale: ChatLocale
   memorySummary: string | null
 }) {
-  const candidate = await getCompactionCandidate(input.userId)
+  const candidate = await getCompactionCandidate(input.userId, input.sessionId)
   if (!candidate || candidate.messages.length === 0) {
     return
   }
@@ -186,6 +247,7 @@ async function compactUserMemory(input: {
 
     await persistCompactedMemory({
       userId: input.userId,
+      sessionId: input.sessionId,
       locale: input.locale,
       summary: summaryResult.content,
       summarizedMessageIds: candidate.messageIds,
@@ -201,6 +263,7 @@ async function compactUserMemory(input: {
     const providerError = error instanceof FactChatError ? error : null
     await logChatRequestEvent({
       userId: input.userId,
+      sessionId: input.sessionId,
       requestKind: "summary",
       status: "provider_error",
       locale: input.locale,
@@ -213,10 +276,73 @@ async function compactUserMemory(input: {
   }
 }
 
+async function refreshUserProfileMemory(input: {
+  userId: string
+  locale: ChatLocale
+}) {
+  const candidate = await getProfileMemoryRefreshCandidate(input.userId)
+  if (!candidate) {
+    return
+  }
+
+  const refreshStartedAt = Date.now()
+
+  try {
+    const result = await createFactChatCompletion({
+      requestKind: "summary",
+      messages: [
+        {
+          role: "system",
+          content: input.locale === "ko"
+            ? "당신은 개인화 메모리 요약기다. 불필요한 군더더기 없이 핵심 선호와 판단 패턴만 압축한다."
+            : "You refresh compact personalization memory. Keep only durable, high-signal user traits.",
+        },
+        {
+          role: "user",
+          content: buildProfileMemoryPrompt({
+            locale: input.locale,
+            existingSummary: candidate.existingSummary,
+            existingAssessment: candidate.existingAssessment,
+            messages: candidate.messages,
+          }),
+        },
+      ],
+    })
+
+    const parsed = parseProfileMemoryPayload(result.content)
+    if (!parsed) {
+      return
+    }
+
+    await persistUserProfileMemory({
+      userId: input.userId,
+      summary: parsed.summary,
+      assessment: parsed.assessment,
+      lastMessageId: candidate.lastMessageId,
+      modelUsed: result.resolvedModel,
+    })
+  } catch (error) {
+    console.error("Profile memory refresh failed:", error)
+    const providerError = error instanceof FactChatError ? error : null
+    await logChatRequestEvent({
+      userId: input.userId,
+      requestKind: "summary",
+      status: "provider_error",
+      locale: input.locale,
+      messageCount: candidate.messages.length,
+      inputCharacters: candidate.messages.reduce((total, message) => total + message.content.length, 0),
+      latencyMs: Date.now() - refreshStartedAt,
+      errorCode: providerError?.code ?? "profile_summary_failed",
+      errorMessage: providerError?.message ?? "Profile memory refresh failed.",
+    })
+  }
+}
+
 async function handleGET(request: NextRequest) {
   try {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
     const locale = getRequestLocale(request)
+    const requestedSessionId = sanitizeSessionId(request.nextUrl.searchParams.get("sessionId"))
 
     if (!authenticatedSession) {
       return clearAuthCookie(
@@ -227,7 +353,11 @@ async function handleGET(request: NextRequest) {
       )
     }
 
-    const response = createAuthJsonResponse(await getChatState(authenticatedSession.user.id))
+    const response = createAuthJsonResponse(await getChatState({
+      userId: authenticatedSession.user.id,
+      locale,
+      requestedSessionId,
+    }))
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Chat GET API failed:", error)
@@ -245,7 +375,7 @@ async function handlePOST(request: NextRequest) {
     return invalidRequestResponse
   }
 
-  let body: { message?: string; locale?: ChatLocale; weatherContext?: unknown } = {}
+  let body: { message?: string; locale?: ChatLocale; weatherContext?: unknown; sessionId?: unknown } = {}
   try {
     body = await request.json()
   } catch {
@@ -259,6 +389,7 @@ async function handlePOST(request: NextRequest) {
   const locale = getRequestLocale(request, body.locale)
   const message = normalizeMessage(body.message)
   const weatherContext = sanitizeWeatherContext(body.weatherContext)
+  const requestedSessionId = sanitizeSessionId(body.sessionId)
   if (!message) {
     return createAuthJsonResponse(
       { error: getErrorMessage(locale, "invalidMessage") },
@@ -273,6 +404,8 @@ async function handlePOST(request: NextRequest) {
     )
   }
 
+  let resolvedSessionId: number | null = null
+
   try {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
     if (!authenticatedSession) {
@@ -284,16 +417,30 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
-    await compactUserMemory({
+    const resolvedSession = await resolveChatSession({
       userId: authenticatedSession.user.id,
       locale,
-      memorySummary: (await getChatMemorySnapshot(authenticatedSession.user.id))?.summary ?? null,
+      requestedSessionId,
+    })
+    resolvedSessionId = resolvedSession.activeSessionId
+
+    const sessionMemory = await getChatSessionMemorySnapshot({
+      userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
+    })
+
+    await compactUserMemory({
+      userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
+      locale,
+      memorySummary: sessionMemory?.summary ?? null,
     })
 
     const reservation = await reserveDailyChatRequest(authenticatedSession.user.id)
     if (!reservation.allowed) {
       await logChatRequestEvent({
         userId: authenticatedSession.user.id,
+        sessionId: resolvedSession.activeSessionId,
         requestKind: "chat",
         status: "rate_limited",
         locale,
@@ -302,9 +449,16 @@ async function handlePOST(request: NextRequest) {
         errorMessage: getErrorMessage(locale, "rateLimited"),
       })
 
+      const state = await getChatState({
+        userId: authenticatedSession.user.id,
+        locale,
+        requestedSessionId: String(resolvedSession.activeSessionId),
+      })
+
       return attachRefreshedAuthCookie(
         createAuthJsonResponse(
           {
+            ...state,
             error: getErrorMessage(locale, "rateLimited"),
             usage: reservation.usage,
             policy: getChatPolicySnapshot(),
@@ -315,9 +469,17 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
-    const [memory, contextMessages] = await Promise.all([
+    const [latestSessionMemory, profileMemory, contextMessages] = await Promise.all([
+      getChatSessionMemorySnapshot({
+        userId: authenticatedSession.user.id,
+        sessionId: resolvedSession.activeSessionId,
+      }),
       getChatMemorySnapshot(authenticatedSession.user.id),
-      getRecentContextMessages(authenticatedSession.user.id, CHAT_CONTEXT_MESSAGE_LIMIT),
+      getRecentContextMessages(
+        authenticatedSession.user.id,
+        resolvedSession.activeSessionId,
+        CHAT_CONTEXT_MESSAGE_LIMIT
+      ),
     ])
 
     const completionResult = await createFactChatCompletion({
@@ -327,7 +489,9 @@ async function handlePOST(request: NextRequest) {
         buildChatSystemPrompt({
           locale,
           user: authenticatedSession.user,
-          memorySummary: memory?.summary ?? null,
+          memorySummary: latestSessionMemory?.summary ?? null,
+          profileSummary: profileMemory?.summary ?? null,
+          profileAssessment: profileMemory?.assessment ?? null,
           weatherContext,
         }),
         message
@@ -336,6 +500,7 @@ async function handlePOST(request: NextRequest) {
 
     await persistChatExchange({
       userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
       locale,
       userMessage: message,
       assistantMessage: completionResult.content,
@@ -347,7 +512,16 @@ async function handlePOST(request: NextRequest) {
       contextMessageCount: contextMessages.length,
     })
 
-    const response = createAuthJsonResponse(await getChatState(authenticatedSession.user.id))
+    await refreshUserProfileMemory({
+      userId: authenticatedSession.user.id,
+      locale,
+    })
+
+    const response = createAuthJsonResponse(await getChatState({
+      userId: authenticatedSession.user.id,
+      locale,
+      requestedSessionId: String(resolvedSession.activeSessionId),
+    }))
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request).catch(() => null)
@@ -356,6 +530,7 @@ async function handlePOST(request: NextRequest) {
     if (authenticatedSession) {
       await markDailyChatFailure({
         userId: authenticatedSession.user.id,
+        sessionId: resolvedSessionId,
         locale,
         latencyMs: Date.now() - requestStartedAt,
         inputCharacters: message.length,

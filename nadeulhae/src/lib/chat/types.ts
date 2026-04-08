@@ -18,6 +18,17 @@ export interface ChatMemorySnapshot {
   modelUsed: string | null
 }
 
+export interface ChatSessionSnapshot {
+  id: string
+  title: string
+  locale: ChatLocale
+  isAutoTitle: boolean
+  messageCount: number
+  lastMessageAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ChatUsageSnapshot {
   metricDate: string
   requestCount: number
@@ -46,6 +57,8 @@ export interface ChatStateResponse {
   memory: ChatMemorySnapshot | null
   usage: ChatUsageSnapshot
   policy: ChatPolicySnapshot
+  sessions: ChatSessionSnapshot[]
+  activeSessionId: string
 }
 
 export interface FactChatUsage {

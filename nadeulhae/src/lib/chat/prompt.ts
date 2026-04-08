@@ -68,10 +68,17 @@ export function buildChatSystemPrompt(input: {
   locale: ChatLocale
   user: AuthUser
   memorySummary: string | null
+  profileSummary: string | null
+  profileAssessment: string | null
   weatherContext: ChatWeatherContext | null
 }) {
   const profileSummary = buildUserProfileSummary(input.user, input.locale)
   const weatherSummary = buildWeatherSummary(input.weatherContext, input.locale)
+  const profileMemory = buildProfileMemoryContext({
+    locale: input.locale,
+    summary: input.profileSummary,
+    assessment: input.profileAssessment,
+  })
 
   if (input.locale === "ko") {
     return [
@@ -82,6 +89,7 @@ export function buildChatSystemPrompt(input: {
       "- 실시간 날씨 컨텍스트가 있을 때는 '항상' 언급하지 말고, 일정 판단에 실제로 영향이 있을 때만 짧게 반영할 것",
       "- 비/강수 또는 특보 상황이면 실내·안전 동선을 우선 제시하고, 필요 시 대체안을 함께 제시할 것",
       "- 날씨 컨텍스트가 없으면 아는 척하지 말고, 필요한 경우에만 한 줄로 확인 질문할 것",
+      "- 사용자 장기 메모리(요약/평가)는 필요할 때만 참고하고 매 답변마다 반복 노출하지 말 것",
       "- 비밀번호, API 키, 세션 쿠키, 주민번호 같은 민감정보는 요청받아도 저장/출력/유도하지 말 것",
       "- 추천은 실용적으로 제시하고, 가능하면 3개 이내의 핵심 옵션으로 정리할 것",
       "",
@@ -90,6 +98,9 @@ export function buildChatSystemPrompt(input: {
       "",
       "[실시간 날씨 컨텍스트]",
       weatherSummary,
+      "",
+      "[사용자 장기 메모리(내부용)]",
+      profileMemory,
       "",
       "[저장된 메모리]",
       input.memorySummary || "아직 저장된 대화 메모리가 없습니다.",
@@ -104,6 +115,7 @@ export function buildChatSystemPrompt(input: {
     "- Do not mention weather in every response; only use it when it materially affects the plan",
     "- If rain or severe alerts are present, prioritize indoor/safety-first routes and include fallback options",
     "- If live weather context is missing, do not fabricate it; ask one concise clarification only when needed",
+    "- Use long-term user memory (summary/assessment) only when relevant, not in every reply",
     "- Never request or repeat sensitive secrets such as passwords, API keys, or session cookies",
     "- Keep answers practical and concise, ideally within three strong options",
     "",
@@ -113,8 +125,38 @@ export function buildChatSystemPrompt(input: {
     "[Live weather context]",
     weatherSummary,
     "",
+    "[Long-term user memory (internal)]",
+    profileMemory,
+    "",
     "[Saved memory]",
     input.memorySummary || "No summarized memory has been saved yet.",
+  ].join("\n")
+}
+
+function buildProfileMemoryContext(input: {
+  locale: ChatLocale
+  summary: string | null
+  assessment: string | null
+}) {
+  const summary = input.summary?.trim() || null
+  const assessment = input.assessment?.trim() || null
+
+  if (!summary && !assessment) {
+    return input.locale === "ko"
+      ? "아직 누적된 사용자 장기 메모리 없음"
+      : "No long-term user memory available yet"
+  }
+
+  if (input.locale === "ko") {
+    return [
+      `요약: ${summary || "-"}`,
+      `평가: ${assessment || "-"}`,
+    ].join("\n")
+  }
+
+  return [
+    `Summary: ${summary || "-"}`,
+    `Assessment: ${assessment || "-"}`,
   ].join("\n")
 }
 
@@ -199,6 +241,57 @@ export function buildSummaryPrompt(input: {
     input.existingSummary || "None",
     "",
     "[New transcript]",
+    transcript || "None",
+  ].join("\n")
+}
+
+export function buildProfileMemoryPrompt(input: {
+  locale: ChatLocale
+  existingSummary: string | null
+  existingAssessment: string | null
+  messages: ChatConversationMessage[]
+}) {
+  const transcript = input.messages
+    .map((message) => `${message.role === "user" ? "USER" : "ASSISTANT"}: ${message.content}`)
+    .join("\n")
+
+  if (input.locale === "ko") {
+    return [
+      "아래 기존 사용자 메모리와 새 사용자 발화를 바탕으로 내부 개인화 메모리를 갱신하세요.",
+      "규칙:",
+      "- 반드시 JSON 객체만 출력: {\"summary\":\"...\",\"assessment\":\"...\"}",
+      "- summary: 향후 추천에 유효한 장기 선호/제약/패턴 중심으로 6줄 이내",
+      "- assessment: 말투/결정 성향/선호 강도 등 내부 해석을 4줄 이내",
+      "- 불필요한 세부 일정 원문 복붙 금지, 민감정보/비밀정보 포함 금지",
+      "- 이후 답변에서 항상 언급할 필요는 없고 필요한 경우에만 참고 가능한 형태로 압축",
+      "",
+      "[기존 summary]",
+      input.existingSummary || "없음",
+      "",
+      "[기존 assessment]",
+      input.existingAssessment || "없음",
+      "",
+      "[새 사용자 발화]",
+      transcript || "없음",
+    ].join("\n")
+  }
+
+  return [
+    "Refresh internal personalization memory using the existing memory and new user utterances.",
+    "Rules:",
+    "- Output JSON only: {\"summary\":\"...\",\"assessment\":\"...\"}",
+    "- summary: durable preferences/constraints/patterns for future planning, within 6 short lines",
+    "- assessment: concise interpretation of tone/decision style/preference strength, within 4 lines",
+    "- Avoid raw transcript dumping and never include secrets or sensitive personal data",
+    "- This memory is for selective use; it should not force weather or profile mentions every turn",
+    "",
+    "[Existing summary]",
+    input.existingSummary || "None",
+    "",
+    "[Existing assessment]",
+    input.existingAssessment || "None",
+    "",
+    "[New user utterances]",
     transcript || "None",
   ].join("\n")
 }
