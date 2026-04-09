@@ -14,16 +14,18 @@ import {
   clearAuthCookie,
   getAuthenticatedUserFromRequest,
 } from "@/lib/auth/session"
+import { getAuthMessage, resolveAuthLocale } from "@/lib/auth/messages"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
 
 async function handleDELETE(request: NextRequest) {
+  const locale = resolveAuthLocale(request.headers.get("accept-language"))
   const ipAddress = getClientIp(request)
   const userAgent = getUserAgent(request)
 
   try {
-    const requestViolation = validateAuthMutationRequest(request)
+    const requestViolation = validateAuthMutationRequest(request, locale)
     if (requestViolation) {
       return requestViolation
     }
@@ -32,7 +34,7 @@ async function handleDELETE(request: NextRequest) {
     if (!sessionUser) {
       return clearAuthCookie(
         createAuthJsonResponse(
-          { error: "로그인이 필요합니다." },
+          { error: getAuthMessage(locale, "authRequired") },
           { status: 401 }
         )
       )
@@ -43,7 +45,7 @@ async function handleDELETE(request: NextRequest) {
       payload = await request.json()
     } catch {
       return createAuthJsonResponse(
-        { error: "잘못된 JSON 요청입니다." },
+        { error: getAuthMessage(locale, "invalidJsonRequest") },
         { status: 400 }
       )
     }
@@ -54,7 +56,7 @@ async function handleDELETE(request: NextRequest) {
 
     if (confirmText !== "DELETE") {
       return createAuthJsonResponse(
-        { error: "계정 탈퇴를 진행하려면 DELETE를 정확히 입력해 주세요." },
+        { error: getAuthMessage(locale, "accountDeleteConfirm") },
         { status: 400 }
       )
     }
@@ -85,7 +87,7 @@ async function handleDELETE(request: NextRequest) {
     })
 
     return createAuthJsonResponse(
-      { error: "회원 탈퇴 처리 중 오류가 발생했습니다." },
+      { error: getAuthMessage(locale, "accountDeleteInternalError") },
       { status: 500 }
     )
   }

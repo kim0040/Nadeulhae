@@ -19,7 +19,6 @@ let warnedAboutFallback = false
 function getProtectionSecret() {
   const configured =
     process.env.DATA_PROTECTION_KEY
-    || process.env.AUTH_PEPPER
     || ""
 
   if (configured) {
@@ -27,15 +26,15 @@ function getProtectionSecret() {
   }
 
   if (process.env.NODE_ENV === "production") {
-    throw new Error("Missing DATA_PROTECTION_KEY (or AUTH_PEPPER) for database field protection.")
+    throw new Error("Missing DATA_PROTECTION_KEY for database field protection. Set DATA_PROTECTION_KEY in production.")
   }
 
   if (!warnedAboutFallback) {
     warnedAboutFallback = true
-    console.warn("[security] Using development fallback key for DATA_PROTECTION_KEY.")
+    console.warn("[security] DATA_PROTECTION_KEY is not set. Falling back to AUTH_PEPPER. Set a dedicated DATA_PROTECTION_KEY for production.")
   }
 
-  return DEV_FALLBACK_SECRET
+  return process.env.AUTH_PEPPER || DEV_FALLBACK_SECRET
 }
 
 function getMasterKey() {

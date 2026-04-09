@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Check, Lock, Mail, MapPinned, Sparkles, User } from "lucide-react"
+import { Check, Eye, EyeOff, Lock, Mail, MapPinned, Sparkles, User } from "lucide-react"
 
+import { AuthField } from "@/components/auth/auth-field"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { useAuth } from "@/context/AuthContext"
@@ -25,6 +26,7 @@ type FormState = {
   nickname: string
   email: string
   password: string
+  passwordConfirm: string
   ageBand: string
   primaryRegion: string
   preferredTimeSlot: string
@@ -40,9 +42,7 @@ type FormState = {
 
 const SIGNUP_COPY = {
   ko: {
-    badge: "profile onboarding",
     title: "회원가입",
-    description: "나이, 취미, 선호 시간대 등을 알려주시면 나들해가 딱 맞는 나들이 정보를 제안해 드릴게요.",
     sideEyebrow: "personal setup",
     sideTitle: "나만의 맞춤 나들이 프로필을 만들어보세요",
     sideDescription:
@@ -56,6 +56,7 @@ const SIGNUP_COPY = {
     personalSection: "나들이 취향 설정",
     consentSection: "약관 동의",
     consentHelper: "선택 항목은 나중에 대시보드에서 편하게 바꿀 수 있어요.",
+    consentAllLabel: "아래 약관 항목 전체에 동의합니다. (선택/필수 포함)",
     nameLabel: "이름",
     namePlaceholder: "홍길동",
     nicknameLabel: "닉네임",
@@ -64,6 +65,12 @@ const SIGNUP_COPY = {
     emailLabel: "이메일",
     passwordLabel: "비밀번호",
     passwordPlaceholder: "영문+숫자 포함 10자 이상",
+    passwordConfirmLabel: "비밀번호 확인",
+    passwordConfirmPlaceholder: "비밀번호를 다시 입력하세요",
+    passwordRuleLength: "10자 이상",
+    passwordRuleLetter: "영문 포함",
+    passwordRuleNumber: "숫자 포함",
+    passwordRuleMatch: "비밀번호 일치",
     ageLabel: "연령대",
     regionLabel: "주 사용 지역",
     hobbyLabel: "취미·관심사",
@@ -84,11 +91,17 @@ const SIGNUP_COPY = {
     loginPrompt: "이미 계정이 있나요?",
     loginLink: "로그인",
     successRedirect: "이미 로그인된 상태입니다. 계정 화면으로 이동합니다.",
+    showPassword: "비밀번호 표시",
+    hidePassword: "비밀번호 숨기기",
+    showPasswordConfirm: "비밀번호 확인 표시",
+    hidePasswordConfirm: "비밀번호 확인 숨기기",
+    submitting: "가입 처리 중...",
+    signupFallbackError: "회원가입에 실패했습니다.",
+    signupNetworkError: "회원가입 요청 중 네트워크 오류가 발생했습니다.",
+    passwordMismatchError: "비밀번호가 일치하지 않습니다.",
   },
   en: {
-    badge: "profile onboarding",
     title: "Sign up",
-    description: "Save age range, hobbies, and preferred outing time so Nadeulhae can personalize your outings.",
     sideEyebrow: "personal setup",
     sideTitle: "Build your outdoor profile before you start",
     sideDescription:
@@ -102,6 +115,7 @@ const SIGNUP_COPY = {
     personalSection: "Personalized outing profile",
     consentSection: "Required and optional consent",
     consentHelper: "Required items are needed to create the account. Optional items can be changed later from the dashboard.",
+    consentAllLabel: "I agree to all consent items below. (Required + optional)",
     nameLabel: "Name",
     namePlaceholder: "Your name",
     nicknameLabel: "Nickname",
@@ -110,6 +124,12 @@ const SIGNUP_COPY = {
     emailLabel: "Email",
     passwordLabel: "Password",
     passwordPlaceholder: "At least 10 chars with letters and numbers",
+    passwordConfirmLabel: "Confirm password",
+    passwordConfirmPlaceholder: "Re-enter your password",
+    passwordRuleLength: "At least 10 characters",
+    passwordRuleLetter: "Contains a letter",
+    passwordRuleNumber: "Contains a number",
+    passwordRuleMatch: "Passwords match",
     ageLabel: "Age range",
     regionLabel: "Primary region",
     hobbyLabel: "Hobbies and interests",
@@ -130,6 +150,14 @@ const SIGNUP_COPY = {
     loginPrompt: "Already have an account?",
     loginLink: "Log in",
     successRedirect: "You are already logged in. Redirecting to your account.",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    showPasswordConfirm: "Show confirm password",
+    hidePasswordConfirm: "Hide confirm password",
+    submitting: "Creating account...",
+    signupFallbackError: "Sign-up failed.",
+    signupNetworkError: "A network error occurred while signing up.",
+    passwordMismatchError: "Passwords do not match.",
   },
 } as const
 
@@ -144,31 +172,15 @@ const SIGNUP_MARQUEE = [
   "해질녘 산책 루트",
 ]
 
-function AuthField({
-  label,
-  icon: Icon,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & {
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-}) {
-  return (
-    <div className="space-y-2">
-      <label className="ml-1 text-[11px] font-black uppercase tracking-[0.28em] text-sky-blue">
-        {label}
-      </label>
-      <div className="relative">
-        <Icon className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          {...props}
-          className={cn(
-            "w-full rounded-[1.5rem] border border-interactive-border bg-interactive/70 py-4 pl-12 pr-4 text-sm font-medium text-foreground outline-none transition focus:border-sky-blue/50",
-            props.className
-          )}
-        />
-      </div>
-    </div>
-  )
+async function readAuthErrorMessage(response: Response, fallback: string) {
+  try {
+    const data = (await response.json()) as { error?: unknown }
+    return typeof data?.error === "string" && data.error.trim().length > 0
+      ? data.error
+      : fallback
+  } catch {
+    return fallback
+  }
 }
 
 function OptionButton({
@@ -244,6 +256,7 @@ export default function SignupPage() {
     nickname: "",
     email: "",
     password: "",
+    passwordConfirm: "",
     ageBand: "20_29",
     primaryRegion: "jeonju",
     preferredTimeSlot: "afternoon",
@@ -256,6 +269,26 @@ export default function SignupPage() {
     marketingAccepted: false,
     analyticsAccepted: false,
   })
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
+
+  const passwordRules = useMemo(() => {
+    const pw = form.password
+    return [
+      { key: "length", label: copy.passwordRuleLength, met: pw.length >= 10 },
+      { key: "letter", label: copy.passwordRuleLetter, met: /[A-Za-z]/.test(pw) },
+      { key: "number", label: copy.passwordRuleNumber, met: /\d/.test(pw) },
+    ]
+  }, [form.password, copy])
+
+  const passwordsMatch = form.password.length > 0 && form.password === form.passwordConfirm
+  const allConsentsChecked =
+    form.termsAccepted
+    && form.privacyAccepted
+    && form.ageConfirmed
+    && form.marketingAccepted
+    && form.analyticsAccepted
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -319,50 +352,60 @@ export default function SignupPage() {
     event.preventDefault()
     setMessage(null)
 
+    if (form.password !== form.passwordConfirm) {
+      setMessage(copy.passwordMismatchError)
+      return
+    }
+
     startTransition(async () => {
       try {
         const response = await fetch("/api/auth/register", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept-Language": language,
           },
           credentials: "include",
           body: JSON.stringify(form),
         })
 
-        const data = await response.json()
         if (!response.ok) {
-          setMessage(
-            data.error ?? (language === "ko" ? "회원가입에 실패했습니다." : "Sign-up failed.")
-          )
+          setMessage(await readAuthErrorMessage(response, copy.signupFallbackError))
           return
         }
 
+        const data = (await response.json()) as AuthResponseBody
         setAuthenticatedUser((data as AuthResponseBody).user)
         router.push("/account")
         router.refresh()
       } catch (error) {
         console.error("Sign-up request failed:", error)
-        setMessage(
-          language === "ko"
-            ? "회원가입 요청 중 네트워크 오류가 발생했습니다."
-            : "A network error occurred while signing up."
-        )
+        setMessage(copy.signupNetworkError)
       }
     })
   }
 
+  const handleToggleAllConsents = (checked: boolean) => {
+    setForm((current) => ({
+      ...current,
+      termsAccepted: checked,
+      privacyAccepted: checked,
+      ageConfirmed: checked,
+      marketingAccepted: checked,
+      analyticsAccepted: checked,
+    }))
+  }
+
   return (
     <AuthShell
-      badge={copy.badge}
       title={copy.title}
-      description={copy.description}
+      showSidePanel={false}
+      performanceMode="fast"
       sideEyebrow={copy.sideEyebrow}
       sideTitle={copy.sideTitle}
       sideDescription={copy.sideDescription}
       marqueeItems={SIGNUP_MARQUEE}
       statItems={copy.stats}
-      panelClassName="xl:min-h-[860px]"
       footer={(
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-card-border/70 pt-6">
           <p className="text-sm text-muted-foreground">
@@ -419,16 +462,79 @@ export default function SignupPage() {
             />
             <p className="ml-1 text-[10px] font-bold text-muted-foreground/60">{copy.nicknameHint}</p>
           </div>
-          <AuthField
-            label={copy.passwordLabel}
-            icon={Lock}
-            type="password"
-            value={form.password}
-            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-            placeholder={copy.passwordPlaceholder}
-            autoComplete="new-password"
-            required
-          />
+          <div className="space-y-1">
+            <AuthField
+              label={copy.passwordLabel}
+              icon={Lock}
+              type={showPassword ? "text" : "password"}
+              value={form.password}
+              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+              placeholder={copy.passwordPlaceholder}
+              autoComplete="new-password"
+              required
+              trailing={(
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground transition hover:text-foreground"
+                  tabIndex={-1}
+                  aria-label={showPassword ? copy.hidePassword : copy.showPassword}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              )}
+            />
+            {form.password.length > 0 && (
+              <div className="ml-1 flex flex-wrap gap-x-3 gap-y-1">
+                {passwordRules.map((rule) => (
+                  <span
+                    key={rule.key}
+                    className={cn(
+                      "inline-flex items-center gap-1 text-[11px] font-bold transition-colors",
+                      rule.met ? "text-nature-green" : "text-danger"
+                    )}
+                  >
+                    <span className={cn("size-1.5 rounded-full", rule.met ? "bg-nature-green" : "bg-danger")} />
+                    {rule.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="space-y-1">
+            <AuthField
+              label={copy.passwordConfirmLabel}
+              icon={Lock}
+              type={showPasswordConfirm ? "text" : "password"}
+              value={form.passwordConfirm}
+              onChange={(event) => setForm((current) => ({ ...current, passwordConfirm: event.target.value }))}
+              placeholder={copy.passwordConfirmPlaceholder}
+              autoComplete="new-password"
+              required
+              trailing={(
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordConfirm((v) => !v)}
+                  className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground transition hover:text-foreground"
+                  tabIndex={-1}
+                  aria-label={showPasswordConfirm ? copy.hidePasswordConfirm : copy.showPasswordConfirm}
+                >
+                  {showPasswordConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              )}
+            />
+            {form.passwordConfirm.length > 0 && (
+              <span
+                className={cn(
+                  "ml-1 inline-flex items-center gap-1 text-[11px] font-bold transition-colors",
+                  passwordsMatch ? "text-nature-green" : "text-danger"
+                )}
+              >
+                <span className={cn("size-1.5 rounded-full", passwordsMatch ? "bg-nature-green" : "bg-danger")} />
+                {copy.passwordRuleMatch}
+              </span>
+            )}
+          </div>
         </section>
 
         <section className="space-y-5">
@@ -538,6 +644,15 @@ export default function SignupPage() {
               {copy.consentHelper}
             </p>
           </div>
+          <label className="flex items-start gap-3 rounded-[1.2rem] border border-sky-blue/20 bg-sky-blue/10 px-4 py-3 text-sm font-semibold text-foreground">
+            <input
+              type="checkbox"
+              checked={allConsentsChecked}
+              onChange={(event) => handleToggleAllConsents(event.target.checked)}
+              className="mt-1 size-4 rounded border-card-border accent-sky-blue"
+            />
+            <span>{copy.consentAllLabel}</span>
+          </label>
           <label className="flex items-start gap-3 text-sm text-foreground">
             <input
               type="checkbox"
@@ -607,13 +722,21 @@ export default function SignupPage() {
         </section>
 
         {status === "authenticated" ? (
-          <div className="rounded-[1.3rem] border border-sky-blue/20 bg-sky-blue/10 px-4 py-3 text-sm font-semibold text-sky-blue">
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-[1.3rem] border border-sky-blue/20 bg-sky-blue/10 px-4 py-3 text-sm font-semibold text-sky-blue"
+          >
             {copy.successRedirect}
           </div>
         ) : null}
 
         {message ? (
-          <div className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger"
+          >
             {message}
           </div>
         ) : null}
@@ -624,7 +747,7 @@ export default function SignupPage() {
           disabled={isPending || status === "authenticated"}
         >
           <span className="inline-flex items-center gap-2">
-            {isPending ? "..." : copy.submit}
+            {isPending ? copy.submitting : copy.submit}
             <Sparkles className="size-4" />
           </span>
         </ShimmerButton>

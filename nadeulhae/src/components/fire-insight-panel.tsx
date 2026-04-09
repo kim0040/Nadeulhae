@@ -35,7 +35,7 @@ export function FireInsightPanel({
   if (isCompact) {
     return (
       <div className="relative overflow-hidden rounded-[2rem] border border-card-border bg-card px-5 py-4 shadow-[0_18px_45px_-35px_rgba(47,111,228,0.32)]">
-        <BorderBeam size={220} duration={8} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
+        <BorderBeam size={200} duration={8} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
         <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">

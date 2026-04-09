@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 
 import { withApiAnalytics } from "@/lib/analytics/route"
+import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
+import { resolveRegionProfile } from "@/lib/weather-utils"
 
 type ArchiveResponse = {
   month: string
@@ -52,7 +54,26 @@ async function handleGET(request: Request) {
   const month = normalizeMonth(url.searchParams.get("month"))
   const lat = url.searchParams.get("lat")
   const lon = url.searchParams.get("lon")
-  const cacheKey = `${month}:${lat || "default"}:${lon || "default"}`
+  const parsedLat = lat ? Number(lat) : null
+  const parsedLon = lon ? Number(lon) : null
+  const userLat = Number.isFinite(parsedLat) ? parsedLat : null
+  const userLon = Number.isFinite(parsedLon) ? parsedLon : null
+  const hasDeviceCoordinates = userLat != null && userLon != null
+  const locationRegionKey = hasDeviceCoordinates
+    ? resolveRegionProfile(userLat, userLon).key
+    : "archives"
+  const cacheKey = `${month}:${userLat != null ? Math.round(userLat * 100) : "default"}:${userLon != null ? Math.round(userLon * 100) : "default"}`
+
+  if (hasDeviceCoordinates) {
+    void recordLocationUsageProofSafely({
+      request,
+      routePath: url.pathname,
+      method: request.method,
+      regionKey: locationRegionKey,
+      eventKind: "weather_forecast",
+    })
+  }
+
   const cached = archiveCache.get(cacheKey)
   if (cached && cached.expiry > Date.now()) {
     return NextResponse.json(cached.data, {
@@ -62,10 +83,15 @@ async function handleGET(request: Request) {
 
   try {
     const forecastUrl = new URL("/api/weather/forecast", url)
-    if (lat) forecastUrl.searchParams.set("lat", lat)
-    if (lon) forecastUrl.searchParams.set("lon", lon)
+    if (userLat != null) forecastUrl.searchParams.set("lat", String(userLat))
+    if (userLon != null) forecastUrl.searchParams.set("lon", String(userLon))
 
-    const forecastResponse = await fetch(forecastUrl.toString(), { cache: "no-store" })
+    const forecastResponse = await fetch(forecastUrl.toString(), {
+      cache: "no-store",
+      headers: {
+        "x-nadeulhae-internal-call": "1",
+      },
+    })
     if (!forecastResponse.ok) {
       throw new Error(`Forecast API responded with ${forecastResponse.status}`)
     }

@@ -14,6 +14,7 @@ import {
   getNextUpdateTimestamp,
 } from "@/lib/weather-utils"
 import { withApiAnalytics } from "@/lib/analytics/route"
+import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { wgs84ToTm } from "@/lib/coords-utils"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 
@@ -181,7 +182,8 @@ function getBulletinFallbackStationIds(profileKey: string) {
   return candidates.slice(0, 5)
 }
 const currentWeatherCache = new Map<string, CacheEntry<CurrentWeatherSnapshot>>()
-const currentResponseCache = new Map<string, UserCacheEntry<any>>()
+const MAX_USER_RESPONSE_CACHE_KEYS = 500
+const currentResponseCache = new Map<string, UserCacheEntry<Record<string, unknown>>>()
 
 const WEATHER_CACHE_DURATION = 90 * 60 * 1000
 const AIR_CACHE_DURATION = 60 * 60 * 1000
@@ -277,10 +279,19 @@ function cleanupExpiringCache<T extends { expiry: number }>(map: Map<string, T>,
   }
 }
 
-function cleanupRateLimitMap(map: Map<string, { count: number; lastReset: number }>, windowMs: number, now: number) {
+function cleanupRateLimitMap(map: Map<string, { count: number; lastReset: number }>, windowMs: number, now: number, maxEntries = 10000) {
   for (const [key, value] of map.entries()) {
     if (now - value.lastReset > windowMs * 5) {
       map.delete(key)
+    }
+  }
+  if (map.size > maxEntries) {
+    const overflow = map.size - maxEntries
+    let removed = 0
+    for (const key of map.keys()) {
+      map.delete(key)
+      removed++
+      if (removed >= overflow) break
     }
   }
 }
@@ -895,11 +906,28 @@ async function handleGET(req: Request) {
   const url = new URL(req.url)
   const lat = url.searchParams.get("lat")
   const lon = url.searchParams.get("lon")
-  const userLat = lat ? Number(lat) : null
-  const userLon = lon ? Number(lon) : null
+  const parsedLat = lat ? Number(lat) : null
+  const parsedLon = lon ? Number(lon) : null
+  const userLat = Number.isFinite(parsedLat) ? parsedLat : null
+  const userLon = Number.isFinite(parsedLon) ? parsedLon : null
+  const hasDeviceCoordinates = userLat != null && userLon != null
   const ip = getClientIp(req)
   const { sessionId, shouldSetCookie } = getOrCreateSessionId(req)
   const profile = resolveRegionProfile(userLat, userLon)
+  const recordLocationUsageProof = () => {
+    if (!hasDeviceCoordinates) {
+      return
+    }
+
+    void recordLocationUsageProofSafely({
+      request: req,
+      routePath: url.pathname,
+      method: req.method,
+      regionKey: profile.key,
+      sessionId,
+      eventKind: "weather_current",
+    })
+  }
   const grid = userLat != null && userLon != null ? dfsToGrid(userLat, userLon) : {
     nx: Number(process.env.KMA_NX ?? 63),
     ny: Number(process.env.KMA_NY ?? 89),
@@ -914,6 +942,7 @@ async function handleGET(req: Request) {
   ].join(":")
   const cachedResponse = currentResponseCache.get(userCacheKey)
   if (cachedResponse && cachedResponse.expiry > Date.now()) {
+    recordLocationUsageProof()
     const response = NextResponse.json(cachedResponse.data)
     return attachSessionCookie(response, sessionId, shouldSetCookie)
   }
@@ -944,7 +973,7 @@ async function handleGET(req: Request) {
   let stationLookupSource: "profile" | "cache" | "live_api" = "profile"
   let nearbyStationCandidates: NearbyStationCandidate[] = []
   let tmCoords: { x: number | null; y: number | null } = { x: null, y: null }
-  if (userLat && userLon) {
+  if (hasDeviceCoordinates && userLat != null && userLon != null) {
     const [tmX, tmY] = wgs84ToTm(userLat, userLon)
     tmCoords = { x: tmX, y: tmY }
     const coordsKey = `${Math.round(userLat * 100)}_${Math.round(userLon * 100)}`
@@ -1193,7 +1222,14 @@ async function handleGET(req: Request) {
     expiry: Date.now() + USER_RESPONSE_CACHE_DURATION,
   })
 
+  while (currentResponseCache.size > MAX_USER_RESPONSE_CACHE_KEYS) {
+    const oldestKey = currentResponseCache.keys().next().value as string | undefined
+    if (!oldestKey) break
+    currentResponseCache.delete(oldestKey)
+  }
+
   const response = NextResponse.json(responsePayload)
+  recordLocationUsageProof()
   return attachSessionCookie(response, sessionId, shouldSetCookie)
 }
 

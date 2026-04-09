@@ -101,6 +101,119 @@ const CHAT_PROFILE_MEMORY_INITIAL_MIN_MESSAGES = 3
 const CHAT_PROFILE_MEMORY_CANDIDATE_LIMIT = 24
 const CHAT_PROFILE_SUMMARY_MAX_CHARACTERS = 1400
 const CHAT_PROFILE_ASSESSMENT_MAX_CHARACTERS = 900
+const CHAT_STATE_CACHE_TTL_MS = 8_000
+const CHAT_SESSIONS_CACHE_TTL_MS = 8_000
+const CHAT_STATE_CACHE_MAX_KEYS = 1200
+
+interface ChatStateCacheEntry {
+  data: ChatStateResponse
+  expiresAt: number
+}
+
+interface ChatSessionsCacheEntry {
+  data: ChatSessionSnapshot[]
+  expiresAt: number
+}
+
+declare global {
+  var __nadeulhaeChatStateCache: Map<string, ChatStateCacheEntry> | undefined
+  var __nadeulhaeChatStateInFlight: Map<string, Promise<ChatStateResponse>> | undefined
+  var __nadeulhaeChatSessionsCache: Map<string, ChatSessionsCacheEntry> | undefined
+}
+
+function getChatStateCache() {
+  if (!globalThis.__nadeulhaeChatStateCache) {
+    globalThis.__nadeulhaeChatStateCache = new Map()
+  }
+  return globalThis.__nadeulhaeChatStateCache
+}
+
+function getChatStateInFlight() {
+  if (!globalThis.__nadeulhaeChatStateInFlight) {
+    globalThis.__nadeulhaeChatStateInFlight = new Map()
+  }
+  return globalThis.__nadeulhaeChatStateInFlight
+}
+
+function getChatSessionsCache() {
+  if (!globalThis.__nadeulhaeChatSessionsCache) {
+    globalThis.__nadeulhaeChatSessionsCache = new Map()
+  }
+  return globalThis.__nadeulhaeChatSessionsCache
+}
+
+function pruneChatCacheMap<T extends { expiresAt: number }>(map: Map<string, T>, maxKeys: number) {
+  const now = Date.now()
+  for (const [key, entry] of map.entries()) {
+    if (entry.expiresAt <= now) {
+      map.delete(key)
+    }
+  }
+
+  if (map.size <= maxKeys) {
+    return
+  }
+
+  const overflow = map.size - maxKeys
+  let removed = 0
+  for (const key of map.keys()) {
+    map.delete(key)
+    removed += 1
+    if (removed >= overflow) {
+      break
+    }
+  }
+}
+
+function cloneChatMemorySnapshot(memory: ChatMemorySnapshot | null): ChatMemorySnapshot | null {
+  if (!memory) {
+    return null
+  }
+
+  return {
+    summary: memory.summary,
+    updatedAt: memory.updatedAt,
+    summarizedMessageCount: memory.summarizedMessageCount,
+    modelUsed: memory.modelUsed,
+  }
+}
+
+function cloneChatStateSnapshot(state: ChatStateResponse): ChatStateResponse {
+  return {
+    messages: state.messages.map((message) => ({ ...message })),
+    memory: cloneChatMemorySnapshot(state.memory),
+    usage: { ...state.usage },
+    policy: { ...state.policy },
+    sessions: state.sessions.map((session) => ({ ...session })),
+    activeSessionId: state.activeSessionId,
+  }
+}
+
+function buildChatStateCacheKey(input: {
+  userId: string
+  locale: ChatLocale
+  requestedSessionId?: string | null
+}) {
+  return `${input.userId}:${input.locale}:${input.requestedSessionId ?? "auto"}`
+}
+
+export function invalidateChatCacheForUser(userId: string) {
+  const stateCache = getChatStateCache()
+  for (const key of stateCache.keys()) {
+    if (key.startsWith(`${userId}:`)) {
+      stateCache.delete(key)
+    }
+  }
+
+  const inFlight = getChatStateInFlight()
+  for (const key of inFlight.keys()) {
+    if (key.startsWith(`${userId}:`)) {
+      inFlight.delete(key)
+    }
+  }
+
+  getChatSessionsCache().delete(userId)
+}
 
 function toIsoString(value: Date | string) {
   if (value instanceof Date) {
@@ -295,7 +408,7 @@ async function withLockedDailyUsage<T>(
 }
 
 export async function reserveDailyChatRequest(userId: string) {
-  return withLockedDailyUsage(userId, async (connection, metricDate, row) => {
+  const result = await withLockedDailyUsage(userId, async (connection, metricDate, row) => {
     if (row.request_count >= CHAT_DAILY_REQUEST_LIMIT) {
       return {
         allowed: false,
@@ -325,6 +438,12 @@ export async function reserveDailyChatRequest(userId: string) {
       ),
     } as const
   })
+
+  if (result.allowed) {
+    invalidateChatCacheForUser(userId)
+  }
+
+  return result
 }
 
 export async function getChatUsageSnapshot(userId: string) {
@@ -451,7 +570,7 @@ async function ensureLegacyMessagesAssignedToSession(userId: string) {
     return
   }
 
-  await getDbPool().execute(
+  const [result] = await getDbPool().execute<ResultSetHeader>(
     `
       UPDATE user_chat_messages
       SET session_id = ?
@@ -460,11 +579,32 @@ async function ensureLegacyMessagesAssignedToSession(userId: string) {
     `,
     [baseSession.id, userId]
   )
+
+  if (result.affectedRows > 0) {
+    invalidateChatCacheForUser(userId)
+  }
 }
 
 export async function listChatSessions(userId: string) {
+  const cache = getChatSessionsCache()
+  const now = Date.now()
+  const cached = cache.get(userId)
+  if (cached && cached.expiresAt > now) {
+    return cached.data.map((session) => ({ ...session }))
+  }
+
+  if (cached) {
+    cache.delete(userId)
+  }
+
   const rows = await listChatSessionRows(userId)
-  return rows.map(toSessionSnapshot)
+  const sessions = rows.map(toSessionSnapshot)
+  cache.set(userId, {
+    data: sessions,
+    expiresAt: now + CHAT_SESSIONS_CACHE_TTL_MS,
+  })
+  pruneChatCacheMap(cache, Math.max(200, Math.floor(CHAT_STATE_CACHE_MAX_KEYS / 3)))
+  return sessions.map((session) => ({ ...session }))
 }
 
 export async function createChatSession(input: {
@@ -488,6 +628,7 @@ export async function createChatSession(input: {
       isAutoTitle: !input.title || !input.title.trim(),
     })
     await connection.commit()
+    invalidateChatCacheForUser(input.userId)
     return String(sessionId)
   } catch (error) {
     await connection.rollback()
@@ -569,6 +710,7 @@ export async function deleteChatSession(input: {
     )
 
     await connection.commit()
+    invalidateChatCacheForUser(input.userId)
   } catch (error) {
     await connection.rollback()
     throw error
@@ -597,7 +739,7 @@ export async function resolveChatSession(input: {
 
     const parsedCreatedId = parseSessionId(createdId)
     if (parsedCreatedId) {
-      await getDbPool().execute(
+      const [result] = await getDbPool().execute<ResultSetHeader>(
         `
           UPDATE user_chat_messages
           SET session_id = ?
@@ -606,6 +748,10 @@ export async function resolveChatSession(input: {
         `,
         [parsedCreatedId, input.userId]
       )
+
+      if (result.affectedRows > 0) {
+        invalidateChatCacheForUser(input.userId)
+      }
     }
     sessionRows = await listChatSessionRows(input.userId)
   } else {
@@ -756,25 +902,60 @@ export async function getChatState(input: {
   locale: ChatLocale
   requestedSessionId?: string | null
 }): Promise<ChatStateResponse> {
-  const resolved = await resolveChatSession({
-    userId: input.userId,
-    locale: input.locale,
-    requestedSessionId: input.requestedSessionId,
-  })
+  const cacheKey = buildChatStateCacheKey(input)
+  const now = Date.now()
+  const cache = getChatStateCache()
+  const cached = cache.get(cacheKey)
+  if (cached && cached.expiresAt > now) {
+    return cloneChatStateSnapshot(cached.data)
+  }
 
-  const [messages, memory, usage] = await Promise.all([
-    getRecentConversationMessages(input.userId, resolved.activeSessionId),
-    Promise.resolve(toSessionMemorySnapshot(resolved.activeSession)),
-    getChatUsageSnapshot(input.userId),
-  ])
+  if (cached) {
+    cache.delete(cacheKey)
+  }
 
-  return {
-    messages,
-    memory,
-    usage,
-    policy: getChatPolicySnapshot(),
-    sessions: resolved.sessions,
-    activeSessionId: String(resolved.activeSessionId),
+  const inFlightMap = getChatStateInFlight()
+  const inFlight = inFlightMap.get(cacheKey)
+  if (inFlight) {
+    return cloneChatStateSnapshot(await inFlight)
+  }
+
+  const pending = (async () => {
+    const resolved = await resolveChatSession({
+      userId: input.userId,
+      locale: input.locale,
+      requestedSessionId: input.requestedSessionId,
+    })
+
+    const [messages, memory, usage] = await Promise.all([
+      getRecentConversationMessages(input.userId, resolved.activeSessionId),
+      Promise.resolve(toSessionMemorySnapshot(resolved.activeSession)),
+      getChatUsageSnapshot(input.userId),
+    ])
+
+    const state: ChatStateResponse = {
+      messages,
+      memory,
+      usage,
+      policy: getChatPolicySnapshot(),
+      sessions: resolved.sessions,
+      activeSessionId: String(resolved.activeSessionId),
+    }
+
+    cache.set(cacheKey, {
+      data: state,
+      expiresAt: Date.now() + CHAT_STATE_CACHE_TTL_MS,
+    })
+    pruneChatCacheMap(cache, CHAT_STATE_CACHE_MAX_KEYS)
+    return state
+  })()
+
+  inFlightMap.set(cacheKey, pending)
+  try {
+    const state = await pending
+    return cloneChatStateSnapshot(state)
+  } finally {
+    inFlightMap.delete(cacheKey)
   }
 }
 
@@ -1116,6 +1297,7 @@ export async function persistChatExchange(input: {
     })
 
     await connection.commit()
+    invalidateChatCacheForUser(input.userId)
   } catch (error) {
     await connection.rollback()
     throw error
@@ -1170,6 +1352,7 @@ export async function markDailyChatFailure(input: {
     })
 
     await connection.commit()
+    invalidateChatCacheForUser(input.userId)
   } catch (error) {
     await connection.rollback()
     throw error
@@ -1368,6 +1551,7 @@ export async function persistCompactedMemory(input: {
     })
 
     await connection.commit()
+    invalidateChatCacheForUser(input.userId)
   } catch (error) {
     await connection.rollback()
     throw error
@@ -1388,6 +1572,7 @@ export async function deleteChatDataForUser(userId: string) {
     await connection.execute("DELETE FROM user_chat_memory WHERE user_id = ?", [userId])
     await connection.execute("DELETE FROM user_chat_usage_daily WHERE user_id = ?", [userId])
     await connection.commit()
+    invalidateChatCacheForUser(userId)
   } catch (error) {
     await connection.rollback()
     throw error

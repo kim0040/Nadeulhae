@@ -111,6 +111,7 @@ function logStep(message) {
 function buildRegisterPayload(email) {
   return {
     displayName: "Auth Tester",
+    nickname: "authtester",
     email,
     password: "nadeulhae2026",
     ageBand: "30_39",
@@ -130,6 +131,7 @@ function buildRegisterPayload(email) {
 function buildProfilePayload() {
   return {
     displayName: "Auth Tester Updated",
+    nickname: "authtester",
     ageBand: "40_49",
     primaryRegion: "current_location",
     interestTags: ["nature", "other"],

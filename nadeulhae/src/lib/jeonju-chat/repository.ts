@@ -13,6 +13,7 @@ export interface JeonjuChatMessageRow extends RowDataPacket {
   is_anonymous: number
   is_mine?: number
   created_at: Date | string
+  created_at_unix?: number | string | null
 }
 
 export interface JeonjuChatMessage {
@@ -104,17 +105,48 @@ function invalidateMessageCaches() {
   getDeltaMessagesInFlight().clear()
 }
 
+function toIsoFromRowTimestamp(value: Date | string, unixTimestamp: number | string | null | undefined) {
+  const normalizedUnix = Number(unixTimestamp)
+  if (Number.isFinite(normalizedUnix) && normalizedUnix > 0) {
+    return new Date(normalizedUnix * 1000).toISOString()
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString()
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (trimmed) {
+      const normalized = trimmed.includes("T") ? trimmed : trimmed.replace(" ", "T")
+      const parsed = new Date(/(?:z|[+-]\d{2}:\d{2})$/i.test(normalized) ? normalized : `${normalized}Z`)
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString()
+      }
+    }
+  }
+
+  return new Date().toISOString()
+}
+
+function decryptChatContentSafely(value: string) {
+  try {
+    return decryptDatabaseValue(value, "jeonju.chat.content")
+  } catch (error) {
+    console.error("Failed to decrypt Jeonju chat content:", error)
+    return ""
+  }
+}
+
 function toPublicMessage(row: JeonjuChatMessageRow): JeonjuChatMessage {
-  const createdAt = row.created_at instanceof Date
-    ? row.created_at.toISOString()
-    : new Date(row.created_at).toISOString()
+  const createdAt = toIsoFromRowTimestamp(row.created_at, row.created_at_unix)
 
   return {
     id: row.id,
     userId: row.is_anonymous ? null : row.user_id,
     nickname: row.is_anonymous ? (row.nickname.startsWith("익명") ? row.nickname : "익명") : row.nickname,
     nicknameTag: row.is_anonymous ? "" : row.nickname_tag,
-    content: decryptDatabaseValue(row.content, "jeonju.chat.content"),
+    content: decryptChatContentSafely(row.content),
     isAnonymous: row.is_anonymous === 1,
     isMine: row.is_mine === 1,
     createdAt,
@@ -122,7 +154,7 @@ function toPublicMessage(row: JeonjuChatMessageRow): JeonjuChatMessage {
 }
 
 const MESSAGE_SELECT_COLS = `
-  id, user_id, nickname, nickname_tag, content, is_anonymous, created_at
+  id, user_id, nickname, nickname_tag, content, is_anonymous, created_at, UNIX_TIMESTAMP(created_at) AS created_at_unix
 `
 
 /**
@@ -167,7 +199,10 @@ export async function getRecentMessages(limit: number = 50, viewerUserId?: strin
       params
     )
 
-    const messages = rows.reverse().map(toPublicMessage)
+    const messages = rows
+      .reverse()
+      .map(toPublicMessage)
+      .filter((message) => message.content.trim().length > 0)
     cache.set(cacheKey, {
       data: messages,
       expiresAt: Date.now() + JEONJU_RECENT_CACHE_TTL_MS,
@@ -227,7 +262,9 @@ export async function getMessagesSince(afterId: number, viewerUserId?: string | 
       params
     )
 
-    const messages = rows.map(toPublicMessage)
+    const messages = rows
+      .map(toPublicMessage)
+      .filter((message) => message.content.trim().length > 0)
     cache.set(cacheKey, {
       data: messages,
       expiresAt: Date.now() + JEONJU_DELTA_CACHE_TTL_MS,

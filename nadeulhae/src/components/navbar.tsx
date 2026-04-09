@@ -22,15 +22,43 @@ import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
 import { cn } from "@/lib/utils"
 
+const NAVBAR_COPY = {
+  ko: {
+    logout: "로그아웃",
+    logoutError: "로그아웃에 실패했어요. 다시 시도해 주세요.",
+    themeToggle: "테마 변경",
+  },
+  en: {
+    logout: "Log out",
+    logoutError: "Failed to log out. Please try again.",
+    themeToggle: "Toggle theme",
+  },
+} as const
+
+async function readErrorMessage(response: Response, fallback: string) {
+  try {
+    const payload = (await response.json()) as { error?: unknown }
+    if (typeof payload?.error === "string" && payload.error.trim().length > 0) {
+      return payload.error
+    }
+  } catch {
+    // no-op
+  }
+
+  return fallback
+}
+
 export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
   const { language, setLanguage, t } = useLanguage()
   const { theme, setTheme } = useTheme()
   const { user, setAuthenticatedUser } = useAuth()
+  const copy = NAVBAR_COPY[language]
   const [mounted, setMounted] = useState(false)
   const [isVisible, setIsVisible] = useState(true)
   const [isPending, startTransition] = useTransition()
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
   const lastScrollYRef = useRef(0)
 
   useEffect(() => {
@@ -49,6 +77,10 @@ export function Navbar() {
     window.addEventListener("scroll", controlNavbar, { passive: true })
     return () => window.removeEventListener("scroll", controlNavbar)
   }, [])
+
+  useEffect(() => {
+    setFeedbackMessage(null)
+  }, [language, pathname])
 
   const authItem = user
     ? {
@@ -70,18 +102,29 @@ export function Navbar() {
   ]
 
   const handleLogout = () => {
+    setFeedbackMessage(null)
+
     startTransition(async () => {
       try {
-        await fetch("/api/auth/logout", {
+        const response = await fetch("/api/auth/logout", {
           method: "POST",
+          headers: {
+            "Accept-Language": language,
+          },
           credentials: "include",
         })
-      } catch (error) {
-        console.error("Failed to log out:", error)
-      } finally {
+
+        if (!response.ok) {
+          setFeedbackMessage(await readErrorMessage(response, copy.logoutError))
+          return
+        }
+
         setAuthenticatedUser(null)
         router.push("/login")
         router.refresh()
+      } catch (error) {
+        console.error("Failed to log out:", error)
+        setFeedbackMessage(copy.logoutError)
       }
     })
   }
@@ -89,7 +132,7 @@ export function Navbar() {
   return (
     <header
       className={cn(
-        "pointer-events-none fixed left-0 right-0 top-0 z-50 flex items-center justify-between px-3 py-4 transition-all duration-500 sm:px-5 sm:py-5 lg:px-8 xl:px-10",
+        "pointer-events-none fixed left-0 right-0 top-0 z-50 flex items-center justify-between px-3 py-3.5 transition-all duration-500 sm:px-5 sm:py-4 lg:px-7 xl:px-8",
         isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
       )}
     >
@@ -116,18 +159,18 @@ export function Navbar() {
         </div>
       </Link>
 
-      <nav className="pointer-events-auto absolute left-1/2 z-50 w-[min(100%,calc(100vw-6.75rem))] max-w-[calc(100vw-6.75rem)] -translate-x-1/2 transition-all sm:w-auto sm:max-w-[calc(100vw-9rem)] lg:max-w-[calc(100vw-15rem)] xl:max-w-[calc(100vw-18rem)]">
+      <nav className="pointer-events-auto absolute left-1/2 z-50 w-[min(100%,calc(100vw-6rem))] max-w-[calc(100vw-6rem)] -translate-x-1/2 transition-all sm:w-auto sm:max-w-[calc(100vw-8rem)] lg:max-w-[calc(100vw-13rem)] xl:max-w-[calc(100vw-15rem)]">
         <div
           className={cn(
             "flex max-w-full items-center rounded-full border border-[var(--card-border)] bg-[var(--card)] shadow-xl shadow-active-blue/10 backdrop-blur-2xl transition-all",
             mounted
               ? language === "en"
-                ? "gap-0.5 px-1.5 py-1.5 sm:gap-4 sm:px-4 sm:py-2.5 lg:gap-5 lg:px-6 xl:gap-7 xl:px-8 xl:py-3"
-                : "gap-1 px-2 py-1.5 sm:gap-4 sm:px-4 sm:py-2.5 lg:gap-5 lg:px-6 xl:gap-7 xl:px-8 xl:py-3"
-              : "gap-1 px-2 py-1.5 sm:gap-4 sm:px-4 sm:py-2.5 lg:gap-5 lg:px-6 xl:gap-7 xl:px-8 xl:py-3"
+                ? "gap-0.5 px-1.5 py-1.5 sm:gap-3 sm:px-3 sm:py-2 lg:gap-3 lg:px-4 xl:gap-4 xl:px-5 xl:py-2.5"
+                : "gap-1 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2 lg:gap-3 lg:px-4 xl:gap-4 xl:px-5 xl:py-2.5"
+              : "gap-1 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2 lg:gap-3 lg:px-4 xl:gap-4 xl:px-5 xl:py-2.5"
           )}
         >
-          <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar sm:gap-4 lg:gap-5 xl:gap-7">
+          <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar sm:gap-4 lg:gap-5 xl:gap-6">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -150,18 +193,18 @@ export function Navbar() {
               ))}
             </div>
 
-          <div className="ml-1.5 flex shrink-0 items-center gap-1 border-l border-neutral-200 pl-2 dark:border-neutral-800 sm:ml-4 sm:gap-2 sm:pl-4 lg:ml-5 lg:gap-3 lg:pl-5 xl:ml-6 xl:gap-5 xl:pl-6">
+          <div className="ml-1 flex shrink-0 items-center gap-1 border-l border-neutral-200 pl-1.5 dark:border-neutral-800 sm:ml-2.5 sm:gap-1.5 sm:pl-2.5 lg:ml-3 lg:gap-2 lg:pl-3 xl:ml-3 xl:gap-2 xl:pl-3">
             {user ? (
               <button
                 type="button"
                 onClick={handleLogout}
                 disabled={isPending}
                 className="flex items-center gap-1.5 p-1.5 text-[10px] font-black text-neutral-500 transition-all hover:text-sky-blue disabled:opacity-50 sm:p-2 sm:text-[11px] xl:text-[13px]"
-                title={language === "ko" ? "로그아웃" : "Log out"}
+                title={copy.logout}
               >
                 <LogOutIcon size={17} />
                 <span className="hidden xl:inline">
-                  {language === "ko" ? "로그아웃" : "Log out"}
+                  {copy.logout}
                 </span>
               </button>
             ) : null}
@@ -176,7 +219,7 @@ export function Navbar() {
                   setTheme(modes[nextIndex])
                 }}
                 className="flex items-center gap-1.5 p-1.5 text-neutral-500 transition-all hover:text-sky-blue sm:p-2"
-                title="Theme Toggle"
+                title={copy.themeToggle}
               >
                 {theme === "light" && <Sun size={17} />}
                 {theme === "dark" && <Moon size={17} />}
@@ -199,7 +242,19 @@ export function Navbar() {
         </div>
       </nav>
 
-      <div className="hidden h-1 w-12 sm:block" />
+      {feedbackMessage ? (
+        <div className="pointer-events-none absolute inset-x-0 top-full mt-2 flex justify-center px-3">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="pointer-events-auto rounded-full border border-danger/25 bg-danger/10 px-4 py-2 text-xs font-bold text-danger shadow-lg backdrop-blur"
+          >
+            {feedbackMessage}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="hidden h-1 w-4 sm:block lg:w-8" />
     </header>
   )
 }

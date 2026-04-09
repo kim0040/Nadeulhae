@@ -3,57 +3,18 @@
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  ArrowRight,
-  Clock3,
-  Lock,
-  Mail,
-  MapPinned,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react"
-import { useTheme } from "next-themes"
+import { Eye, EyeOff, Lock, Mail, Sparkles } from "lucide-react"
 
-import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text"
-import { BorderBeam } from "@/components/magicui/border-beam"
-import { MagicCard } from "@/components/magicui/magic-card"
-import { Meteors } from "@/components/magicui/meteors"
-import { Particles } from "@/components/magicui/particles"
+import { AuthField } from "@/components/auth/auth-field"
+import { AuthShell } from "@/components/auth/auth-shell"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
 import type { AuthResponseBody } from "@/lib/auth/types"
-import { cn } from "@/lib/utils"
 
 const LOGIN_COPY = {
   ko: {
-    badge: "secure access",
     title: "로그인",
-    description: "로그인하면 저장된 설정으로 바로 시작할 수 있어요.",
-    helper: "안전한 방식으로 비밀번호를 보관하고 소중한 개인정보를 철저하게 지켜드립니다.",
-    sideEyebrow: "nadeulhae account",
-    sideTitle: "날씨 기록과 취향 프로필을 한 번에 다시 연결하세요",
-    sideDescription:
-      "로그인 후에는 기본 지역, 선호 시간대, 취미 정보가 대시보드와 챗봇에 매끄럽게 반영됩니다.",
-    statCards: [
-      { label: "세션 유지", value: "30일", meta: "활동 시 자동 연장" },
-      { label: "비밀번호", value: "scrypt", meta: "salt + pepper 적용" },
-      { label: "개인화", value: "지역·취향", meta: "대시보드와 연동" },
-    ],
-    points: [
-      {
-        title: "기본 지역 복원",
-        description: "전주 중심, 현재 위치 우선 등 저장해둔 기준을 바로 불러옵니다.",
-      },
-      {
-        title: "취미 기반 추천",
-        description: "산책, 카페, 자연, 가족 나들이 같은 선호도가 자연스럽게 반영됩니다.",
-      },
-      {
-        title: "안전한 인증 흐름",
-        description: "로그인 실패 제한 등 안전한 보안 기준이 적용되어 있습니다.",
-      },
-    ],
     emailLabel: "이메일",
     passwordLabel: "비밀번호",
     emailPlaceholder: "name@example.com",
@@ -63,37 +24,14 @@ const LOGIN_COPY = {
     signupLink: "회원가입",
     termsLink: "약관 보기",
     pendingRedirect: "이미 로그인된 상태입니다. 대시보드로 이동합니다.",
-    quickLabel: "로그인 후 바로 이어지는 정보",
-    quickItems: ["날씨 브리핑", "대시보드", "챗봇 메모리", "계정 설정"],
+    showPassword: "비밀번호 표시",
+    hidePassword: "비밀번호 숨기기",
+    submitting: "로그인 중...",
+    loginFallbackError: "로그인에 실패했습니다.",
+    loginNetworkError: "로그인 요청 중 네트워크 오류가 발생했습니다.",
   },
   en: {
-    badge: "secure access",
     title: "Log in",
-    description: "Restore your saved preferences and continue with today’s outing flow immediately.",
-    helper: "Passwords are stored only as non-reversible hashes, and the session is maintained with an HttpOnly cookie.",
-    sideEyebrow: "nadeulhae account",
-    sideTitle: "Reconnect your weather profile and outing preferences",
-    sideDescription:
-      "After login, your saved region, preferred time slot, and interests flow back into the dashboard and chatbot.",
-    statCards: [
-      { label: "Session", value: "30 days", meta: "Extended during activity" },
-      { label: "Password", value: "scrypt", meta: "Salt + pepper applied" },
-      { label: "Personalization", value: "Region + taste", meta: "Shared with dashboard" },
-    ],
-    points: [
-      {
-        title: "Restore your region defaults",
-        description: "Bring back saved choices like Jeonju-first or current-location priority.",
-      },
-      {
-        title: "Reuse hobby-aware guidance",
-        description: "Walking, cafe, nature, and family outing preferences are restored immediately.",
-      },
-      {
-        title: "Protected sign-in flow",
-        description: "Rate limits, session hardening, and same-origin checks are already applied.",
-      },
-    ],
     emailLabel: "Email",
     passwordLabel: "Password",
     emailPlaceholder: "name@example.com",
@@ -103,67 +41,35 @@ const LOGIN_COPY = {
     signupLink: "Sign up",
     termsLink: "View terms",
     pendingRedirect: "You are already logged in. Redirecting to the dashboard.",
-    quickLabel: "Available right after login",
-    quickItems: ["Weather briefing", "Dashboard", "Chat memory", "Account settings"],
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    submitting: "Logging in...",
+    loginFallbackError: "Login failed.",
+    loginNetworkError: "A network error occurred while logging in.",
   },
 } as const
 
-function LoginField({
-  label,
-  icon: Icon,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & {
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-}) {
-  return (
-    <div className="space-y-2">
-      <label className="ml-1 text-[11px] font-black uppercase tracking-[0.28em] text-sky-blue">
-        {label}
-      </label>
-      <div className="relative">
-        <Icon className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          {...props}
-          className={cn(
-            "w-full rounded-[1.45rem] border border-interactive-border bg-interactive/75 py-4 pl-12 pr-4 text-sm font-medium text-foreground outline-none transition focus:border-sky-blue/45",
-            props.className
-          )}
-        />
-      </div>
-    </div>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-  meta,
-}: {
-  label: string
-  value: string
-  meta: string
-}) {
-  return (
-    <div className="rounded-[1.45rem] border border-card-border/70 bg-background/80 p-4">
-      <p className="text-[11px] font-black uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-xl font-black tracking-tight text-foreground">{value}</p>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">{meta}</p>
-    </div>
-  )
+async function readAuthErrorMessage(response: Response, fallback: string) {
+  try {
+    const data = (await response.json()) as { error?: unknown }
+    return typeof data?.error === "string" && data.error.trim().length > 0
+      ? data.error
+      : fallback
+  } catch {
+    return fallback
+  }
 }
 
 export default function LoginPage() {
   const router = useRouter()
   const { language } = useLanguage()
-  const { resolvedTheme } = useTheme()
   const { status, setAuthenticatedUser } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const copy = LOGIN_COPY[language]
-  const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -185,29 +91,24 @@ export default function LoginPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept-Language": language,
           },
           credentials: "include",
           body: JSON.stringify({ email, password }),
         })
 
-        const data = await response.json()
         if (!response.ok) {
-          setMessage(
-            data.error ?? (language === "ko" ? "로그인에 실패했습니다." : "Login failed.")
-          )
+          setMessage(await readAuthErrorMessage(response, copy.loginFallbackError))
           return
         }
 
+        const data = (await response.json()) as AuthResponseBody
         setAuthenticatedUser((data as AuthResponseBody).user)
         router.push("/dashboard")
         router.refresh()
       } catch (error) {
         console.error("Login request failed:", error)
-        setMessage(
-          language === "ko"
-            ? "로그인 요청 중 네트워크 오류가 발생했습니다."
-            : "A network error occurred while logging in."
-        )
+        setMessage(copy.loginNetworkError)
       }
     })
   }
@@ -215,115 +116,92 @@ export default function LoginPage() {
   const redirectMessage = status === "authenticated" ? copy.pendingRedirect : null
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-24 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8">
-      <Particles
-        className="absolute inset-0 z-0 opacity-75"
-        quantity={84}
-        ease={80}
-        color={particleColor}
-        refresh
-      />
-      <Meteors number={12} className="z-0" />
-
-      <div className="relative z-10 mx-auto flex w-full max-w-md flex-col">
-        <section className="w-full">
-          <MagicCard
-            mode="orb"
-            className="overflow-hidden rounded-[2rem] sm:rounded-[2.4rem]"
-            glowSize={360}
-            glowBlur={70}
-            glowOpacity={0.44}
-            glowFrom="#0b7d71"
-            glowTo="#2f6fe4"
+    <AuthShell
+      title={copy.title}
+      showSidePanel={false}
+      performanceMode="fast"
+      footer={(
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-card-border/70 pt-5">
+          <p className="text-sm text-muted-foreground">
+            {copy.signupPrompt}{" "}
+            <Link href="/signup" className="font-black text-sky-blue hover:underline">
+              {copy.signupLink}
+            </Link>
+          </p>
+          <Link
+            href="/terms"
+            className="text-xs font-black uppercase tracking-[0.25em] text-muted-foreground hover:text-sky-blue"
           >
-            <div className="relative rounded-[2rem] border border-card-border/70 bg-card/92 p-5 shadow-[0_24px_120px_rgba(17,32,39,0.16)] backdrop-blur-2xl sm:rounded-[2.4rem] sm:p-8">
-              <BorderBeam
-                size={220}
-                duration={10}
-                delay={4}
-                colorFrom="var(--beam-from)"
-                colorTo="var(--beam-to)"
-              />
+            {copy.termsLink}
+          </Link>
+        </div>
+      )}
+    >
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <AuthField
+          type="email"
+          label={copy.emailLabel}
+          icon={Mail}
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder={copy.emailPlaceholder}
+          autoComplete="email"
+          required
+        />
 
-              <div className="relative z-10 space-y-6">
-                <div className="space-y-4">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-active-blue/20 bg-active-blue/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.35em] text-active-blue">
-                    <Sparkles className="size-3.5" />
-                    {copy.badge}
-                  </span>
-                  <div className="space-y-3">
-                    <AnimatedGradientText className="text-3xl font-black tracking-tight sm:text-4xl">
-                      {copy.title}
-                    </AnimatedGradientText>
-                  </div>
-                </div>
+        <AuthField
+          type={showPassword ? "text" : "password"}
+          label={copy.passwordLabel}
+          icon={Lock}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder={copy.passwordPlaceholder}
+          autoComplete="current-password"
+          required
+          trailing={(
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground transition hover:text-foreground"
+              tabIndex={-1}
+              aria-label={showPassword ? copy.hidePassword : copy.showPassword}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          )}
+        />
 
-                <form className="space-y-5" onSubmit={handleSubmit}>
-                  <LoginField
-                    type="email"
-                    label={copy.emailLabel}
-                    icon={Mail}
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder={copy.emailPlaceholder}
-                    autoComplete="email"
-                    required
-                  />
+        {redirectMessage ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-[1.3rem] border border-sky-blue/20 bg-sky-blue/10 px-4 py-3 text-sm font-semibold text-sky-blue"
+          >
+            {redirectMessage}
+          </div>
+        ) : null}
 
-                  <LoginField
-                    type="password"
-                    label={copy.passwordLabel}
-                    icon={Lock}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder={copy.passwordPlaceholder}
-                    autoComplete="current-password"
-                    required
-                  />
+        {message ? (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger"
+          >
+            {message}
+          </div>
+        ) : null}
 
-                  {redirectMessage ? (
-                    <div className="rounded-[1.3rem] border border-sky-blue/20 bg-sky-blue/10 px-4 py-3 text-sm font-semibold text-sky-blue">
-                      {redirectMessage}
-                    </div>
-                  ) : null}
-
-                  {message ? (
-                    <div className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
-                      {message}
-                    </div>
-                  ) : null}
-
-                  <ShimmerButton
-                    type="submit"
-                    className="w-full rounded-[1.45rem] py-4 text-base font-black"
-                    disabled={isPending || status === "authenticated"}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      {isPending ? "..." : copy.submit}
-                      {!isPending ? <ArrowRight className="size-4" /> : null}
-                    </span>
-                  </ShimmerButton>
-                </form>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-card-border/70 pt-5">
-                  <p className="text-sm text-muted-foreground">
-                    {copy.signupPrompt}{" "}
-                    <Link href="/signup" className="font-black text-sky-blue hover:underline">
-                      {copy.signupLink}
-                    </Link>
-                  </p>
-                  <Link
-                    href="/terms"
-                    className="text-xs font-black uppercase tracking-[0.25em] text-muted-foreground hover:text-sky-blue"
-                  >
-                    {copy.termsLink}
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </MagicCard>
-        </section>
-      </div>
-    </main>
+        <ShimmerButton
+          type="submit"
+          className="w-full rounded-[1.45rem] py-4 text-base font-black"
+          disabled={isPending || status === "authenticated"}
+        >
+          <span className="inline-flex items-center gap-2">
+            {isPending ? copy.submitting : copy.submit}
+            <Sparkles className="size-4" />
+          </span>
+        </ShimmerButton>
+      </form>
+    </AuthShell>
   )
 }

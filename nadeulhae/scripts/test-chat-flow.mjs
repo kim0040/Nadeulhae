@@ -106,6 +106,7 @@ function logStep(message) {
 function buildRegisterPayload(email) {
   return {
     displayName: "Chat Tester",
+    nickname: "chattester",
     email,
     password: "nadeulhae2026",
     ageBand: "30_39",

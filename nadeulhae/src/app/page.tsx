@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
 import {
   CloudIcon,
@@ -19,10 +20,16 @@ import { Particles } from "@/components/magicui/particles"
 import { Meteors } from "@/components/magicui/meteors"
 import { WordPullUp } from "@/components/magicui/word-pull-up"
 import { ShineBorder } from "@/components/magicui/shine-border"
-import { PicnicBriefing } from "@/components/picnic-briefing"
-import { WeatherImagePanel, type WeatherImageData } from "@/components/weather-image-panel"
-import { FireInsightPanel } from "@/components/fire-insight-panel"
-import { TodayHourlyForecast, type HourlyForecastItem } from "@/components/today-hourly-forecast"
+import type { HourlyForecastItem } from "@/components/today-hourly-forecast"
+import type { WeatherImageData } from "@/components/weather-image-panel"
+
+const PicnicBriefing = dynamic(() => import("@/components/picnic-briefing").then(m => ({ default: m.PicnicBriefing })), { ssr: false })
+const WeatherImagePanel = dynamic(() => import("@/components/weather-image-panel").then(m => ({ default: m.WeatherImagePanel })), { ssr: false })
+const FireInsightPanel = dynamic(() => import("@/components/fire-insight-panel").then(m => ({ default: m.FireInsightPanel })), { ssr: false })
+const TodayHourlyForecast = dynamic(() => import("@/components/today-hourly-forecast").then(m => ({ default: m.TodayHourlyForecast })), {
+  ssr: false,
+  loading: () => <div className="h-48 animate-pulse rounded-3xl bg-card" />,
+})
 
 function localizeUvLabel(value: string | undefined, language: "ko" | "en") {
   if (!value) return "--"
@@ -86,9 +93,9 @@ export default function Home() {
           await loadFallback()
         },
         {
-          enableHighAccuracy: true,
+          enableHighAccuracy: false,
           timeout: 10000,
-          maximumAge: 0,
+          maximumAge: 300000,
         }
       )
     }
@@ -214,8 +221,8 @@ export default function Home() {
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden bg-background">
       <section className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden py-24 sm:py-32">
-        <Particles className="absolute inset-0 z-0 opacity-70" quantity={72} ease={80} color={particleColor} refresh />
-        <Meteors number={10} className="z-0" />
+        <Particles className="absolute inset-0 z-0 opacity-70" quantity={36} ease={80} color={particleColor} />
+        <Meteors number={4} className="z-0" />
 
         <div className="z-10 flex max-w-6xl flex-col items-center gap-6 px-4 text-center">
           {weatherData.isFallback && (

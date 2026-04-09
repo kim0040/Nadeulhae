@@ -103,7 +103,7 @@ const POLICY_CONTENT: Record<
         title: "4. 개인정보 국외 이전 고지 의무 명시",
         items: [
           "나들해의 모든 회원 서비스는 보안 강화 및 최신의 기술 집약적인 클라우드 데이터 관리 환경 하에서 제공되며, '개인정보 보호법 제28조의8' 및 정보통신망 이용촉진 등에 관한 규정을 준수하여 수집된 정보를 다음과 같이 물리적 서버가 국외에 존재하는 수탁업체로 안전히 이전(위탁 보관)하여 처리합니다.",
-          "① 국외 이전받는 자: PingCAP Inc (TiDB Cloud 데이터베이스 솔루션 운영사) 및 Vercel Inc (웹 호스팅 서버 운영사).",
+          "① 국외 이전받는 자: PingCAP Inc (TiDB Cloud 데이터베이스 솔루션 운영사) 및 Vultr (클라우드 인프라/웹 호스팅 서버 운영사).",
           "② 이전되는 국가 및 이전 일시/방법: 데이터를 전송 및 저장하는 물리적 주요 거점 국가는 일본(AWS ap-northeast 리전) 및 미국이며, 서비스 가입 또는 정보 갱신/채팅 발송 시 암호화된 전송망(TLS 지원)을 통해 자동 실시간으로 이전됩니다.",
           "③ 이전되는 관련 정보 항목: 이메일, 개인 프로필(연령, 취미, 시간 등), 해시 암호, 작성한 채팅 메시지 등 나들해 서비스를 통해 가입 시 수집되거나 활동 시 생산된 전체 정보.",
           "④ 이전의 목적 및 보유 기간: 글로벌 최고 수준의 고가용성 데이터베이스 저장 목적이며, 데이터는 회원의 탈퇴 등 법정 파기 사유 달성 시점(다만 채팅은 규정된 단기 보존 만료 시 파기)까지 안정적으로 이용 및 보유됩니다.",
@@ -116,7 +116,7 @@ const POLICY_CONTENT: Record<
         title: "5. 보관 및 파기 절차 및 기준",
         items: [
           "수집된 회원 정보는 목적 달성(회원 탈퇴)과 동시에 해당 데이터베이스 테이블에서 삭제 및 영구 삭제 플래그로 파기하여 데이터 복원이 불가하도록 안전하게 소거합니다.",
-          "통신비밀보호법 등 관련 법률 상 보존 의무가 명시적인 접속 이벤트, 로그인 정보 통계의 경우 관련 법에서 지정된 기간 한도로 제한적으로 분리 보관한 후에 파기될 수 있습니다.",
+          "통신비밀보호법 등 관련 법률 취지를 반영해 접속 이벤트 및 로그인 보안 통계는 최대 3개월(90일)까지 제한적으로 분리 보관되며, 기간 만료 시 자동 파기됩니다.",
           "단기 휘발성 보관 원칙에 따라 실시간 커뮤니티 채팅 서비스 상 작성한 메시지(닉네임 표시분 포함)는 서버 등록 기점 7일(168시간) 초과 시 어떠한 백업 저장분 없이 데이터베이스 상에서 원천 삭제됩니다.",
         ],
       },
@@ -136,7 +136,7 @@ const POLICY_CONTENT: Record<
         title: "7. 이용자 권리와 구제(문의) 창구",
         items: [
           "모든 회원은 서비스 메인 화면 내 대시보드의 계정 설정 항목에서 본인의 등록 정보를 언제든 열람, 수정, 파기(회원 탈퇴 처리) 할 권한을 자유롭게 가집니다.",
-          "개인정보 또는 위치정보 활용, 기타 시스템 장애와 관련해 발생하는 건의/민원 접수 및 법률 문의 대응은 서비스 내 명시된 공식 고객 지원 이메일을 통해 신속히 처리를 도모합니다.",
+          "개인정보 또는 위치정보 활용, 기타 시스템 장애와 관련해 발생하는 건의/민원 접수 및 법률 문의 대응은 공식 고객 지원 메일(kim0040@jbnu.ac.kr)로 접수해 신속히 처리합니다.",
         ],
       },
     ],
@@ -210,7 +210,7 @@ const POLICY_CONTENT: Record<
         title: "4. Mandatory Notice on Cross-Border Data Transfer",
         items: [
           "Nadeulhae processes database structures utilizing cutting-edge global cloud technologies. Pursuant to the PIPA (Personal Information Protection Act) Article 28-8, paragraph 1, item 3, necessary records are securely transferred to overseas hosting vendors.",
-          "① Transferee: PingCAP Inc. (TiDB Cloud Infrastructure DB Solutions) and Vercel Inc. (Web Server Platform Provider).",
+          "① Transferee: PingCAP Inc. (TiDB Cloud Infrastructure DB Solutions) and Vultr (cloud infrastructure and web hosting provider).",
           "② Country and Transfer Mechanics: Principal server facilities reside in Japan (AWS ap-northeast) and USA. Transmission happens automatically in real-time under robust TLS/SSL encryption when members update profiles or submit chats.",
           "③ Processed Datasets: Names, emails, passwords (hashed), activity interests, and user-generated chat payloads created over Nadeulhae.",
           "④ Objective and Retention duration: Assures high-availability and fault-tolerant retention across borders. Retained strictly until members legally delete accounts (minus community chats which auto-expire at exactly 7 days).",
@@ -223,7 +223,7 @@ const POLICY_CONTENT: Record<
         title: "5. Retention and Safe Disposal",
         items: [
           "Collected standard member data is instantly destructed and virtually voided (via permanent delete flags avoiding soft recoveries) synchronously upon an account deletion execution.",
-          "System logs mandated under localized ecommerce laws are quarantined separately for max 3 months if enforced.",
+          "Security-relevant access and login event logs are retained for up to 3 months (90 days) and automatically deleted once the retention period expires.",
           "As a strict privacy protocol, the 'Jeonju Real-Time Chat' data physically self-destructs precisely 168 hours (7 days) after a message has been sent; leaving no archived history nor identifiable residuals.",
         ],
       },
@@ -243,7 +243,7 @@ const POLICY_CONTENT: Record<
         title: "7. User Claims and Remediation",
         items: [
           "Members yield perpetual authority to review, amend, and immediately terminate their Nadeulhae registry and related records straight from the in-app active Settings dashboard.",
-          "For further inquiries entailing data infringement suspicions, geolocation inquiries, or service complaints, contact our official support email to prompt investigation workflows.",
+          "For privacy, geolocation, and service complaints, contact our official support email at kim0040@jbnu.ac.kr for prompt assistance.",
         ],
       },
     ],
@@ -259,18 +259,18 @@ export default function TermsPage() {
     <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-20 pt-24 sm:px-6 sm:pt-28 lg:px-8">
       <Particles
         className="absolute inset-0 z-0 opacity-75"
-        quantity={72}
+        quantity={60}
         ease={80}
         color={resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"}
         refresh
       />
-      <Meteors number={10} className="z-0" />
+      <Meteors number={7} className="z-0" />
 
       <div className="relative z-10 mx-auto max-w-6xl space-y-6 sm:space-y-8">
         <MagicCard className="overflow-hidden rounded-[2.6rem]" gradientSize={240}>
           <div className="relative rounded-[2.2rem] border border-card-border/70 bg-card/90 p-6 backdrop-blur-2xl sm:rounded-[2.6rem] sm:p-10">
             <BorderBeam
-              size={220}
+              size={200}
               duration={10}
               delay={4}
               colorFrom="var(--beam-from)"

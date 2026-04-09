@@ -18,6 +18,7 @@ interface UserRow extends RowDataPacket {
   email_hash: string | null
   display_name: string
   nickname: string
+  nickname_hash: string | null
   nickname_tag: string
   password_hash: string
   password_salt: string
@@ -88,6 +89,23 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase()
 }
 
+function normalizeNickname(value: string) {
+  return value.trim().normalize("NFKC")
+}
+
+function parseEncryptedJsonArray(value: unknown, context: string) {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string")
+  }
+
+  if (typeof value !== "string") {
+    return []
+  }
+
+  const plain = decryptDatabaseValueSafely(value, context) ?? value
+  return parseJsonArray(plain)
+}
+
 function toIsoString(value: Date | string) {
   if (value instanceof Date) {
     return value.toISOString()
@@ -123,19 +141,25 @@ export function toPublicUser(row: Pick<
   | "created_at"
 >): AuthUser {
   const displayName = decryptDatabaseValueSafely(row.display_name, "users.display_name") ?? row.display_name
+  const decryptedNickname = decryptDatabaseValueSafely(row.nickname, "users.nickname")
+  const nickname = normalizeNickname(decryptedNickname ?? row.nickname) || displayName
+  const ageBand = decryptDatabaseValueSafely(row.age_band, "users.age_band") ?? row.age_band
+  const primaryRegion = decryptDatabaseValueSafely(row.primary_region, "users.primary_region") ?? row.primary_region
+  const preferredTimeSlot = decryptDatabaseValueSafely(row.preferred_time_slot, "users.preferred_time_slot")
+    ?? row.preferred_time_slot
 
   return {
     id: row.id,
     email: normalizeEmail(decryptDatabaseValueSafely(row.email, "users.email") ?? row.email),
     displayName,
-    nickname: row.nickname ?? displayName,
+    nickname,
     nicknameTag: row.nickname_tag ?? "0000",
-    ageBand: row.age_band,
-    primaryRegion: row.primary_region,
-    interestTags: parseJsonArray(row.interest_tags),
+    ageBand,
+    primaryRegion,
+    interestTags: parseEncryptedJsonArray(row.interest_tags, "users.interest_tags"),
     interestOther: decryptDatabaseValueSafely(row.interest_other, "users.interest_other"),
-    preferredTimeSlot: row.preferred_time_slot,
-    weatherSensitivity: parseJsonArray(row.weather_sensitivity),
+    preferredTimeSlot,
+    weatherSensitivity: parseEncryptedJsonArray(row.weather_sensitivity, "users.weather_sensitivity"),
     marketingAccepted: row.marketing_accepted === 1,
     analyticsAccepted: row.analytics_accepted === 1,
     createdAt: toIsoString(row.created_at),
@@ -170,6 +194,7 @@ export async function findUserByEmail(email: string) {
         email_hash,
         display_name,
         nickname,
+        nickname_hash,
         nickname_tag,
         password_hash,
         password_salt,
@@ -205,6 +230,7 @@ export async function findUserById(userId: string) {
         email_hash,
         display_name,
         nickname,
+        nickname_hash,
         nickname_tag,
         password_hash,
         password_salt,
@@ -229,19 +255,21 @@ export async function findUserById(userId: string) {
 }
 
 async function generateUniqueNicknameTag(nickname: string): Promise<string> {
+  const normalizedNickname = normalizeNickname(nickname)
+  const nicknameHash = createBlindIndex(normalizedNickname, "users.nickname")
   const maxAttempts = 20
   for (let i = 0; i < maxAttempts; i++) {
     const tag = String(Math.floor(Math.random() * 10000)).padStart(4, '0')
     const existing = await queryRows<RowDataPacket[]>(
-      'SELECT 1 FROM users WHERE nickname = ? AND nickname_tag = ? LIMIT 1',
-      [nickname, tag]
+      'SELECT 1 FROM users WHERE (nickname_hash = ? OR nickname = ?) AND nickname_tag = ? LIMIT 1',
+      [nicknameHash, normalizedNickname, tag]
     )
     if (existing.length === 0) return tag
   }
   // Fallback: sequential scan for available tag
   const usedTags = await queryRows<RowDataPacket[]>(
-    'SELECT nickname_tag FROM users WHERE nickname = ?',
-    [nickname]
+    'SELECT nickname_tag FROM users WHERE nickname_hash = ? OR nickname = ?',
+    [nicknameHash, normalizedNickname]
   )
   const usedSet = new Set(usedTags.map(r => r.nickname_tag))
   for (let n = 0; n < 10000; n++) {
@@ -272,7 +300,14 @@ export async function createUser(input: {
   await ensureAuthSchema()
 
   const normalizedEmail = normalizeEmail(input.email)
-  const nicknameTag = await generateUniqueNicknameTag(input.nickname)
+  const normalizedNickname = normalizeNickname(input.nickname)
+  const nicknameTag = await generateUniqueNicknameTag(normalizedNickname)
+  const normalizedInterestTags = Array.isArray(input.interestTags)
+    ? input.interestTags.filter((item): item is string => typeof item === "string")
+    : []
+  const normalizedWeatherSensitivity = Array.isArray(input.weatherSensitivity)
+    ? input.weatherSensitivity.filter((item): item is string => typeof item === "string")
+    : []
 
   await executeStatement(
     `
@@ -282,6 +317,7 @@ export async function createUser(input: {
         email_hash,
         display_name,
         nickname,
+        nickname_hash,
         nickname_tag,
         password_hash,
         password_salt,
@@ -299,24 +335,25 @@ export async function createUser(input: {
         marketing_agreed_at,
         analytics_accepted,
         analytics_agreed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       input.id,
       encryptDatabaseValue(normalizedEmail, "users.email"),
       createBlindIndex(normalizedEmail, "users.email"),
       encryptDatabaseValue(input.displayName, "users.display_name"),
-      input.nickname,
+      encryptDatabaseValue(normalizedNickname, "users.nickname"),
+      createBlindIndex(normalizedNickname, "users.nickname"),
       nicknameTag,
       input.passwordHash,
       input.passwordSalt,
       input.passwordAlgorithm,
-      input.ageBand,
-      input.primaryRegion,
-      JSON.stringify(input.interestTags),
+      encryptDatabaseValue(input.ageBand, "users.age_band"),
+      encryptDatabaseValue(input.primaryRegion, "users.primary_region"),
+      encryptDatabaseValue(JSON.stringify(normalizedInterestTags), "users.interest_tags"),
       encryptDatabaseValueSafely(input.interestOther || null, "users.interest_other"),
-      input.preferredTimeSlot,
-      JSON.stringify(input.weatherSensitivity),
+      encryptDatabaseValue(input.preferredTimeSlot, "users.preferred_time_slot"),
+      encryptDatabaseValue(JSON.stringify(normalizedWeatherSensitivity), "users.weather_sensitivity"),
       input.agreedAt,
       input.agreedAt,
       input.agreedAt,
@@ -398,6 +435,7 @@ export async function findUserBySessionTokenHash(tokenHash: string) {
         u.email,
         u.display_name,
         u.nickname,
+        u.nickname_hash,
         u.nickname_tag,
         u.password_hash,
         u.password_salt,
@@ -472,12 +510,19 @@ export async function updateUserProfile(input: {
   analyticsAccepted: boolean
 }) {
   await ensureAuthSchema()
+  const normalizedNickname = normalizeNickname(input.nickname)
+  const normalizedInterestTags = Array.isArray(input.interestTags)
+    ? input.interestTags.filter((item): item is string => typeof item === "string")
+    : []
+  const normalizedWeatherSensitivity = Array.isArray(input.weatherSensitivity)
+    ? input.weatherSensitivity.filter((item): item is string => typeof item === "string")
+    : []
 
   // Check if nickname changed and regenerate tag if needed
   const currentUser = await findUserById(input.userId)
   let nicknameTag = currentUser?.nicknameTag ?? '0000'
-  if (currentUser && currentUser.nickname !== input.nickname) {
-    nicknameTag = await generateUniqueNicknameTag(input.nickname)
+  if (currentUser && currentUser.nickname !== normalizedNickname) {
+    nicknameTag = await generateUniqueNicknameTag(normalizedNickname)
   }
 
   await executeStatement(
@@ -486,6 +531,7 @@ export async function updateUserProfile(input: {
       SET
         display_name = ?,
         nickname = ?,
+        nickname_hash = ?,
         nickname_tag = ?,
         age_band = ?,
         primary_region = ?,
@@ -507,14 +553,15 @@ export async function updateUserProfile(input: {
     `,
     [
       encryptDatabaseValue(input.displayName, "users.display_name"),
-      input.nickname,
+      encryptDatabaseValue(normalizedNickname, "users.nickname"),
+      createBlindIndex(normalizedNickname, "users.nickname"),
       nicknameTag,
-      input.ageBand,
-      input.primaryRegion,
-      JSON.stringify(input.interestTags),
+      encryptDatabaseValue(input.ageBand, "users.age_band"),
+      encryptDatabaseValue(input.primaryRegion, "users.primary_region"),
+      encryptDatabaseValue(JSON.stringify(normalizedInterestTags), "users.interest_tags"),
       encryptDatabaseValueSafely(input.interestOther || null, "users.interest_other"),
-      input.preferredTimeSlot,
-      JSON.stringify(input.weatherSensitivity),
+      encryptDatabaseValue(input.preferredTimeSlot, "users.preferred_time_slot"),
+      encryptDatabaseValue(JSON.stringify(normalizedWeatherSensitivity), "users.weather_sensitivity"),
       input.marketingAccepted ? 1 : 0,
       input.analyticsAccepted ? 1 : 0,
       input.marketingAccepted ? 1 : 0,

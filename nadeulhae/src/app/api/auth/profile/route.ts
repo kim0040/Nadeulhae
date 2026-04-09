@@ -18,6 +18,7 @@ import {
   getAuthenticatedSessionFromRequest,
 } from "@/lib/auth/session"
 import { validateUpdateProfilePayload } from "@/lib/auth/validation"
+import { getAuthMessage, resolveAuthLocale } from "@/lib/auth/messages"
 import { recordDailyConsentDecisionSafely } from "@/lib/analytics/repository"
 import { attachAnalyticsConsentCookie } from "@/lib/analytics/consent"
 import { withApiAnalytics } from "@/lib/analytics/route"
@@ -25,11 +26,12 @@ import { withApiAnalytics } from "@/lib/analytics/route"
 export const runtime = "nodejs"
 
 async function handlePATCH(request: NextRequest) {
+  const locale = resolveAuthLocale(request.headers.get("accept-language"))
   const ipAddress = getClientIp(request)
   const userAgent = getUserAgent(request)
 
   try {
-    const requestViolation = validateAuthMutationRequest(request)
+    const requestViolation = validateAuthMutationRequest(request, locale)
     if (requestViolation) {
       return requestViolation
     }
@@ -38,7 +40,7 @@ async function handlePATCH(request: NextRequest) {
     if (!authenticatedSession) {
       return clearAuthCookie(
         createAuthJsonResponse(
-          { error: "로그인이 필요합니다." },
+          { error: getAuthMessage(locale, "authRequired") },
           { status: 401 }
         )
       )
@@ -51,12 +53,12 @@ async function handlePATCH(request: NextRequest) {
       payload = await request.json()
     } catch {
       return createAuthJsonResponse(
-        { error: "잘못된 JSON 요청입니다." },
+        { error: getAuthMessage(locale, "invalidJsonRequest") },
         { status: 400 }
       )
     }
 
-    const validation = validateUpdateProfilePayload(payload)
+    const validation = validateUpdateProfilePayload(payload, locale)
     if ("error" in validation) {
       return createAuthJsonResponse({ error: validation.error }, { status: 400 })
     }
@@ -65,7 +67,7 @@ async function handlePATCH(request: NextRequest) {
     if (!existingUser) {
       return clearAuthCookie(
         createAuthJsonResponse(
-          { error: "계정 정보를 찾을 수 없습니다." },
+          { error: getAuthMessage(locale, "accountNotFound") },
           { status: 404 }
         )
       )
@@ -135,6 +137,18 @@ async function handlePATCH(request: NextRequest) {
     )
     return response
   } catch (error) {
+    const duplicateNickname = typeof error === "object"
+      && error !== null
+      && "code" in error
+      && String((error as { code?: unknown }).code) === "ER_DUP_ENTRY"
+
+    if (duplicateNickname) {
+      return createAuthJsonResponse(
+        { error: getAuthMessage(locale, "duplicateNickname") },
+        { status: 409 }
+      )
+    }
+
     console.error("Profile update API failed:", error)
     await recordAuthSecurityEventSafely({
       eventType: "profile_update_failed",
@@ -145,7 +159,7 @@ async function handlePATCH(request: NextRequest) {
     })
 
     return createAuthJsonResponse(
-      { error: "회원 정보를 수정하는 중 오류가 발생했습니다." },
+      { error: getAuthMessage(locale, "profileUpdateInternalError") },
       { status: 500 }
     )
   }
