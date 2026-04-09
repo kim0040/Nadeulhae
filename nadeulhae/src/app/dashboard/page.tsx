@@ -10,6 +10,8 @@ import {
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
+import { BorderBeam } from "@/components/magicui/border-beam"
+import { MagicCard } from "@/components/magicui/magic-card"
 import { Meteors } from "@/components/magicui/meteors"
 import { Particles } from "@/components/magicui/particles"
 import { DashboardChatPanel } from "@/components/chat/dashboard-chat-panel"
@@ -19,6 +21,7 @@ import { useLanguage } from "@/context/LanguageContext"
 import { getOptionLabel, PRIMARY_REGION_OPTIONS } from "@/lib/auth/profile-options"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { AuthUser } from "@/lib/auth/types"
+import { formatServerDateTime, parseServerTimestamp } from "@/lib/time/server-time"
 import { cn } from "@/lib/utils"
 import { dataService, type WeatherData } from "@/services/dataService"
 
@@ -26,18 +29,53 @@ import { DASHBOARD_COPY } from "./constants"
 import { SectionCard, StatusMetric } from "@/components/dashboard/ui"
 import { SettingsModal } from "@/components/dashboard/settings-modal"
 
-function formatLastUpdate(value: WeatherData["metadata"] extends { lastUpdate: infer T } ? T : unknown) {
+function formatLastUpdate(
+  value: WeatherData["metadata"] extends { lastUpdate: infer T } ? T : unknown,
+  language: "ko" | "en"
+) {
+  const formatValue = (raw: string) => {
+    const parsed = parseServerTimestamp(raw)
+    if (!parsed) {
+      return raw
+    }
+
+    return formatServerDateTime(parsed, language)
+  }
+
   if (!value) return "-"
-  if (typeof value === "string") return value
+  if (typeof value === "string") return formatValue(value)
   if (typeof value === "object" && value !== null) {
     const record = value as Record<string, string>
-    return Object.values(record).filter(Boolean).join(" / ")
+    return Object.values(record).filter(Boolean).map(formatValue).join(" / ")
   }
   return "-"
 }
 
+function splitBulletinSummary(summary: string) {
+  const cleaned = summary
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((segment) => segment.replace(/^[•·\-*\s]+/, "").trim())
+    .filter(Boolean)
+    .flatMap((line) =>
+      line.split(/(?<=[.!?])\s+|(?<=다\.)\s+|(?<=요\.)\s+/).map((segment) => segment.trim()).filter(Boolean)
+    )
+
+  const uniqueSegments: string[] = []
+  for (const segment of cleaned) {
+    if (!uniqueSegments.includes(segment)) {
+      uniqueSegments.push(segment)
+    }
+    if (uniqueSegments.length >= 4) {
+      break
+    }
+  }
+
+  return uniqueSegments
+}
+
 function DashboardWorkspace({ user }: { user: AuthUser }) {
-  const { language } = useLanguage()
+  const { language, t } = useLanguage()
   const { resolvedTheme } = useTheme()
   const copy = DASHBOARD_COPY[language]
 
@@ -50,14 +88,16 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
 
   const loadWeather = useCallback(async (lat?: number, lon?: number) => {
-    const detail = await dataService.getWeatherData(lat, lon)
-    setWeatherData(detail)
-
     const query = lat != null && lon != null ? `?lat=${lat}&lon=${lon}` : ""
-    const response = await fetch(`/api/weather/forecast${query}`, {
-      cache: "no-store",
-      credentials: "include",
-    })
+    const [detail, response] = await Promise.all([
+      dataService.getWeatherData(lat, lon),
+      fetch(`/api/weather/forecast${query}`, {
+        cache: "no-store",
+        credentials: "include",
+      }),
+    ])
+
+    setWeatherData(detail)
     if (!response.ok) {
       setHourlyForecast([])
       return
@@ -115,19 +155,30 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
 
   const weatherPrimaryMetrics = useMemo(() => {
     if (!weatherData) return []
+    const localizedStatus = t(weatherData.status, weatherData.status)
     return [
-      { label: copy.score, value: String(weatherData.score), meta: weatherData.status },
+      { label: copy.score, value: String(weatherData.score), meta: localizedStatus },
       { label: copy.temp, value: `${weatherData.details.temp ?? "--"}°C` },
       { label: copy.feelsLike, value: `${weatherData.details.feelsLike ?? weatherData.details.temp ?? "--"}°C` },
       { label: copy.humidity, value: `${weatherData.details.humidity ?? "--"}%` },
       { label: copy.wind, value: `${weatherData.details.wind ?? "--"}m/s` },
       { label: copy.pm10, value: weatherData.details.pm10 != null ? `${weatherData.details.pm10}` : weatherData.details.dust || "--" },
     ]
-  }, [copy, weatherData])
+  }, [copy, t, weatherData])
 
   const weatherTags = useMemo(() => {
     return weatherData?.metadata?.alertSummary?.hazardTags?.filter(Boolean) ?? []
   }, [weatherData])
+
+  const bulletinSummary = weatherData?.metadata?.bulletin?.summary?.trim() ?? ""
+  const bulletinWarningStatus = weatherData?.metadata?.bulletin?.warningStatus?.trim() ?? ""
+  const bulletinSegments = useMemo(() => splitBulletinSummary(bulletinSummary), [bulletinSummary])
+  const bulletinUpdatedLabel = useMemo(() => {
+    return formatLastUpdate(
+      weatherData?.metadata?.bulletin?.updatedAt || weatherData?.metadata?.lastUpdate,
+      language
+    )
+  }, [language, weatherData?.metadata?.bulletin?.updatedAt, weatherData?.metadata?.lastUpdate])
 
   const chatWeatherContext = useMemo<ChatWeatherContext | null>(() => {
     if (!weatherData) {
@@ -167,9 +218,9 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
   }, [weatherData])
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-32 sm:px-6 sm:pt-36 lg:px-8">
-      <Particles className="absolute inset-0 z-0 opacity-70" quantity={80} ease={80} color={particleColor} refresh />
-      <Meteors number={12} className="z-0" />
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-24 sm:px-6 sm:pt-28 lg:px-8">
+      <Particles className="absolute inset-0 z-0 opacity-70" quantity={68} ease={80} color={particleColor} refresh />
+      <Meteors number={8} className="z-0" />
 
       <div className="relative z-10 mx-auto max-w-[90rem]">
         {/* Top Banner (Bento style) */}
@@ -210,7 +261,7 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
                   </div>
                   <div>
                     <h3 className="text-lg font-black tracking-widest text-sky-blue uppercase">{copy.profileTitle}</h3>
-                    <p className="mt-1 text-xs font-semibold text-sky-blue/80">Manage preferences</p>
+                    <p className="mt-1 text-xs font-semibold text-sky-blue/80">{copy.profileActionHint}</p>
                   </div>
                 </div>
               </button>
@@ -269,35 +320,82 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
               <>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {weatherPrimaryMetrics.map((metric) => (
-                    <StatusMetric key={metric.label} label={metric.label} value={metric.value} meta={metric.meta} />
+                    <StatusMetric
+                      key={metric.label}
+                      label={metric.label}
+                      value={metric.value}
+                      meta={metric.meta}
+                      compact
+                    />
                   ))}
                 </div>
 
-                <div className="mt-6 rounded-[1.5rem] border border-card-border/70 bg-background/75 p-5">
-                  <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
-                    <ShieldAlert className="size-4 text-sky-blue" />
-                    {copy.bulletin}
+                <MagicCard
+                  className="mt-6 overflow-hidden rounded-[1.7rem]"
+                  gradientSize={220}
+                  gradientOpacity={0.68}
+                >
+                  <div className="relative rounded-[1.7rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
+                    <BorderBeam
+                      size={170}
+                      duration={11}
+                      colorFrom="var(--beam-from)"
+                      colorTo="var(--beam-to)"
+                    />
+                    <div className="relative z-10">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.24em] text-sky-blue">
+                          <ShieldAlert className="size-4" />
+                          {copy.bulletin}
+                        </div>
+                        <span className="rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-bold text-muted-foreground">
+                          {copy.updatedAt}: {bulletinUpdatedLabel}
+                        </span>
+                      </div>
+
+                      {bulletinWarningStatus ? (
+                        <div className="mt-4 rounded-[1.1rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold leading-6 text-danger">
+                          {bulletinWarningStatus}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {(weatherTags.length > 0 ? weatherTags : [copy.noTags]).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full border border-card-border/70 bg-card px-3 py-1.5 text-sm font-semibold text-foreground"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+
+                      {bulletinSegments.length > 0 ? (
+                        <div className="mt-4 grid gap-2.5">
+                          {bulletinSegments.map((segment, index) => (
+                            <div
+                              key={`${segment}-${index + 1}`}
+                              className="flex items-start gap-3 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3"
+                            >
+                              <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-blue/12 text-xs font-black text-sky-blue">
+                                {index + 1}
+                              </span>
+                              <p className="text-sm leading-6 text-foreground">{segment}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-4 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3 text-sm leading-7 text-muted-foreground">
+                          {copy.noBulletin}
+                        </p>
+                      )}
+
+                      <p className="mt-3 text-xs font-semibold text-muted-foreground">
+                        {copy.location}: {weatherData.metadata?.region || "-"} · {copy.station}: {weatherData.metadata?.station || "-"} · {copy.updatedAt}: {formatLastUpdate(weatherData.metadata?.lastUpdate, language)}
+                      </p>
+                    </div>
                   </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {(weatherTags.length > 0 ? weatherTags : [copy.noTags]).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full border border-card-border/70 bg-card px-3 py-1.5 text-sm font-semibold text-foreground"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  <p className="mt-4 text-sm leading-7 text-foreground">
-                    {weatherData.metadata?.bulletin?.summary || copy.noBulletin}
-                  </p>
-
-                  <p className="mt-3 text-xs font-semibold text-muted-foreground">
-                    {copy.location}: {weatherData.metadata?.region || "-"} · {copy.station}: {weatherData.metadata?.station || "-"} · {copy.updatedAt}: {formatLastUpdate(weatherData.metadata?.lastUpdate)}
-                  </p>
-                </div>
+                </MagicCard>
 
                 <TodayHourlyForecast items={hourlyForecast} />
               </>
@@ -335,7 +433,11 @@ export default function DashboardPage() {
   }, [router, status])
 
   if (status === "loading") {
-    return <div className="flex min-h-screen items-center justify-center text-sm font-bold text-sky-blue">...</div>
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4 text-center text-sm font-bold text-sky-blue">
+        {copy.loading}
+      </div>
+    )
   }
 
   if (!user) {

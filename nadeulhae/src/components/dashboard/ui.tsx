@@ -88,16 +88,39 @@ export function StatusMetric({
   label,
   value,
   meta,
+  compact = false,
 }: {
   label: string
   value: string
   meta?: string
+  compact?: boolean
 }) {
   return (
-    <div className="rounded-[1.3rem] border border-card-border/70 bg-background/75 p-4">
+    <div
+      className={cn(
+        "rounded-[1.3rem] border border-card-border/70 bg-background/75",
+        compact ? "p-3 sm:p-3.5" : "p-4"
+      )}
+    >
       <p className="text-[11px] font-black uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
-      <p className="mt-3 break-words text-xl font-black tracking-tight text-foreground sm:text-2xl">{value}</p>
-      {meta ? <p className="mt-2 text-xs leading-5 text-muted-foreground sm:text-sm">{meta}</p> : null}
+      <p
+        className={cn(
+          "break-words font-black tracking-tight text-foreground",
+          compact ? "mt-2 text-lg sm:text-xl" : "mt-3 text-xl sm:text-2xl"
+        )}
+      >
+        {value}
+      </p>
+      {meta ? (
+        <p
+          className={cn(
+            "text-muted-foreground",
+            compact ? "mt-1.5 text-[11px] leading-4 sm:text-xs sm:leading-5" : "mt-2 text-xs leading-5 sm:text-sm"
+          )}
+        >
+          {meta}
+        </p>
+      ) : null}
     </div>
   )
 }

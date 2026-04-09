@@ -51,7 +51,7 @@ export default function JeonjuPage() {
 
   const texts = {
     heroTag: language === "ko" ? "전주 특화 서비스" : "Jeonju Special Service",
-    heroTitle: language === "ko" ? "전주를 위한 데이터 중심 나들이 실험실" : "A Jeonju-first outdoor planning lab",
+    heroTitle: language === "ko" ? "전주를 위한 데이터 기반 나들이 실험실" : "A Jeonju-first outdoor planning lab",
     heroDesc: language === "ko"
       ? "나들해의 고향, 전주를 위한 데이터 기반 나들이 실험실입니다. 현재 동작하는 실시간 환경 분석 기능을 시작으로, 향후 백엔드 및 공간 DB 통합을 통해 전주만의 정밀한 로컬 경험을 완성해 나갈 예정입니다."
       : "A data-driven outdoor lab dedicated to Nadeulhae's hometown, Jeonju. Starting with our active real-time environmental analysis, we are building toward a precision local experience powered by upcoming backend and spatial database integrations.",
@@ -121,8 +121,8 @@ export default function JeonjuPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <section className="relative overflow-hidden px-4 pt-36 pb-20">
-        <Particles className="absolute inset-0 z-0 opacity-60" quantity={48} color="#2f6fe4" />
+      <section className="relative overflow-hidden px-4 pt-24 pb-20 sm:pt-28">
+        <Particles className="absolute inset-0 z-0 opacity-60" quantity={42} color="#2f6fe4" />
         <div className="relative z-10 container mx-auto max-w-6xl">
           <div className="mx-auto inline-flex rounded-full border border-nature-green/20 bg-nature-green/10 px-5 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-nature-green">
             {texts.heroTag}
