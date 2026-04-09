@@ -11,6 +11,7 @@ import { useLanguage } from "@/context/LanguageContext"
 import type { AuthUser } from "@/lib/auth/types"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { ChatConversationMessage, ChatStateResponse } from "@/lib/chat/types"
+import { formatServerClockTime } from "@/lib/time/server-time"
 import { cn } from "@/lib/utils"
 
 type UiChatMessage = ChatConversationMessage & {
@@ -90,15 +91,7 @@ const CHAT_SUGGESTIONS = {
 } as const
 
 function formatTimestamp(value: string, language: "ko" | "en") {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ""
-  }
-
-  return date.toLocaleTimeString(language === "ko" ? "ko-KR" : "en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  return formatServerClockTime(value, language)
 }
 
 function TypingIndicator() {
@@ -171,9 +164,11 @@ export function DashboardChatPanel({
   const [chatInput, setChatInput] = useState("")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const messageViewportRef = useRef<HTMLDivElement | null>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
   const didInitScrollRef = useRef(false)
   const previousMessageCountRef = useRef(0)
   const shouldStickToBottomRef = useRef(true)
+  const isComposingRef = useRef(false)
 
   const applyPayload = useCallback((payload: ChatStateResponse) => {
     setMessages(payload.messages)
@@ -260,6 +255,21 @@ export function DashboardChatPanel({
   const canSend = !isLoading && !isPending && !isSessionPending && !isLimitReached && Boolean(resolvedActiveSessionId)
   const maxInputCharacters = policy?.maxInputCharacters ?? 1600
 
+  const focusInputWithoutScroll = useCallback(() => {
+    const element = chatInputRef.current
+    if (!element) {
+      return
+    }
+
+    requestAnimationFrame(() => {
+      try {
+        element.focus({ preventScroll: true })
+      } catch {
+        element.focus()
+      }
+    })
+  }, [])
+
   const handleCreateSession = () => {
     setErrorMessage(null)
     startSessionTransition(async () => {
@@ -336,7 +346,12 @@ export function DashboardChatPanel({
   }
 
   const handleSend = () => {
-    const nextMessage = chatInput.trim()
+    if (isComposingRef.current) {
+      return
+    }
+
+    const rawInput = chatInput
+    const nextMessage = rawInput.trim()
     if (!nextMessage) {
       return
     }
@@ -368,6 +383,7 @@ export function DashboardChatPanel({
 
     setMessages((current) => [...current, optimisticUserMessage, optimisticAssistantMessage])
     setChatInput("")
+    focusInputWithoutScroll()
 
     startTransition(async () => {
       try {
@@ -391,7 +407,7 @@ export function DashboardChatPanel({
           setMessages((current) => current.filter((item) =>
             item.id !== optimisticUserMessage.id && item.id !== optimisticAssistantMessage.id
           ))
-          setChatInput(nextMessage)
+          setChatInput(rawInput)
           setErrorMessage(data?.error ?? copy.sendError)
           if (
             Array.isArray(data?.messages)
@@ -416,7 +432,7 @@ export function DashboardChatPanel({
         setMessages((current) => current.filter((item) =>
           item.id !== optimisticUserMessage.id && item.id !== optimisticAssistantMessage.id
         ))
-        setChatInput(nextMessage)
+        setChatInput(rawInput)
         setErrorMessage(copy.sendError)
       }
     })
@@ -507,7 +523,7 @@ export function DashboardChatPanel({
         <div
           ref={messageViewportRef}
           onScroll={handleViewportScroll}
-          className="max-h-[46vh] min-h-[16rem] space-y-4 overflow-y-auto overscroll-contain p-4 custom-scrollbar [overflow-anchor:none] sm:max-h-[52vh] sm:p-5"
+          className="max-h-[58vh] min-h-[22rem] space-y-4 overflow-y-auto overscroll-contain p-4 custom-scrollbar [overflow-anchor:none] sm:max-h-[64vh] sm:min-h-[26rem] sm:p-5"
         >
           {isLoading ? (
             <div className="flex items-center gap-3 rounded-[1.4rem] border border-card-border/70 bg-background/80 px-4 py-4 text-sm font-semibold text-muted-foreground">
@@ -532,13 +548,27 @@ export function DashboardChatPanel({
         <div className="border-t border-card-border/50 bg-background/60 p-3 backdrop-blur-sm sm:p-4">
           <div className="relative flex items-end gap-2 rounded-[1.6rem] border border-sky-blue/30 bg-background/95 p-2 shadow-inner transition-colors focus-within:border-sky-blue">
             <textarea
+              ref={chatInputRef}
               value={chatInput}
               onChange={(event) => setChatInput(event.target.value.slice(0, maxInputCharacters))}
+              onCompositionStart={() => {
+                isComposingRef.current = true
+              }}
+              onCompositionEnd={() => {
+                isComposingRef.current = false
+              }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault()
-                  handleSend()
-                }
+                if (event.key !== "Enter" || event.shiftKey) return
+
+                const isImeComposing =
+                  isComposingRef.current
+                  || event.nativeEvent.isComposing
+                  || event.nativeEvent.keyCode === 229
+
+                if (isImeComposing) return
+
+                event.preventDefault()
+                handleSend()
               }}
               placeholder={copy.placeholder}
               disabled={!canSend}
@@ -548,6 +578,7 @@ export function DashboardChatPanel({
             <ShimmerButton
               type="button"
               onClick={handleSend}
+              onMouseDown={(event) => event.preventDefault()}
               disabled={!chatInput.trim() || !canSend}
               className="mb-1 mr-1 shrink-0 rounded-full px-5 py-3 text-sm font-black"
             >
@@ -561,7 +592,11 @@ export function DashboardChatPanel({
       </div>
 
       {errorMessage ? (
-        <div className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger"
+        >
           {errorMessage}
         </div>
       ) : null}

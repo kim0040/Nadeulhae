@@ -15,6 +15,11 @@ import { BorderBeam } from "@/components/magicui/border-beam"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
+import {
+  computeServerClockOffsetMs,
+  formatServerRelativeTime,
+  getServerNowMs,
+} from "@/lib/time/server-time"
 import { cn } from "@/lib/utils"
 
 interface ChatMessage {
@@ -69,31 +74,10 @@ const COPY = {
   },
 } as const
 
-const CHAT_POLL_INTERVAL_MS = 8_000
+const CHAT_POLL_INTERVAL_MS = 10_000
 
-function formatChatTime(iso: string, language: "ko" | "en") {
-  const safeIso = iso.endsWith("Z") ? iso : `${iso}Z`
-  const date = new Date(safeIso)
-  if (Number.isNaN(date.getTime())) return ""
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  if (diff < 60_000) return language === "ko" ? "방금" : "Just now"
-  if (diff < 3600_000) {
-    const mins = Math.floor(diff / 60_000)
-    return language === "ko" ? `${mins}분 전` : `${mins}m ago`
-  }
-  if (diff < 86400_000) {
-    const hours = Math.floor(diff / 3600_000)
-    return language === "ko" ? `${hours}시간 전` : `${hours}h ago`
-  }
-
-  return date.toLocaleDateString(language === "ko" ? "ko-KR" : "en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+function formatChatTime(iso: string, language: "ko" | "en", nowMs: number) {
+  return formatServerRelativeTime(iso, nowMs, language)
 }
 
 function ChatBubble({
@@ -101,11 +85,13 @@ function ChatBubble({
   isMine,
   language,
   showProfile = true,
+  nowMs,
 }: {
   message: ChatMessage
   isMine: boolean
   language: "ko" | "en"
   showProfile?: boolean
+  nowMs: number
 }) {
   const displayName = message.isAnonymous
     ? (language === "ko" ? "익명" : "Anonymous")
@@ -162,7 +148,7 @@ function ChatBubble({
         <div className="flex items-end gap-1.5">
           {isMine && (
              <p className="text-[10px] font-semibold text-muted-foreground/60 shrink-0 mb-1">
-               {formatChatTime(message.createdAt, language)}
+               {formatChatTime(message.createdAt, language, nowMs)}
              </p>
           )}
           <div
@@ -177,7 +163,7 @@ function ChatBubble({
           </div>
           {!isMine && (
              <p className="text-[10px] font-semibold text-muted-foreground/60 shrink-0 mb-1">
-               {formatChatTime(message.createdAt, language)}
+               {formatChatTime(message.createdAt, language, nowMs)}
              </p>
           )}
         </div>
@@ -197,6 +183,7 @@ export function JeonjuChatPanel() {
   const [input, setInput] = useState("")
   const [isAnonymous, setIsAnonymous] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -205,44 +192,76 @@ export function JeonjuChatPanel() {
   const previousMessageCountRef = useRef(0)
   const shouldStickToBottomRef = useRef(true)
   const isComposingRef = useRef(false)
+  const isPollingRef = useRef(false)
 
   const loadMessages = useCallback(async () => {
     try {
       const res = await fetch("/api/jeonju-chat", {
         cache: "no-store",
         credentials: "include",
+        headers: {
+          "Accept-Language": language,
+        },
       })
-      const data = await res.json()
-      if (res.ok && data.messages) {
-        setMessages(data.messages)
-        lastMessageIdRef.current = data.messages[data.messages.length - 1]?.id ?? null
-        setError(null)
+      const data = (await res.json().catch(() => null)) as {
+        messages?: ChatMessage[]
+        error?: unknown
+        serverNow?: unknown
+      } | null
+
+      const offsetMs = computeServerClockOffsetMs(data?.serverNow)
+      if (offsetMs != null) {
+        setServerClockOffsetMs(offsetMs)
       }
+
+      if (!res.ok || !Array.isArray(data?.messages)) {
+        setError(
+          typeof data?.error === "string" && data.error.trim().length > 0
+            ? data.error
+            : copy.error
+        )
+        return
+      }
+
+      setMessages(data.messages)
+      lastMessageIdRef.current = data.messages[data.messages.length - 1]?.id ?? null
+      setError(null)
     } catch {
       setError(copy.error)
     } finally {
       setIsLoading(false)
     }
-  }, [copy.error])
+  }, [copy.error, language])
 
   // Poll for new messages
   const pollNewMessages = useCallback(async () => {
     const lastId = lastMessageIdRef.current
-    if (!lastId) return
+    if (!lastId || isPollingRef.current) return
 
+    isPollingRef.current = true
     try {
       const res = await fetch(`/api/jeonju-chat?after_id=${lastId}`, {
         cache: "no-store",
         credentials: "include",
+        headers: {
+          "Accept-Language": language,
+        },
       })
-      const data = await res.json()
-      if (res.ok && data.messages && data.messages.length > 0) {
-        setMessages((prev) => [...prev, ...data.messages])
+      const data = (await res.json().catch(() => null)) as { messages?: ChatMessage[]; serverNow?: unknown } | null
+      const offsetMs = computeServerClockOffsetMs(data?.serverNow)
+      if (offsetMs != null) {
+        setServerClockOffsetMs(offsetMs)
+      }
+      if (res.ok && Array.isArray(data?.messages) && data.messages.length > 0) {
+        const incomingMessages = data.messages
+        setMessages((prev) => [...prev, ...incomingMessages])
       }
     } catch {
       // Silently ignore polling errors
+    } finally {
+      isPollingRef.current = false
     }
-  }, [])
+  }, [language])
 
   useEffect(() => {
     void loadMessages()
@@ -320,6 +339,8 @@ export function JeonjuChatPanel() {
     })
   }, [])
 
+  const serverNowMs = getServerNowMs(serverClockOffsetMs)
+
   const handleSend = async () => {
     if (isSending || !user || isComposingRef.current) return
 
@@ -336,22 +357,38 @@ export function JeonjuChatPanel() {
       const res = await fetch("/api/jeonju-chat", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept-Language": language,
+        },
         body: JSON.stringify({
           message: msgText,
           anonymous: isAnonymous,
         }),
       })
 
-      const data = await res.json()
+      const data = (await res.json().catch(() => null)) as {
+        message?: ChatMessage
+        error?: unknown
+        serverNow?: unknown
+      } | null
+      const offsetMs = computeServerClockOffsetMs(data?.serverNow)
+      if (offsetMs != null) {
+        setServerClockOffsetMs(offsetMs)
+      }
       if (!res.ok) {
         setInput(msgText)
-        setSendError(data.error || copy.sendError)
+        setSendError(
+          typeof data?.error === "string" && data.error.trim().length > 0
+            ? data.error
+            : copy.sendError
+        )
         return
       }
 
-      if (data.message) {
-        setMessages(prev => [...prev, data.message])
+      if (data?.message) {
+        const createdMessage = data.message
+        setMessages(prev => [...prev, createdMessage])
       }
     } catch {
       setInput(msgText)
@@ -403,14 +440,18 @@ export function JeonjuChatPanel() {
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="max-h-[24rem] min-h-[14rem] space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none] sm:max-h-[28rem] sm:p-5"
+              className="max-h-[32rem] min-h-[19rem] space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none] sm:max-h-[40rem] sm:min-h-[24rem] sm:p-5"
             >
               {isLoading ? (
                 <div className="flex h-32 items-center justify-center text-sm font-semibold text-muted-foreground">
                   <span className="animate-pulse">{copy.loading}</span>
                 </div>
               ) : error ? (
-                <div className="flex h-32 items-center justify-center text-sm font-semibold text-danger">
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="flex h-32 items-center justify-center text-sm font-semibold text-danger"
+                >
                   {error}
                 </div>
               ) : messages.length === 0 ? (
@@ -446,6 +487,7 @@ export function JeonjuChatPanel() {
                       isMine={currentIsMine}
                       language={language}
                       showProfile={showProfile}
+                      nowMs={serverNowMs}
                     />
                   )
                 })
@@ -470,7 +512,11 @@ export function JeonjuChatPanel() {
               ) : (
                 <div className="space-y-3">
                   {sendError && (
-                    <div className="rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-xs font-semibold text-danger">
+                    <div
+                      role="alert"
+                      aria-live="assertive"
+                      className="rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-xs font-semibold text-danger"
+                    >
                       {sendError}
                     </div>
                   )}

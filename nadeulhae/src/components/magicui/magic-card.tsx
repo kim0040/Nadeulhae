@@ -49,6 +49,47 @@ interface MagicCardOrbProps extends MagicCardBaseProps {
 
 type MagicCardProps = MagicCardGradientProps | MagicCardOrbProps
 type ResetReason = "enter" | "leave" | "global" | "init"
+const globalResetHandlers = new Set<() => void>()
+let detachGlobalResetListeners: (() => void) | null = null
+
+function dispatchGlobalReset() {
+  globalResetHandlers.forEach((handler) => handler())
+}
+
+function ensureGlobalResetListeners() {
+  if (typeof window === "undefined" || detachGlobalResetListeners) {
+    return
+  }
+
+  const handleGlobalPointerOut = (event: PointerEvent) => {
+    if (!event.relatedTarget) {
+      dispatchGlobalReset()
+    }
+  }
+  const handleBlur = () => dispatchGlobalReset()
+  const handleVisibility = () => {
+    if (document.visibilityState !== "visible") {
+      dispatchGlobalReset()
+    }
+  }
+
+  window.addEventListener("pointerout", handleGlobalPointerOut)
+  window.addEventListener("blur", handleBlur)
+  document.addEventListener("visibilitychange", handleVisibility)
+
+  detachGlobalResetListeners = () => {
+    window.removeEventListener("pointerout", handleGlobalPointerOut)
+    window.removeEventListener("blur", handleBlur)
+    document.removeEventListener("visibilitychange", handleVisibility)
+  }
+}
+
+function cleanupGlobalResetListenersIfNeeded() {
+  if (globalResetHandlers.size === 0 && detachGlobalResetListeners) {
+    detachGlobalResetListeners()
+    detachGlobalResetListeners = null
+  }
+}
 
 function isOrbMode(props: MagicCardProps): props is MagicCardOrbProps {
   return props.mode === "orb"
@@ -137,22 +178,13 @@ export function MagicCard(props: MagicCardProps) {
   }, [reset])
 
   useEffect(() => {
-    const handleGlobalPointerOut = (e: PointerEvent) => {
-      if (!e.relatedTarget) reset("global")
-    }
-    const handleBlur = () => reset("global")
-    const handleVisibility = () => {
-      if (document.visibilityState !== "visible") reset("global")
-    }
-
-    window.addEventListener("pointerout", handleGlobalPointerOut)
-    window.addEventListener("blur", handleBlur)
-    document.addEventListener("visibilitychange", handleVisibility)
+    const handler = () => reset("global")
+    globalResetHandlers.add(handler)
+    ensureGlobalResetListeners()
 
     return () => {
-      window.removeEventListener("pointerout", handleGlobalPointerOut)
-      window.removeEventListener("blur", handleBlur)
-      document.removeEventListener("visibilitychange", handleVisibility)
+      globalResetHandlers.delete(handler)
+      cleanupGlobalResetListenersIfNeeded()
     }
   }, [reset])
 

@@ -18,7 +18,20 @@ import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session
 
 export const runtime = "nodejs"
 
-function normalizeLocale(value: unknown) {
+const CONSENT_ERRORS = {
+  ko: {
+    invalidRequest: "잘못된 분석 동의 요청입니다.",
+    invalidPreference: "유효한 분석 동의 설정이 필요합니다.",
+  },
+  en: {
+    invalidRequest: "Invalid analytics consent request.",
+    invalidPreference: "A valid analytics consent preference is required.",
+  },
+} as const
+
+type ConsentLocale = keyof typeof CONSENT_ERRORS
+
+function normalizeLocale(value: unknown): ConsentLocale | null {
   if (typeof value !== "string") {
     return null
   }
@@ -36,11 +49,22 @@ function normalizeLocale(value: unknown) {
     return "en"
   }
 
-  return trimmed.slice(0, 8)
+  return null
+}
+
+function resolveConsentLocale(request: NextRequest, payloadLocale?: unknown): ConsentLocale {
+  const fromPayload = normalizeLocale(payloadLocale)
+  if (fromPayload) {
+    return fromPayload
+  }
+
+  const fromHeader = normalizeLocale(request.headers.get("accept-language"))
+  return fromHeader ?? "ko"
 }
 
 async function handlePOST(request: NextRequest) {
-  const requestViolation = validateAuthMutationRequest(request)
+  const headerLocale = resolveConsentLocale(request)
+  const requestViolation = validateAuthMutationRequest(request, headerLocale)
   if (requestViolation) {
     return requestViolation
   }
@@ -50,10 +74,17 @@ async function handlePOST(request: NextRequest) {
     payload = await request.json()
   } catch {
     return createAuthJsonResponse(
-      { error: "잘못된 분석 동의 요청입니다." },
+      { error: CONSENT_ERRORS[headerLocale].invalidRequest },
       { status: 400 }
     )
   }
+
+  const locale = resolveConsentLocale(
+    request,
+    typeof payload === "object" && payload !== null && "locale" in payload
+      ? (payload as { locale?: unknown }).locale
+      : null
+  )
 
   const preference = normalizeAnalyticsConsentPreference(
     typeof payload === "object" && payload !== null && "preference" in payload
@@ -63,16 +94,10 @@ async function handlePOST(request: NextRequest) {
 
   if (!preference) {
     return createAuthJsonResponse(
-      { error: "유효한 분석 동의 설정이 필요합니다." },
+      { error: CONSENT_ERRORS[locale].invalidPreference },
       { status: 400 }
     )
   }
-
-  const locale = normalizeLocale(
-    typeof payload === "object" && payload !== null && "locale" in payload
-      ? (payload as { locale?: unknown }).locale
-      : null
-  )
   const { sessionId, shouldSetCookie } = getOrCreateSessionId(request)
   const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
 

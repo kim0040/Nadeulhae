@@ -22,6 +22,7 @@ import {
 } from "@/lib/auth/request-security"
 import { attachAuthCookie, startAuthenticatedSession } from "@/lib/auth/session"
 import { validateRegisterPayload } from "@/lib/auth/validation"
+import { getAuthMessage, resolveAuthLocale } from "@/lib/auth/messages"
 import { recordDailyConsentDecisionSafely } from "@/lib/analytics/repository"
 import { attachAnalyticsConsentCookie } from "@/lib/analytics/consent"
 import { withApiAnalytics } from "@/lib/analytics/route"
@@ -29,12 +30,13 @@ import { withApiAnalytics } from "@/lib/analytics/route"
 export const runtime = "nodejs"
 
 async function handlePOST(request: NextRequest) {
+  const locale = resolveAuthLocale(request.headers.get("accept-language"))
   const ipAddress = getClientIp(request)
   const userAgent = getUserAgent(request)
   const ipScopeKey = getAuthScopeKey("ip", ipAddress)
 
   try {
-    const requestViolation = validateAuthMutationRequest(request)
+    const requestViolation = validateAuthMutationRequest(request, locale)
     if (requestViolation) {
       await recordAuthSecurityEventSafely({
         eventType: "register_request_rejected",
@@ -64,7 +66,7 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "회원가입 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+        { error: getAuthMessage(locale, "registerTooManyAttempts") },
         {
           status: 429,
           retryAfterSeconds: blockedByIp.retryAfterSeconds,
@@ -90,12 +92,12 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "잘못된 JSON 요청입니다." },
+        { error: getAuthMessage(locale, "invalidJsonRequest") },
         { status: 400 }
       )
     }
 
-    const validation = validateRegisterPayload(payload)
+    const validation = validateRegisterPayload(payload, locale)
 
     if ("error" in validation) {
       await consumeAuthRateLimit({
@@ -133,7 +135,7 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "회원가입 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+        { error: getAuthMessage(locale, "registerTooManyAttempts") },
         {
           status: 429,
           retryAfterSeconds: activeBlock.retryAfterSeconds,
@@ -172,7 +174,7 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "회원가입 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+        { error: getAuthMessage(locale, "registerTooManyAttempts") },
         {
           status: 429,
           retryAfterSeconds,
@@ -192,7 +194,7 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "사용할 수 없는 이메일입니다. 다른 이메일을 사용해 주세요." },
+        { error: getAuthMessage(locale, "registerDuplicateEmail") },
         { status: 409 }
       )
     }
@@ -280,7 +282,7 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "사용할 수 없는 이메일입니다. 다른 이메일을 사용해 주세요." },
+        { error: getAuthMessage(locale, "registerDuplicateEmail") },
         { status: 409 }
       )
     }
@@ -295,7 +297,7 @@ async function handlePOST(request: NextRequest) {
     })
 
     return createAuthJsonResponse(
-      { error: "회원가입 처리 중 오류가 발생했습니다." },
+      { error: getAuthMessage(locale, "registerInternalError") },
       { status: 500 }
     )
   }

@@ -11,16 +11,18 @@ import {
   clearAuthCookie,
   destroyAuthenticatedSession,
 } from "@/lib/auth/session"
+import { getAuthMessage, resolveAuthLocale } from "@/lib/auth/messages"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
 
 async function handlePOST(request: NextRequest) {
+  const locale = resolveAuthLocale(request.headers.get("accept-language"))
   const ipAddress = getClientIp(request)
   const userAgent = getUserAgent(request)
 
   try {
-    const requestViolation = validateSameOriginRequest(request)
+    const requestViolation = validateSameOriginRequest(request, locale)
     if (requestViolation) {
       await recordAuthSecurityEventSafely({
         eventType: "logout_request_rejected",
@@ -53,7 +55,7 @@ async function handlePOST(request: NextRequest) {
     })
 
     return createAuthJsonResponse(
-      { error: "로그아웃 처리 중 오류가 발생했습니다." },
+      { error: getAuthMessage(locale, "logoutInternalError") },
       { status: 500 }
     )
   }

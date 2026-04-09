@@ -44,6 +44,7 @@ const CHAT_ERRORS = {
     invalidMessage: "메시지를 입력해 주세요.",
     tooLong: `메시지는 ${CHAT_INPUT_MAX_CHARACTERS}자 이하여야 합니다.`,
     rateLimited: "오늘 사용할 수 있는 채팅 횟수를 모두 사용했습니다. 내일 다시 시도해 주세요.",
+    busy: "이전 답변을 생성 중입니다. 잠시 후 다시 시도해 주세요.",
     providerFailure: "챗봇 응답을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     unexpected: "채팅 처리 중 오류가 발생했습니다.",
   },
@@ -52,10 +53,41 @@ const CHAT_ERRORS = {
     invalidMessage: "Please enter a message.",
     tooLong: `Messages must be ${CHAT_INPUT_MAX_CHARACTERS} characters or fewer.`,
     rateLimited: "You have reached today’s chat limit. Please try again tomorrow.",
+    busy: "Your previous message is still being processed. Please try again shortly.",
     providerFailure: "Failed to get a chatbot response. Please try again shortly.",
     unexpected: "An unexpected chat error occurred.",
   },
 } as const
+
+declare global {
+  var __nadeulhaeChatUsersInFlight: Set<string> | undefined
+}
+
+function getChatUsersInFlight() {
+  if (!globalThis.__nadeulhaeChatUsersInFlight) {
+    globalThis.__nadeulhaeChatUsersInFlight = new Set()
+  }
+
+  return globalThis.__nadeulhaeChatUsersInFlight
+}
+
+function acquireChatUserLock(userId: string) {
+  const inFlight = getChatUsersInFlight()
+  if (inFlight.has(userId)) {
+    return false
+  }
+
+  inFlight.add(userId)
+  return true
+}
+
+function releaseChatUserLock(userId: string | null) {
+  if (!userId) {
+    return
+  }
+
+  getChatUsersInFlight().delete(userId)
+}
 
 function getRequestLocale(request: Request, preferred?: unknown): ChatLocale {
   if (preferred === "en" || preferred === "ko") {
@@ -405,6 +437,7 @@ async function handlePOST(request: NextRequest) {
   }
 
   let resolvedSessionId: number | null = null
+  let lockedUserId: string | null = null
 
   try {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
@@ -416,6 +449,17 @@ async function handlePOST(request: NextRequest) {
         )
       )
     }
+
+    if (!acquireChatUserLock(authenticatedSession.user.id)) {
+      return attachRefreshedAuthCookie(
+        createAuthJsonResponse(
+          { error: getErrorMessage(locale, "busy") },
+          { status: 429 }
+        ),
+        authenticatedSession
+      )
+    }
+    lockedUserId = authenticatedSession.user.id
 
     const resolvedSession = await resolveChatSession({
       userId: authenticatedSession.user.id,
@@ -554,6 +598,8 @@ async function handlePOST(request: NextRequest) {
     return authenticatedSession
       ? attachRefreshedAuthCookie(response, authenticatedSession)
       : response
+  } finally {
+    releaseChatUserLock(lockedUserId)
   }
 }
 

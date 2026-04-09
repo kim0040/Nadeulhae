@@ -18,6 +18,8 @@ import Link from "next/link"
 
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
+import { BorderBeam } from "@/components/magicui/border-beam"
+import { MagicCard } from "@/components/magicui/magic-card"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { cn } from "@/lib/utils"
 
@@ -68,9 +70,9 @@ export function SettingsModal({
   )
 
   const panelClassName =
-    "rounded-[1.5rem] border border-card-border/70 bg-card/65 p-4 backdrop-blur-xl sm:p-5"
+    "rounded-[1.6rem] border border-card-border/70 bg-card/75 p-4 shadow-[0_14px_34px_-28px_rgba(47,111,228,0.7)] backdrop-blur-xl sm:p-5"
   const inputClassName =
-    "w-full rounded-[1.2rem] border border-card-border/70 bg-background/80 px-4 py-3 text-sm font-medium text-foreground outline-none transition focus:border-sky-blue/35 focus:ring-2 focus:ring-sky-blue/15"
+    "w-full rounded-[1.25rem] border border-card-border/70 bg-background/80 px-4 py-3 text-sm font-medium text-foreground shadow-inner outline-none transition focus:border-sky-blue/35 focus:ring-2 focus:ring-sky-blue/15"
 
   const handleToggleInterest = (value: string) => {
     setSaveMessage(null)
@@ -114,7 +116,10 @@ export function SettingsModal({
     try {
       const response = await fetch("/api/auth/profile", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept-Language": language,
+        },
         credentials: "include",
         body: JSON.stringify(form),
       })
@@ -141,7 +146,10 @@ export function SettingsModal({
     try {
       const response = await fetch("/api/auth/account", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept-Language": language,
+        },
         credentials: "include",
         body: JSON.stringify({ confirmText: deleteConfirm }),
       })
@@ -163,14 +171,37 @@ export function SettingsModal({
   }
 
   const handleLogout = async () => {
+    setSaveMessage(null)
+
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
-    } catch (error) {
-      console.error("Logout failed:", error)
-    } finally {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Accept-Language": language,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        let errorMessage: string = copy.logoutError
+        try {
+          const data = (await response.json()) as { error?: unknown }
+          if (typeof data?.error === "string" && data.error.trim().length > 0) {
+            errorMessage = data.error
+          }
+        } catch {
+          // no-op
+        }
+        setSaveMessage({ type: "error", text: errorMessage })
+        return
+      }
+
       setAuthenticatedUser(null)
       router.push("/login")
       router.refresh()
+    } catch (error) {
+      console.error("Logout failed:", error)
+      setSaveMessage({ type: "error", text: copy.logoutError })
     }
   }
 
@@ -187,17 +218,25 @@ export function SettingsModal({
             className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
           />
 
-          {/* Drawer */}
+          {/* Bottom Sheet */}
           <motion.div
-            initial={{ x: "100%", opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: "100%", opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl overflow-y-auto border-l border-card-border bg-background/95 px-5 py-6 shadow-2xl backdrop-blur-2xl sm:px-8 sm:py-8 custom-scrollbar"
+            initial={{ y: "100%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0 }}
+            transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-6 sm:pb-6"
           >
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(47,111,228,0.18),transparent_52%),radial-gradient(circle_at_16%_24%,rgba(11,125,113,0.14),transparent_44%)]" />
-
-            <div className="relative z-10">
+            <div className="mx-auto h-[min(92dvh,960px)] max-w-5xl">
+              <MagicCard className="h-full overflow-hidden rounded-[2rem] border border-card-border/70" gradientSize={280} gradientOpacity={0.72}>
+                <div className="relative h-full overflow-y-auto rounded-[2rem] bg-background/95 p-5 shadow-2xl backdrop-blur-2xl sm:p-8 custom-scrollbar">
+                  <BorderBeam
+                    size={200}
+                    duration={10}
+                    colorFrom="var(--beam-from)"
+                    colorTo="var(--beam-to)"
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(47,111,228,0.18),transparent_52%),radial-gradient(circle_at_16%_24%,rgba(11,125,113,0.14),transparent_44%)]" />
+                  <div className="relative z-10">
               <div className="mb-8 flex items-start justify-between gap-4">
                 <div className="space-y-2">
                   <span className="inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-sky-blue">
@@ -208,6 +247,7 @@ export function SettingsModal({
                   <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{copy.profileDescription}</p>
                 </div>
                 <button
+                  type="button"
                   onClick={onClose}
                   className="rounded-full border border-card-border/70 bg-card/70 p-2.5 text-muted-foreground transition hover:border-sky-blue/25 hover:text-foreground"
                 >
@@ -239,7 +279,7 @@ export function SettingsModal({
                 </div>
               </div>
 
-              <div className="space-y-10 pb-10">
+              <div className="grid gap-6 pb-10 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:items-start">
                 <section>
                   <form className="space-y-5" onSubmit={handleSaveProfile}>
                     <div className={panelClassName}>
@@ -423,6 +463,7 @@ export function SettingsModal({
                   </form>
                 </section>
 
+                <aside className="space-y-6 xl:sticky xl:top-6">
                 <section className={panelClassName}>
                   <div className="mb-5 space-y-2">
                     <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
@@ -486,7 +527,11 @@ export function SettingsModal({
                     </button>
                   </div>
                 </section>
+                </aside>
               </div>
+            </div>
+                </div>
+              </MagicCard>
             </div>
           </motion.div>
         </>

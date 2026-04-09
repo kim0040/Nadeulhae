@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { withApiAnalytics } from "@/lib/analytics/route"
+import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 import { getRegionProfileByKey, resolveRegionProfile } from "@/lib/weather-utils"
 
@@ -234,11 +235,28 @@ async function handleGET(request: Request) {
   const days = Math.min(Math.max(Number(url.searchParams.get("days") || 7), 3), 10)
   const { sessionId, shouldSetCookie } = getOrCreateSessionId(request)
 
-  const userLat = lat ? Number(lat) : null
-  const userLon = lon ? Number(lon) : null
+  const parsedLat = lat ? Number(lat) : null
+  const parsedLon = lon ? Number(lon) : null
+  const userLat = Number.isFinite(parsedLat) ? parsedLat : null
+  const userLon = Number.isFinite(parsedLon) ? parsedLon : null
+  const hasDeviceCoordinates = userLat != null && userLon != null
   const profile = regionKey
     ? getRegionProfileByKey(regionKey)
     : resolveRegionProfile(userLat, userLon)
+  const recordLocationUsageProof = () => {
+    if (!hasDeviceCoordinates) {
+      return
+    }
+
+    void recordLocationUsageProofSafely({
+      request,
+      routePath: url.pathname,
+      method: request.method,
+      regionKey: profile.key,
+      sessionId,
+      eventKind: "fire_summary",
+    })
+  }
 
   const fireSidoName = FIRE_SIDO_NAME_MAP[profile.airSidoName] || profile.displayName
   const cacheKey = `${profile.key}:${days}`
@@ -246,6 +264,7 @@ async function handleGET(request: Request) {
   const includesToday = Array.from({ length: days }, (_, index) => getKstDateOffsetLabel(-index)).includes(todayKey)
   const cached = fireCache.get(cacheKey)
   if (cached && cached.expiry > Date.now()) {
+    recordLocationUsageProof()
     const response = NextResponse.json(cached.data)
     return attachSessionCookie(response, sessionId, shouldSetCookie)
   }
@@ -351,6 +370,7 @@ async function handleGET(request: Request) {
   })
 
   const response = NextResponse.json(payload)
+  recordLocationUsageProof()
   return attachSessionCookie(response, sessionId, shouldSetCookie)
 }
 

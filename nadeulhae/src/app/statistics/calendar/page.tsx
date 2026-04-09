@@ -12,10 +12,10 @@ export default function CalendarPage() {
   const { resolvedTheme } = useTheme()
 
   return (
-    <main className="min-h-screen bg-background pt-32 pb-64 px-4 relative overflow-hidden">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-64 pt-24 sm:pt-28">
       <Particles
         className="absolute inset-0 z-0"
-        quantity={100}
+        quantity={84}
         color={resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"}
       />
       

@@ -199,10 +199,10 @@ export default function AboutPage() {
   return (
     <main className="min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">
       {/* Hero Section */}
-      <section className="relative pt-40 pb-20 px-4 text-center overflow-hidden">
+      <section className="relative px-4 pb-20 pt-24 text-center overflow-hidden sm:pt-28">
         <Particles
           className="absolute inset-0 z-0"
-          quantity={100}
+          quantity={84}
           color={resolvedTheme === "dark" ? "#ffffff" : "#87CEEB"}
         />
         <div className="relative z-10 max-w-4xl mx-auto">
@@ -225,7 +225,7 @@ export default function AboutPage() {
           {[
             "Next.js 16", "React 19+", "TypeScript", "Tailwind CSS", 
             "Prisma ORM", "MySQL", "Lucide Icons", "Magic UI", 
-            "Framer Motion", "Shadcn UI", "Vercel", "i18n"
+            "Framer Motion", "Shadcn UI", "Vultr", "i18n"
           ].map((tech, i) => (
             <div key={i} className="mx-16 flex items-center gap-4 group">
               <CodeIcon size={24} className="text-sky-blue opacity-50 group-hover:opacity-100 transition-opacity" />
@@ -513,7 +513,7 @@ export default function AboutPage() {
       </section>
 
       {/* Contributors Section */}
-      <section id="contributors" className="container mx-auto py-32 px-4 bg-sky-blue/5 dark:bg-white/5 border-y border-sky-blue/10 dark:border-white/5 relative overflow-hidden">
+      <section id="contributors" className="container mx-auto py-32 px-4 border-y border-sky-blue/10 dark:border-white/5 relative overflow-hidden">
         <div className="hidden xl:block absolute top-0 right-0 px-8 py-2 bg-sky-blue/10 border-l border-b border-sky-blue/20 rounded-bl-3xl text-[10px] font-black uppercase tracking-[0.3em] text-sky-blue">
           The Engineering Team
         </div>

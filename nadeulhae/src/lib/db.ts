@@ -23,9 +23,34 @@ function resolveSslOptions() {
   const caPath = process.env.DB_CA_PATH
 
   if (caPath) {
-    return {
-      ca: fs.readFileSync(caPath, "utf8"),
-      rejectUnauthorized: true,
+    try {
+      return {
+        ca: fs.readFileSync(caPath, "utf8"),
+        rejectUnauthorized: true,
+      }
+    } catch {
+      console.warn(`[db] DB_CA_PATH="${caPath}" not found, falling back to system CA bundle.`)
+    }
+  }
+
+  const fallbackPaths = [
+    "/etc/ssl/certs/ca-certificates.crt",
+    "/etc/ssl/cert.pem",
+    "/usr/local/share/ca-certificates/",
+    "/etc/ssl/certs/",
+  ]
+
+  for (const path of fallbackPaths) {
+    try {
+      const stat = fs.statSync(path)
+      if (stat.isFile()) {
+        return {
+          ca: fs.readFileSync(path, "utf8"),
+          rejectUnauthorized: true,
+        }
+      }
+    } catch {
+      continue
     }
   }
 

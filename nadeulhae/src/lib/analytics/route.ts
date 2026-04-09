@@ -1,4 +1,5 @@
 import { recordDailyUsageEventSafely } from "@/lib/analytics/repository"
+import { runRetentionSweepIfNeededSafely } from "@/lib/privacy/retention"
 
 type RouteHandler<TRequest extends Request = Request, TContext = unknown> = (
   request: TRequest,
@@ -10,6 +11,7 @@ export function withApiAnalytics<TRequest extends Request = Request, TContext = 
 ) {
   return async (request: TRequest, context: TContext) => {
     const startedAt = Date.now()
+    void runRetentionSweepIfNeededSafely()
 
     try {
       const response = await handler(request, context)

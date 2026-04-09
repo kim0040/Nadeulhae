@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { AUTH_BODY_LIMIT_BYTES } from "@/lib/auth/guardrails"
+import {
+  type AuthLocale,
+  getAuthMessage,
+  resolveAuthLocale,
+} from "@/lib/auth/messages"
 
 const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
   process.env.TRUST_PROXY_HEADERS ?? ""
@@ -69,12 +74,13 @@ function getAllowedOrigins(request: NextRequest) {
   return allowedOrigins
 }
 
-export function validateSameOriginRequest(request: NextRequest) {
+export function validateSameOriginRequest(request: NextRequest, locale?: AuthLocale) {
+  const resolvedLocale = locale ?? resolveAuthLocale(request.headers.get("accept-language"))
   const origin = request.headers.get("origin")
   const allowedOrigins = getAllowedOrigins(request)
   if (origin && !allowedOrigins.has(origin)) {
     return createAuthJsonResponse(
-      { error: "허용되지 않은 요청 출처입니다." },
+      { error: getAuthMessage(resolvedLocale, "invalidRequestOrigin") },
       { status: 403 }
     )
   }
@@ -82,7 +88,7 @@ export function validateSameOriginRequest(request: NextRequest) {
   const secFetchSite = request.headers.get("sec-fetch-site")
   if (secFetchSite && !["same-origin", "same-site", "none"].includes(secFetchSite)) {
     return createAuthJsonResponse(
-      { error: "교차 사이트 요청은 허용되지 않습니다." },
+      { error: getAuthMessage(resolvedLocale, "crossSiteBlocked") },
       { status: 403 }
     )
   }
@@ -90,8 +96,9 @@ export function validateSameOriginRequest(request: NextRequest) {
   return null
 }
 
-export function validateAuthMutationRequest(request: NextRequest) {
-  const sameOriginViolation = validateSameOriginRequest(request)
+export function validateAuthMutationRequest(request: NextRequest, locale?: AuthLocale) {
+  const resolvedLocale = locale ?? resolveAuthLocale(request.headers.get("accept-language"))
+  const sameOriginViolation = validateSameOriginRequest(request, resolvedLocale)
   if (sameOriginViolation) {
     return sameOriginViolation
   }
@@ -99,7 +106,7 @@ export function validateAuthMutationRequest(request: NextRequest) {
   const contentType = request.headers.get("content-type") ?? ""
   if (!contentType.toLowerCase().includes("application/json")) {
     return createAuthJsonResponse(
-      { error: "JSON 요청만 허용됩니다." },
+      { error: getAuthMessage(resolvedLocale, "jsonOnly") },
       { status: 415 }
     )
   }
@@ -107,7 +114,7 @@ export function validateAuthMutationRequest(request: NextRequest) {
   const contentLength = Number(request.headers.get("content-length") ?? "0")
   if (Number.isFinite(contentLength) && contentLength > AUTH_BODY_LIMIT_BYTES) {
     return createAuthJsonResponse(
-      { error: "요청 본문이 너무 큽니다." },
+      { error: getAuthMessage(resolvedLocale, "requestBodyTooLarge") },
       { status: 413 }
     )
   }

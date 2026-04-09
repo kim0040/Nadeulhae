@@ -15,6 +15,34 @@ const RATE_LIMIT_WINDOW_MS = 5_000
 const rateLimitMap = new Map<string, number>()
 const RATE_LIMIT_MAP_MAX_KEYS = 6_000
 
+const JEONJU_CHAT_ERRORS = {
+  ko: {
+    loadFailed: "채팅 메시지를 불러오지 못했습니다.",
+    authRequired: "로그인이 필요합니다.",
+    rateLimited: "메시지를 너무 자주 보내고 있습니다. 잠시 후 다시 시도해 주세요.",
+    invalidRequest: "잘못된 요청입니다.",
+    invalidLength: "메시지는 1자 이상 500자 이하로 입력해 주세요.",
+    profanity: "부적절한 표현이 포함되어 있습니다. 다시 작성해 주세요.",
+    sendFailed: "메시지 전송에 실패했습니다.",
+  },
+  en: {
+    loadFailed: "Failed to load chat messages.",
+    authRequired: "You need to log in first.",
+    rateLimited: "You are sending messages too quickly. Please try again shortly.",
+    invalidRequest: "Invalid request.",
+    invalidLength: "Message must be between 1 and 500 characters.",
+    profanity: "Your message contains inappropriate language. Please revise it.",
+    sendFailed: "Failed to send the message.",
+  },
+} as const
+
+type JeonjuChatLocale = keyof typeof JEONJU_CHAT_ERRORS
+
+function resolveLocale(request: Request): JeonjuChatLocale {
+  const acceptLanguage = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  return acceptLanguage.startsWith("en") ? "en" : "ko"
+}
+
 function isRateLimited(userId: string): boolean {
   const now = Date.now()
   const lastSent = rateLimitMap.get(userId)
@@ -43,6 +71,7 @@ function pruneRateLimitMap(map: Map<string, number>) {
 }
 
 export async function GET(request: NextRequest) {
+  const locale = resolveLocale(request)
   try {
     const session = await getAuthenticatedSessionFromRequest(request)
     const viewerUserId = session?.user.id ?? null
@@ -51,23 +80,30 @@ export async function GET(request: NextRequest) {
 
     if (afterId && afterId > 0) {
       const messages = await getMessagesSince(afterId, viewerUserId)
-      return NextResponse.json({ messages })
+      return NextResponse.json({
+        messages,
+        serverNow: new Date().toISOString(),
+      })
     }
 
     const messages = await getRecentMessages(50, viewerUserId)
-    return NextResponse.json({ messages })
+    return NextResponse.json({
+      messages,
+      serverNow: new Date().toISOString(),
+    })
   } catch (error) {
     console.error("Jeonju chat GET failed:", error)
     return NextResponse.json(
-      { error: "채팅 메시지를 불러오지 못했습니다." },
+      { error: JEONJU_CHAT_ERRORS[locale].loadFailed },
       { status: 500 }
     )
   }
 }
 
 export async function POST(request: NextRequest) {
+  const locale = resolveLocale(request)
   try {
-    const requestViolation = validateAuthMutationRequest(request)
+    const requestViolation = validateAuthMutationRequest(request, locale)
     if (requestViolation) {
       return requestViolation
     }
@@ -75,7 +111,7 @@ export async function POST(request: NextRequest) {
     const session = await getAuthenticatedSessionFromRequest(request)
     if (!session) {
       return NextResponse.json(
-        { error: "로그인이 필요합니다." },
+        { error: JEONJU_CHAT_ERRORS[locale].authRequired },
         { status: 401 }
       )
     }
@@ -84,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     if (isRateLimited(user.id)) {
       return NextResponse.json(
-        { error: "메시지를 너무 자주 보내고 있습니다. 잠시 후 다시 시도해 주세요." },
+        { error: JEONJU_CHAT_ERRORS[locale].rateLimited },
         { status: 429 }
       )
     }
@@ -94,7 +130,7 @@ export async function POST(request: NextRequest) {
       payload = await request.json()
     } catch {
       return NextResponse.json(
-        { error: "잘못된 요청입니다." },
+        { error: JEONJU_CHAT_ERRORS[locale].invalidRequest },
         { status: 400 }
       )
     }
@@ -105,7 +141,7 @@ export async function POST(request: NextRequest) {
 
     if (!message || message.length > 500) {
       return NextResponse.json(
-        { error: "메시지는 1자 이상 500자 이하로 입력해 주세요." },
+        { error: JEONJU_CHAT_ERRORS[locale].invalidLength },
         { status: 400 }
       )
     }
@@ -113,7 +149,7 @@ export async function POST(request: NextRequest) {
     // Profanity check
     if (containsProfanity(message)) {
       return NextResponse.json(
-        { error: "부적절한 표현이 포함되어 있습니다. 다시 작성해 주세요." },
+        { error: JEONJU_CHAT_ERRORS[locale].profanity },
         { status: 400 }
       )
     }
@@ -128,11 +164,17 @@ export async function POST(request: NextRequest) {
       isAnonymous,
     })
 
-    return NextResponse.json({ message: { ...created, isMine: true } }, { status: 201 })
+    return NextResponse.json(
+      {
+        message: { ...created, isMine: true },
+        serverNow: new Date().toISOString(),
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error("Jeonju chat POST failed:", error)
     return NextResponse.json(
-      { error: "메시지 전송에 실패했습니다." },
+      { error: JEONJU_CHAT_ERRORS[locale].sendFailed },
       { status: 500 }
     )
   }

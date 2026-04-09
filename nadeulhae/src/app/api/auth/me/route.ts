@@ -6,18 +6,20 @@ import {
   clearAuthCookie,
   getAuthenticatedSessionFromRequest,
 } from "@/lib/auth/session"
+import { getAuthMessage, resolveAuthLocale } from "@/lib/auth/messages"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
 
 async function handleGET(request: NextRequest) {
+  const locale = resolveAuthLocale(request.headers.get("accept-language"))
   try {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
 
     if (!authenticatedSession) {
       return clearAuthCookie(
         createAuthJsonResponse(
-          { error: "인증된 세션이 없습니다." },
+          { error: getAuthMessage(locale, "sessionMissing") },
           { status: 401 }
         )
       )
@@ -30,7 +32,7 @@ async function handleGET(request: NextRequest) {
   } catch (error) {
     console.error("Auth me API failed:", error)
     return createAuthJsonResponse(
-      { error: "세션 확인 중 오류가 발생했습니다." },
+      { error: getAuthMessage(locale, "sessionCheckError") },
       { status: 500 }
     )
   }

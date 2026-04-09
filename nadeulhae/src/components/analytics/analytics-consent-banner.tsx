@@ -31,6 +31,7 @@ const BANNER_COPY = {
     allowAction: "분석 허용",
     link: "약관·개인정보 보기",
     saving: "저장 중...",
+    saveError: "동의 설정 저장에 실패했어요. 다시 시도해 주세요.",
   },
   en: {
     badge: "privacy controls",
@@ -46,6 +47,7 @@ const BANNER_COPY = {
     allowAction: "Allow analytics",
     link: "View terms and privacy",
     saving: "Saving...",
+    saveError: "Failed to save your consent preference. Please try again.",
   },
 } as const
 
@@ -71,6 +73,7 @@ export function AnalyticsConsentBanner() {
   const { language } = useLanguage()
   const { user, status, refreshSession } = useAuth()
   const [optimisticPreference, setOptimisticPreference] = useState<AnalyticsConsentPreference | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const copy = BANNER_COPY[language]
   const cookiePreference = useSyncExternalStore(
@@ -100,12 +103,15 @@ export function AnalyticsConsentBanner() {
   }, [cookiePreference, optimisticPreference, status, user?.analyticsAccepted])
 
   const handleSelect = (nextPreference: AnalyticsConsentPreference) => {
+    setErrorMessage(null)
+
     startTransition(async () => {
       try {
         const response = await fetch("/api/analytics/consent", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept-Language": language,
           },
           credentials: "include",
           body: JSON.stringify({
@@ -115,6 +121,12 @@ export function AnalyticsConsentBanner() {
         })
 
         if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { error?: unknown } | null
+          setErrorMessage(
+            typeof payload?.error === "string" && payload.error.trim().length > 0
+              ? payload.error
+              : copy.saveError
+          )
           return
         }
 
@@ -122,6 +134,7 @@ export function AnalyticsConsentBanner() {
         await refreshSession()
       } catch (error) {
         console.error("Failed to update analytics consent:", error)
+        setErrorMessage(copy.saveError)
       }
     })
   }
@@ -185,6 +198,16 @@ export function AnalyticsConsentBanner() {
               <div className="rounded-[1.25rem] border border-card-border/70 bg-background/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
                 {copy.note}
               </div>
+
+              {errorMessage ? (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-[1.2rem] border border-danger/25 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger"
+                >
+                  {errorMessage}
+                </div>
+              ) : null}
 
               <div className="flex flex-col gap-3 border-t border-card-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <Link

@@ -9,6 +9,71 @@ import { mockWeatherData, mockInsights, mockTrends, mockCourse } from "@/data/mo
 const MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE === "true";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/weather";
 
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+const API_CACHE_MAX_KEYS = 256;
+const apiCache = new Map<string, CacheEntry<unknown>>();
+const apiInFlight = new Map<string, Promise<unknown>>();
+
+function getCachedValue<T>(key: string): T | null {
+  const cached = apiCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    apiCache.delete(key);
+    return null;
+  }
+  return cached.value as T;
+}
+
+function setCachedValue<T>(key: string, value: T, ttlMs: number) {
+  apiCache.set(key, {
+    value,
+    expiresAt: Date.now() + ttlMs,
+  });
+
+  if (apiCache.size <= API_CACHE_MAX_KEYS) {
+    return;
+  }
+
+  const overflow = apiCache.size - API_CACHE_MAX_KEYS;
+  let removed = 0;
+  for (const cacheKey of apiCache.keys()) {
+    apiCache.delete(cacheKey);
+    removed += 1;
+    if (removed >= overflow) {
+      break;
+    }
+  }
+}
+
+async function getOrFetchCached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
+  const cached = getCachedValue<T>(key);
+  if (cached != null) {
+    return cached;
+  }
+
+  const inFlight = apiInFlight.get(key) as Promise<T> | undefined;
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const pending = (async () => {
+    const value = await fetcher();
+    setCachedValue(key, value, ttlMs);
+    return value;
+  })();
+
+  apiInFlight.set(key, pending as Promise<unknown>);
+  try {
+    return await pending;
+  } finally {
+    apiInFlight.delete(key);
+  }
+}
+
 export interface WeatherData {
   score: number;
   status: string;
@@ -188,11 +253,18 @@ export const dataService = {
           }
         };
       }
-      
-      const query = (lat && lon) ? `?lat=${lat}&lon=${lon}` : '';
-      const response = await fetch(`${API_BASE}/current${query}`, { next: { revalidate: 60 } });
-      if (!response.ok) throw new Error("Weather API error");
-      return await response.json();
+
+      const hasCoords = lat != null && lon != null;
+      const latKey = hasCoords ? lat.toFixed(3) : "default";
+      const lonKey = hasCoords ? lon.toFixed(3) : "default";
+      const cacheKey = `weather:${latKey}:${lonKey}`;
+
+      return await getOrFetchCached(cacheKey, 45_000, async () => {
+        const query = hasCoords ? `?lat=${lat}&lon=${lon}` : "";
+        const response = await fetch(`${API_BASE}/current${query}`, { next: { revalidate: 60 } });
+        if (!response.ok) throw new Error("Weather API error");
+        return await response.json();
+      });
     } catch (error) {
       console.error("Failed to fetch weather data:", error);
       return mockWeatherData; // Fallback to mock on error
@@ -203,10 +275,12 @@ export const dataService = {
   getInsights: async (): Promise<Insight[]> => {
     try {
       if (MOCK_MODE) return mockInsights as Insight[];
-      
-      const response = await fetch(`${API_BASE}/insights`);
-      if (!response.ok) throw new Error("Insights API error");
-      return await response.json();
+
+      return await getOrFetchCached("insights:default", 5 * 60_000, async () => {
+        const response = await fetch(`${API_BASE}/insights`);
+        if (!response.ok) throw new Error("Insights API error");
+        return await response.json();
+      });
     } catch (error) {
       console.error("Failed to fetch insights:", error);
       return mockInsights as Insight[];
@@ -217,10 +291,12 @@ export const dataService = {
   getTrends: async (): Promise<string[]> => {
     try {
       if (MOCK_MODE) return mockTrends;
-      
-      const response = await fetch(`${API_BASE}/trends`);
-      if (!response.ok) throw new Error("Trends API error");
-      return await response.json();
+
+      return await getOrFetchCached("trends:default", 10 * 60_000, async () => {
+        const response = await fetch(`${API_BASE}/trends`);
+        if (!response.ok) throw new Error("Trends API error");
+        return await response.json();
+      });
     } catch (error) {
       console.error("Failed to fetch trends:", error);
       return mockTrends;
@@ -256,11 +332,14 @@ export const dataService = {
       if (params?.lon != null) query.set("lon", String(params.lon))
       if (params?.days != null) query.set("days", String(params.days))
 
-      const response = await fetch(`/api/fire/summary${query.toString() ? `?${query.toString()}` : ""}`, {
-        next: { revalidate: 60 * 60 },
+      const cacheKey = `fire:${query.toString() || "default"}`
+      return await getOrFetchCached(cacheKey, 30 * 60_000, async () => {
+        const response = await fetch(`/api/fire/summary${query.toString() ? `?${query.toString()}` : ""}`, {
+          next: { revalidate: 60 * 60 },
+        })
+        if (!response.ok) return null
+        return await response.json()
       })
-      if (!response.ok) return null
-      return await response.json()
     } catch (error) {
       console.error("Failed to fetch fire summary:", error)
       return null

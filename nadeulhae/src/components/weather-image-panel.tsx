@@ -67,11 +67,12 @@ function ImageBlock({
             <Image
               src={image.url}
               alt={image.name || title}
-              width={1280}
-              height={720}
+              width={800}
+              height={450}
               unoptimized
               className="h-[220px] w-full object-cover"
               loading="lazy"
+              sizes="(max-width: 768px) 100vw, 50vw"
             />
           </div>
           <p className="text-xs sm:text-sm font-semibold text-foreground/85 break-words">{localizedImageName}</p>

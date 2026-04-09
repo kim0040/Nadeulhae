@@ -13,6 +13,10 @@ async function handleGET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid asset request" }, { status: 400 })
   }
 
+  if (!/^\d{12,14}$/.test(tm)) {
+    return NextResponse.json({ error: "Invalid date format" }, { status: 400 })
+  }
+
   const authKey = process.env.APIHUB_KEY || process.env.KMA_API_KEY
   if (!authKey) {
     return NextResponse.json({ error: "KMA auth key missing" }, { status: 500 })

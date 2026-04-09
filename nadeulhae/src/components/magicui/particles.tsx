@@ -14,6 +14,7 @@ interface ParticlesProps extends ComponentPropsWithoutRef<"div"> {
   staticity?: number
   ease?: number
   size?: number
+  fps?: number
   refresh?: boolean
   color?: string
   vx?: number
@@ -45,15 +46,15 @@ type Circle = {
   magnetism: number
 }
 
-const FRAME_INTERVAL_MS = 1000 / 30
 const MAX_DPR = 1.5
 
 export const Particles: React.FC<ParticlesProps> = ({
   className = "",
-  quantity = 100,
+  quantity = 80,
   staticity = 50,
   ease = 50,
   size = 0.4,
+  fps = 20,
   refresh = false,
   color = "#ffffff",
   vx = 0,
@@ -73,6 +74,7 @@ export const Particles: React.FC<ParticlesProps> = ({
   const pageVisible = useRef(true)
   const reducedMotion = useRef(false)
   const rgb = useRef<number[]>(hexToRgb(color))
+  const frameIntervalMs = 1000 / Math.max(8, fps)
 
   const refreshDpr = useCallback(() => {
     if (typeof window === "undefined") {
@@ -182,7 +184,7 @@ export const Particles: React.FC<ParticlesProps> = ({
         return
       }
 
-      if (timestamp - lastFrameTs.current >= FRAME_INTERVAL_MS) {
+      if (timestamp - lastFrameTs.current >= frameIntervalMs) {
         renderFrame()
         lastFrameTs.current = timestamp
       }
@@ -190,7 +192,7 @@ export const Particles: React.FC<ParticlesProps> = ({
     }
 
     rafID.current = window.requestAnimationFrame(tick)
-  }, [renderFrame, shouldAnimate, stopAnimation])
+  }, [frameIntervalMs, renderFrame, shouldAnimate, stopAnimation])
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -198,7 +200,7 @@ export const Particles: React.FC<ParticlesProps> = ({
     }
     rgb.current = hexToRgb(color)
 
-    const onPointerMove = (event: MouseEvent) => {
+    const onPointerMove = (event: PointerEvent) => {
       if (!canvasRef.current) {
         return
       }
@@ -212,6 +214,11 @@ export const Particles: React.FC<ParticlesProps> = ({
         mouse.current.x = x
         mouse.current.y = y
       }
+    }
+
+    const onPointerLeave = () => {
+      mouse.current.x = 0
+      mouse.current.y = 0
     }
 
     const onResize = () => {
@@ -256,8 +263,20 @@ export const Particles: React.FC<ParticlesProps> = ({
     }
 
     initCanvas()
-    window.addEventListener("mousemove", onPointerMove, { passive: true })
-    window.addEventListener("resize", onResize)
+    const container = canvasContainerRef.current
+    if (container) {
+      container.addEventListener("pointermove", onPointerMove, { passive: true })
+      container.addEventListener("pointerleave", onPointerLeave, { passive: true })
+    }
+
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== "undefined" && container) {
+      resizeObserver = new ResizeObserver(onResize)
+      resizeObserver.observe(container)
+    } else {
+      window.addEventListener("resize", onResize)
+    }
+
     document.addEventListener("visibilitychange", onVisibilityChange)
     media.addEventListener("change", applyReducedMotion)
 
@@ -268,8 +287,15 @@ export const Particles: React.FC<ParticlesProps> = ({
     return () => {
       stopAnimation()
       observer.disconnect()
-      window.removeEventListener("mousemove", onPointerMove)
-      window.removeEventListener("resize", onResize)
+      if (container) {
+        container.removeEventListener("pointermove", onPointerMove)
+        container.removeEventListener("pointerleave", onPointerLeave)
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect()
+      } else {
+        window.removeEventListener("resize", onResize)
+      }
       document.removeEventListener("visibilitychange", onVisibilityChange)
       media.removeEventListener("change", applyReducedMotion)
     }

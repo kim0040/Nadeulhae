@@ -11,6 +11,7 @@ import {
   getNextUpdateTimestamp,
 } from "@/lib/weather-utils"
 import { withApiAnalytics } from "@/lib/analytics/route"
+import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 
 type CacheEntry<T> = {
@@ -23,11 +24,12 @@ type UserCacheEntry<T> = {
   expiry: number
 }
 
-const villageCache = new Map<string, CacheEntry<any>>()
-const midCache = new Map<string, CacheEntry<any>>()
-const ultraCache = new Map<string, CacheEntry<any>>()
+const villageCache = new Map<string, CacheEntry<Record<string, unknown>>>()
+const midCache = new Map<string, CacheEntry<Record<string, unknown>>>()
+const ultraCache = new Map<string, CacheEntry<Record<string, unknown>>>()
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
-const forecastResponseCache = new Map<string, UserCacheEntry<any>>()
+const MAX_FORECAST_CACHE_KEYS = 500
+const forecastResponseCache = new Map<string, UserCacheEntry<Record<string, unknown>>>()
 
 const CACHE_DURATION = 3 * 60 * 60 * 1000
 const MID_CACHE_DURATION = 12 * 60 * 60 * 1000
@@ -35,6 +37,7 @@ const ULTRA_CACHE_DURATION = 60 * 60 * 1000
 const USER_RESPONSE_CACHE_DURATION = 5 * 60 * 1000
 const RATE_LIMIT_WINDOW = 60 * 1000
 const MAX_REQUESTS_PER_WINDOW = 30
+const MAX_RATE_LIMIT_ENTRIES = 5000
 const CACHE_SWEEP_INTERVAL = 5 * 60 * 1000
 let lastMaintenanceSweep = 0
 
@@ -76,10 +79,19 @@ function cleanupExpiringCache<T extends { expiry: number }>(map: Map<string, T>,
   }
 }
 
-function cleanupRateLimitMap(map: Map<string, { count: number; lastReset: number }>, windowMs: number, now: number) {
+function cleanupRateLimitMap(map: Map<string, { count: number; lastReset: number }>, windowMs: number, now: number, maxEntries = 5000) {
   for (const [key, value] of map.entries()) {
     if (now - value.lastReset > windowMs * 5) {
       map.delete(key)
+    }
+  }
+  if (map.size > maxEntries) {
+    const overflow = map.size - maxEntries
+    let removed = 0
+    for (const key of map.keys()) {
+      map.delete(key)
+      removed++
+      if (removed >= overflow) break
     }
   }
 }
@@ -94,7 +106,7 @@ function runMaintenanceSweepIfNeeded() {
   cleanupLastUpdateCache(midCache, MID_CACHE_DURATION * 3, now)
   cleanupLastUpdateCache(ultraCache, ULTRA_CACHE_DURATION * 3, now)
   cleanupExpiringCache(forecastResponseCache, now)
-  cleanupRateLimitMap(rateLimitMap, RATE_LIMIT_WINDOW, now)
+  cleanupRateLimitMap(rateLimitMap, RATE_LIMIT_WINDOW, now, MAX_RATE_LIMIT_ENTRIES)
 
   lastMaintenanceSweep = now
 }
@@ -144,7 +156,7 @@ async function fetchMidData(profile: any, serviceKey: string) {
 
 async function fetchJsonSafely(url: string) {
   try {
-    const response = await fetch(url, { cache: "no-store", next: { revalidate: 0 } })
+    const response = await fetch(url, { cache: "no-store" })
     if (!response.ok) return null
     const text = await response.text()
     if (!text || text.trim().startsWith("<")) return null
@@ -206,10 +218,28 @@ async function handleGET(request: Request) {
   const url = new URL(request.url)
   const lat = url.searchParams.get("lat")
   const lon = url.searchParams.get("lon")
-  const userLat = lat ? Number(lat) : null
-  const userLon = lon ? Number(lon) : null
+  const parsedLat = lat ? Number(lat) : null
+  const parsedLon = lon ? Number(lon) : null
+  const userLat = Number.isFinite(parsedLat) ? parsedLat : null
+  const userLon = Number.isFinite(parsedLon) ? parsedLon : null
+  const hasDeviceCoordinates = userLat != null && userLon != null
+  const isInternalUpstreamCall = request.headers.get("x-nadeulhae-internal-call") === "1"
   const { sessionId, shouldSetCookie } = getOrCreateSessionId(request)
   const profile = resolveRegionProfile(userLat, userLon)
+  const recordLocationUsageProof = () => {
+    if (!hasDeviceCoordinates || isInternalUpstreamCall) {
+      return
+    }
+
+    void recordLocationUsageProofSafely({
+      request,
+      routePath: url.pathname,
+      method: request.method,
+      regionKey: profile.key,
+      sessionId,
+      eventKind: "weather_forecast",
+    })
+  }
   const grid = userLat != null && userLon != null
     ? dfsToGrid(userLat, userLon)
     : {
@@ -228,6 +258,7 @@ async function handleGET(request: Request) {
   ].join(":")
   const cachedResponse = forecastResponseCache.get(userCacheKey)
   if (cachedResponse && cachedResponse.expiry > Date.now()) {
+    recordLocationUsageProof()
     const response = NextResponse.json(cachedResponse.data)
     return attachSessionCookie(response, sessionId, shouldSetCookie)
   }
@@ -514,7 +545,14 @@ async function handleGET(request: Request) {
     expiry: Date.now() + USER_RESPONSE_CACHE_DURATION,
   })
 
+  while (forecastResponseCache.size > MAX_FORECAST_CACHE_KEYS) {
+    const oldestKey = forecastResponseCache.keys().next().value as string | undefined
+    if (!oldestKey) break
+    forecastResponseCache.delete(oldestKey)
+  }
+
   const response = NextResponse.json(finalResult)
+  recordLocationUsageProof()
   return attachSessionCookie(response, sessionId, shouldSetCookie)
 }
 

@@ -27,6 +27,7 @@ import {
 } from "@/lib/auth/request-security"
 import { attachAuthCookie, startAuthenticatedSession } from "@/lib/auth/session"
 import { validateLoginPayload } from "@/lib/auth/validation"
+import { getAuthMessage, resolveAuthLocale } from "@/lib/auth/messages"
 import {
   attachAnalyticsConsentCookie,
   getAnalyticsConsentPreferenceFromRequest,
@@ -36,12 +37,13 @@ import { withApiAnalytics } from "@/lib/analytics/route"
 export const runtime = "nodejs"
 
 async function handlePOST(request: NextRequest) {
+  const locale = resolveAuthLocale(request.headers.get("accept-language"))
   const ipAddress = getClientIp(request)
   const userAgent = getUserAgent(request)
   const ipScopeKey = getAuthScopeKey("ip", ipAddress)
 
   try {
-    const requestViolation = validateAuthMutationRequest(request)
+    const requestViolation = validateAuthMutationRequest(request, locale)
     if (requestViolation) {
       await recordAuthSecurityEventSafely({
         eventType: "login_request_rejected",
@@ -71,7 +73,7 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+        { error: getAuthMessage(locale, "loginTooManyAttempts") },
         {
           status: 429,
           retryAfterSeconds: blockedByIp.retryAfterSeconds,
@@ -97,12 +99,12 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "잘못된 JSON 요청입니다." },
+        { error: getAuthMessage(locale, "invalidJsonRequest") },
         { status: 400 }
       )
     }
 
-    const validation = validateLoginPayload(payload)
+    const validation = validateLoginPayload(payload, locale)
 
     if ("error" in validation) {
       await recordAuthSecurityEventSafely({
@@ -136,7 +138,7 @@ async function handlePOST(request: NextRequest) {
       })
 
       return createAuthJsonResponse(
-        { error: "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+        { error: getAuthMessage(locale, "loginTooManyAttempts") },
         {
           status: 429,
           retryAfterSeconds: activeBlock.retryAfterSeconds,
@@ -193,7 +195,7 @@ async function handlePOST(request: NextRequest) {
 
       if (ipRateDecision.blocked || emailRateDecision.blocked) {
         return createAuthJsonResponse(
-          { error: "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+          { error: getAuthMessage(locale, "loginTooManyAttempts") },
           {
             status: 429,
             retryAfterSeconds,
@@ -202,7 +204,7 @@ async function handlePOST(request: NextRequest) {
       }
 
       return createAuthJsonResponse(
-        { error: "이메일 또는 비밀번호가 올바르지 않습니다." },
+        { error: getAuthMessage(locale, "loginInvalidCredentials") },
         { status: 401 }
       )
     }
@@ -264,7 +266,7 @@ async function handlePOST(request: NextRequest) {
     })
 
     return createAuthJsonResponse(
-      { error: "로그인 처리 중 오류가 발생했습니다." },
+      { error: getAuthMessage(locale, "loginInternalError") },
       { status: 500 }
     )
   }
