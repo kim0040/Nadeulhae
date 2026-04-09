@@ -34,7 +34,7 @@ import {
   resolveChatSession,
   reserveDailyChatRequest,
 } from "@/lib/chat/repository"
-import type { ChatConversationMessage, ChatLocale } from "@/lib/chat/types"
+import type { ChatConversationMessage, ChatLocale, ChatStateResponse } from "@/lib/chat/types"
 
 export const runtime = "nodejs"
 
@@ -104,6 +104,67 @@ function normalizeMessage(value: unknown) {
   }
 
   return value.replace(/\u0000/g, "").trim()
+}
+
+const ASSISTANT_NAME_KO = "나들이 메이트"
+const ASSISTANT_NAME_EN = "Nadeul Mate"
+const MODEL_DISCLOSURE_PATTERN = /\b(chatgpt|gpt(?:-|_)?\d[\w.-]*|openai|claude|gemini|llama|mistral)\b/i
+const SELF_REFERENCE_PATTERN = /(저는|나는|제가|내가|i am|i'm|as an?)/i
+
+function enforceAssistantIdentity(content: string, locale: ChatLocale) {
+  const identity = locale === "ko"
+    ? `저는 ${ASSISTANT_NAME_KO}입니다.`
+    : `I am ${ASSISTANT_NAME_EN}.`
+
+  const disclosureNote = locale === "ko"
+    ? "모델명이나 내부 시스템 정보는 공개하지 않아요."
+    : "I can't share model or internal system details."
+
+  const normalized = content.trim()
+  if (!normalized) {
+    return identity
+  }
+
+  const sanitized = normalized
+    .replace(
+      /(?:저는|나는|제가|내가)\s*(?:chatgpt|gpt[^\s,.!?]*|openai[^\s,.!?]*|ai\s*언어\s*모델|인공지능\s*모델)[^.!?\n]*[.!?]?/gi,
+      identity
+    )
+    .replace(
+      /(?:i am|i'm)\s*(?:chatgpt|gpt[^\s,.!?]*|an?\s+(?:ai\s+)?language model|openai[^\s,.!?]*)[^.!?\n]*[.!?]?/gi,
+      identity
+    )
+    .replace(
+      /as an?\s+(?:ai\s+)?language model[^.!?\n]*[.!?]?/gi,
+      identity
+    )
+    .trim()
+
+  if (!sanitized) {
+    return identity
+  }
+
+  if (MODEL_DISCLOSURE_PATTERN.test(sanitized) && SELF_REFERENCE_PATTERN.test(sanitized)) {
+    return `${identity} ${disclosureNote}`
+  }
+
+  return sanitized
+}
+
+function sanitizeChatStateIdentity(state: ChatStateResponse, locale: ChatLocale): ChatStateResponse {
+  return {
+    ...state,
+    messages: state.messages.map((message) => {
+      if (message.role !== "assistant") {
+        return message
+      }
+
+      return {
+        ...message,
+        content: enforceAssistantIdentity(message.content, locale),
+      }
+    }),
+  }
 }
 
 function getErrorMessage(locale: ChatLocale, key: keyof typeof CHAT_ERRORS.ko) {
@@ -385,11 +446,12 @@ async function handleGET(request: NextRequest) {
       )
     }
 
-    const response = createAuthJsonResponse(await getChatState({
+    const state = await getChatState({
       userId: authenticatedSession.user.id,
       locale,
       requestedSessionId,
-    }))
+    })
+    const response = createAuthJsonResponse(sanitizeChatStateIdentity(state, locale))
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Chat GET API failed:", error)
@@ -498,11 +560,12 @@ async function handlePOST(request: NextRequest) {
         locale,
         requestedSessionId: String(resolvedSession.activeSessionId),
       })
+      const sanitizedState = sanitizeChatStateIdentity(state, locale)
 
       return attachRefreshedAuthCookie(
         createAuthJsonResponse(
           {
-            ...state,
+            ...sanitizedState,
             error: getErrorMessage(locale, "rateLimited"),
             usage: reservation.usage,
             policy: getChatPolicySnapshot(),
@@ -541,13 +604,14 @@ async function handlePOST(request: NextRequest) {
         message
       ),
     })
+    const assistantMessage = enforceAssistantIdentity(completionResult.content, locale)
 
     await persistChatExchange({
       userId: authenticatedSession.user.id,
       sessionId: resolvedSession.activeSessionId,
       locale,
       userMessage: message,
-      assistantMessage: completionResult.content,
+      assistantMessage,
       requestedModel: completionResult.requestedModel,
       resolvedModel: completionResult.resolvedModel,
       providerRequestId: completionResult.providerRequestId,
@@ -561,11 +625,12 @@ async function handlePOST(request: NextRequest) {
       locale,
     })
 
-    const response = createAuthJsonResponse(await getChatState({
+    const state = await getChatState({
       userId: authenticatedSession.user.id,
       locale,
       requestedSessionId: String(resolvedSession.activeSessionId),
-    }))
+    })
+    const response = createAuthJsonResponse(sanitizeChatStateIdentity(state, locale))
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request).catch(() => null)

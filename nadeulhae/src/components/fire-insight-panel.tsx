@@ -36,8 +36,8 @@ export function FireInsightPanel({
     return (
       <div className="relative overflow-hidden rounded-[2rem] border border-card-border bg-card px-5 py-4 shadow-[0_18px_45px_-35px_rgba(47,111,228,0.32)]">
         <BorderBeam size={200} duration={8} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
-        <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
+        <div className="relative z-10 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+          <div className="min-w-0 sm:pr-2">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
               <Flame size={14} className="text-orange-500" />
               {language === "ko" ? "지역 화재 흐름" : "Regional fire flow"}
@@ -46,7 +46,7 @@ export function FireInsightPanel({
               {language === "ko" ? data.overview.shortMessageKo : data.overview.shortMessageEn}
             </p>
           </div>
-          <div className={cn("inline-flex shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-wide", cautionTone)}>
+          <div className={cn("inline-flex w-fit shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-wide sm:justify-self-end", cautionTone)}>
             {language === "ko" ? `최근 기준 ${formatDateLabel(data.metadata.latestDate)}` : `Latest ${formatDateLabel(data.metadata.latestDate)}`}
           </div>
         </div>
