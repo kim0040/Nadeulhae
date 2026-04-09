@@ -440,7 +440,7 @@ export function JeonjuChatPanel() {
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="max-h-[32rem] min-h-[19rem] space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none] sm:max-h-[40rem] sm:min-h-[24rem] sm:p-5"
+              className="max-h-[35rem] min-h-[21rem] space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none] sm:max-h-[44rem] sm:min-h-[26rem] sm:p-5"
             >
               {isLoading ? (
                 <div className="flex h-32 items-center justify-center text-sm font-semibold text-muted-foreground">

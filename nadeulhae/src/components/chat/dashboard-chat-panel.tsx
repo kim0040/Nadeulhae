@@ -523,7 +523,7 @@ export function DashboardChatPanel({
         <div
           ref={messageViewportRef}
           onScroll={handleViewportScroll}
-          className="max-h-[58vh] min-h-[22rem] space-y-4 overflow-y-auto overscroll-contain p-4 custom-scrollbar [overflow-anchor:none] sm:max-h-[64vh] sm:min-h-[26rem] sm:p-5"
+          className="max-h-[62vh] min-h-[24rem] space-y-4 overflow-y-auto overscroll-contain p-4 custom-scrollbar [overflow-anchor:none] sm:max-h-[68vh] sm:min-h-[28rem] sm:p-5"
         >
           {isLoading ? (
             <div className="flex items-center gap-3 rounded-[1.4rem] border border-card-border/70 bg-background/80 px-4 py-4 text-sm font-semibold text-muted-foreground">

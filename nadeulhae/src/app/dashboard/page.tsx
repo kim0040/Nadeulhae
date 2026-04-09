@@ -74,6 +74,303 @@ function splitBulletinSummary(summary: string) {
   return uniqueSegments
 }
 
+const NON_ALERT_BULLETIN_PATTERN = /^(?:[oO○◯●□■▪︎ㆍ·\-\*\s]*)?(?:없음|없\s*음|특보없음|해당없음|none|no\s*alerts?|n\/a)(?:[\s.)\]]*)$/i
+const BULLETIN_HIGHLIGHT_MAX_LENGTH = 96
+const BULLETIN_CATEGORY_SET = new Set([
+  "종합",
+  "요약",
+  "긴급",
+  "오늘",
+  "내일",
+  "모레",
+  "글피",
+  "그글피",
+  "summary",
+  "today",
+  "tomorrow",
+])
+
+type BulletinSeverity = "critical" | "warning" | "advisory" | "info"
+
+type BulletinBodyItem = {
+  label: string | null
+  content: string
+}
+
+type BulletinKeywordTag = {
+  id: string
+  label: string
+  tone: BulletinSeverity
+}
+
+const BULLETIN_SEVERITY_RULES: Array<{ severity: BulletinSeverity; regex: RegExp }> = [
+  {
+    severity: "critical",
+    regex: /(경보|긴급|재난|지진|해일|산사태|태풍\s*경보|호우\s*경보|대설\s*경보|폭염\s*경보|한파\s*경보|storm warning|emergency|tsunami warning)/i,
+  },
+  {
+    severity: "warning",
+    regex: /(주의보|특보|강풍|풍랑|호우|대설|폭염|한파|황사|안개|빙판|낙뢰|advisory|heavy rain|strong wind|typhoon)/i,
+  },
+  {
+    severity: "advisory",
+    regex: /(비|눈|소나기|천둥|번개|바람|rain|snow|shower|thunder|wind)/i,
+  },
+]
+
+const BULLETIN_TAG_RULES: Array<{
+  id: string
+  regex: RegExp
+  tone: BulletinSeverity
+  label: Record<"ko" | "en", string>
+}> = [
+  { id: "typhoon", regex: /(태풍|typhoon)/i, tone: "critical", label: { ko: "태풍", en: "Typhoon" } },
+  { id: "heavy-rain", regex: /(호우|집중호우|heavy rain)/i, tone: "warning", label: { ko: "호우", en: "Heavy Rain" } },
+  { id: "strong-wind", regex: /(강풍|돌풍|strong wind|gust)/i, tone: "warning", label: { ko: "강풍", en: "Strong Wind" } },
+  { id: "snow", regex: /(대설|폭설|snow|blizzard)/i, tone: "warning", label: { ko: "대설", en: "Heavy Snow" } },
+  { id: "thunder", regex: /(천둥|번개|낙뢰|thunder|lightning)/i, tone: "warning", label: { ko: "낙뢰", en: "Thunder" } },
+  { id: "heatwave", regex: /(폭염|heat wave|heatwave)/i, tone: "warning", label: { ko: "폭염", en: "Heatwave" } },
+  { id: "cold-wave", regex: /(한파|cold wave)/i, tone: "warning", label: { ko: "한파", en: "Cold Wave" } },
+  { id: "dust", regex: /(황사|미세먼지|초미세먼지|dust|pm10|pm2\.?5)/i, tone: "advisory", label: { ko: "대기질", en: "Air Quality" } },
+  { id: "fog", regex: /(안개|가시거리|fog|visibility)/i, tone: "advisory", label: { ko: "안개", en: "Fog" } },
+  { id: "rain", regex: /(비|강수|rain|drizzle)/i, tone: "advisory", label: { ko: "비", en: "Rain" } },
+]
+
+function splitBulletinSymbols(value: string) {
+  return value
+    .replace(/[□■]/g, "\n")
+    .replace(/[○◯●]/g, "\n")
+}
+
+function normalizeBulletinText(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim()
+  if (!normalized) {
+    return ""
+  }
+
+  const withoutPrefix = normalized.replace(/^[oO○◯●□■▪︎ㆍ·\-\*\s]+/, "").trim()
+
+  if (NON_ALERT_BULLETIN_PATTERN.test(normalized) || NON_ALERT_BULLETIN_PATTERN.test(withoutPrefix)) {
+    return ""
+  }
+
+  return withoutPrefix || normalized
+}
+
+function buildBulletinSegments(sources: string[]) {
+  const merged = sources
+    .map((source) => splitBulletinSymbols(source))
+    .join("\n")
+    .split("\n")
+    .map((line) => normalizeBulletinText(line))
+    .filter(Boolean)
+
+  if (merged.length === 0) {
+    return []
+  }
+
+  return splitBulletinSummary(merged.join("\n")).map((segment) => normalizeBulletinText(segment)).filter(Boolean)
+}
+
+function clampText(value: string, maxLength: number) {
+  if (value.length <= maxLength) {
+    return value
+  }
+
+  return `${value.slice(0, maxLength).trimEnd()}…`
+}
+
+function normalizeBulletinHeadline(value: string) {
+  return value
+    .replace(/^\((?:종합|요약|긴급)\)\s*/i, "")
+    .replace(/^\[(?:종합|요약|긴급)\]\s*/i, "")
+    .trim()
+}
+
+function buildBulletinHighlight(sources: string[]) {
+  const segments = buildBulletinSegments(sources)
+  if (segments.length === 0) {
+    return ""
+  }
+
+  const headline = normalizeBulletinHeadline(segments[0])
+  return clampText(headline || segments[0], BULLETIN_HIGHLIGHT_MAX_LENGTH)
+}
+
+function getBulletinSeverity(value: string): BulletinSeverity {
+  const normalized = normalizeBulletinText(value)
+  if (!normalized) {
+    return "info"
+  }
+
+  for (const rule of BULLETIN_SEVERITY_RULES) {
+    if (rule.regex.test(normalized)) {
+      return rule.severity
+    }
+  }
+
+  return "info"
+}
+
+function getBulletinTone(severity: BulletinSeverity) {
+  switch (severity) {
+    case "critical":
+      return {
+        container: "border-danger/25 bg-danger/10",
+        iconWrapper: "border-danger/30 bg-danger/15 text-danger",
+        icon: "text-danger",
+        kicker: "text-danger/85",
+        text: "text-danger",
+        itemContainer: "border-danger/20 bg-danger/6",
+        itemLabel: "border-danger/25 bg-danger/10 text-danger",
+      }
+    case "warning":
+      return {
+        container: "border-orange-500/30 bg-orange-500/10",
+        iconWrapper: "border-orange-500/35 bg-orange-500/12 text-orange-600 dark:text-orange-300",
+        icon: "text-orange-600 dark:text-orange-300",
+        kicker: "text-orange-600/90 dark:text-orange-300",
+        text: "text-foreground",
+        itemContainer: "border-orange-500/20 bg-orange-500/6",
+        itemLabel: "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-300",
+      }
+    case "advisory":
+      return {
+        container: "border-sky-blue/25 bg-sky-blue/8",
+        iconWrapper: "border-sky-blue/25 bg-sky-blue/12 text-sky-blue",
+        icon: "text-sky-blue",
+        kicker: "text-sky-blue/90",
+        text: "text-foreground",
+        itemContainer: "border-sky-blue/18 bg-sky-blue/5",
+        itemLabel: "border-sky-blue/25 bg-sky-blue/10 text-sky-blue",
+      }
+    default:
+      return {
+        container: "border-card-border/70 bg-card/70",
+        iconWrapper: "border-card-border/70 bg-card/90 text-muted-foreground",
+        icon: "text-muted-foreground",
+        kicker: "text-muted-foreground",
+        text: "text-foreground",
+        itemContainer: "border-card-border/70 bg-card/70",
+        itemLabel: "border-card-border/70 bg-background/70 text-muted-foreground",
+      }
+  }
+}
+
+function getBulletinTagToneClass(tone: BulletinSeverity) {
+  switch (tone) {
+    case "critical":
+      return "border-danger/25 bg-danger/10 text-danger"
+    case "warning":
+      return "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-300"
+    case "advisory":
+      return "border-sky-blue/25 bg-sky-blue/10 text-sky-blue"
+    default:
+      return "border-card-border/70 bg-card/85 text-foreground"
+  }
+}
+
+function normalizeTagKey(value: string) {
+  return value.toLowerCase().replace(/\s+/g, "").trim()
+}
+
+function extractBulletinKeywordTags(sources: string[], language: "ko" | "en"): BulletinKeywordTag[] {
+  const merged = sources
+    .map((source) => normalizeBulletinText(source))
+    .filter(Boolean)
+    .join(" ")
+
+  if (!merged) {
+    return []
+  }
+
+  return BULLETIN_TAG_RULES
+    .filter((rule) => rule.regex.test(merged))
+    .map((rule) => ({
+      id: rule.id,
+      label: rule.label[language],
+      tone: rule.tone,
+    }))
+}
+
+function extractBulletinCategoryToken(segment: string) {
+  const normalized = segment.replace(/^[\s\-:·•]+/, "").trim()
+
+  const wrappedMatch = normalized.match(/^[\[(]([^\])]+)[\])]\s*(.*)$/)
+  if (wrappedMatch) {
+    const token = wrappedMatch[1].split(/[,\s/·:]+/).filter(Boolean)[0] ?? ""
+    return {
+      token: token.toLowerCase(),
+      content: wrappedMatch[2]?.trim() ?? "",
+    }
+  }
+
+  const plainMatch = normalized.match(/^([A-Za-z가-힣]+)\s*[:\-]?\s*(.*)$/)
+  if (plainMatch) {
+    return {
+      token: plainMatch[1].toLowerCase(),
+      content: plainMatch[2]?.trim() ?? "",
+    }
+  }
+
+  return { token: "", content: normalized }
+}
+
+function formatBulletinCategoryLabel(token: string, language: "ko" | "en") {
+  if (language === "ko") {
+    switch (token) {
+      case "summary":
+        return "종합"
+      case "today":
+        return "오늘"
+      case "tomorrow":
+        return "내일"
+      default:
+        return token
+    }
+  }
+
+  switch (token) {
+    case "종합":
+    case "요약":
+      return "Summary"
+    case "긴급":
+      return "Urgent"
+    case "오늘":
+      return "Today"
+    case "내일":
+      return "Tomorrow"
+    case "모레":
+      return "Day After Tomorrow"
+    case "글피":
+      return "In 3 Days"
+    case "그글피":
+      return "In 4 Days"
+    default:
+      return token.charAt(0).toUpperCase() + token.slice(1)
+  }
+}
+
+function toBulletinBodyItem(segment: string, language: "ko" | "en"): BulletinBodyItem {
+  const normalized = normalizeBulletinText(segment)
+  if (!normalized) {
+    return { label: null, content: "" }
+  }
+
+  const { token, content } = extractBulletinCategoryToken(normalized)
+  if (BULLETIN_CATEGORY_SET.has(token)) {
+    return {
+      label: formatBulletinCategoryLabel(token, language),
+      content: content || normalized,
+    }
+  }
+
+  return {
+    label: null,
+    content: normalized,
+  }
+}
+
 function DashboardWorkspace({ user }: { user: AuthUser }) {
   const { language, t } = useLanguage()
   const { resolvedTheme } = useTheme()
@@ -170,9 +467,104 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
     return weatherData?.metadata?.alertSummary?.hazardTags?.filter(Boolean) ?? []
   }, [weatherData])
 
-  const bulletinSummary = weatherData?.metadata?.bulletin?.summary?.trim() ?? ""
-  const bulletinWarningStatus = weatherData?.metadata?.bulletin?.warningStatus?.trim() ?? ""
-  const bulletinSegments = useMemo(() => splitBulletinSummary(bulletinSummary), [bulletinSummary])
+  const rawBulletinSummary = weatherData?.metadata?.bulletin?.summary?.trim() ?? ""
+  const rawBulletinWarningStatus = weatherData?.metadata?.bulletin?.warningStatus?.trim() ?? ""
+  const rawWarningTitle = weatherData?.metadata?.alertSummary?.warningTitle?.trim() ?? ""
+  const rawEventWarningMessage = weatherData?.eventData?.warningMessage?.trim() ?? ""
+  const bulletinHighlight = useMemo(
+    () =>
+      buildBulletinHighlight([
+        rawBulletinWarningStatus,
+        rawWarningTitle,
+        rawEventWarningMessage,
+      ]),
+    [rawBulletinWarningStatus, rawWarningTitle, rawEventWarningMessage]
+  )
+  const bulletinSegments = useMemo(
+    () =>
+      buildBulletinSegments([
+        rawBulletinWarningStatus,
+        rawWarningTitle,
+        rawEventWarningMessage,
+        rawBulletinSummary,
+      ]),
+    [rawBulletinSummary, rawBulletinWarningStatus, rawWarningTitle, rawEventWarningMessage]
+  )
+  const bulletinBodySegments = useMemo(() => {
+    if (!bulletinHighlight) {
+      return bulletinSegments
+    }
+
+    const normalizedHighlight = normalizeBulletinText(bulletinHighlight)
+    return bulletinSegments.filter((segment, index) => {
+      if (index !== 0) {
+        return true
+      }
+
+      return normalizeBulletinText(segment) !== normalizedHighlight
+    })
+  }, [bulletinHighlight, bulletinSegments])
+  const bulletinBodyItems = useMemo(
+    () =>
+      bulletinBodySegments
+        .map((segment) => toBulletinBodyItem(segment, language))
+        .filter((item) => item.content.length > 0),
+    [bulletinBodySegments, language]
+  )
+  const bulletinKeywordTags = useMemo(
+    () =>
+      extractBulletinKeywordTags(
+        [
+          rawBulletinWarningStatus,
+          rawWarningTitle,
+          rawEventWarningMessage,
+          rawBulletinSummary,
+          ...bulletinBodyItems.map((item) => item.content),
+        ],
+        language
+      ),
+    [rawBulletinWarningStatus, rawWarningTitle, rawEventWarningMessage, rawBulletinSummary, bulletinBodyItems, language]
+  )
+  const bulletinTags = useMemo(() => {
+    const merged: BulletinKeywordTag[] = []
+    const seen = new Set<string>()
+
+    const push = (tag: BulletinKeywordTag) => {
+      const key = normalizeTagKey(tag.label)
+      if (!key || seen.has(key)) {
+        return
+      }
+
+      seen.add(key)
+      merged.push(tag)
+    }
+
+    for (const tag of bulletinKeywordTags) {
+      push(tag)
+    }
+
+    for (const tag of weatherTags) {
+      const normalized = tag.trim()
+      if (!normalized) {
+        continue
+      }
+
+      push({
+        id: `meta-${normalized}`,
+        label: normalized,
+        tone: "info",
+      })
+    }
+
+    return merged.slice(0, 8)
+  }, [bulletinKeywordTags, weatherTags])
+  const bulletinHighlightTone = useMemo(() => {
+    if (!bulletinHighlight) {
+      return null
+    }
+
+    return getBulletinTone(getBulletinSeverity(bulletinHighlight))
+  }, [bulletinHighlight])
   const bulletinUpdatedLabel = useMemo(() => {
     return formatLastUpdate(
       weatherData?.metadata?.bulletin?.updatedAt || weatherData?.metadata?.lastUpdate,
@@ -222,10 +614,10 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
       <Particles className="absolute inset-0 z-0 opacity-70" quantity={68} ease={80} color={particleColor} refresh />
       <Meteors number={8} className="z-0" />
 
-      <div className="relative z-10 mx-auto max-w-[90rem]">
+      <div className="relative z-10 mx-auto max-w-[82rem] 2xl:max-w-[86rem]">
         {/* Top Banner (Bento style) */}
         <SectionCard className="mb-6">
-          <div className="grid gap-6 xl:grid-cols-[1fr_auto] xl:items-end">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(17rem,0.85fr)] xl:items-end">
             <div className="space-y-4">
               <span className="inline-flex items-center gap-2 rounded-full border border-active-blue/20 bg-active-blue/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.3em] text-active-blue">
                 <Sparkles className="size-3.5" />
@@ -270,7 +662,7 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
         </SectionCard>
 
         {/* Responsive 2-Column Layout */}
-        <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)]">
           {/* Weather & Briefing Module */}
           <SectionCard className="min-w-0">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -353,42 +745,79 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
                         </span>
                       </div>
 
-                      {bulletinWarningStatus ? (
-                        <div className="mt-4 rounded-[1.1rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold leading-6 text-danger">
-                          {bulletinWarningStatus}
+                      {bulletinHighlight && bulletinHighlightTone ? (
+                        <div className={cn("mt-4 rounded-[1.3rem] border px-4 py-4 sm:px-5", bulletinHighlightTone.container)}>
+                          <div className="flex items-start gap-3">
+                            <span className={cn(
+                              "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border",
+                              bulletinHighlightTone.iconWrapper
+                            )}>
+                              <ShieldAlert className={cn("size-4", bulletinHighlightTone.icon)} />
+                            </span>
+                            <div className="min-w-0">
+                              <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", bulletinHighlightTone.kicker)}>
+                                {language === "ko" ? "핵심 공지" : "Key Notice"}
+                              </p>
+                              <p className={cn("mt-1 text-sm font-semibold leading-6 sm:text-[15px]", bulletinHighlightTone.text)}>
+                                {bulletinHighlight}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       ) : null}
 
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {(weatherTags.length > 0 ? weatherTags : [copy.noTags]).map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full border border-card-border/70 bg-card px-3 py-1.5 text-sm font-semibold text-foreground"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-
-                      {bulletinSegments.length > 0 ? (
-                        <div className="mt-4 grid gap-2.5">
-                          {bulletinSegments.map((segment, index) => (
-                            <div
-                              key={`${segment}-${index + 1}`}
-                              className="flex items-start gap-3 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3"
+                      {bulletinTags.length > 0 ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {bulletinTags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className={cn(
+                                "rounded-full border px-3 py-1.5 text-xs font-semibold",
+                                getBulletinTagToneClass(tag.tone)
+                              )}
                             >
-                              <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-blue/12 text-xs font-black text-sky-blue">
-                                {index + 1}
-                              </span>
-                              <p className="text-sm leading-6 text-foreground">{segment}</p>
-                            </div>
+                              {tag.label}
+                            </span>
                           ))}
                         </div>
-                      ) : (
+                      ) : null}
+
+                      {bulletinBodyItems.length > 0 ? (
+                        <div className="mt-4 space-y-2.5">
+                          {bulletinBodyItems.map((item, index) => {
+                            const itemTone = getBulletinTone(getBulletinSeverity(item.content))
+                            return (
+                              <article
+                                key={`${item.label ?? "notice"}-${item.content}-${index + 1}`}
+                                className={cn("rounded-[1.15rem] border px-4 py-3.5", itemTone.itemContainer)}
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span
+                                      className={cn(
+                                        "inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
+                                        item.label
+                                          ? itemTone.itemLabel
+                                          : "border border-card-border/70 bg-background/70 text-muted-foreground"
+                                      )}
+                                    >
+                                      {item.label ?? (language === "ko" ? `공지 ${index + 1}` : `Notice ${index + 1}`)}
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-muted-foreground">
+                                      #{String(index + 1).padStart(2, "0")}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 text-sm leading-6 text-foreground/95">{item.content}</p>
+                                </div>
+                              </article>
+                            )
+                          })}
+                        </div>
+                      ) : !bulletinHighlight ? (
                         <p className="mt-4 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3 text-sm leading-7 text-muted-foreground">
                           {copy.noBulletin}
                         </p>
-                      )}
+                      ) : null}
 
                       <p className="mt-3 text-xs font-semibold text-muted-foreground">
                         {copy.location}: {weatherData.metadata?.region || "-"} · {copy.station}: {weatherData.metadata?.station || "-"} · {copy.updatedAt}: {formatLastUpdate(weatherData.metadata?.lastUpdate, language)}
