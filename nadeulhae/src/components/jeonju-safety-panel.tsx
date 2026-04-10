@@ -24,6 +24,9 @@ interface JeonjuSafetyPanelProps {
 
 type Tone = "safe" | "info" | "caution" | "danger"
 
+const NON_BULLETIN_MESSAGE_PATTERN = /(전주 기준 대기질 데이터를 표시 중입니다|showing fallback air quality data)/i
+const EMPTY_BULLETIN_PATTERN = /^(?:[oO○◯●□■▪︎ㆍ·\-\*\s]*)?(?:없음|없\s*음|none|no\s*alerts?|n\/a)(?:[\s.)\]]*)$/i
+
 function formatDateLabel(date: string) {
   if (!date || date.length !== 8) return date
   return `${date.slice(0, 4)}.${date.slice(4, 6)}.${date.slice(6, 8)}`
@@ -52,6 +55,24 @@ function toneClasses(tone: Tone) {
     default:
       return "border-nature-green/20 bg-nature-green/10 text-nature-green"
   }
+}
+
+function selectOfficialAlertText(weatherData: WeatherData) {
+  const { metadata, eventData } = weatherData
+
+  return [
+    metadata?.alertSummary?.warningTitle,
+    metadata?.alertSummary?.earthquakeTitle,
+    metadata?.alertSummary?.tsunamiTitle,
+    metadata?.alertSummary?.volcanoTitle,
+    metadata?.bulletin?.warningStatus,
+    metadata?.bulletin?.summary,
+    eventData?.warningMessage,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .find((value) => value.length > 0
+      && !NON_BULLETIN_MESSAGE_PATTERN.test(value)
+      && !EMPTY_BULLETIN_PATTERN.test(value)) || ""
 }
 
 function getHazardChips(weatherData: WeatherData, language: "ko" | "en") {
@@ -93,13 +114,7 @@ function getHazardChips(weatherData: WeatherData, language: "ko" | "en") {
 
 function getHazardSummary(weatherData: WeatherData, language: "ko" | "en") {
   const { eventData, metadata } = weatherData
-  const alertSummary = metadata?.alertSummary
-  const detail = alertSummary?.warningTitle
-    || alertSummary?.earthquakeTitle
-    || alertSummary?.tsunamiTitle
-    || alertSummary?.volcanoTitle
-    || eventData?.warningMessage
-    || metadata?.bulletin?.warningStatus
+  const detail = selectOfficialAlertText(weatherData)
 
   if (eventData?.isEarthquake || eventData?.isTsunami || eventData?.isVolcano || eventData?.isWeatherWarning) {
     return {
@@ -294,11 +309,13 @@ function getFirePlaceNarrative(fireSummary: FireSummaryData | null, language: "k
 }
 
 function getOverallSafetyGuide(weatherData: WeatherData, fireSummary: FireSummaryData | null, language: "ko" | "en") {
+  const alertDetail = selectOfficialAlertText(weatherData)
+
   if (weatherData.eventData?.isEarthquake || weatherData.eventData?.isTsunami || weatherData.eventData?.isVolcano) {
     return {
       tone: "danger" as const,
       title: language === "ko" ? "오늘은 전주 안전 안내를 먼저 확인하는 편이 좋습니다" : "Today is a day to check Jeonju safety notices first",
-      text: weatherData.eventData.warningMessage || (language === "ko"
+      text: alertDetail || (language === "ko"
         ? "재난 신호가 감지된 날에는 외부 일정 확대보다 공식 안내와 이동 안전을 우선으로 보는 편이 좋습니다."
         : "With a hazard signal active, official guidance and movement safety should come before expanding outdoor plans."),
       chips: [
@@ -312,7 +329,7 @@ function getOverallSafetyGuide(weatherData: WeatherData, fireSummary: FireSummar
     return {
       tone: "danger" as const,
       title: language === "ko" ? "오늘은 특보 내용까지 보고 움직이는 편이 안전합니다" : "Today is safer if you move with the warning details in mind",
-      text: weatherData.eventData.warningMessage || (language === "ko"
+      text: alertDetail || (language === "ko"
         ? "전주 기준 특보가 감지된 상태라 실시간 점수보다 통보 내용과 바람·강수 흐름을 함께 보는 편이 좋습니다."
         : "A warning is active for Jeonju, so the bulletin plus wind and rain signals matter more than the score alone."),
       chips: [

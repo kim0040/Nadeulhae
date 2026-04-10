@@ -76,6 +76,8 @@ function splitBulletinSummary(summary: string) {
 
 const NON_ALERT_BULLETIN_PATTERN = /^(?:[oO○◯●□■▪︎ㆍ·\-\*\s]*)?(?:없음|없\s*음|특보없음|해당없음|none|no\s*alerts?|n\/a)(?:[\s.)\]]*)$/i
 const BULLETIN_HIGHLIGHT_MAX_LENGTH = 96
+const BULLETIN_MAX_SEGMENTS = 6
+const NON_BULLETIN_SOURCE_PATTERN = /(전주 기준 대기질 데이터를 표시 중입니다|showing fallback air quality data)/i
 const BULLETIN_CATEGORY_SET = new Set([
   "종합",
   "요약",
@@ -169,7 +171,10 @@ function buildBulletinSegments(sources: string[]) {
     return []
   }
 
-  return splitBulletinSummary(merged.join("\n")).map((segment) => normalizeBulletinText(segment)).filter(Boolean)
+  return splitBulletinSummary(merged.join("\n"))
+    .map((segment) => normalizeBulletinText(segment))
+    .filter(Boolean)
+    .slice(0, BULLETIN_MAX_SEGMENTS)
 }
 
 function clampText(value: string, maxLength: number) {
@@ -185,6 +190,41 @@ function normalizeBulletinHeadline(value: string) {
     .replace(/^\((?:종합|요약|긴급)\)\s*/i, "")
     .replace(/^\[(?:종합|요약|긴급)\]\s*/i, "")
     .trim()
+}
+
+function sanitizeBulletinSource(value: string) {
+  const normalized = normalizeBulletinText(value)
+  if (!normalized) {
+    return ""
+  }
+
+  if (NON_BULLETIN_SOURCE_PATTERN.test(normalized)) {
+    return ""
+  }
+
+  return normalized
+}
+
+function buildBulletinSourceCandidates(primarySources: string[], fallbackSources: string[]) {
+  const selected: string[] = []
+  const seen = new Set<string>()
+
+  const push = (source: string) => {
+    const normalized = sanitizeBulletinSource(source)
+    if (!normalized || seen.has(normalized)) {
+      return
+    }
+
+    seen.add(normalized)
+    selected.push(normalized)
+  }
+
+  primarySources.forEach(push)
+  if (selected.length === 0) {
+    fallbackSources.forEach(push)
+  }
+
+  return selected
 }
 
 function buildBulletinHighlight(sources: string[]) {
@@ -471,24 +511,21 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
   const rawBulletinWarningStatus = weatherData?.metadata?.bulletin?.warningStatus?.trim() ?? ""
   const rawWarningTitle = weatherData?.metadata?.alertSummary?.warningTitle?.trim() ?? ""
   const rawEventWarningMessage = weatherData?.eventData?.warningMessage?.trim() ?? ""
-  const bulletinHighlight = useMemo(
+  const bulletinSourceCandidates = useMemo(
     () =>
-      buildBulletinHighlight([
-        rawBulletinWarningStatus,
-        rawWarningTitle,
-        rawEventWarningMessage,
-      ]),
-    [rawBulletinWarningStatus, rawWarningTitle, rawEventWarningMessage]
+      buildBulletinSourceCandidates(
+        [rawBulletinWarningStatus, rawWarningTitle, rawBulletinSummary],
+        [rawEventWarningMessage]
+      ),
+    [rawBulletinWarningStatus, rawWarningTitle, rawBulletinSummary, rawEventWarningMessage]
+  )
+  const bulletinHighlight = useMemo(
+    () => buildBulletinHighlight(bulletinSourceCandidates),
+    [bulletinSourceCandidates]
   )
   const bulletinSegments = useMemo(
-    () =>
-      buildBulletinSegments([
-        rawBulletinWarningStatus,
-        rawWarningTitle,
-        rawEventWarningMessage,
-        rawBulletinSummary,
-      ]),
-    [rawBulletinSummary, rawBulletinWarningStatus, rawWarningTitle, rawEventWarningMessage]
+    () => buildBulletinSegments(bulletinSourceCandidates),
+    [bulletinSourceCandidates]
   )
   const bulletinBodySegments = useMemo(() => {
     if (!bulletinHighlight) {
@@ -515,15 +552,12 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
     () =>
       extractBulletinKeywordTags(
         [
-          rawBulletinWarningStatus,
-          rawWarningTitle,
-          rawEventWarningMessage,
-          rawBulletinSummary,
+          ...bulletinSourceCandidates,
           ...bulletinBodyItems.map((item) => item.content),
         ],
         language
       ),
-    [rawBulletinWarningStatus, rawWarningTitle, rawEventWarningMessage, rawBulletinSummary, bulletinBodyItems, language]
+    [bulletinSourceCandidates, bulletinBodyItems, language]
   )
   const bulletinTags = useMemo(() => {
     const merged: BulletinKeywordTag[] = []
