@@ -13,9 +13,17 @@ import {
 import type { AuthUser } from "@/lib/auth/types"
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
-const SESSION_DURATION_DAYS = Number(process.env.AUTH_SESSION_DAYS ?? "30")
-const SESSION_REFRESH_WINDOW_HOURS = Number(
-  process.env.AUTH_SESSION_REFRESH_WINDOW_HOURS ?? "72"
+const SESSION_DURATION_DAYS = parsePositiveInt(
+  process.env.AUTH_SESSION_DAYS,
+  7,
+  1,
+  30
+)
+const SESSION_REFRESH_WINDOW_HOURS = parsePositiveInt(
+  process.env.AUTH_SESSION_REFRESH_WINDOW_HOURS,
+  24,
+  1,
+  168
 )
 const ALWAYS_SECURE_COOKIES = /^(1|true|yes)$/i.test(
   process.env.ALWAYS_SECURE_COOKIES ?? process.env.NODE_ENV ?? ""
