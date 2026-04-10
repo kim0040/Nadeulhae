@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server"
 import {
   HOME_REGION,
-  dfsToGrid,
   getCurrentNowcastBase,
   getMidForecastBase,
   getVillageForecastBase,
   getStableForecastSeed,
+  mergeRegionProfileWithForecastLocation,
+  resolveForecastGrid,
   resolveRegionProfile,
   getKstCompactDate,
   getNextUpdateTimestamp,
 } from "@/lib/weather-utils"
 import { withApiAnalytics } from "@/lib/analytics/route"
+import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/repository"
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 
@@ -223,9 +225,13 @@ async function handleGET(request: Request) {
   const userLat = Number.isFinite(parsedLat) ? parsedLat : null
   const userLon = Number.isFinite(parsedLon) ? parsedLon : null
   const hasDeviceCoordinates = userLat != null && userLon != null
+  const dbForecastPoint = await resolveNearestForecastLocationPoint(userLat, userLon)
   const isInternalUpstreamCall = request.headers.get("x-nadeulhae-internal-call") === "1"
   const { sessionId, shouldSetCookie } = getOrCreateSessionId(request)
-  const profile = resolveRegionProfile(userLat, userLon)
+  const profile = mergeRegionProfileWithForecastLocation(
+    resolveRegionProfile(userLat, userLon),
+    dbForecastPoint
+  )
   const recordLocationUsageProof = () => {
     if (!hasDeviceCoordinates || isInternalUpstreamCall) {
       return
@@ -240,12 +246,16 @@ async function handleGET(request: Request) {
       eventKind: "weather_forecast",
     })
   }
-  const grid = userLat != null && userLon != null
-    ? dfsToGrid(userLat, userLon)
-    : {
-        nx: Number(process.env.KMA_NX ?? 63),
-        ny: Number(process.env.KMA_NY ?? 89),
-      }
+  const grid = dbForecastPoint
+    ? {
+      nx: dbForecastPoint.gridX,
+      ny: dbForecastPoint.gridY,
+    }
+    : (resolveForecastGrid(userLat, userLon)
+      ?? {
+      nx: Number(process.env.KMA_NX ?? 63),
+      ny: Number(process.env.KMA_NY ?? 89),
+    })
 
   const ip = getClientIp(request)
   const userCacheKey = [

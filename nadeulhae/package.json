@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "data:forecast-grid": "node scripts/generate-forecast-location-grid.mjs",
+    "db:forecast-grid:init": "node scripts/bootstrap-forecast-location-db.mjs",
+    "db:forecast-grid:verify": "node scripts/verify-forecast-location-db.mjs",
     "db:auth:init": "node scripts/bootstrap-auth-db.mjs",
     "test:auth": "node scripts/test-auth-flows.mjs",
     "test:chat": "node scripts/test-chat-flow.mjs"

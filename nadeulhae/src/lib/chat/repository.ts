@@ -276,11 +276,32 @@ function toUsageSnapshot(row: ChatUsageRow | null, metricDate: string) {
   } satisfies ChatUsageSnapshot
 }
 
+function decryptChatValueSafely(
+  value: string,
+  context: string,
+  fallback: string | null,
+  debugLabel: string
+) {
+  try {
+    return decryptDatabaseValue(value, context)
+  } catch (error) {
+    console.error(`[chat] Failed to decrypt ${debugLabel}:`, error)
+    return fallback
+  }
+}
+
 function toConversationMessage(row: ChatMessageRow): ChatConversationMessage {
+  const content = decryptChatValueSafely(
+    row.content,
+    `chat.message.${row.role}`,
+    "[Unavailable message]",
+    `message:${row.id}`
+  ) ?? "[Unavailable message]"
+
   return {
     id: String(row.id),
     role: row.role,
-    content: decryptDatabaseValue(row.content, `chat.message.${row.role}`),
+    content,
     createdAt: toIsoString(row.created_at),
     resolvedModel: row.resolved_model,
   }
@@ -291,8 +312,18 @@ function toSessionMemorySnapshot(row: ChatSessionRow | null): ChatMemorySnapshot
     return null
   }
 
+  const summary = decryptChatValueSafely(
+    row.memory_summary_text,
+    "chat.session.memory",
+    null,
+    `session-memory:${row.id}`
+  )
+  if (!summary) {
+    return null
+  }
+
   return {
-    summary: decryptDatabaseValue(row.memory_summary_text, "chat.session.memory"),
+    summary,
     updatedAt: toIsoString(row.updated_at),
     summarizedMessageCount: Math.max(0, row.summarized_message_count),
     modelUsed: row.memory_model_used,
@@ -304,10 +335,25 @@ function toProfileMemorySnapshot(row: ChatMemoryRow | null) {
     return null
   }
 
+  const summary = decryptChatValueSafely(
+    row.summary_text,
+    "chat.memory.summary",
+    null,
+    `profile-summary:${row.user_id}`
+  )
+  if (!summary) {
+    return null
+  }
+
   return {
-    summary: decryptDatabaseValue(row.summary_text, "chat.memory.summary"),
+    summary,
     assessment: row.assessment_text
-      ? decryptDatabaseValue(row.assessment_text, "chat.profile.assessment")
+      ? decryptChatValueSafely(
+        row.assessment_text,
+        "chat.profile.assessment",
+        null,
+        `profile-assessment:${row.user_id}`
+      )
       : null,
     updatedAt: toIsoString(row.updated_at),
     refreshedAt: row.profile_refreshed_at ? toIsoString(row.profile_refreshed_at) : null,
@@ -320,7 +366,12 @@ function toProfileMemorySnapshot(row: ChatMemoryRow | null) {
 function toSessionSnapshot(row: ChatSessionWithCountRow): ChatSessionSnapshot {
   return {
     id: String(row.id),
-    title: decryptDatabaseValue(row.title, "chat.session.title"),
+    title: decryptChatValueSafely(
+      row.title,
+      "chat.session.title",
+      row.locale === "en" ? "New chat" : "새 대화",
+      `session-title:${row.id}`
+    ) ?? (row.locale === "en" ? "New chat" : "새 대화"),
     locale: row.locale === "en" ? "en" : "ko",
     isAutoTitle: Boolean(row.is_auto_title),
     messageCount: Math.max(0, row.message_count),
@@ -997,7 +1048,12 @@ export async function getCompactionCandidate(userId: string, sessionId: number) 
 
   const resolvedMessages = rows.map((row) => ({
     row,
-    decryptedContent: decryptDatabaseValue(row.content, `chat.message.${row.role}`),
+    decryptedContent: decryptChatValueSafely(
+      row.content,
+      `chat.message.${row.role}`,
+      "[Unavailable history]",
+      `compact-message:${row.id}`
+    ) ?? "[Unavailable history]",
   }))
 
   const estimatedTokens = resolvedMessages.reduce(

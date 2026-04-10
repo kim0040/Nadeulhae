@@ -26,6 +26,7 @@ yarn-error.log*
 
 # Data & Scripts
 *.csv
+*.xlsx
 *.command
 # 나들해*.md (Allow these)
 brain/
