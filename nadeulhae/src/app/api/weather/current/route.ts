@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server"
 import {
   HOME_REGION,
-  dfsToGrid,
   formatKmaDateTime,
   getCurrentNowcastBase,
   getKstCompactDate,
   getKstDateLabel,
   getRegionProfileByKey,
   getRegionProfiles,
+  mergeRegionProfileWithForecastLocation,
+  resolveForecastGrid,
   pickStationByKeywords,
   resolveRegionProfile,
   stripHtmlTags,
   getNextUpdateTimestamp,
 } from "@/lib/weather-utils"
 import { withApiAnalytics } from "@/lib/analytics/route"
+import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/repository"
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { wgs84ToTm } from "@/lib/coords-utils"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
@@ -911,9 +913,13 @@ async function handleGET(req: Request) {
   const userLat = Number.isFinite(parsedLat) ? parsedLat : null
   const userLon = Number.isFinite(parsedLon) ? parsedLon : null
   const hasDeviceCoordinates = userLat != null && userLon != null
+  const dbForecastPoint = await resolveNearestForecastLocationPoint(userLat, userLon)
   const ip = getClientIp(req)
   const { sessionId, shouldSetCookie } = getOrCreateSessionId(req)
-  const profile = resolveRegionProfile(userLat, userLon)
+  const profile = mergeRegionProfileWithForecastLocation(
+    resolveRegionProfile(userLat, userLon),
+    dbForecastPoint
+  )
   const recordLocationUsageProof = () => {
     if (!hasDeviceCoordinates) {
       return
@@ -928,10 +934,15 @@ async function handleGET(req: Request) {
       eventKind: "weather_current",
     })
   }
-  const grid = userLat != null && userLon != null ? dfsToGrid(userLat, userLon) : {
-    nx: Number(process.env.KMA_NX ?? 63),
-    ny: Number(process.env.KMA_NY ?? 89),
-  }
+  const grid = dbForecastPoint
+    ? {
+      nx: dbForecastPoint.gridX,
+      ny: dbForecastPoint.gridY,
+    }
+    : (resolveForecastGrid(userLat, userLon) ?? {
+      nx: Number(process.env.KMA_NX ?? 63),
+      ny: Number(process.env.KMA_NY ?? 89),
+    })
   const userCacheKey = [
     sessionId,
     profile.key,

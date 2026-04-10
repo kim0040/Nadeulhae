@@ -500,6 +500,7 @@ async function handlePOST(request: NextRequest) {
 
   let resolvedSessionId: number | null = null
   let lockedUserId: string | null = null
+  let contextMessageCount = 0
 
   try {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
@@ -588,6 +589,7 @@ async function handlePOST(request: NextRequest) {
         CHAT_CONTEXT_MESSAGE_LIMIT
       ),
     ])
+    contextMessageCount = contextMessages.length
 
     const completionResult = await createFactChatCompletion({
       requestKind: "chat",
@@ -635,6 +637,11 @@ async function handlePOST(request: NextRequest) {
   } catch (error) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request).catch(() => null)
     const providerError = error instanceof FactChatError ? error : null
+    const runtimeError = error instanceof Error ? error : null
+    const runtimeErrorCode = runtimeError?.name
+      ? `chat_runtime_${runtimeError.name}`.slice(0, 64)
+      : "chat_failed"
+    const runtimeErrorMessage = runtimeError?.message?.slice(0, 255) || "Chat request failed."
 
     if (authenticatedSession) {
       await markDailyChatFailure({
@@ -643,9 +650,9 @@ async function handlePOST(request: NextRequest) {
         locale,
         latencyMs: Date.now() - requestStartedAt,
         inputCharacters: message.length,
-        messageCount: CHAT_CONTEXT_MESSAGE_LIMIT,
-        errorCode: providerError?.code ?? "chat_failed",
-        errorMessage: providerError?.message ?? "Chat request failed.",
+        messageCount: contextMessageCount,
+        errorCode: providerError?.code ?? runtimeErrorCode,
+        errorMessage: providerError?.message ?? runtimeErrorMessage,
       }).catch((loggingError) => {
         console.error("Failed to record chat failure:", loggingError)
       })

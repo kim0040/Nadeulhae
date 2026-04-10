@@ -1,3 +1,5 @@
+import forecastLocationGridRaw from "@/data/forecast-location-grid.json"
+
 export interface RegionProfile {
   key: string
   displayName: string
@@ -11,6 +13,17 @@ export interface RegionProfile {
   areaNo: string
   weatherStationId: string
   warningKeywords: string[]
+}
+
+export interface ForecastLocationPoint {
+  adminCode: string
+  level1: string
+  level2: string
+  level3: string
+  gridX: number
+  gridY: number
+  lon: number
+  lat: number
 }
 
 const GRID_RE = 6371.00877
@@ -346,6 +359,116 @@ const REGION_ALIASES: RegionProfile[] = [
 ]
 
 const REGION_PROFILES: RegionProfile[] = [...HUB_REGION_PROFILES, ...REGION_ALIASES, HOME_REGION]
+const FORECAST_LOCATION_POINTS: ForecastLocationPoint[] = forecastLocationGridRaw as ForecastLocationPoint[]
+const PROVINCE_TO_AIR_SIDO_NAME: Record<string, string> = {
+  서울특별시: "서울",
+  부산광역시: "부산",
+  대구광역시: "대구",
+  인천광역시: "인천",
+  광주광역시: "광주",
+  대전광역시: "대전",
+  울산광역시: "울산",
+  세종특별자치시: "세종",
+  경기: "경기",
+  경기도: "경기",
+  충청북도: "충북",
+  충청남도: "충남",
+  전라북도: "전북",
+  전북특별자치도: "전북",
+  전라남도: "전남",
+  경상북도: "경북",
+  경상남도: "경남",
+  강원도: "강원",
+  강원특별자치도: "강원",
+  제주특별자치도: "제주",
+}
+
+function mergeKeywordArrays(base: string[], additions: Array<string | null | undefined>) {
+  const merged: string[] = []
+  const seen = new Set<string>()
+
+  for (const keyword of [...additions, ...base]) {
+    const normalized = keyword?.trim()
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+    merged.push(normalized)
+  }
+
+  return merged
+}
+
+function normalizeAirSidoName(level1Name: string) {
+  return PROVINCE_TO_AIR_SIDO_NAME[level1Name.trim()] ?? null
+}
+
+function getForecastLocationLabel(point: ForecastLocationPoint) {
+  const level2 = point.level2.trim()
+  const level3 = point.level3.trim()
+
+  if (level2 && level3) return `${level2} ${level3}`
+  if (level2) return level2
+  if (level3) return level3
+  return point.level1.trim()
+}
+
+export function mergeRegionProfileWithForecastLocation(
+  baseProfile: RegionProfile,
+  point: ForecastLocationPoint | null
+): RegionProfile {
+  if (!point) {
+    return baseProfile
+  }
+
+  const locationLabel = getForecastLocationLabel(point)
+  const areaNo = /^\d{10}$/.test(point.adminCode) ? point.adminCode : baseProfile.areaNo
+  const localKeywords = [point.level3, point.level2, locationLabel]
+  const warningKeywords = [point.level3, point.level2, point.level1]
+
+  return {
+    ...baseProfile,
+    displayName: locationLabel || baseProfile.displayName,
+    airSidoName: normalizeAirSidoName(point.level1) ?? baseProfile.airSidoName,
+    areaNo,
+    stationKeywords: mergeKeywordArrays(baseProfile.stationKeywords, localKeywords),
+    warningKeywords: mergeKeywordArrays(baseProfile.warningKeywords, warningKeywords),
+  }
+}
+
+function getNearestRegionProfile(lat: number, lon: number) {
+  let minDistanceSq = Infinity
+  let nearestProfile = HOME_REGION
+
+  for (const profile of REGION_PROFILES) {
+    const dLat = lat - profile.lat
+    const dLon = lon - profile.lon
+    const distanceSq = dLat * dLat + dLon * dLon
+
+    if (distanceSq < minDistanceSq) {
+      minDistanceSq = distanceSq
+      nearestProfile = profile
+    }
+  }
+
+  return nearestProfile
+}
+
+function getNearestForecastLocationPoint(lat: number, lon: number) {
+  let minDistanceSq = Infinity
+  let nearestPoint: ForecastLocationPoint | null = null
+
+  for (const point of FORECAST_LOCATION_POINTS) {
+    const dLat = lat - point.lat
+    const dLon = lon - point.lon
+    const distanceSq = dLat * dLat + dLon * dLon
+
+    if (distanceSq < minDistanceSq) {
+      minDistanceSq = distanceSq
+      nearestPoint = point
+    }
+  }
+
+  return nearestPoint
+}
 
 export function getRegionProfiles() {
   return REGION_PROFILES
@@ -383,6 +506,18 @@ export function dfsToGrid(lat: number, lon: number) {
   return {
     nx: Math.floor(ra * Math.sin(theta) + XO + 0.5),
     ny: Math.floor(ro - ra * Math.cos(theta) + YO + 0.5),
+  }
+}
+
+export function resolveForecastGrid(lat?: number | null, lon?: number | null) {
+  if (lat == null || lon == null) return null
+
+  const nearestPoint = getNearestForecastLocationPoint(lat, lon)
+  if (!nearestPoint) return null
+
+  return {
+    nx: nearestPoint.gridX,
+    ny: nearestPoint.gridY,
   }
 }
 
@@ -530,21 +665,9 @@ export function formatKmaDateTime(baseDate: string, baseTime: string) {
 export function resolveRegionProfile(lat?: number | null, lon?: number | null): RegionProfile {
   if (lat == null || lon == null) return HOME_REGION
 
-  let minDistanceSq = Infinity
-  let nearestProfile = HOME_REGION
-
-  for (const profile of REGION_PROFILES) {
-    const dLat = lat - profile.lat
-    const dLon = lon - profile.lon
-    const distanceSq = dLat * dLat + dLon * dLon
-    
-    if (distanceSq < minDistanceSq) {
-      minDistanceSq = distanceSq
-      nearestProfile = profile
-    }
-  }
-
-  return nearestProfile
+  const nearestProfile = getNearestRegionProfile(lat, lon)
+  const nearestPoint = getNearestForecastLocationPoint(lat, lon)
+  return mergeRegionProfileWithForecastLocation(nearestProfile, nearestPoint)
 }
 
 export function pickStationByKeywords<T extends { stationName?: string }>(items: T[], keywords: string[]) {

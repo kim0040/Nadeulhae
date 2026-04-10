@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
 
 import { withApiAnalytics } from "@/lib/analytics/route"
+import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/repository"
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
-import { getRegionProfileByKey, resolveRegionProfile } from "@/lib/weather-utils"
+import { getRegionProfileByKey, mergeRegionProfileWithForecastLocation, resolveRegionProfile } from "@/lib/weather-utils"
 
 type FireSummaryItem = {
   OCRN_YMD: string
@@ -240,9 +241,13 @@ async function handleGET(request: Request) {
   const userLat = Number.isFinite(parsedLat) ? parsedLat : null
   const userLon = Number.isFinite(parsedLon) ? parsedLon : null
   const hasDeviceCoordinates = userLat != null && userLon != null
-  const profile = regionKey
+  const dbForecastPoint = hasDeviceCoordinates
+    ? await resolveNearestForecastLocationPoint(userLat, userLon)
+    : null
+  const baseProfile = regionKey
     ? getRegionProfileByKey(regionKey)
     : resolveRegionProfile(userLat, userLon)
+  const profile = mergeRegionProfileWithForecastLocation(baseProfile, dbForecastPoint)
   const recordLocationUsageProof = () => {
     if (!hasDeviceCoordinates) {
       return
