@@ -747,7 +747,7 @@ async function fetchRegionalBulletin(profile: RegionProfile, serviceKey: string)
 
   const summary = truncateText(
     stripHtmlTags(String(item?.wfSv1 || item?.wfSv || item?.wn || "")).replace(/\s+/g, " ").trim(),
-    180
+    420
   )
   const warningStatus = stripHtmlTags(String(item?.wr || "")).trim()
   const normalizedWarning = warningStatus.replace(/\s+/g, "")

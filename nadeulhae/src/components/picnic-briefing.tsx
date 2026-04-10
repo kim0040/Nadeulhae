@@ -30,6 +30,9 @@ type BulletinSegment = {
 
 type BulletinTagTone = "danger" | "caution" | "info" | "neutral"
 
+const NON_BULLETIN_MESSAGE_PATTERN = /(전주 기준 대기질 데이터를 표시 중입니다|showing fallback air quality data)/i
+const EMPTY_BULLETIN_PATTERN = /^(?:[oO○◯●□■▪︎ㆍ·\-\*\s]*)?(?:없음|없\s*음|none|no\s*alerts?|n\/a)(?:[\s.)\]]*)$/i
+
 export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   const { t, language } = useLanguage()
   const { details, metadata, eventData, isFallback } = weatherData
@@ -367,12 +370,19 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   }
 
   const getIntegratedGuide = () => {
-    const alertTitle = metadata?.alertSummary?.warningTitle
-      || metadata?.alertSummary?.earthquakeTitle
-      || metadata?.alertSummary?.tsunamiTitle
-      || metadata?.alertSummary?.volcanoTitle
-      || eventData?.warningMessage
-      || metadata?.bulletin?.summary
+    const alertTitle = [
+      metadata?.alertSummary?.warningTitle,
+      metadata?.alertSummary?.earthquakeTitle,
+      metadata?.alertSummary?.tsunamiTitle,
+      metadata?.alertSummary?.volcanoTitle,
+      metadata?.bulletin?.warningStatus,
+      metadata?.bulletin?.summary,
+      eventData?.warningMessage,
+    ]
+      .map((value) => String(value ?? "").trim())
+      .find((value) => value.length > 0
+        && !NON_BULLETIN_MESSAGE_PATTERN.test(value)
+        && !EMPTY_BULLETIN_PATTERN.test(value))
 
     if (eventData?.isEarthquake || eventData?.isTsunami || eventData?.isVolcano) {
       return {
