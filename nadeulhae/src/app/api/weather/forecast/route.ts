@@ -263,8 +263,8 @@ async function handleGET(request: Request) {
     profile.key,
     grid.nx,
     grid.ny,
-    userLat != null ? Math.round(userLat * 100) : "home",
-    userLon != null ? Math.round(userLon * 100) : "home",
+    userLat != null ? Math.round(userLat * 1000) : "home",
+    userLon != null ? Math.round(userLon * 1000) : "home",
   ].join(":")
   const cachedResponse = forecastResponseCache.get(userCacheKey)
   if (cachedResponse && cachedResponse.expiry > Date.now()) {

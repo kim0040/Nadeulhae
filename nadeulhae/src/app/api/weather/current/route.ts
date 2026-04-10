@@ -5,7 +5,6 @@ import {
   getCurrentNowcastBase,
   getKstCompactDate,
   getKstDateLabel,
-  getRegionProfileByKey,
   getRegionProfiles,
   mergeRegionProfileWithForecastLocation,
   resolveForecastGrid,
@@ -13,6 +12,7 @@ import {
   resolveRegionProfile,
   stripHtmlTags,
   getNextUpdateTimestamp,
+  type RegionProfile,
 } from "@/lib/weather-utils"
 import { withApiAnalytics } from "@/lib/analytics/route"
 import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/repository"
@@ -35,7 +35,7 @@ type StationCacheEntry = {
 }
 
 const stationCache = new Map<string, StationCacheEntry>()
-const STATION_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
+const STATION_CACHE_TTL = 30 * 60 * 1000 // 30 minutes
 
 type CacheEntry<T> = {
   data: T
@@ -154,8 +154,7 @@ function getDistanceSq(latA: number, lonA: number, latB: number, lonB: number) {
   return dLat * dLat + dLon * dLon
 }
 
-function getBulletinFallbackStationIds(profileKey: string) {
-  const profile = getRegionProfileByKey(profileKey)
+function getBulletinFallbackStationIds(profile: RegionProfile) {
   const profiles = getRegionProfiles()
   const seen = new Set<string>([profile.weatherStationId])
   const candidates: string[] = []
@@ -623,11 +622,11 @@ async function fetchCurrentWeather(nx: number, ny: number, apiKey: string) {
   return snapshot
 }
 
-async function fetchAirQuality(profileKey: string, serviceKey: string, dynamicStationName?: string) {
-  const explicitProfile = getRegionProfileByKey(profileKey)
+async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynamicStationName?: string) {
+  const explicitProfile = profile
   const normalizedStationName = dynamicStationName?.trim()
-  const profileCacheKey = `profile:${explicitProfile.key}`
-  const homeProfileCacheKey = `profile:${HOME_REGION.key}`
+  const profileCacheKey = `profile:${explicitProfile.key}:${explicitProfile.areaNo}`
+  const homeProfileCacheKey = `profile:${HOME_REGION.key}:${HOME_REGION.areaNo}`
   const cacheKey = normalizedStationName
     ? `station:${normalizedStationName}`
     : profileCacheKey
@@ -641,8 +640,9 @@ async function fetchAirQuality(profileKey: string, serviceKey: string, dynamicSt
     const data = await fetchJsonSafely(url)
     const items = data?.response?.body?.items
     if (Array.isArray(items) && items.length > 0) {
-      const station = dynamicStationName 
-        ? items.find(item => item.stationName === dynamicStationName) || pickStationByKeywords(items, explicitProfile.stationKeywords)
+      const station = normalizedStationName
+        ? items.find((item) => String(item?.stationName ?? "").trim() === normalizedStationName)
+          || pickStationByKeywords(items, explicitProfile.stationKeywords)
         : pickStationByKeywords(items, explicitProfile.stationKeywords)
       if (station) {
         const resolvedCacheKey = station.stationName
@@ -697,9 +697,9 @@ async function fetchAirQuality(profileKey: string, serviceKey: string, dynamicSt
   return { data: DEFAULT_AIR_QUALITY, isFallback: true }
 }
 
-async function fetchUvIndex(profileKey: string, serviceKey: string) {
-  const profile = getRegionProfileByKey(profileKey)
-  const cached = getCachedValue(uvCache, profile.key, UV_CACHE_DURATION)
+async function fetchUvIndex(profile: RegionProfile, serviceKey: string) {
+  const cacheKey = `${profile.key}:${profile.areaNo}`
+  const cached = getCachedValue(uvCache, cacheKey, UV_CACHE_DURATION)
   if (cached) return cached
 
   const date = new Date()
@@ -720,13 +720,13 @@ async function fetchUvIndex(profileKey: string, serviceKey: string) {
     else label = "위험"
   }
 
-  uvCache.set(profile.key, { data: label, lastUpdate: Date.now() })
+  uvCache.set(cacheKey, { data: label, lastUpdate: Date.now() })
   return label
 }
 
-async function fetchRegionalBulletin(profileKey: string, serviceKey: string) {
-  const profile = getRegionProfileByKey(profileKey)
-  const cached = getCachedValue(bulletinCache, profile.key, ALERT_CACHE_DURATION)
+async function fetchRegionalBulletin(profile: RegionProfile, serviceKey: string) {
+  const cacheKey = `${profile.key}:${profile.areaNo}`
+  const cached = getCachedValue(bulletinCache, cacheKey, ALERT_CACHE_DURATION)
   if (cached) return cached
 
   const fetchBulletinItem = async (stationId: string) => {
@@ -737,7 +737,7 @@ async function fetchRegionalBulletin(profileKey: string, serviceKey: string) {
 
   let item = await fetchBulletinItem(profile.weatherStationId)
   if (!item) {
-    for (const fallbackStationId of getBulletinFallbackStationIds(profile.key)) {
+    for (const fallbackStationId of getBulletinFallbackStationIds(profile)) {
       item = await fetchBulletinItem(fallbackStationId)
       if (item) {
         break
@@ -758,13 +758,13 @@ async function fetchRegionalBulletin(profileKey: string, serviceKey: string) {
     lastUpdate: String(item?.tmFc || item?.tmSeq || "--:--"),
   }
 
-  bulletinCache.set(profile.key, { data: snapshot, lastUpdate: Date.now() })
+  bulletinCache.set(cacheKey, { data: snapshot, lastUpdate: Date.now() })
   return snapshot
 }
 
-async function fetchRegionalWarning(profileKey: string, serviceKey: string) {
-  const profile = getRegionProfileByKey(profileKey)
-  const cached = getCachedValue(warningCache, profile.key, ALERT_CACHE_DURATION)
+async function fetchRegionalWarning(profile: RegionProfile, serviceKey: string) {
+  const cacheKey = `${profile.key}:${profile.areaNo}`
+  const cached = getCachedValue(warningCache, cacheKey, ALERT_CACHE_DURATION)
   if (cached) return cached
 
   const fromTmFc = getShiftedKstDate(-1)
@@ -797,7 +797,7 @@ async function fetchRegionalWarning(profileKey: string, serviceKey: string) {
     lastUpdate: latest?.timestamp || "--:--",
   }
 
-  warningCache.set(profile.key, { data: snapshot, lastUpdate: Date.now() })
+  warningCache.set(cacheKey, { data: snapshot, lastUpdate: Date.now() })
   return snapshot
 }
 
@@ -948,8 +948,8 @@ async function handleGET(req: Request) {
     profile.key,
     grid.nx,
     grid.ny,
-    userLat != null ? Math.round(userLat * 100) : "home",
-    userLon != null ? Math.round(userLon * 100) : "home",
+    userLat != null ? Math.round(userLat * 1000) : "home",
+    userLon != null ? Math.round(userLon * 1000) : "home",
   ].join(":")
   const cachedResponse = currentResponseCache.get(userCacheKey)
   if (cachedResponse && cachedResponse.expiry > Date.now()) {
@@ -987,7 +987,7 @@ async function handleGET(req: Request) {
   if (hasDeviceCoordinates && userLat != null && userLon != null) {
     const [tmX, tmY] = wgs84ToTm(userLat, userLon)
     tmCoords = { x: tmX, y: tmY }
-    const coordsKey = `${Math.round(userLat * 100)}_${Math.round(userLon * 100)}`
+    const coordsKey = `${Math.round(userLat * 1000)}_${Math.round(userLon * 1000)}`
     const cached = stationCache.get(coordsKey)
     if (cached && cached.expiry > Date.now()) {
       dynamicStationName = cached.name
@@ -1026,10 +1026,10 @@ async function handleGET(req: Request) {
 
   const [weatherData, airResponse, uvIndex, bulletin, warning, earthquake, tsunami, volcano] = await Promise.all([
     fetchCurrentWeather(grid.nx, grid.ny, kmaKey),
-    fetchAirQuality(profile.key, publicServiceKey, dynamicStationName),
-    fetchUvIndex(profile.key, publicServiceKey),
-    fetchRegionalBulletin(profile.key, publicServiceKey),
-    fetchRegionalWarning(profile.key, publicServiceKey),
+    fetchAirQuality(profile, publicServiceKey, dynamicStationName),
+    fetchUvIndex(profile, publicServiceKey),
+    fetchRegionalBulletin(profile, publicServiceKey),
+    fetchRegionalWarning(profile, publicServiceKey),
     fetchEarthquakeInfo(publicServiceKey),
     fetchTsunamiInfo(kmaKey),
     fetchVolcanoInfo(kmaKey),
