@@ -224,11 +224,11 @@ export function SettingsModal({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 260 }}
-            className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-6 sm:pb-6"
+            className="fixed inset-x-0 bottom-0 z-50 overflow-x-hidden px-3 pb-3 sm:px-6 sm:pb-6"
           >
-            <div className="mx-auto h-[min(92dvh,960px)] max-w-5xl">
-              <MagicCard className="h-full overflow-hidden rounded-[2rem] border border-card-border/70" gradientSize={280} gradientOpacity={0.72}>
-                <div className="relative h-full overflow-y-auto rounded-[2rem] bg-background/95 p-5 shadow-2xl backdrop-blur-2xl sm:p-8 custom-scrollbar">
+            <div className="mx-auto h-[min(92dvh,960px)] w-full max-w-5xl min-w-0">
+              <MagicCard className="h-full w-full overflow-hidden rounded-[2rem] border border-card-border/70" gradientSize={280} gradientOpacity={0.72}>
+                <div className="relative h-full overflow-y-auto overflow-x-hidden overscroll-x-none touch-pan-y rounded-[2rem] bg-background/95 p-5 shadow-2xl backdrop-blur-2xl sm:p-8 custom-scrollbar">
                   <BorderBeam
                     size={200}
                     duration={10}
@@ -236,15 +236,15 @@ export function SettingsModal({
                     colorTo="var(--beam-to)"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(47,111,228,0.18),transparent_52%),radial-gradient(circle_at_16%_24%,rgba(11,125,113,0.14),transparent_44%)]" />
-                  <div className="relative z-10">
+                  <div className="relative z-10 min-w-0">
               <div className="mb-8 flex items-start justify-between gap-4">
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                   <span className="inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-sky-blue">
                     <Sparkles className="size-3.5" />
                     {copy.accountTitle}
                   </span>
-                  <h2 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl">{copy.profileTitle}</h2>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{copy.profileDescription}</p>
+                  <h2 className="break-words text-3xl font-black tracking-tight text-foreground sm:text-4xl">{copy.profileTitle}</h2>
+                  <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">{copy.profileDescription}</p>
                 </div>
                 <button
                   type="button"
@@ -279,8 +279,8 @@ export function SettingsModal({
                 </div>
               </div>
 
-              <div className="grid gap-6 pb-10 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:items-start">
-                <section>
+              <div className="grid min-w-0 gap-6 pb-10 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:items-start">
+                <section className="min-w-0">
                   <form className="space-y-5" onSubmit={handleSaveProfile}>
                     <div className={panelClassName}>
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -463,7 +463,7 @@ export function SettingsModal({
                   </form>
                 </section>
 
-                <aside className="space-y-6 xl:sticky xl:top-6">
+                <aside className="min-w-0 space-y-6 xl:sticky xl:top-6">
                 <section className={panelClassName}>
                   <div className="mb-5 space-y-2">
                     <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
