@@ -419,18 +419,23 @@ export function mergeRegionProfileWithForecastLocation(
     return baseProfile
   }
 
+  const normalizedSidoName = normalizeAirSidoName(point.level1)
+  const provinceAlignedProfile = normalizedSidoName
+    ? getNearestRegionProfileByAirSidoName(point.lat, point.lon, normalizedSidoName)
+    : null
+  const resolvedBaseProfile = provinceAlignedProfile ?? baseProfile
   const locationLabel = getForecastLocationLabel(point)
-  const areaNo = /^\d{10}$/.test(point.adminCode) ? point.adminCode : baseProfile.areaNo
+  const areaNo = /^\d{10}$/.test(point.adminCode) ? point.adminCode : resolvedBaseProfile.areaNo
   const localKeywords = [point.level3, point.level2, locationLabel]
   const warningKeywords = [point.level3, point.level2, point.level1]
 
   return {
-    ...baseProfile,
-    displayName: locationLabel || baseProfile.displayName,
-    airSidoName: normalizeAirSidoName(point.level1) ?? baseProfile.airSidoName,
+    ...resolvedBaseProfile,
+    displayName: locationLabel || resolvedBaseProfile.displayName,
+    airSidoName: normalizedSidoName ?? resolvedBaseProfile.airSidoName,
     areaNo,
-    stationKeywords: mergeKeywordArrays(baseProfile.stationKeywords, localKeywords),
-    warningKeywords: mergeKeywordArrays(baseProfile.warningKeywords, warningKeywords),
+    stationKeywords: mergeKeywordArrays(resolvedBaseProfile.stationKeywords, localKeywords),
+    warningKeywords: mergeKeywordArrays(resolvedBaseProfile.warningKeywords, warningKeywords),
   }
 }
 
@@ -439,6 +444,29 @@ function getNearestRegionProfile(lat: number, lon: number) {
   let nearestProfile = HOME_REGION
 
   for (const profile of REGION_PROFILES) {
+    const dLat = lat - profile.lat
+    const dLon = lon - profile.lon
+    const distanceSq = dLat * dLat + dLon * dLon
+
+    if (distanceSq < minDistanceSq) {
+      minDistanceSq = distanceSq
+      nearestProfile = profile
+    }
+  }
+
+  return nearestProfile
+}
+
+function getNearestRegionProfileByAirSidoName(lat: number, lon: number, airSidoName: string) {
+  const candidates = REGION_PROFILES.filter((profile) => profile.airSidoName === airSidoName)
+  if (candidates.length === 0) {
+    return null
+  }
+
+  let minDistanceSq = Infinity
+  let nearestProfile: RegionProfile | null = null
+
+  for (const profile of candidates) {
     const dLat = lat - profile.lat
     const dLon = lon - profile.lon
     const distanceSq = dLat * dLat + dLon * dLon
