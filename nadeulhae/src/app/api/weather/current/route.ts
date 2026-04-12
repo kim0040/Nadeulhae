@@ -395,6 +395,33 @@ function getKhaiGrade(khai: number) {
   return 4
 }
 
+function buildAirQualitySnapshot(station: any): AirQualitySnapshot {
+  const pm10 = isInvalidAirFlag(station?.pm10Flag)
+    ? DEFAULT_AIR_QUALITY.pm10
+    : parseNumber(station?.pm10Value, DEFAULT_AIR_QUALITY.pm10)
+  const pm25 = isInvalidAirFlag(station?.pm25Flag)
+    ? DEFAULT_AIR_QUALITY.pm25
+    : parseNumber(station?.pm25Value, DEFAULT_AIR_QUALITY.pm25)
+  const khai = parseNumber(station?.khaiValue, DEFAULT_AIR_QUALITY.khai)
+  const khaiGrade = parseNumber(station?.khaiGrade, getKhaiGrade(khai))
+
+  return {
+    dust: `${pm10}µg/m³`,
+    pm10,
+    pm25,
+    o3: parseNumber(station?.o3Value),
+    no2: parseNumber(station?.no2Value),
+    co: parseNumber(station?.coValue),
+    so2: parseNumber(station?.so2Value),
+    khai,
+    khaiGrade,
+    kr: getKrAirGrade(pm10),
+    who: getWhoAirGrade(pm25),
+    station: station?.stationName ?? DEFAULT_AIR_QUALITY.station,
+    lastUpdate: typeof station?.dataTime === "string" ? station.dataTime.replace(/-/g, ".") : "--:--",
+  }
+}
+
 function truncateText(value: string, maxLength = 140) {
   if (value.length <= maxLength) return value
   return `${value.slice(0, maxLength - 1).trimEnd()}…`
@@ -636,6 +663,27 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
   }
 
   if (consumeAirQuotaSlot()) {
+    if (normalizedStationName) {
+      const stationUrl = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${serviceKey}&returnType=json&numOfRows=48&pageNo=1&stationName=${encodeURIComponent(normalizedStationName)}&dataTerm=DAILY&ver=1.0`
+      const stationData = await fetchJsonSafely(stationUrl)
+      const stationItems = toArray(stationData?.response?.body?.items?.item)
+      const exactStation = stationItems.find(
+        (item: any) => String(item?.stationName ?? "").trim() === normalizedStationName
+      )
+      const station = exactStation ?? stationItems[0] ?? null
+
+      if (station) {
+        const resolvedCacheKey = station.stationName
+          ? `station:${station.stationName.trim()}`
+          : cacheKey
+        const snapshot = buildAirQualitySnapshot(station)
+
+        airQualityCache.set(resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
+        airQualityCache.set(profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
+        return { data: snapshot, isFallback: false }
+      }
+    }
+
     const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty?serviceKey=${serviceKey}&returnType=json&numOfRows=100&pageNo=1&sidoName=${encodeURIComponent(explicitProfile.airSidoName)}&ver=1.0`
     const data = await fetchJsonSafely(url)
     const items = data?.response?.body?.items
@@ -648,29 +696,7 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
         const resolvedCacheKey = station.stationName
           ? `station:${station.stationName.trim()}`
           : cacheKey
-        const pm10 = isInvalidAirFlag(station.pm10Flag)
-          ? DEFAULT_AIR_QUALITY.pm10
-          : parseNumber(station.pm10Value, DEFAULT_AIR_QUALITY.pm10)
-        const pm25 = isInvalidAirFlag(station.pm25Flag)
-          ? DEFAULT_AIR_QUALITY.pm25
-          : parseNumber(station.pm25Value, DEFAULT_AIR_QUALITY.pm25)
-        const khai = parseNumber(station.khaiValue, DEFAULT_AIR_QUALITY.khai)
-        const khaiGrade = parseNumber(station.khaiGrade, getKhaiGrade(khai))
-        const snapshot: AirQualitySnapshot = {
-          dust: `${pm10}µg/m³`,
-          pm10,
-          pm25,
-          o3: parseNumber(station.o3Value),
-          no2: parseNumber(station.no2Value),
-          co: parseNumber(station.coValue),
-          so2: parseNumber(station.so2Value),
-          khai,
-          khaiGrade,
-          kr: getKrAirGrade(pm10),
-          who: getWhoAirGrade(pm25),
-          station: station.stationName ?? DEFAULT_AIR_QUALITY.station,
-          lastUpdate: typeof station.dataTime === "string" ? station.dataTime.replace(/-/g, ".") : "--:--",
-        }
+        const snapshot = buildAirQualitySnapshot(station)
 
         airQualityCache.set(resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
         airQualityCache.set(profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
