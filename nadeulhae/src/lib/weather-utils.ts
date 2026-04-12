@@ -401,6 +401,36 @@ function normalizeAirSidoName(level1Name: string) {
   return PROVINCE_TO_AIR_SIDO_NAME[level1Name.trim()] ?? null
 }
 
+function expandStationKeywords(value: string) {
+  const normalized = value.trim()
+  if (!normalized) return []
+
+  const keywords = new Set<string>([normalized])
+  const compact = normalized.replace(/\s+/g, "")
+  if (compact.length >= 2) {
+    keywords.add(compact)
+  }
+
+  const stripped = normalized.replace(/(특별자치시|특별자치도|광역시|특별시|자치시|자치도|시|군|구|읍|면|동|리)$/g, "").trim()
+  if (stripped.length >= 2) {
+    keywords.add(stripped)
+    keywords.add(stripped.replace(/\s+/g, ""))
+  }
+
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  for (const part of parts) {
+    if (part.length >= 2) {
+      keywords.add(part)
+    }
+    const partStripped = part.replace(/(특별자치시|특별자치도|광역시|특별시|자치시|자치도|시|군|구|읍|면|동|리)$/g, "").trim()
+    if (partStripped.length >= 2) {
+      keywords.add(partStripped)
+    }
+  }
+
+  return [...keywords]
+}
+
 function getForecastLocationLabel(point: ForecastLocationPoint) {
   const level2 = point.level2.trim()
   const level3 = point.level3.trim()
@@ -427,6 +457,8 @@ export function mergeRegionProfileWithForecastLocation(
   const locationLabel = getForecastLocationLabel(point)
   const areaNo = /^\d{10}$/.test(point.adminCode) ? point.adminCode : resolvedBaseProfile.areaNo
   const localKeywords = [point.level3, point.level2, locationLabel]
+    .filter((value): value is string => Boolean(value && value.trim().length > 0))
+    .flatMap((value) => expandStationKeywords(value))
   const warningKeywords = [point.level3, point.level2, point.level1]
 
   return {
