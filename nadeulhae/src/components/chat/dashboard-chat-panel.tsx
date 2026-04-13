@@ -572,7 +572,7 @@ export function DashboardChatPanel({
               }}
               placeholder={copy.placeholder}
               disabled={!canSend}
-              className="max-h-48 min-h-[52px] flex-1 resize-none bg-transparent px-4 py-3.5 text-sm leading-6 text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-70"
+              className="max-h-48 min-h-[52px] flex-1 resize-none bg-transparent px-4 py-3.5 text-base leading-6 text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm"
             />
 
             <ShimmerButton

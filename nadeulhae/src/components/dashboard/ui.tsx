@@ -99,10 +99,17 @@ export function StatusMetric({
     <div
       className={cn(
         "min-w-0 rounded-[1.3rem] border border-card-border/70 bg-background/75",
-        compact ? "p-3 sm:p-3.5" : "p-4"
+        compact ? "p-2.5 sm:p-3.5" : "p-4"
       )}
     >
-      <p className="break-words text-[11px] font-black uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          "break-words font-black uppercase text-muted-foreground",
+          compact ? "text-[10px] tracking-[0.18em]" : "text-[11px] tracking-[0.24em]"
+        )}
+      >
+        {label}
+      </p>
       <p
         className={cn(
           "break-words font-black tracking-tight text-foreground",
