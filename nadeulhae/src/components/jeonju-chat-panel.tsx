@@ -546,7 +546,7 @@ export function JeonjuChatPanel() {
                         }}
                         placeholder={copy.placeholder}
                         rows={1}
-                        className="w-full resize-none rounded-xl border border-card-border/60 bg-background/80 px-3.5 py-2.5 text-sm leading-relaxed text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-sky-blue/30"
+                        className="w-full resize-none rounded-xl border border-card-border/60 bg-background/80 px-3.5 py-2.5 text-base leading-relaxed text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-sky-blue/30 sm:text-sm"
                       />
                       <div className="flex items-center justify-between gap-2">
                         <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-bold text-muted-foreground transition hover:text-foreground">
