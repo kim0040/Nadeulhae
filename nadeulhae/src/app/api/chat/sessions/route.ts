@@ -45,6 +45,13 @@ function getErrorMessage(locale: ChatLocale, key: keyof typeof SESSION_ERRORS.ko
   return SESSION_ERRORS[locale][key]
 }
 
+function withServerNow<T extends object>(payload: T) {
+  return {
+    ...payload,
+    serverNow: new Date().toISOString(),
+  }
+}
+
 function sanitizeSessionId(value: string | null) {
   if (!value) {
     return null
@@ -64,17 +71,20 @@ async function handleGET(request: NextRequest) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
     if (!authenticatedSession) {
       return clearAuthCookie(
-        createAuthJsonResponse({ error: getErrorMessage(locale, "unauthorized") }, { status: 401 })
+        createAuthJsonResponse(
+          withServerNow({ error: getErrorMessage(locale, "unauthorized") }),
+          { status: 401 }
+        )
       )
     }
 
     const sessions = await listChatSessions(authenticatedSession.user.id)
-    const response = createAuthJsonResponse({ sessions })
+    const response = createAuthJsonResponse(withServerNow({ sessions }))
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Chat sessions GET API failed:", error)
     return createAuthJsonResponse(
-      { error: getErrorMessage(getRequestLocale(request), "unexpected") },
+      withServerNow({ error: getErrorMessage(getRequestLocale(request), "unexpected") }),
       { status: 500 }
     )
   }
@@ -99,7 +109,10 @@ async function handlePOST(request: NextRequest) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
     if (!authenticatedSession) {
       return clearAuthCookie(
-        createAuthJsonResponse({ error: getErrorMessage(locale, "unauthorized") }, { status: 401 })
+        createAuthJsonResponse(
+          withServerNow({ error: getErrorMessage(locale, "unauthorized") }),
+          { status: 401 }
+        )
       )
     }
 
@@ -109,16 +122,18 @@ async function handlePOST(request: NextRequest) {
       title: typeof body.title === "string" ? body.title : null,
     })
 
-    const response = createAuthJsonResponse(await getChatState({
-      userId: authenticatedSession.user.id,
-      locale,
-      requestedSessionId: newSessionId,
-    }))
+    const response = createAuthJsonResponse(
+      withServerNow(await getChatState({
+        userId: authenticatedSession.user.id,
+        locale,
+        requestedSessionId: newSessionId,
+      }))
+    )
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Chat sessions POST API failed:", error)
     return createAuthJsonResponse(
-      { error: getErrorMessage(locale, "unexpected") },
+      withServerNow({ error: getErrorMessage(locale, "unexpected") }),
       { status: 500 }
     )
   }
@@ -134,7 +149,7 @@ async function handleDELETE(request: NextRequest) {
   const sessionId = sanitizeSessionId(request.nextUrl.searchParams.get("sessionId"))
   if (!sessionId) {
     return createAuthJsonResponse(
-      { error: getErrorMessage(locale, "invalidSession") },
+      withServerNow({ error: getErrorMessage(locale, "invalidSession") }),
       { status: 400 }
     )
   }
@@ -143,7 +158,10 @@ async function handleDELETE(request: NextRequest) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
     if (!authenticatedSession) {
       return clearAuthCookie(
-        createAuthJsonResponse({ error: getErrorMessage(locale, "unauthorized") }, { status: 401 })
+        createAuthJsonResponse(
+          withServerNow({ error: getErrorMessage(locale, "unauthorized") }),
+          { status: 401 }
+        )
       )
     }
 
@@ -154,21 +172,23 @@ async function handleDELETE(request: NextRequest) {
 
     if (!nextSessionId) {
       return createAuthJsonResponse(
-        { error: getErrorMessage(locale, "cannotDelete") },
+        withServerNow({ error: getErrorMessage(locale, "cannotDelete") }),
         { status: 400 }
       )
     }
 
-    const response = createAuthJsonResponse(await getChatState({
-      userId: authenticatedSession.user.id,
-      locale,
-      requestedSessionId: nextSessionId,
-    }))
+    const response = createAuthJsonResponse(
+      withServerNow(await getChatState({
+        userId: authenticatedSession.user.id,
+        locale,
+        requestedSessionId: nextSessionId,
+      }))
+    )
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Chat sessions DELETE API failed:", error)
     return createAuthJsonResponse(
-      { error: getErrorMessage(locale, "unexpected") },
+      withServerNow({ error: getErrorMessage(locale, "unexpected") }),
       { status: 500 }
     )
   }
