@@ -1,6 +1,9 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion, type MotionStyle, type Transition } from "framer-motion"
+
+import { shouldRunContinuousAnimation } from "@/lib/performance"
 import { cn } from "@/lib/utils"
 
 interface BorderBeamProps {
@@ -30,6 +33,35 @@ export const BorderBeam = ({
   initialOffset = 0,
   borderWidth = 1,
 }: BorderBeamProps) => {
+  const [canAnimate, setCanAnimate] = useState(false)
+
+  useEffect(() => {
+    const update = () => setCanAnimate(shouldRunContinuousAnimation())
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    update()
+
+    const onVisibility = () => update()
+    const onFocus = () => update()
+    const onBlur = () => update()
+    const onMediaChange = () => update()
+
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("blur", onBlur)
+    media.addEventListener("change", onMediaChange)
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("blur", onBlur)
+      media.removeEventListener("change", onMediaChange)
+    }
+  }, [])
+
+  if (!canAnimate) {
+    return null
+  }
+
   return (
     <div
       className="pointer-events-none absolute inset-0 rounded-[inherit] border-(length:--border-beam-width) border-transparent mask-[linear-gradient(transparent,transparent),linear-gradient(#000,#000)] mask-intersect [mask-clip:padding-box,border-box]"

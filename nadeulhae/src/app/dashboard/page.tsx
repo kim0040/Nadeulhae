@@ -16,6 +16,7 @@ import { BorderBeam } from "@/components/magicui/border-beam"
 import { MagicCard } from "@/components/magicui/magic-card"
 import { Meteors } from "@/components/magicui/meteors"
 import { Particles } from "@/components/magicui/particles"
+import { getMeteorCount, getParticleCount, shouldRunRichAnimation } from "@/lib/performance"
 import { DashboardChatPanel } from "@/components/chat/dashboard-chat-panel"
 import { TodayHourlyForecast, type HourlyForecastItem } from "@/components/today-hourly-forecast"
 import { useAuth } from "@/context/AuthContext"
@@ -425,6 +426,9 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
+  const particleQuantity = useMemo(() => getParticleCount(30), [])
+  const meteorCount = useMemo(() => getMeteorCount(4), [])
+  const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
   const loadWeather = useCallback(async (lat?: number, lon?: number) => {
     const query = lat != null && lon != null ? `?lat=${lat}&lon=${lon}` : ""
@@ -607,6 +611,97 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
       language
     )
   }, [language, weatherData?.metadata?.bulletin?.updatedAt, weatherData?.metadata?.lastUpdate])
+  const bulletinContent = (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.24em] text-sky-blue">
+          <ShieldAlert className="size-4" />
+          {copy.bulletin}
+        </div>
+        <span className="rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-bold text-muted-foreground">
+          {copy.updatedAt}: {bulletinUpdatedLabel}
+        </span>
+      </div>
+
+      {bulletinHighlight && bulletinHighlightTone ? (
+        <div className={cn("mt-4 rounded-[1.3rem] border px-4 py-4 sm:px-5", bulletinHighlightTone.container)}>
+          <div className="flex items-start gap-3">
+            <span className={cn(
+              "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border",
+              bulletinHighlightTone.iconWrapper
+            )}>
+              <ShieldAlert className={cn("size-4", bulletinHighlightTone.icon)} />
+            </span>
+            <div className="min-w-0">
+              <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", bulletinHighlightTone.kicker)}>
+                {language === "ko" ? "핵심 공지" : "Key Notice"}
+              </p>
+              <p className={cn("mt-1 text-sm font-semibold leading-6 sm:text-[15px]", bulletinHighlightTone.text)}>
+                {bulletinHighlight}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bulletinTags.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {bulletinTags.map((tag) => (
+            <span
+              key={tag.id}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-xs font-semibold",
+                getBulletinTagToneClass(tag.tone)
+              )}
+            >
+              {tag.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {bulletinBodyItems.length > 0 ? (
+        <div className="mt-4 space-y-2.5">
+          {bulletinBodyItems.map((item, index) => {
+            const itemTone = getBulletinTone(getBulletinSeverity(item.content))
+            return (
+              <article
+                key={`${item.label ?? "notice"}-${item.content}-${index + 1}`}
+                className={cn("rounded-[1.15rem] border px-4 py-3.5", itemTone.itemContainer)}
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={cn(
+                        "inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
+                        item.label
+                          ? itemTone.itemLabel
+                          : "border border-card-border/70 bg-background/70 text-muted-foreground"
+                      )}
+                    >
+                      {item.label ?? (language === "ko" ? `공지 ${index + 1}` : `Notice ${index + 1}`)}
+                    </span>
+                    <span className="text-[11px] font-semibold text-muted-foreground">
+                      #{String(index + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-foreground/95">{item.content}</p>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      ) : !bulletinHighlight ? (
+        <p className="mt-4 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3 text-sm leading-7 text-muted-foreground">
+          {copy.noBulletin}
+        </p>
+      ) : null}
+
+      <p className="mt-3 text-xs font-semibold text-muted-foreground">
+        {copy.location}: {weatherData?.metadata?.region || "-"} · {copy.station}: {weatherData?.metadata?.station || "-"} · {copy.updatedAt}: {formatLastUpdate(weatherData?.metadata?.lastUpdate, language)}
+      </p>
+    </>
+  )
 
   const chatWeatherContext = useMemo<ChatWeatherContext | null>(() => {
     if (!weatherData) {
@@ -647,8 +742,8 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-24 sm:px-6 sm:pt-28 lg:px-8">
-      <Particles className="absolute inset-0 z-0 opacity-70" quantity={68} ease={80} color={particleColor} refresh />
-      <Meteors number={8} className="z-0" />
+      {particleQuantity > 0 && <Particles className="absolute inset-0 z-0 opacity-70" quantity={particleQuantity} ease={80} color={particleColor} refresh />}
+      {meteorCount > 0 && <Meteors number={meteorCount} className="z-0" />}
 
       <div className="relative z-10 mx-auto max-w-[82rem] 2xl:max-w-[86rem]">
         {/* Top Banner (Bento style) */}
@@ -776,109 +871,31 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
                   ))}
                 </div>
 
-                <MagicCard
-                  className="mt-6 overflow-hidden rounded-[1.7rem]"
-                  gradientSize={220}
-                  gradientOpacity={0.68}
-                >
-                  <div className="relative rounded-[1.7rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
-                    <BorderBeam
-                      size={170}
-                      duration={11}
-                      colorFrom="var(--beam-from)"
-                      colorTo="var(--beam-to)"
-                    />
-                    <div className="relative z-10">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.24em] text-sky-blue">
-                          <ShieldAlert className="size-4" />
-                          {copy.bulletin}
-                        </div>
-                        <span className="rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-bold text-muted-foreground">
-                          {copy.updatedAt}: {bulletinUpdatedLabel}
-                        </span>
+                {enableAnimations ? (
+                  <MagicCard
+                    className="mt-6 overflow-hidden rounded-[1.7rem]"
+                    gradientSize={220}
+                    gradientOpacity={0.68}
+                  >
+                    <div className="relative rounded-[1.7rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
+                      <BorderBeam
+                        size={170}
+                        duration={11}
+                        colorFrom="var(--beam-from)"
+                        colorTo="var(--beam-to)"
+                      />
+                      <div className="relative z-10">{bulletinContent}</div>
+                    </div>
+                  </MagicCard>
+                ) : (
+                  <div className="mt-6 overflow-hidden rounded-[1.7rem]">
+                    <div className="relative rounded-[1.7rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
+                      <div className="relative z-10">
+                        {bulletinContent}
                       </div>
-
-                      {bulletinHighlight && bulletinHighlightTone ? (
-                        <div className={cn("mt-4 rounded-[1.3rem] border px-4 py-4 sm:px-5", bulletinHighlightTone.container)}>
-                          <div className="flex items-start gap-3">
-                            <span className={cn(
-                              "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border",
-                              bulletinHighlightTone.iconWrapper
-                            )}>
-                              <ShieldAlert className={cn("size-4", bulletinHighlightTone.icon)} />
-                            </span>
-                            <div className="min-w-0">
-                              <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", bulletinHighlightTone.kicker)}>
-                                {language === "ko" ? "핵심 공지" : "Key Notice"}
-                              </p>
-                              <p className={cn("mt-1 text-sm font-semibold leading-6 sm:text-[15px]", bulletinHighlightTone.text)}>
-                                {bulletinHighlight}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {bulletinTags.length > 0 ? (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {bulletinTags.map((tag) => (
-                            <span
-                              key={tag.id}
-                              className={cn(
-                                "rounded-full border px-3 py-1.5 text-xs font-semibold",
-                                getBulletinTagToneClass(tag.tone)
-                              )}
-                            >
-                              {tag.label}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {bulletinBodyItems.length > 0 ? (
-                        <div className="mt-4 space-y-2.5">
-                          {bulletinBodyItems.map((item, index) => {
-                            const itemTone = getBulletinTone(getBulletinSeverity(item.content))
-                            return (
-                              <article
-                                key={`${item.label ?? "notice"}-${item.content}-${index + 1}`}
-                                className={cn("rounded-[1.15rem] border px-4 py-3.5", itemTone.itemContainer)}
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span
-                                      className={cn(
-                                        "inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
-                                        item.label
-                                          ? itemTone.itemLabel
-                                          : "border border-card-border/70 bg-background/70 text-muted-foreground"
-                                      )}
-                                    >
-                                      {item.label ?? (language === "ko" ? `공지 ${index + 1}` : `Notice ${index + 1}`)}
-                                    </span>
-                                    <span className="text-[11px] font-semibold text-muted-foreground">
-                                      #{String(index + 1).padStart(2, "0")}
-                                    </span>
-                                  </div>
-                                  <p className="mt-2 text-sm leading-6 text-foreground/95">{item.content}</p>
-                                </div>
-                              </article>
-                            )
-                          })}
-                        </div>
-                      ) : !bulletinHighlight ? (
-                        <p className="mt-4 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3 text-sm leading-7 text-muted-foreground">
-                          {copy.noBulletin}
-                        </p>
-                      ) : null}
-
-                      <p className="mt-3 text-xs font-semibold text-muted-foreground">
-                        {copy.location}: {weatherData.metadata?.region || "-"} · {copy.station}: {weatherData.metadata?.station || "-"} · {copy.updatedAt}: {formatLastUpdate(weatherData.metadata?.lastUpdate, language)}
-                      </p>
                     </div>
                   </div>
-                </MagicCard>
+                )}
 
                 <TodayHourlyForecast items={hourlyForecast} />
               </>

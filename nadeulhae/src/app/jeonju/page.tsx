@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useTheme } from "next-themes"
 
 import { useLanguage } from "@/context/LanguageContext"
 import { dataService, type FireSummaryData, type WeatherData } from "@/services/dataService"
@@ -13,6 +14,7 @@ import { PicnicBriefing } from "@/components/picnic-briefing"
 import { PicnicCalendar } from "@/components/picnic-calendar"
 import { JeonjuSafetyPanel } from "@/components/jeonju-safety-panel"
 import { JeonjuChatPanel } from "@/components/jeonju-chat-panel"
+import { getParticleCount } from "@/lib/performance"
 
 
 
@@ -24,8 +26,11 @@ const JEONJU_COORDS = {
 
 export default function JeonjuPage() {
   const { language } = useLanguage()
+  const { resolvedTheme } = useTheme()
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [fireSummary, setFireSummary] = useState<FireSummaryData | null>(null)
+  const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
+  const particleQuantity = useMemo(() => getParticleCount(24), [])
 
   useEffect(() => {
     const loadJeonjuData = async () => {
@@ -117,7 +122,9 @@ export default function JeonjuPage() {
   return (
     <main className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <section className="relative overflow-hidden px-4 pt-24 pb-20 sm:pt-28">
-        <Particles className="absolute inset-0 z-0 opacity-60" quantity={42} color="#2f6fe4" />
+        {particleQuantity > 0 ? (
+          <Particles className="absolute inset-0 z-0 opacity-60" quantity={particleQuantity} color={particleColor} />
+        ) : null}
         <div className="relative z-10 container mx-auto max-w-6xl">
           <div className="mx-auto inline-flex rounded-full border border-nature-green/20 bg-nature-green/10 px-5 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-nature-green">
             {texts.heroTag}
