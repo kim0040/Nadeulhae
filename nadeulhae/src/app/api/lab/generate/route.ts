@@ -281,23 +281,56 @@ async function handlePOST(request: NextRequest) {
 
     let shouldRefund = true
     try {
-      const prompts = buildLabGenerationPrompts({
-        locale,
-        user: authenticatedSession.user,
-        topic,
-        cardCount,
-      })
+      const collectedCards: LabGeneratedCardInput[] = []
+      let attempts = 0
+      const maxAttempts = 6
+      let deckTitle = topic
+      let lastRequestedModel: string | null = null
+      let lastResolvedModel: string | null = null
 
-      const completion = await createFactChatCompletion({
-        requestKind: "chat",
-        messages: [
-          { role: "system", content: prompts.systemPrompt },
-          { role: "user", content: prompts.userPrompt },
-        ],
-      })
+      while (collectedCards.length < cardCount && attempts < maxAttempts) {
+        attempts++
+        const remainingCount = cardCount - collectedCards.length
+        const batchSize = Math.min(15, remainingCount)
+        
+        const prompts = buildLabGenerationPrompts({
+          locale,
+          user: authenticatedSession.user,
+          topic,
+          cardCount: batchSize,
+        })
 
-      const parsedDeck = parseDeckFromCompletion(completion.content, cardCount)
-      if (parsedDeck.cards.length < LAB_MIN_CARD_COUNT) {
+        const existingTerms = collectedCards.map((c) => c.term).join(", ")
+        const repetitionConstraint = existingTerms ? `\n\nDO NOT GENERATE ANY OF THESE TERMS AGAIN: ${existingTerms}` : ""
+
+        const completion = await createFactChatCompletion({
+          requestKind: "chat",
+          messages: [
+            { role: "system", content: prompts.systemPrompt },
+            { role: "user", content: prompts.userPrompt + repetitionConstraint },
+          ],
+        })
+
+        if (!lastRequestedModel) lastRequestedModel = completion.requestedModel
+        if (!lastResolvedModel) lastResolvedModel = completion.resolvedModel
+
+        const parsedDeck = parseDeckFromCompletion(completion.content, batchSize)
+        if (parsedDeck.title && parsedDeck.title.length > 2) {
+          deckTitle = parsedDeck.title
+        }
+
+        const newCards = parsedDeck.cards.filter((c) => 
+          !collectedCards.some((ec) => ec.term.toLowerCase() === c.term.toLowerCase())
+        )
+
+        if (newCards.length === 0) {
+          break // Model is failing to generate new cards
+        }
+
+        collectedCards.push(...newCards)
+      }
+
+      if (collectedCards.length < LAB_MIN_CARD_COUNT) {
         await refundDailyLabGeneration(authenticatedSession.user.id)
         shouldRefund = false
 
@@ -313,11 +346,11 @@ async function handlePOST(request: NextRequest) {
       const savedDeck = await createLabDeckWithCards({
         userId: authenticatedSession.user.id,
         locale,
-        title: parsedDeck.title || topic,
+        title: deckTitle,
         topic,
-        cards: parsedDeck.cards,
-        requestedModel: completion.requestedModel,
-        resolvedModel: completion.resolvedModel,
+        cards: collectedCards,
+        requestedModel: lastRequestedModel,
+        resolvedModel: lastResolvedModel,
       })
 
       shouldRefund = false
