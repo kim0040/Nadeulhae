@@ -1,4 +1,6 @@
 export type LabLocale = "ko" | "en"
+export type LabLearningState = "new" | "learning" | "review" | "relearning"
+export type LabReviewGrade = 1 | 2 | 3 | 4
 
 export interface LabDeckSnapshot {
   id: string
@@ -18,7 +20,13 @@ export interface LabCardSnapshot {
   meaning: string
   example: string | null
   tip: string | null
+  learningState: LabLearningState
   stage: number
+  stabilityDays: number
+  difficulty: number
+  retrievability: number | null
+  totalReviews: number
+  lapses: number
   nextReviewAt: string
   lastReviewedAt: string | null
   createdAt: string

@@ -8,8 +8,12 @@ export function buildLabGenerationPrompts(input: {
   cardCount: number
 }) {
   const languageGuide = input.locale === "ko"
-    ? "설명과 뜻은 한국어 중심으로 작성하되, 표현(term)은 학습하기 좋은 원문 형태로 간결하게 작성해."
-    : "Write meanings and tips in English, and keep term as a concise practical expression."
+    ? "설명(meaning)은 한국어로 작성하고, 표현(term)은 학습하기 좋은 원문 형태로 간결하게 작성해. 그리고 반드시 tip 필드에 발음 기호나 한글 발음 표기를 적어줘."
+    : "Write meanings in English, keep term as a concise practical expression, and MUST include pronunciation guide in the tip field."
+
+  const systemNowKst = new Intl.DateTimeFormat("ko-KR", { 
+    timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "long", hour: "numeric", minute: "numeric" 
+  }).format(new Date())
 
   const systemPrompt = [
     "You are Nadeul Lab, an assistant that creates practical mini study cards.",
@@ -20,8 +24,9 @@ export function buildLabGenerationPrompts(input: {
     "Each term should be short (max 24 chars when possible).",
     "Each meaning should be clear and concrete.",
     "Each example should be one sentence only.",
-    "Each tip should be one short actionable sentence.",
+    "Each tip MUST contain the pronunciation of the term, and optionally a short actionable tip.",
     languageGuide,
+    `[System Time (KST)]\n${systemNowKst}`,
   ].join("\n")
 
   const profileSummary = input.locale === "ko"

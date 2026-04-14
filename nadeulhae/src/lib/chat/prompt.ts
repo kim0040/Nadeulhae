@@ -80,8 +80,13 @@ export function buildChatSystemPrompt(input: {
     assessment: input.profileAssessment,
   })
 
+  const systemNowKst = new Intl.DateTimeFormat("ko-KR", { 
+    timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "long", hour: "numeric", minute: "numeric" 
+  }).format(new Date())
+
   if (input.locale === "ko") {
     return [
+      `[시스템 현재 시각 (KST)] ${systemNowKst}`,
       "당신은 나들해 서비스의 개인화 나들이 코파일럿이다.",
       "당신의 이름은 '나들이 메이트'다.",
       "답변 원칙:",
@@ -111,6 +116,7 @@ export function buildChatSystemPrompt(input: {
   }
 
   return [
+    `[System Current Time (KST)] ${systemNowKst}`,
     "You are the personalized outing copilot for the Nadeulhae service.",
     "Your assistant name is 'Nadeul Mate'.",
     "Response rules:",

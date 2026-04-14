@@ -25,7 +25,7 @@ function resolveSslOptions() {
   if (caPath) {
     try {
       return {
-        ca: fs.readFileSync(caPath, "utf8"),
+        ca: fs.readFileSync(/*turbopackIgnore: true*/ caPath, "utf8"),
         rejectUnauthorized: true,
       }
     } catch {
@@ -42,10 +42,10 @@ function resolveSslOptions() {
 
   for (const path of fallbackPaths) {
     try {
-      const stat = fs.statSync(path)
+      const stat = fs.statSync(/*turbopackIgnore: true*/ path)
       if (stat.isFile()) {
         return {
-          ca: fs.readFileSync(path, "utf8"),
+          ca: fs.readFileSync(/*turbopackIgnore: true*/ path, "utf8"),
           rejectUnauthorized: true,
         }
       }

@@ -142,7 +142,7 @@ export function Navbar() {
   return (
     <header
       className={cn(
-        "pointer-events-none fixed left-0 right-0 top-0 z-50 flex items-center justify-between px-3 py-3.5 transition-all duration-500 sm:px-5 sm:py-4 lg:px-7 xl:px-8",
+        "pointer-events-none fixed left-0 right-0 top-0 z-50 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center px-3 py-3.5 transition-all duration-500 sm:px-5 sm:py-4 lg:px-7 xl:px-8",
         isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
       )}
     >
@@ -169,10 +169,10 @@ export function Navbar() {
         </div>
       </Link>
 
-      <nav className="pointer-events-auto absolute left-1/2 z-50 w-[min(100%,calc(100vw-6rem))] max-w-[calc(100vw-6rem)] -translate-x-1/2 transition-all sm:w-auto sm:max-w-[calc(100vw-8rem)] lg:max-w-[calc(100vw-13rem)] xl:max-w-[calc(100vw-15rem)]">
+      <nav className="pointer-events-auto relative z-50 mx-auto flex max-w-full justify-center transition-all">
         <div
           className={cn(
-            "flex max-w-full items-center rounded-full border border-[var(--card-border)] bg-[var(--card)] shadow-xl shadow-active-blue/10 backdrop-blur-2xl transition-all",
+            "flex max-w-full shrink items-center rounded-full border border-[var(--card-border)] bg-[var(--card)] shadow-xl shadow-active-blue/10 backdrop-blur-2xl transition-all",
             mounted
               ? language === "en"
                 ? "gap-0.5 px-1.5 py-1.5 sm:gap-3 sm:px-3 sm:py-2 lg:gap-3 lg:px-4 xl:gap-4 xl:px-5 xl:py-2.5"
@@ -193,10 +193,7 @@ export function Navbar() {
                 )}
                 >
                   <item.icon size={16} className="shrink-0 sm:size-[18px]" />
-                  <span className={cn(
-                    "max-w-[5.5rem] truncate lg:max-w-none",
-                    item.href === "/about" && "hidden sm:inline"
-                  )}>
+                  <span className="hidden max-w-[5.5rem] truncate sm:inline lg:max-w-none">
                     {item.name}
                   </span>
                 </Link>
@@ -264,7 +261,19 @@ export function Navbar() {
         </div>
       ) : null}
 
-      <div className="hidden h-1 w-4 sm:block lg:w-8" />
+      <div aria-hidden="true" className="invisible flex shrink-0 items-center gap-2">
+        <div className="size-9 sm:size-11 lg:size-12" />
+        <div className="hidden lg:block">
+          <span
+            className={cn(
+              "text-base font-black tracking-tighter text-foreground xl:text-[1.6rem]",
+              mounted && language === "en" && "xl:block"
+            )}
+          >
+            {t("logo_text")}
+          </span>
+        </div>
+      </div>
     </header>
   )
 }
