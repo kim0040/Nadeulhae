@@ -215,8 +215,9 @@ export default function LabVocabReportPage() {
   }, [loadReport, status, user?.labEnabled])
 
   const maxTrend = useMemo(() => {
-    const maxReview = Math.max(1, ...(report?.trend.map((item) => item.reviewCount) ?? [0]))
-    const maxGeneration = Math.max(1, ...(report?.trend.map((item) => item.generationCount) ?? [0]))
+    const trend = report?.trend ?? []
+    const maxReview = Math.max(1, ...trend.map((item) => item.reviewCount))
+    const maxGeneration = Math.max(1, ...trend.map((item) => item.generationCount))
     return { maxReview, maxGeneration }
   }, [report?.trend])
 

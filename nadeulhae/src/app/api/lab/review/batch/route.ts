@@ -19,6 +19,8 @@ import {
 
 export const runtime = "nodejs"
 
+const LAB_REVIEW_BATCH_MAX = 200
+
 const LAB_REVIEW_ERRORS = {
   ko: {
     unauthorized: "로그인이 필요합니다.",
@@ -98,7 +100,17 @@ async function handlePOST(request: NextRequest) {
 
     const rawReviews = (payload as { reviews: unknown[] }).reviews
 
-    const validReviews: { cardId: number; grade: number }[] = []
+    if (rawReviews.length > LAB_REVIEW_BATCH_MAX) {
+      return attachRefreshedAuthCookie(
+        createAuthJsonResponse(
+          { error: LAB_REVIEW_ERRORS[locale].invalidRequest },
+          { status: 400 }
+        ),
+        authenticatedSession
+      )
+    }
+
+    const dedupedReviews = new Map<number, number>()
     
     for (const r of rawReviews) {
       if (!r || typeof r !== "object") continue
@@ -113,9 +125,11 @@ async function handlePOST(request: NextRequest) {
         Math.floor(rawGrade) >= LAB_REVIEW_GRADE_MIN &&
         Math.floor(rawGrade) <= LAB_REVIEW_GRADE_MAX
       ) {
-        validReviews.push({ cardId: Math.floor(rawCardId), grade: Math.floor(rawGrade) })
+        dedupedReviews.set(Math.floor(rawCardId), Math.floor(rawGrade))
       }
     }
+
+    const validReviews = Array.from(dedupedReviews.entries()).map(([cardId, grade]) => ({ cardId, grade }))
 
     if (validReviews.length === 0) {
       // Nothing to process, return state

@@ -9,6 +9,29 @@ import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session
 
 export const runtime = "nodejs"
 
+const PAGE_VIEW_RATE_LIMIT_WINDOW_MS = 10_000
+const pageViewRateLimitMap = new Map<string, number>()
+const PAGE_VIEW_RATE_LIMIT_MAX_KEYS = 4_000
+
+function isPageViewRateLimited(sessionId: string): boolean {
+  const now = Date.now()
+  const lastSent = pageViewRateLimitMap.get(sessionId)
+  if (lastSent && now - lastSent < PAGE_VIEW_RATE_LIMIT_WINDOW_MS) {
+    return true
+  }
+  pageViewRateLimitMap.set(sessionId, now)
+  if (pageViewRateLimitMap.size > PAGE_VIEW_RATE_LIMIT_MAX_KEYS) {
+    const overflow = pageViewRateLimitMap.size - PAGE_VIEW_RATE_LIMIT_MAX_KEYS
+    let removed = 0
+    for (const key of pageViewRateLimitMap.keys()) {
+      pageViewRateLimitMap.delete(key)
+      removed++
+      if (removed >= overflow) break
+    }
+  }
+  return false
+}
+
 function normalizePath(value: unknown) {
   const path = typeof value === "string" ? value.trim() : ""
   if (!path.startsWith("/")) {
@@ -187,6 +210,14 @@ export async function POST(request: NextRequest) {
       : 0
   )
   const { sessionId, shouldSetCookie } = getOrCreateSessionId(request)
+
+  if (isPageViewRateLimited(sessionId)) {
+    return attachSessionCookie(
+      createAuthJsonResponse({ success: true, throttled: true }),
+      sessionId,
+      shouldSetCookie
+    )
+  }
 
   await recordDailyUsageEventSafely({
     request,

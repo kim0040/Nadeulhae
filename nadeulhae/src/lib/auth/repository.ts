@@ -3,9 +3,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise"
 import { MAX_ACTIVE_SESSIONS_PER_USER } from "@/lib/auth/guardrails"
 import { ensureAuthSchema } from "@/lib/auth/schema"
 import type { AuthUser } from "@/lib/auth/types"
-import { deleteChatDataForUser } from "@/lib/chat/repository"
 import { executeStatement, getDbPool, queryRows } from "@/lib/db"
-import { deleteLabDataForUser } from "@/lib/lab/repository"
 import {
   createBlindIndex,
   decryptDatabaseValueSafely,
@@ -616,10 +614,30 @@ export async function updateUserAnalyticsConsent(input: {
 export async function deleteUserAccount(userId: string) {
   await ensureAuthSchema()
 
-  await deleteChatDataForUser(userId)
-  await deleteLabDataForUser(userId)
-  await executeStatement("DELETE FROM user_sessions WHERE user_id = ?", [userId])
-  await executeStatement("DELETE FROM users WHERE id = ?", [userId])
+  const connection = await getDbPool().getConnection()
+  try {
+    await connection.beginTransaction()
+
+    await connection.execute("DELETE FROM user_chat_messages WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM user_chat_sessions WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM user_chat_memory WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM user_chat_usage_daily WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM user_chat_request_events WHERE user_id = ?", [userId])
+
+    await connection.execute("DELETE FROM lab_cards WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM lab_decks WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM lab_daily_usage WHERE user_id = ?", [userId])
+
+    await connection.execute("DELETE FROM user_sessions WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM users WHERE id = ?", [userId])
+
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
 }
 
 export async function findActiveAuthBlock(action: string, scopeKeys: string[]) {

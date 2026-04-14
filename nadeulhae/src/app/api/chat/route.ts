@@ -105,7 +105,9 @@ function normalizeMessage(value: unknown) {
     return ""
   }
 
-  return value.replace(/\u0000/g, "").trim()
+  return value
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200F\u2028-\u202F]/g, "")
+    .trim()
 }
 
 const ASSISTANT_NAME_KO = "나들이 메이트"

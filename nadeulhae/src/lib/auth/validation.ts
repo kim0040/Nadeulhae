@@ -114,6 +114,10 @@ export function validateRegisterPayload(payload: unknown, locale: AuthLocale = "
   const normalizedPassword = asTrimmedString(password)
   const normalizedInterestOther = asTrimmedString(interestOther)
 
+  if (/[<>"'&\/\\]/.test(normalizedDisplayName)) {
+    return { error: getAuthMessage(locale, "displayNameLengthInvalid") }
+  }
+
   const sanitizedInterestTags = filterAllowedValues(
     Array.isArray(interestTags) ? interestTags : [],
     INTEREST_OPTIONS
@@ -132,6 +136,10 @@ export function validateRegisterPayload(payload: unknown, locale: AuthLocale = "
   }
 
   if (/[#@\s]/.test(normalizedNickname)) {
+    return { error: getAuthMessage(locale, "nicknameCharsInvalid") }
+  }
+
+  if (/[<>"'&\/\\]/.test(normalizedNickname)) {
     return { error: getAuthMessage(locale, "nicknameCharsInvalid") }
   }
 
@@ -231,6 +239,10 @@ export function validateUpdateProfilePayload(payload: unknown, locale: AuthLocal
   const normalizedNickname = asNormalizedNickname(nickname)
   const normalizedInterestOther = asTrimmedString(interestOther)
 
+  if (/[<>"'&\/\\]/.test(normalizedDisplayName)) {
+    return { error: getAuthMessage(locale, "displayNameLengthInvalid") }
+  }
+
   const sanitizedInterestTags = filterAllowedValues(
     Array.isArray(interestTags) ? interestTags : [],
     INTEREST_OPTIONS
@@ -249,6 +261,10 @@ export function validateUpdateProfilePayload(payload: unknown, locale: AuthLocal
   }
 
   if (/[#@\s]/.test(normalizedNickname)) {
+    return { error: getAuthMessage(locale, "nicknameCharsInvalid") }
+  }
+
+  if (/[<>"'&\/\\]/.test(normalizedNickname)) {
     return { error: getAuthMessage(locale, "nicknameCharsInvalid") }
   }
 

@@ -134,8 +134,8 @@ function sanitizeCardDraft(input: unknown): LabGeneratedCardInput | null {
   }
 }
 
-function toTermDedupKey(value: string) {
-  return value.toLowerCase().replace(/\s+/g, "")
+function toTermDedupKey(term: string, meaning: string) {
+  return `${term.toLowerCase().replace(/\s+/g, "")}|${meaning.toLowerCase().replace(/\s+/g, "")}`
 }
 
 function normalizeDeckPayload(payload: unknown, maxCards: number) {
@@ -162,7 +162,7 @@ function normalizeDeckPayload(payload: unknown, maxCards: number) {
       continue
     }
 
-    const dedupeKey = toTermDedupKey(draft.term)
+    const dedupeKey = toTermDedupKey(draft.term, draft.meaning)
     if (seen.has(dedupeKey)) {
       continue
     }
@@ -383,7 +383,7 @@ async function handlePOST(request: NextRequest) {
           }
 
           for (const card of parsedDeck.cards) {
-            const dedupeKey = toTermDedupKey(card.term)
+            const dedupeKey = toTermDedupKey(card.term, card.meaning)
             if (seenTerms.has(dedupeKey)) {
               continue
             }
