@@ -216,6 +216,7 @@ async function handlePOST(request: NextRequest) {
       weatherSensitivity: validation.data.weatherSensitivity,
       marketingAccepted: validation.data.marketingAccepted,
       analyticsAccepted: validation.data.analyticsAccepted,
+      labEnabled: false,
       agreedAt: new Date(),
     })
 
@@ -256,6 +257,7 @@ async function handlePOST(request: NextRequest) {
         weather_sensitivity: createdUser.weatherSensitivity,
         marketing_accepted: createdUser.marketingAccepted ? 1 : 0,
         analytics_accepted: createdUser.analyticsAccepted ? 1 : 0,
+        lab_enabled: createdUser.labEnabled ? 1 : 0,
         created_at: createdUser.createdAt,
       }) },
       { status: 201 }

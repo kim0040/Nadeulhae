@@ -432,6 +432,19 @@ export function SettingsModal({
                             <span className="mt-1 block text-xs leading-5 text-muted-foreground">{copy.analyticsHint}</span>
                           </span>
                         </label>
+
+                        <label className="flex items-start gap-3 rounded-[1.2rem] border border-card-border/70 bg-background/70 px-4 py-3 text-sm text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={form.labEnabled}
+                            onChange={(e) => setForm((curr) => ({ ...curr, labEnabled: e.target.checked }))}
+                            className="mt-1 size-4 rounded border-card-border accent-sky-blue"
+                          />
+                          <span>
+                            {copy.labFeature}
+                            <span className="mt-1 block text-xs leading-5 text-muted-foreground">{copy.labFeatureHint}</span>
+                          </span>
+                        </label>
                       </div>
                     </div>
 
@@ -476,6 +489,7 @@ export function SettingsModal({
                     <StatusMetric label={copy.joined} value={joinedAtLabel} />
                     <StatusMetric label={copy.sensitivity} value={weatherSensitivityLabels.join(" · ")} />
                     <StatusMetric label={copy.analytics} value={user.analyticsAccepted ? copy.yes : copy.no} />
+                    <StatusMetric label={copy.labNav} value={user.labEnabled ? copy.yes : copy.no} />
                   </div>
                   <div className="mt-4 flex flex-col gap-3">
                     <button

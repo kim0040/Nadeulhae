@@ -224,6 +224,7 @@ export function validateUpdateProfilePayload(payload: unknown, locale: AuthLocal
     weatherSensitivity,
     marketingAccepted,
     analyticsAccepted,
+    labEnabled,
   } = payload as Partial<UpdateProfilePayload>
 
   const normalizedDisplayName = asTrimmedString(displayName)
@@ -295,6 +296,7 @@ export function validateUpdateProfilePayload(payload: unknown, locale: AuthLocal
       weatherSensitivity: sanitizedWeatherSensitivity,
       marketingAccepted: asBoolean(marketingAccepted),
       analyticsAccepted: asBoolean(analyticsAccepted),
+      labEnabled: asBoolean(labEnabled),
     },
   }
 }

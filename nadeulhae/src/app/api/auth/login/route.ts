@@ -242,6 +242,7 @@ async function handlePOST(request: NextRequest) {
         weather_sensitivity: authenticatedUser.weatherSensitivity,
         marketing_accepted: authenticatedUser.marketingAccepted ? 1 : 0,
         analytics_accepted: authenticatedUser.analyticsAccepted ? 1 : 0,
+        lab_enabled: authenticatedUser.labEnabled ? 1 : 0,
         created_at: authenticatedUser.createdAt,
       }) }
     )

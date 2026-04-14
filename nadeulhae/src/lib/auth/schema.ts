@@ -37,6 +37,7 @@ const createUsersTableSql = `
     marketing_agreed_at DATETIME NULL,
     analytics_accepted TINYINT(1) NOT NULL DEFAULT 0,
     analytics_agreed_at DATETIME NULL,
+    lab_enabled TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_users_email_hash (email_hash),
@@ -132,6 +133,11 @@ const addAnalyticsAcceptedColumnSql = `
 const addAnalyticsAgreedAtColumnSql = `
   ALTER TABLE users
     ADD COLUMN IF NOT EXISTS analytics_agreed_at DATETIME NULL AFTER analytics_accepted
+`
+
+const addLabEnabledColumnSql = `
+  ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS lab_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER analytics_agreed_at
 `
 
 const createSessionsTableSql = `
@@ -588,6 +594,7 @@ export async function ensureAuthSchema() {
     await runIgnoreDuplicateKey(addUsersNicknameHashUniqueIndexSql)
     await pool.query(addAnalyticsAcceptedColumnSql)
     await pool.query(addAnalyticsAgreedAtColumnSql)
+    await pool.query(addLabEnabledColumnSql)
     await pool.query(createSessionsTableSql)
     await pool.query(modifySessionUserAgentColumnSql)
     await pool.query(modifySessionIpAddressColumnSql)

@@ -1,8 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
+  FlaskConical,
   RefreshCcw,
   ShieldAlert,
   Sparkles,
@@ -691,6 +693,24 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
                   </div>
                 </div>
               </button>
+              {user.labEnabled ? (
+                <Link
+                  href="/lab"
+                  className="group relative overflow-hidden rounded-[1.3rem] border border-active-blue/30 bg-active-blue/10 px-6 py-5 text-left transition hover:border-active-blue hover:bg-active-blue/20"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-full bg-active-blue/20 p-3 text-active-blue transition-transform group-hover:scale-110">
+                      <FlaskConical className="size-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black tracking-widest text-active-blue uppercase">{copy.labNav}</h3>
+                      <p className="mt-1 text-xs font-semibold text-active-blue/80">
+                        {language === "ko" ? "맞춤 카드 생성/복습" : "Generate and review cards"}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ) : null}
             </div>
           </div>
         </SectionCard>
