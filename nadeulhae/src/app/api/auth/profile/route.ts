@@ -85,6 +85,7 @@ async function handlePATCH(request: NextRequest) {
       weatherSensitivity: validation.data.weatherSensitivity,
       marketingAccepted: validation.data.marketingAccepted,
       analyticsAccepted: validation.data.analyticsAccepted,
+      labEnabled: validation.data.labEnabled,
     })
 
     if (!updatedUser) {
@@ -126,6 +127,7 @@ async function handlePATCH(request: NextRequest) {
           weather_sensitivity: updatedUser.weatherSensitivity,
           marketing_accepted: updatedUser.marketingAccepted ? 1 : 0,
           analytics_accepted: updatedUser.analyticsAccepted ? 1 : 0,
+          lab_enabled: updatedUser.labEnabled ? 1 : 0,
           created_at: updatedUser.createdAt,
         }),
       }),

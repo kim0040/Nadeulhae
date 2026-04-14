@@ -6,6 +6,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Calendar as CalendarIcon,
+  FlaskConical,
   InfoIcon,
   LayoutDashboard,
   Languages,
@@ -94,10 +95,19 @@ export function Navbar() {
         icon: LogInIcon,
       }
 
+  const labItem = user?.labEnabled
+    ? {
+        name: t("nav_lab"),
+        href: "/lab",
+        icon: FlaskConical,
+      }
+    : null
+
   const navItems = [
     { name: t("nav_about"), href: "/about", icon: InfoIcon },
     { name: t("nav_calendar"), href: "/statistics/calendar", icon: CalendarIcon },
     { name: t("nav_jeonju"), href: "/jeonju", icon: Sparkles },
+    ...(labItem ? [labItem] : []),
     authItem,
   ]
 

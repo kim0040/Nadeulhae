@@ -11,6 +11,7 @@ export type ProfileFormState = {
   weatherSensitivity: string[]
   marketingAccepted: boolean
   analyticsAccepted: boolean
+  labEnabled: boolean
 }
 
 export function createProfileFormState(user: AuthUser): ProfileFormState {
@@ -25,6 +26,7 @@ export function createProfileFormState(user: AuthUser): ProfileFormState {
     weatherSensitivity: user.weatherSensitivity,
     marketingAccepted: user.marketingAccepted,
     analyticsAccepted: user.analyticsAccepted,
+    labEnabled: user.labEnabled,
   }
 }
 
@@ -92,6 +94,9 @@ export const DASHBOARD_COPY = {
     analytics: "서비스 개선 분석 동의",
     analyticsHint:
       "동의하면 페이지 방문, 테마, 기기 정보를 일별 통계로 저장해요.",
+    labFeature: "실험실 기능 활성화",
+    labFeatureHint: "기본 화면과 분리된 실험 기능을 사용할 수 있어요. 언제든 끌 수 있습니다.",
+    labNav: "실험실",
     yes: "동의",
     no: "미동의",
     score: "피크닉 지수",
@@ -178,6 +183,9 @@ export const DASHBOARD_COPY = {
     analytics: "Analytics consent",
     analyticsHint:
       "When enabled, we store daily aggregates of page visits, theme, and device info.",
+    labFeature: "Enable experimental lab",
+    labFeatureHint: "Unlock optional experimental tools without affecting the default experience.",
+    labNav: "Lab",
     yes: "Enabled",
     no: "Disabled",
     score: "Picnic score",

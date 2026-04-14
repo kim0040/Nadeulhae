@@ -5,6 +5,7 @@ import { ensureAuthSchema } from "@/lib/auth/schema"
 import type { AuthUser } from "@/lib/auth/types"
 import { deleteChatDataForUser } from "@/lib/chat/repository"
 import { executeStatement, getDbPool, queryRows } from "@/lib/db"
+import { deleteLabDataForUser } from "@/lib/lab/repository"
 import {
   createBlindIndex,
   decryptDatabaseValueSafely,
@@ -31,6 +32,7 @@ interface UserRow extends RowDataPacket {
   weather_sensitivity: string | string[]
   marketing_accepted: number
   analytics_accepted: number
+  lab_enabled: number
   created_at: Date | string
 }
 
@@ -138,6 +140,7 @@ export function toPublicUser(row: Pick<
   | "weather_sensitivity"
   | "marketing_accepted"
   | "analytics_accepted"
+  | "lab_enabled"
   | "created_at"
 >): AuthUser {
   const displayName = decryptDatabaseValueSafely(row.display_name, "users.display_name") ?? row.display_name
@@ -162,6 +165,7 @@ export function toPublicUser(row: Pick<
     weatherSensitivity: parseEncryptedJsonArray(row.weather_sensitivity, "users.weather_sensitivity"),
     marketingAccepted: row.marketing_accepted === 1,
     analyticsAccepted: row.analytics_accepted === 1,
+    labEnabled: row.lab_enabled === 1,
     createdAt: toIsoString(row.created_at),
   }
 }
@@ -207,6 +211,7 @@ export async function findUserByEmail(email: string) {
         weather_sensitivity,
         marketing_accepted,
         analytics_accepted,
+        lab_enabled,
         created_at
       FROM users
       WHERE email_hash = ?
@@ -243,6 +248,7 @@ export async function findUserById(userId: string) {
         weather_sensitivity,
         marketing_accepted,
         analytics_accepted,
+        lab_enabled,
         created_at
       FROM users
       WHERE id = ?
@@ -295,6 +301,7 @@ export async function createUser(input: {
   weatherSensitivity: string[]
   marketingAccepted: boolean
   analyticsAccepted: boolean
+  labEnabled?: boolean
   agreedAt: Date
 }) {
   await ensureAuthSchema()
@@ -334,8 +341,9 @@ export async function createUser(input: {
         marketing_accepted,
         marketing_agreed_at,
         analytics_accepted,
-        analytics_agreed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        analytics_agreed_at,
+        lab_enabled
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       input.id,
@@ -361,6 +369,7 @@ export async function createUser(input: {
       input.marketingAccepted ? input.agreedAt : null,
       input.analyticsAccepted ? 1 : 0,
       input.analyticsAccepted ? input.agreedAt : null,
+      input.labEnabled ? 1 : 0,
     ]
   )
 
@@ -448,6 +457,7 @@ export async function findUserBySessionTokenHash(tokenHash: string) {
         u.weather_sensitivity,
         u.marketing_accepted,
         u.analytics_accepted,
+        u.lab_enabled,
         u.created_at
       FROM user_sessions s
       JOIN users u ON u.id = s.user_id
@@ -508,6 +518,7 @@ export async function updateUserProfile(input: {
   weatherSensitivity: string[]
   marketingAccepted: boolean
   analyticsAccepted: boolean
+  labEnabled: boolean
 }) {
   await ensureAuthSchema()
   const normalizedNickname = normalizeNickname(input.nickname)
@@ -541,6 +552,7 @@ export async function updateUserProfile(input: {
         weather_sensitivity = ?,
         marketing_accepted = ?,
         analytics_accepted = ?,
+        lab_enabled = ?,
         marketing_agreed_at = CASE
           WHEN ? = 1 THEN COALESCE(marketing_agreed_at, NOW())
           ELSE NULL
@@ -564,6 +576,7 @@ export async function updateUserProfile(input: {
       encryptDatabaseValue(JSON.stringify(normalizedWeatherSensitivity), "users.weather_sensitivity"),
       input.marketingAccepted ? 1 : 0,
       input.analyticsAccepted ? 1 : 0,
+      input.labEnabled ? 1 : 0,
       input.marketingAccepted ? 1 : 0,
       input.analyticsAccepted ? 1 : 0,
       input.userId,
@@ -604,6 +617,7 @@ export async function deleteUserAccount(userId: string) {
   await ensureAuthSchema()
 
   await deleteChatDataForUser(userId)
+  await deleteLabDataForUser(userId)
   await executeStatement("DELETE FROM user_sessions WHERE user_id = ?", [userId])
   await executeStatement("DELETE FROM users WHERE id = ?", [userId])
 }

@@ -12,6 +12,7 @@ export interface AuthUser {
   weatherSensitivity: string[]
   marketingAccepted: boolean
   analyticsAccepted: boolean
+  labEnabled: boolean
   createdAt: string
 }
 
@@ -51,4 +52,5 @@ export interface UpdateProfilePayload {
   weatherSensitivity: string[]
   marketingAccepted: boolean
   analyticsAccepted: boolean
+  labEnabled: boolean
 }
