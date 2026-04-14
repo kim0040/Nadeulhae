@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { BookOpenCheck, FlaskConical, Sparkles } from "lucide-react"
 
 import { BorderBeam } from "@/components/magicui/border-beam"
@@ -24,6 +24,8 @@ const LAB_HUB_COPY = {
     title: "나들 실험실",
     subtitle:
       "실험 기능을 한곳에서 관리하고, 필요한 기능 페이지로 바로 진입할 수 있습니다.",
+    introNote:
+      "프론트/서버 담당 김현민이 쓰려고 만든 기능인데, 다 같이 써도 됩니다.",
     availableTitle: "사용 가능한 기능",
     vocabTitle: "단어 암기 실험실",
     vocabDescription:
@@ -41,6 +43,8 @@ const LAB_HUB_COPY = {
     title: "Nadeul Lab",
     subtitle:
       "Manage experimental features in one place and move into each feature page when needed.",
+    introNote:
+      "Built by Hyunmin Kim (frontend/backend) mainly as his own utility feature, but open for everyone.",
     availableTitle: "Available features",
     vocabTitle: "Vocabulary Memory Lab",
     vocabDescription:
@@ -54,6 +58,9 @@ export default function LabHubPage() {
   const { user, status } = useAuth()
   const { language } = useLanguage()
   const copy = LAB_HUB_COPY[language]
+  const [isCompactViewport, setIsCompactViewport] = useState(false)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const [isLowPowerDevice, setIsLowPowerDevice] = useState(false)
 
   useEffect(() => {
     if (status === "guest") {
@@ -64,9 +71,42 @@ export default function LabHubPage() {
     }
   }, [router, status])
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const applyMotionPreference = () => {
+      setPrefersReducedMotion(media.matches)
+    }
+    const applyViewportMode = () => {
+      setIsCompactViewport(window.innerWidth < 1024)
+    }
+    const applyPowerProfile = () => {
+      const nav = navigator as Navigator & { deviceMemory?: number }
+      const cpuCores = typeof nav.hardwareConcurrency === "number" ? nav.hardwareConcurrency : 8
+      const memoryGiB = typeof nav.deviceMemory === "number" ? nav.deviceMemory : 8
+      setIsLowPowerDevice(cpuCores <= 4 || memoryGiB <= 4)
+    }
+
+    applyMotionPreference()
+    applyViewportMode()
+    applyPowerProfile()
+
+    window.addEventListener("resize", applyViewportMode, { passive: true })
+    media.addEventListener("change", applyMotionPreference)
+    return () => {
+      window.removeEventListener("resize", applyViewportMode)
+      media.removeEventListener("change", applyMotionPreference)
+    }
+  }, [])
+
+  const reduceVisualEffects = prefersReducedMotion || isCompactViewport || isLowPowerDevice
+
   if (status === "loading") {
     return (
-      <main className="flex min-h-screen items-center justify-center px-4 pt-24 text-center text-sm font-bold text-sky-blue">
+      <main className="flex min-h-screen items-center justify-center px-4 pt-24 text-center text-base font-bold text-sky-blue">
         {copy.loading}
       </main>
     )
@@ -74,7 +114,7 @@ export default function LabHubPage() {
 
   if (status === "guest" || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center px-4 pt-24 text-center text-sm font-bold text-sky-blue">
+      <main className="flex min-h-screen items-center justify-center px-4 pt-24 text-center text-base font-bold text-sky-blue">
         {copy.loginRequired}
       </main>
     )
@@ -90,11 +130,11 @@ export default function LabHubPage() {
                 <FlaskConical className="size-3.5" />
                 {copy.badge}
               </span>
-              <h1 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl">{copy.disabledTitle}</h1>
-              <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">{copy.disabledDescription}</p>
+              <h1 className="text-4xl font-black tracking-tight text-foreground sm:text-5xl">{copy.disabledTitle}</h1>
+              <p className="mx-auto max-w-2xl text-base leading-8 text-muted-foreground sm:text-lg">{copy.disabledDescription}</p>
               <Link
                 href="/dashboard"
-                className="inline-flex items-center justify-center rounded-[1.25rem] border border-sky-blue/30 bg-sky-blue/10 px-5 py-3 text-sm font-black text-sky-blue transition hover:border-sky-blue hover:bg-sky-blue/20"
+                className="inline-flex items-center justify-center rounded-[1.25rem] border border-sky-blue/30 bg-sky-blue/10 px-5 py-3 text-base font-black text-sky-blue transition hover:border-sky-blue hover:bg-sky-blue/20"
               >
                 {copy.goDashboard}
               </Link>
@@ -115,30 +155,39 @@ export default function LabHubPage() {
               {copy.badge}
             </span>
             <div className="space-y-2">
-              <h1 className="text-4xl font-black tracking-tight text-foreground sm:text-5xl">{copy.title}</h1>
-              <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">{copy.subtitle}</p>
+              <h1 className="text-5xl font-black tracking-tight text-foreground sm:text-6xl">{copy.title}</h1>
+              <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">{copy.subtitle}</p>
+              <p className="max-w-3xl rounded-[1.1rem] border border-sky-blue/20 bg-sky-blue/8 px-4 py-3 text-base font-semibold leading-8 text-foreground/90">
+                {copy.introNote}
+              </p>
             </div>
           </div>
         </SectionCard>
 
         <SectionCard>
           <div className="space-y-4">
-            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">{copy.availableTitle}</p>
-            <MagicCard className="overflow-hidden rounded-[1.8rem]" gradientSize={210} gradientOpacity={0.72}>
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-muted-foreground">{copy.availableTitle}</p>
+            <MagicCard
+              className="overflow-hidden rounded-[1.8rem]"
+              gradientSize={reduceVisualEffects ? 150 : 210}
+              gradientOpacity={reduceVisualEffects ? 0.55 : 0.72}
+            >
               <div className="relative rounded-[1.8rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
-                <BorderBeam size={170} duration={11} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
+                {!reduceVisualEffects ? (
+                  <BorderBeam size={170} duration={11} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
+                ) : null}
                 <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div className="space-y-2">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
                       <BookOpenCheck className="size-3.5" />
                       {copy.vocabTitle}
                     </span>
-                    <p className="max-w-2xl text-sm leading-7 text-muted-foreground">{copy.vocabDescription}</p>
+                    <p className="max-w-2xl text-base leading-8 text-muted-foreground">{copy.vocabDescription}</p>
                   </div>
                   <ShimmerButton
                     type="button"
                     onClick={() => router.push("/lab/vocab")}
-                    className="rounded-[1.1rem] px-5 py-3 text-sm font-black sm:shrink-0"
+                    className="rounded-[1.1rem] px-5 py-3 text-base font-black sm:shrink-0"
                   >
                     {copy.openFeature}
                   </ShimmerButton>

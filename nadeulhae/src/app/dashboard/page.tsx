@@ -764,7 +764,7 @@ function DashboardWorkspace({ user }: { user: AuthUser }) {
 
             {weatherData && (
               <>
-                <div className="mt-5 grid grid-cols-1 gap-2.5 min-[430px]:grid-cols-2 sm:gap-3 xl:grid-cols-3">
+                <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-3">
                   {weatherPrimaryMetrics.map((metric) => (
                     <StatusMetric
                       key={metric.label}

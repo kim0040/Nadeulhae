@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -49,6 +49,14 @@ async function readErrorMessage(response: Response, fallback: string) {
   return fallback
 }
 
+function useIsClient() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
+}
+
 export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -56,15 +64,13 @@ export function Navbar() {
   const { theme, setTheme } = useTheme()
   const { user, setAuthenticatedUser } = useAuth()
   const copy = NAVBAR_COPY[language]
-  const [mounted, setMounted] = useState(false)
+  const mounted = useIsClient()
   const [isVisible, setIsVisible] = useState(true)
   const [isPending, startTransition] = useTransition()
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
   const lastScrollYRef = useRef(0)
 
   useEffect(() => {
-    setMounted(true)
-
     const controlNavbar = () => {
       if (window.scrollY > lastScrollYRef.current && window.scrollY > 100) {
         setIsVisible(false)
@@ -78,10 +84,6 @@ export function Navbar() {
     window.addEventListener("scroll", controlNavbar, { passive: true })
     return () => window.removeEventListener("scroll", controlNavbar)
   }, [])
-
-  useEffect(() => {
-    setFeedbackMessage(null)
-  }, [language, pathname])
 
   const authItem = user
     ? {

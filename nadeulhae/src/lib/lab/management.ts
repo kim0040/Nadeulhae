@@ -33,7 +33,9 @@ interface LabCardRow extends RowDataPacket {
   user_id: string
   term_text: string
   meaning_text: string
+  pos_text: string | null
   example_text: string | null
+  example_translation_text: string | null
   tip_text: string | null
   learning_state: string
   stage: number
@@ -47,6 +49,12 @@ interface LabCardRow extends RowDataPacket {
 }
 
 interface LabCardKeyRow extends RowDataPacket {
+  term_text: string
+  meaning_text: string
+}
+
+interface LabCardKeyWithIdRow extends RowDataPacket {
+  id: number
   term_text: string
   meaning_text: string
 }
@@ -104,8 +112,9 @@ function mapCardRow(row: LabCardRow): LabCardSnapshot {
     deckId: String(row.deck_id),
     term: decryptLabText(row.term_text, "lab.card.term", "-") ?? "-",
     meaning: decryptLabText(row.meaning_text, "lab.card.meaning", "-") ?? "-",
+    partOfSpeech: decryptLabText(row.pos_text, "lab.card.pos"),
     example: decryptLabText(row.example_text, "lab.card.example"),
-    tip: decryptLabText(row.tip_text, "lab.card.tip"),
+    exampleTranslation: decryptLabText(row.example_translation_text, "lab.card.example_translation"),
     learningState: row.learning_state === "learning"
       ? "learning"
       : row.learning_state === "review"
@@ -136,7 +145,7 @@ function normalizeCards(cards: LabGeneratedCardInput[]) {
     const term = normalizeText(card.term ?? "", 80)
     const meaning = normalizeText(card.meaning ?? "", 220)
     const example = normalizeOptionalText(card.example ?? null, 280)
-    const tip = normalizeOptionalText(card.tip ?? null, 200)
+    const exampleTranslation = normalizeOptionalText(card.exampleTranslation ?? null, 280)
 
     if (!term || !meaning) {
       continue
@@ -145,8 +154,9 @@ function normalizeCards(cards: LabGeneratedCardInput[]) {
     safeCards.push({
       term,
       meaning,
+      partOfSpeech: normalizeOptionalText(card.partOfSpeech ?? null, 40),
       example,
-      tip,
+      exampleTranslation,
     })
   }
 
@@ -173,6 +183,40 @@ async function getDeckById(connection: PoolConnection, userId: string, deckId: n
       FOR UPDATE
     `,
     [deckId, userId]
+  )
+
+  return rows[0] ?? null
+}
+
+async function getCardById(connection: PoolConnection, userId: string, cardId: number) {
+  const [rows] = await connection.query<LabCardRow[]>(
+    `
+      SELECT
+        id,
+        deck_id,
+        user_id,
+        term_text,
+        meaning_text,
+        pos_text,
+        example_text,
+        example_translation_text,
+        tip_text,
+        learning_state,
+        stage,
+        stability_days,
+        difficulty,
+        total_reviews,
+        lapses,
+        next_review_at,
+        last_reviewed_at,
+        created_at
+      FROM lab_cards
+      WHERE id = ?
+        AND user_id = ?
+      LIMIT 1
+      FOR UPDATE
+    `,
+    [cardId, userId]
   )
 
   return rows[0] ?? null
@@ -444,7 +488,6 @@ export async function addLabCardsToDeck(input: {
       dedupeKeys.add(toDeckDedupKey(term, meaning))
     }
 
-    const now = new Date()
     let addedCount = 0
 
     for (const card of cards) {
@@ -462,8 +505,9 @@ export async function addLabCardsToDeck(input: {
             user_id,
             term_text,
             meaning_text,
+            pos_text,
             example_text,
-            tip_text,
+            example_translation_text,
             learning_state,
             consecutive_correct,
             stage,
@@ -474,15 +518,16 @@ export async function addLabCardsToDeck(input: {
             last_review_outcome,
             next_review_at,
             last_reviewed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'new', 0, 0, ?, ?, 0, 0, NULL, NOW(), NULL)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', 0, 0, ?, ?, 0, 0, NULL, NOW(), NULL)
         `,
         [
           deckId,
           input.userId,
           encryptDatabaseValue(card.term, "lab.card.term"),
           encryptDatabaseValue(card.meaning, "lab.card.meaning"),
+          encryptDatabaseValueSafely(card.partOfSpeech ?? null, "lab.card.pos"),
           encryptDatabaseValueSafely(card.example ?? null, "lab.card.example"),
-          encryptDatabaseValueSafely(card.tip ?? null, "lab.card.tip"),
+          encryptDatabaseValueSafely(card.exampleTranslation ?? null, "lab.card.example_translation"),
           LAB_DEFAULT_STABILITY_DAYS,
           LAB_DEFAULT_DIFFICULTY,
         ]
@@ -501,6 +546,252 @@ export async function addLabCardsToDeck(input: {
       deck: refreshedDeckRow ? mapDeckRow(refreshedDeckRow) : null,
       addedCount,
       skippedCount: Math.max(0, cards.length - addedCount),
+    }
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+}
+
+export async function getLabDeckCardsForUser(input: {
+  userId: string
+  deckId: number
+  limit?: number
+}) {
+  await ensureLabSchema()
+
+  const safeLimit = Math.min(
+    LAB_EXPORT_CARD_LIMIT,
+    Math.max(1, Math.floor(input.limit ?? LAB_IMPORT_MAX_CARD_COUNT))
+  )
+
+  const [deckRows, cardRows] = await Promise.all([
+    queryRows<LabDeckRow[]>(
+      `
+        SELECT
+          id,
+          user_id,
+          locale,
+          title_text,
+          topic_text,
+          requested_model,
+          resolved_model,
+          card_count,
+          created_at
+        FROM lab_decks
+        WHERE user_id = ?
+          AND id = ?
+        LIMIT 1
+      `,
+      [input.userId, input.deckId]
+    ),
+    queryRows<LabCardRow[]>(
+      `
+        SELECT
+          id,
+          deck_id,
+          user_id,
+          term_text,
+          meaning_text,
+          pos_text,
+          example_text,
+          example_translation_text,
+          tip_text,
+          learning_state,
+          stage,
+          stability_days,
+          difficulty,
+          total_reviews,
+          lapses,
+          next_review_at,
+          last_reviewed_at,
+          created_at
+        FROM lab_cards
+        WHERE user_id = ?
+          AND deck_id = ?
+        ORDER BY created_at ASC, id ASC
+        LIMIT ?
+      `,
+      [input.userId, input.deckId, safeLimit]
+    ),
+  ])
+
+  const deck = deckRows[0]
+  if (!deck) {
+    return null
+  }
+
+  return {
+    deck: mapDeckRow(deck),
+    cards: cardRows.map(mapCardRow),
+  }
+}
+
+export async function updateLabCardForUser(input: {
+  userId: string
+  cardId: number
+  term: string
+  meaning: string
+  partOfSpeech: string | null
+  example: string | null
+  exampleTranslation: string | null
+}) {
+  await ensureLabSchema()
+
+  const term = normalizeText(input.term, 80)
+  const meaning = normalizeText(input.meaning, 220)
+  const partOfSpeech = normalizeOptionalText(input.partOfSpeech, 40)
+  const example = normalizeOptionalText(input.example, 280)
+  const exampleTranslation = normalizeOptionalText(input.exampleTranslation, 280)
+
+  if (!term || !meaning) {
+    return {
+      status: "invalid" as const,
+      deck: null,
+      card: null,
+    }
+  }
+
+  const connection = await getDbPool().getConnection()
+
+  try {
+    await connection.beginTransaction()
+
+    const currentCard = await getCardById(connection, input.userId, input.cardId)
+    if (!currentCard) {
+      await connection.rollback()
+      return {
+        status: "not_found" as const,
+        deck: null,
+        card: null,
+      }
+    }
+
+    const deckId = Number(currentCard.deck_id)
+    const nextDedupKey = toDeckDedupKey(term, meaning)
+
+    const [existingRows] = await connection.query<LabCardKeyWithIdRow[]>(
+      `
+        SELECT
+          id,
+          term_text,
+          meaning_text
+        FROM lab_cards
+        WHERE user_id = ?
+          AND deck_id = ?
+          AND id <> ?
+      `,
+      [input.userId, deckId, input.cardId]
+    )
+
+    for (const row of existingRows) {
+      const rowTerm = decryptLabText(row.term_text, "lab.card.term", "") ?? ""
+      const rowMeaning = decryptLabText(row.meaning_text, "lab.card.meaning", "") ?? ""
+      if (!rowTerm || !rowMeaning) {
+        continue
+      }
+      if (toDeckDedupKey(rowTerm, rowMeaning) === nextDedupKey) {
+        await connection.rollback()
+        return {
+          status: "duplicate" as const,
+          deck: null,
+          card: null,
+        }
+      }
+    }
+
+    await connection.execute(
+      `
+        UPDATE lab_cards
+        SET
+          term_text = ?,
+          meaning_text = ?,
+          pos_text = ?,
+          example_text = ?,
+          example_translation_text = ?,
+          updated_at = NOW()
+        WHERE id = ?
+          AND user_id = ?
+      `,
+      [
+        encryptDatabaseValue(term, "lab.card.term"),
+        encryptDatabaseValue(meaning, "lab.card.meaning"),
+        encryptDatabaseValueSafely(partOfSpeech, "lab.card.pos"),
+        encryptDatabaseValueSafely(example, "lab.card.example"),
+        encryptDatabaseValueSafely(exampleTranslation, "lab.card.example_translation"),
+        input.cardId,
+        input.userId,
+      ]
+    )
+
+    await refreshDeckCardCount(connection, input.userId, deckId)
+
+    const updatedCard = await getCardById(connection, input.userId, input.cardId)
+    const deckRow = await getDeckById(connection, input.userId, deckId)
+
+    await connection.commit()
+
+    if (!updatedCard || !deckRow) {
+      return {
+        status: "not_found" as const,
+        deck: null,
+        card: null,
+      }
+    }
+
+    return {
+      status: "updated" as const,
+      deck: mapDeckRow(deckRow),
+      card: mapCardRow(updatedCard),
+    }
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+}
+
+export async function deleteLabCardForUser(input: {
+  userId: string
+  cardId: number
+}) {
+  await ensureLabSchema()
+
+  const connection = await getDbPool().getConnection()
+
+  try {
+    await connection.beginTransaction()
+
+    const currentCard = await getCardById(connection, input.userId, input.cardId)
+    if (!currentCard) {
+      await connection.rollback()
+      return {
+        status: "not_found" as const,
+        deck: null,
+      }
+    }
+
+    const deckId = Number(currentCard.deck_id)
+
+    await connection.execute(
+      `
+        DELETE FROM lab_cards
+        WHERE id = ?
+          AND user_id = ?
+      `,
+      [input.cardId, input.userId]
+    )
+
+    await refreshDeckCardCount(connection, input.userId, deckId)
+    const deckRow = await getDeckById(connection, input.userId, deckId)
+    await connection.commit()
+
+    return {
+      status: "deleted" as const,
+      deck: deckRow ? mapDeckRow(deckRow) : null,
     }
   } catch (error) {
     await connection.rollback()
@@ -544,7 +835,9 @@ export async function getLabDeckExportData(input: {
           user_id,
           term_text,
           meaning_text,
+          pos_text,
           example_text,
+          example_translation_text,
           tip_text,
           learning_state,
           stage,

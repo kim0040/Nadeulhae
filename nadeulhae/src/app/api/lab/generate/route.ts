@@ -28,6 +28,12 @@ import type { LabGeneratedCardInput, LabLocale } from "@/lib/lab/types"
 
 export const runtime = "nodejs"
 
+const LAB_GENERATE_BATCH_MAX = 10
+const LAB_GENERATE_MAX_PARALLEL = 3
+const LAB_GENERATE_MAX_ROUNDS = 8
+const LAB_GENERATE_MAX_STAGNATION = 2
+const LAB_GENERATE_EXCLUDE_TERMS_LIMIT = 140
+
 const LAB_GENERATE_ERRORS = {
   ko: {
     unauthorized: "로그인이 필요합니다.",
@@ -36,6 +42,7 @@ const LAB_GENERATE_ERRORS = {
     invalidTopic: "주제는 2자 이상 입력해 주세요.",
     tooLongTopic: `주제는 ${LAB_INPUT_MAX_CHARACTERS}자 이하여야 합니다.`,
     providerFailure: "카드 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    globalLlmLimit: "오늘 AI 요청 한도에 도달했습니다. 내일 다시 시도해 주세요.",
     parseFailure: "생성 결과를 해석하지 못했습니다. 표현을 바꿔 다시 시도해 주세요.",
     dailyLimit: "오늘 실험실 카드 생성 한도를 모두 사용했습니다.",
     internal: "실험실 카드 생성 중 오류가 발생했습니다.",
@@ -47,6 +54,7 @@ const LAB_GENERATE_ERRORS = {
     invalidTopic: "Please enter a topic with at least 2 characters.",
     tooLongTopic: `Topic must be ${LAB_INPUT_MAX_CHARACTERS} characters or fewer.`,
     providerFailure: "Failed to generate cards. Please try again shortly.",
+    globalLlmLimit: "The site has reached today's AI request limit. Please try again tomorrow.",
     parseFailure: "Could not parse generated cards. Please try with a different prompt.",
     dailyLimit: "You have reached today's lab generation limit.",
     internal: "An error occurred while generating lab cards.",
@@ -108,8 +116,10 @@ function sanitizeCardDraft(input: unknown): LabGeneratedCardInput | null {
   const source = input as Record<string, unknown>
   const term = typeof source.term === "string" ? source.term.trim() : ""
   const meaning = typeof source.meaning === "string" ? source.meaning.trim() : ""
+  const partOfSpeech = typeof source.partOfSpeech === "string" ? source.partOfSpeech.trim() : ""
   const example = typeof source.example === "string" ? source.example.trim() : ""
-  const tip = typeof source.tip === "string" ? source.tip.trim() : ""
+  const explanation = typeof source.explanation === "string" ? source.explanation.trim() : ""
+  const exampleTranslation = typeof source.exampleTranslation === "string" ? source.exampleTranslation.trim() : explanation
 
   if (!term || !meaning) {
     return null
@@ -118,9 +128,14 @@ function sanitizeCardDraft(input: unknown): LabGeneratedCardInput | null {
   return {
     term: term.slice(0, 80),
     meaning: meaning.slice(0, 220),
+    partOfSpeech: partOfSpeech ? partOfSpeech.slice(0, 40) : null,
     example: example ? example.slice(0, 280) : null,
-    tip: tip ? tip.slice(0, 200) : null,
+    exampleTranslation: exampleTranslation ? exampleTranslation.slice(0, 280) : null,
   }
+}
+
+function toTermDedupKey(value: string) {
+  return value.toLowerCase().replace(/\s+/g, "")
 }
 
 function normalizeDeckPayload(payload: unknown, maxCards: number) {
@@ -147,7 +162,7 @@ function normalizeDeckPayload(payload: unknown, maxCards: number) {
       continue
     }
 
-    const dedupeKey = draft.term.toLowerCase().replace(/\s+/g, "")
+    const dedupeKey = toTermDedupKey(draft.term)
     if (seen.has(dedupeKey)) {
       continue
     }
@@ -282,52 +297,133 @@ async function handlePOST(request: NextRequest) {
     let shouldRefund = true
     try {
       const collectedCards: LabGeneratedCardInput[] = []
-      let attempts = 0
-      const maxAttempts = 6
+      const seenTerms = new Set<string>()
+      let rounds = 0
+      let stagnationRounds = 0
+      let providerFailureCount = 0
+      let globalLlmLimitHit = false
       let deckTitle = topic
       let lastRequestedModel: string | null = null
       let lastResolvedModel: string | null = null
 
-      while (collectedCards.length < cardCount && attempts < maxAttempts) {
-        attempts++
+      while (
+        collectedCards.length < cardCount
+        && rounds < LAB_GENERATE_MAX_ROUNDS
+        && stagnationRounds < LAB_GENERATE_MAX_STAGNATION
+      ) {
+        rounds++
         const remainingCount = cardCount - collectedCards.length
-        const batchSize = Math.min(15, remainingCount)
-        
-        const prompts = buildLabGenerationPrompts({
-          locale,
-          user: authenticatedSession.user,
-          topic,
-          cardCount: batchSize,
-        })
-
-        const existingTerms = collectedCards.map((c) => c.term).join(", ")
-        const repetitionConstraint = existingTerms ? `\n\nDO NOT GENERATE ANY OF THESE TERMS AGAIN: ${existingTerms}` : ""
-
-        const completion = await createFactChatCompletion({
-          requestKind: "chat",
-          messages: [
-            { role: "system", content: prompts.systemPrompt },
-            { role: "user", content: prompts.userPrompt + repetitionConstraint },
-          ],
-        })
-
-        if (!lastRequestedModel) lastRequestedModel = completion.requestedModel
-        if (!lastResolvedModel) lastResolvedModel = completion.resolvedModel
-
-        const parsedDeck = parseDeckFromCompletion(completion.content, batchSize)
-        if (parsedDeck.title && parsedDeck.title.length > 2) {
-          deckTitle = parsedDeck.title
-        }
-
-        const newCards = parsedDeck.cards.filter((c) => 
-          !collectedCards.some((ec) => ec.term.toLowerCase() === c.term.toLowerCase())
+        const parallelCount = remainingCount <= LAB_MIN_CARD_COUNT
+          ? 1
+          : Math.min(
+            LAB_GENERATE_MAX_PARALLEL,
+            Math.max(1, Math.ceil(remainingCount / LAB_GENERATE_BATCH_MAX))
+          )
+        const batchSize = Math.min(
+          LAB_GENERATE_BATCH_MAX,
+          Math.max(LAB_MIN_CARD_COUNT, Math.ceil(remainingCount / parallelCount))
         )
 
-        if (newCards.length === 0) {
-          break // Model is failing to generate new cards
+        const blockedTerms = Array.from(seenTerms).slice(0, LAB_GENERATE_EXCLUDE_TERMS_LIMIT)
+        const repetitionConstraint = blockedTerms.length > 0
+          ? locale === "ko"
+            ? `\n\n절대 아래 단어(term)를 다시 만들지 마세요:\n${blockedTerms.join(", ")}`
+            : `\n\nNever generate any of these terms again:\n${blockedTerms.join(", ")}`
+          : ""
+
+        const generationJobs = Array.from({ length: parallelCount }, (_, index) => {
+          const prompts = buildLabGenerationPrompts({
+            locale,
+            user: authenticatedSession.user,
+            topic,
+            cardCount: batchSize,
+          })
+
+          const branchHint = locale === "ko"
+            ? `\n\n이번은 분할 생성 배치 ${rounds}-${index + 1} 입니다. 다른 배치와 겹치지 않게 다양한 단어를 생성하세요.`
+            : `\n\nThis is parallel split batch ${rounds}-${index + 1}. Generate diverse terms that do not overlap with other batches.`
+
+          return createFactChatCompletion({
+            requestKind: "chat",
+            messages: [
+              { role: "system", content: prompts.systemPrompt },
+              { role: "user", content: prompts.userPrompt + repetitionConstraint + branchHint },
+            ],
+          })
+        })
+
+        const generationResults = await Promise.allSettled(generationJobs)
+        let roundAdded = 0
+
+        for (const result of generationResults) {
+          if (result.status === "rejected") {
+            if (result.reason instanceof FactChatError) {
+              if (
+                result.reason.statusCode === 429
+                && result.reason.code === "global_daily_limit_reached"
+              ) {
+                globalLlmLimitHit = true
+              }
+              providerFailureCount += 1
+            }
+            continue
+          }
+
+          const completion = result.value
+          if (!lastRequestedModel) {
+            lastRequestedModel = completion.requestedModel
+          }
+          if (!lastResolvedModel) {
+            lastResolvedModel = completion.resolvedModel
+          }
+
+          const parsedDeck = parseDeckFromCompletion(completion.content, batchSize)
+          if (parsedDeck.title && parsedDeck.title.length > 2) {
+            deckTitle = parsedDeck.title
+          }
+
+          for (const card of parsedDeck.cards) {
+            const dedupeKey = toTermDedupKey(card.term)
+            if (seenTerms.has(dedupeKey)) {
+              continue
+            }
+
+            seenTerms.add(dedupeKey)
+            collectedCards.push(card)
+            roundAdded += 1
+
+            if (collectedCards.length >= cardCount) {
+              break
+            }
+          }
+
+          if (collectedCards.length >= cardCount) {
+            break
+          }
         }
 
-        collectedCards.push(...newCards)
+        if (roundAdded === 0) {
+          stagnationRounds += 1
+        } else {
+          stagnationRounds = 0
+        }
+
+        if (globalLlmLimitHit && collectedCards.length < cardCount) {
+          break
+        }
+      }
+
+      if (globalLlmLimitHit && collectedCards.length < LAB_MIN_CARD_COUNT) {
+        await refundDailyLabGeneration(authenticatedSession.user.id)
+        shouldRefund = false
+
+        return attachRefreshedAuthCookie(
+          createAuthJsonResponse(
+            { error: LAB_GENERATE_ERRORS[locale].globalLlmLimit },
+            { status: 429 }
+          ),
+          authenticatedSession
+        )
       }
 
       if (collectedCards.length < LAB_MIN_CARD_COUNT) {
@@ -336,7 +432,7 @@ async function handlePOST(request: NextRequest) {
 
         return attachRefreshedAuthCookie(
           createAuthJsonResponse(
-            { error: LAB_GENERATE_ERRORS[locale].parseFailure },
+            { error: providerFailureCount > 0 ? LAB_GENERATE_ERRORS[locale].providerFailure : LAB_GENERATE_ERRORS[locale].parseFailure },
             { status: 502 }
           ),
           authenticatedSession
@@ -375,6 +471,16 @@ async function handlePOST(request: NextRequest) {
       }
 
       if (error instanceof FactChatError) {
+        if (error.statusCode === 429 && error.code === "global_daily_limit_reached") {
+          return attachRefreshedAuthCookie(
+            createAuthJsonResponse(
+              { error: LAB_GENERATE_ERRORS[locale].globalLlmLimit },
+              { status: 429 }
+            ),
+            authenticatedSession
+          )
+        }
+
         return attachRefreshedAuthCookie(
           createAuthJsonResponse(
             { error: LAB_GENERATE_ERRORS[locale].providerFailure },

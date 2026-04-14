@@ -95,36 +95,38 @@ export function StatusMetric({
   meta?: string
   compact?: boolean
 }) {
+  if (compact) {
+    return (
+      <div className="min-w-0 rounded-[1.2rem] border border-card-border/70 bg-background/75 px-3 py-2.5 sm:rounded-[1.3rem] sm:px-3.5 sm:py-3">
+        <div className="flex h-full min-h-[94px] flex-col justify-between gap-2 sm:min-h-[108px] sm:gap-2.5">
+          <p className="line-clamp-2 break-words text-xs font-black uppercase tracking-[0.16em] leading-5 text-muted-foreground sm:text-sm sm:tracking-[0.2em] sm:leading-6">
+            {label}
+          </p>
+          <p className="break-words text-base font-black leading-tight tracking-tight text-foreground sm:text-xl">
+            {value}
+          </p>
+          {meta ? (
+            <p className="line-clamp-2 break-words text-[11px] leading-5 text-muted-foreground sm:text-xs sm:leading-5">
+              {meta}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div
-      className={cn(
-        "min-w-0 rounded-[1.3rem] border border-card-border/70 bg-background/75",
-        compact ? "p-2.5 sm:p-3.5" : "p-4"
-      )}
-    >
+    <div className="min-w-0 rounded-[1.3rem] border border-card-border/70 bg-background/75 p-4">
       <p
-        className={cn(
-          "break-words font-black uppercase text-muted-foreground",
-          compact ? "text-[10px] tracking-[0.18em]" : "text-[11px] tracking-[0.24em]"
-        )}
+        className="break-words text-[11px] font-black uppercase tracking-[0.24em] text-muted-foreground"
       >
         {label}
       </p>
-      <p
-        className={cn(
-          "break-words font-black tracking-tight text-foreground",
-          compact ? "mt-2 text-lg sm:text-xl" : "mt-3 text-xl sm:text-2xl"
-        )}
-      >
+      <p className="mt-3 break-words text-xl font-black tracking-tight text-foreground sm:text-2xl">
         {value}
       </p>
       {meta ? (
-        <p
-          className={cn(
-            "break-words text-muted-foreground",
-            compact ? "mt-1.5 text-[11px] leading-4 sm:text-xs sm:leading-5" : "mt-2 text-xs leading-5 sm:text-sm"
-          )}
-        >
+        <p className="mt-2 break-words text-xs leading-5 text-muted-foreground sm:text-sm">
           {meta}
         </p>
       ) : null}

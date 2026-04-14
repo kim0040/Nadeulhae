@@ -1,11 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import {
-  MapPinned,
-  Route,
-  Waves,
-} from "lucide-react"
 
 import { useLanguage } from "@/context/LanguageContext"
 import { dataService, type FireSummaryData, type WeatherData } from "@/services/dataService"

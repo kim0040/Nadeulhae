@@ -44,6 +44,7 @@ const CHAT_ERRORS = {
     invalidMessage: "메시지를 입력해 주세요.",
     tooLong: `메시지는 ${CHAT_INPUT_MAX_CHARACTERS}자 이하여야 합니다.`,
     rateLimited: "오늘 사용할 수 있는 채팅 횟수를 모두 사용했습니다. 내일 다시 시도해 주세요.",
+    globalLlmLimit: "오늘 AI 요청 한도에 도달했습니다. 내일 다시 시도해 주세요.",
     busy: "이전 답변을 생성 중입니다. 잠시 후 다시 시도해 주세요.",
     providerFailure: "챗봇 응답을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     unexpected: "채팅 처리 중 오류가 발생했습니다.",
@@ -53,6 +54,7 @@ const CHAT_ERRORS = {
     invalidMessage: "Please enter a message.",
     tooLong: `Messages must be ${CHAT_INPUT_MAX_CHARACTERS} characters or fewer.`,
     rateLimited: "You have reached today’s chat limit. Please try again tomorrow.",
+    globalLlmLimit: "The site has reached today's AI request limit. Please try again tomorrow.",
     busy: "Your previous message is still being processed. Please try again shortly.",
     providerFailure: "Failed to get a chatbot response. Please try again shortly.",
     unexpected: "An unexpected chat error occurred.",
@@ -670,12 +672,18 @@ async function handlePOST(request: NextRequest) {
     }
 
     console.error("Chat POST API failed:", error)
-    const status = providerError?.statusCode && providerError.statusCode < 500
-      ? 502
-      : 500
-    const errorMessage = providerError
-      ? getErrorMessage(locale, "providerFailure")
-      : getErrorMessage(locale, "unexpected")
+    const isGlobalLlmLimitError = providerError?.statusCode === 429
+      && providerError.code === "global_daily_limit_reached"
+    const status = isGlobalLlmLimitError
+      ? 429
+      : providerError
+        ? 502
+        : 500
+    const errorMessage = isGlobalLlmLimitError
+      ? getErrorMessage(locale, "globalLlmLimit")
+      : providerError
+        ? getErrorMessage(locale, "providerFailure")
+        : getErrorMessage(locale, "unexpected")
 
     const response = createAuthJsonResponse(
       withServerNow({ error: errorMessage }),
