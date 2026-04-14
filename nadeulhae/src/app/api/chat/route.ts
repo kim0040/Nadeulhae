@@ -171,6 +171,13 @@ function getErrorMessage(locale: ChatLocale, key: keyof typeof CHAT_ERRORS.ko) {
   return CHAT_ERRORS[locale][key]
 }
 
+function withServerNow<T extends object>(payload: T) {
+  return {
+    ...payload,
+    serverNow: new Date().toISOString(),
+  }
+}
+
 function sanitizeText(value: unknown, maxLength: number) {
   if (typeof value !== "string") {
     return null
@@ -440,7 +447,7 @@ async function handleGET(request: NextRequest) {
     if (!authenticatedSession) {
       return clearAuthCookie(
         createAuthJsonResponse(
-          { error: getErrorMessage(locale, "unauthorized") },
+          withServerNow({ error: getErrorMessage(locale, "unauthorized") }),
           { status: 401 }
         )
       )
@@ -451,12 +458,14 @@ async function handleGET(request: NextRequest) {
       locale,
       requestedSessionId,
     })
-    const response = createAuthJsonResponse(sanitizeChatStateIdentity(state, locale))
+    const response = createAuthJsonResponse(
+      withServerNow(sanitizeChatStateIdentity(state, locale))
+    )
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Chat GET API failed:", error)
     return createAuthJsonResponse(
-      { error: getErrorMessage(getRequestLocale(request), "unexpected") },
+      withServerNow({ error: getErrorMessage(getRequestLocale(request), "unexpected") }),
       { status: 500 }
     )
   }
@@ -475,7 +484,7 @@ async function handlePOST(request: NextRequest) {
   } catch {
     const locale = getRequestLocale(request)
     return createAuthJsonResponse(
-      { error: getErrorMessage(locale, "invalidMessage") },
+      withServerNow({ error: getErrorMessage(locale, "invalidMessage") }),
       { status: 400 }
     )
   }
@@ -486,14 +495,14 @@ async function handlePOST(request: NextRequest) {
   const requestedSessionId = sanitizeSessionId(body.sessionId)
   if (!message) {
     return createAuthJsonResponse(
-      { error: getErrorMessage(locale, "invalidMessage") },
+      withServerNow({ error: getErrorMessage(locale, "invalidMessage") }),
       { status: 400 }
     )
   }
 
   if (message.length > CHAT_INPUT_MAX_CHARACTERS) {
     return createAuthJsonResponse(
-      { error: getErrorMessage(locale, "tooLong") },
+      withServerNow({ error: getErrorMessage(locale, "tooLong") }),
       { status: 413 }
     )
   }
@@ -507,7 +516,7 @@ async function handlePOST(request: NextRequest) {
     if (!authenticatedSession) {
       return clearAuthCookie(
         createAuthJsonResponse(
-          { error: getErrorMessage(locale, "unauthorized") },
+          withServerNow({ error: getErrorMessage(locale, "unauthorized") }),
           { status: 401 }
         )
       )
@@ -516,7 +525,7 @@ async function handlePOST(request: NextRequest) {
     if (!acquireChatUserLock(authenticatedSession.user.id)) {
       return attachRefreshedAuthCookie(
         createAuthJsonResponse(
-          { error: getErrorMessage(locale, "busy") },
+          withServerNow({ error: getErrorMessage(locale, "busy") }),
           { status: 429 }
         ),
         authenticatedSession
@@ -565,12 +574,12 @@ async function handlePOST(request: NextRequest) {
 
       return attachRefreshedAuthCookie(
         createAuthJsonResponse(
-          {
+          withServerNow({
             ...sanitizedState,
             error: getErrorMessage(locale, "rateLimited"),
             usage: reservation.usage,
             policy: getChatPolicySnapshot(),
-          },
+          }),
           { status: 429 }
         ),
         authenticatedSession
@@ -632,7 +641,9 @@ async function handlePOST(request: NextRequest) {
       locale,
       requestedSessionId: String(resolvedSession.activeSessionId),
     })
-    const response = createAuthJsonResponse(sanitizeChatStateIdentity(state, locale))
+    const response = createAuthJsonResponse(
+      withServerNow(sanitizeChatStateIdentity(state, locale))
+    )
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request).catch(() => null)
@@ -666,7 +677,10 @@ async function handlePOST(request: NextRequest) {
       ? getErrorMessage(locale, "providerFailure")
       : getErrorMessage(locale, "unexpected")
 
-    const response = createAuthJsonResponse({ error: errorMessage }, { status })
+    const response = createAuthJsonResponse(
+      withServerNow({ error: errorMessage }),
+      { status }
+    )
     return authenticatedSession
       ? attachRefreshedAuthCookie(response, authenticatedSession)
       : response

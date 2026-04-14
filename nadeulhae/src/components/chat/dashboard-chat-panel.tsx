@@ -11,11 +11,20 @@ import { useLanguage } from "@/context/LanguageContext"
 import type { AuthUser } from "@/lib/auth/types"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { ChatConversationMessage, ChatStateResponse } from "@/lib/chat/types"
-import { formatServerClockTime } from "@/lib/time/server-time"
+import {
+  computeServerClockOffsetMs,
+  formatServerClockTime,
+  getServerNowMs,
+} from "@/lib/time/server-time"
 import { cn } from "@/lib/utils"
 
 type UiChatMessage = ChatConversationMessage & {
   pending?: boolean
+}
+
+type ChatStateApiResponse = ChatStateResponse & {
+  serverNow?: unknown
+  error?: string
 }
 
 const CHAT_PANEL_COPY = {
@@ -163,6 +172,7 @@ export function DashboardChatPanel({
   const [policy, setPolicy] = useState<ChatStateResponse["policy"] | null>(null)
   const [chatInput, setChatInput] = useState("")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null)
   const messageViewportRef = useRef<HTMLDivElement | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
   const didInitScrollRef = useRef(false)
@@ -176,6 +186,13 @@ export function DashboardChatPanel({
     setPolicy(payload.policy)
     setSessions(payload.sessions)
     setActiveSessionId(payload.activeSessionId)
+  }, [])
+
+  const syncServerClock = useCallback((serverNow: unknown) => {
+    const offsetMs = computeServerClockOffsetMs(serverNow)
+    if (offsetMs != null) {
+      setServerClockOffsetMs(offsetMs)
+    }
   }, [])
 
   const loadChatState = useCallback(async (sessionId?: string | null) => {
@@ -194,12 +211,13 @@ export function DashboardChatPanel({
       })
 
       const data = await response.json().catch(() => null)
+      syncServerClock((data as { serverNow?: unknown } | null)?.serverNow)
       if (!response.ok || !data) {
         setErrorMessage(data?.error ?? copy.sessionLoadError)
         return
       }
 
-      const payload = data as ChatStateResponse
+      const payload = data as ChatStateApiResponse
       applyPayload(payload)
     } catch (error) {
       console.error("Failed to load dashboard chat state:", error)
@@ -207,7 +225,7 @@ export function DashboardChatPanel({
     } finally {
       setIsLoading(false)
     }
-  }, [applyPayload, copy.loadError, copy.sessionLoadError, language])
+  }, [applyPayload, copy.loadError, copy.sessionLoadError, language, syncServerClock])
 
   useEffect(() => {
     void loadChatState(null)
@@ -270,7 +288,7 @@ export function DashboardChatPanel({
     })
   }, [])
 
-  const handleCreateSession = () => {
+  const handleCreateSession = useCallback(() => {
     setErrorMessage(null)
     startSessionTransition(async () => {
       try {
@@ -285,19 +303,20 @@ export function DashboardChatPanel({
         })
 
         const data = await response.json().catch(() => null)
+        syncServerClock((data as { serverNow?: unknown } | null)?.serverNow)
         if (!response.ok || !data) {
           setErrorMessage(data?.error ?? copy.sessionCreateError)
           return
         }
 
-        applyPayload(data as ChatStateResponse)
+        applyPayload(data as ChatStateApiResponse)
         setChatInput("")
       } catch (error) {
         console.error("Failed to create dashboard chat session:", error)
         setErrorMessage(copy.sessionCreateError)
       }
     })
-  }
+  }, [applyPayload, copy.sessionCreateError, language, syncServerClock])
 
   const handleDeleteSession = () => {
     if (!resolvedActiveSessionId || sessions.length <= 1 || isSessionPending) {
@@ -320,12 +339,13 @@ export function DashboardChatPanel({
         })
 
         const data = await response.json().catch(() => null)
+        syncServerClock((data as { serverNow?: unknown } | null)?.serverNow)
         if (!response.ok || !data) {
           setErrorMessage(data?.error ?? copy.sessionDeleteError)
           return
         }
 
-        applyPayload(data as ChatStateResponse)
+        applyPayload(data as ChatStateApiResponse)
       } catch (error) {
         console.error("Failed to delete dashboard chat session:", error)
         setErrorMessage(copy.sessionDeleteError)
@@ -344,6 +364,8 @@ export function DashboardChatPanel({
       await loadChatState(sessionId)
     })
   }
+
+  const serverNowMs = getServerNowMs(serverClockOffsetMs)
 
   const handleSend = () => {
     if (isComposingRef.current) {
@@ -364,7 +386,7 @@ export function DashboardChatPanel({
     }
 
     setErrorMessage(null)
-    const now = new Date().toISOString()
+    const now = new Date(serverNowMs).toISOString()
     const optimisticUserMessage: UiChatMessage = {
       id: `optimistic-user-${Date.now()}`,
       role: "user",
@@ -403,6 +425,7 @@ export function DashboardChatPanel({
         })
 
         const data = await response.json().catch(() => null)
+        syncServerClock((data as { serverNow?: unknown } | null)?.serverNow)
         if (!response.ok || !data) {
           setMessages((current) => current.filter((item) =>
             item.id !== optimisticUserMessage.id && item.id !== optimisticAssistantMessage.id
@@ -414,7 +437,7 @@ export function DashboardChatPanel({
             && Array.isArray(data?.sessions)
             && typeof data?.activeSessionId === "string"
           ) {
-            applyPayload(data as ChatStateResponse)
+            applyPayload(data as ChatStateApiResponse)
           }
           if (data?.usage) {
             setUsage(data.usage)
