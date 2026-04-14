@@ -54,21 +54,39 @@ export function createAuthJsonResponse(
 function getAllowedOrigins(request: NextRequest) {
   const allowedOrigins = new Set<string>()
 
-  if (request.nextUrl.origin) {
-    allowedOrigins.add(request.nextUrl.origin)
+  const addOrigin = (value: string | null | undefined) => {
+    if (!value) return
+    try {
+      const normalized = new URL(value).origin
+      if (normalized) {
+        allowedOrigins.add(normalized)
+      }
+    } catch {
+      // Ignore invalid origin candidates.
+    }
   }
 
-  if (process.env.APP_BASE_URL) {
-    allowedOrigins.add(process.env.APP_BASE_URL)
+  const pickHeaderToken = (value: string | null) => {
+    if (!value) return ""
+    return value.split(",")[0]?.trim() ?? ""
   }
 
-  const forwardedHost = request.headers.get("x-forwarded-host")
-  const host = forwardedHost || request.headers.get("host")
-  const forwardedProto = request.headers.get("x-forwarded-proto")
-  const protocol = forwardedProto || request.nextUrl.protocol.replace(/:$/, "")
+  const normalizeProtocol = (value: string) => value.replace(/:$/, "").toLowerCase()
+
+  addOrigin(request.nextUrl.origin)
+  addOrigin(process.env.APP_BASE_URL)
+
+  const forwardedHost = pickHeaderToken(request.headers.get("x-forwarded-host"))
+  const host = forwardedHost || pickHeaderToken(request.headers.get("host"))
+  const forwardedProto = pickHeaderToken(request.headers.get("x-forwarded-proto"))
+  const requestProtocol = normalizeProtocol(request.nextUrl.protocol)
+  const protocol = normalizeProtocol(forwardedProto || requestProtocol)
 
   if (host) {
-    allowedOrigins.add(`${protocol}://${host}`)
+    const protocolCandidates = new Set<string>([protocol, "https", "http"])
+    for (const candidateProtocol of protocolCandidates) {
+      addOrigin(`${candidateProtocol}://${host}`)
+    }
   }
 
   return allowedOrigins
@@ -76,9 +94,42 @@ function getAllowedOrigins(request: NextRequest) {
 
 export function validateSameOriginRequest(request: NextRequest, locale?: AuthLocale) {
   const resolvedLocale = locale ?? resolveAuthLocale(request.headers.get("accept-language"))
-  const origin = request.headers.get("origin")
+  const originHeader = request.headers.get("origin")
   const allowedOrigins = getAllowedOrigins(request)
-  if (origin && !allowedOrigins.has(origin)) {
+
+  const origin = (() => {
+    if (!originHeader) return null
+    if (originHeader === "null") return "null"
+    try {
+      return new URL(originHeader).origin
+    } catch {
+      return null
+    }
+  })()
+
+  if (originHeader === "null") {
+    const refererHeader = request.headers.get("referer")
+    const refererOrigin = (() => {
+      if (!refererHeader) return null
+      try {
+        return new URL(refererHeader).origin
+      } catch {
+        return null
+      }
+    })()
+    if (refererOrigin && allowedOrigins.has(refererOrigin)) {
+      return null
+    }
+  }
+
+  if (originHeader && origin !== "null" && !origin) {
+    return createAuthJsonResponse(
+      { error: getAuthMessage(resolvedLocale, "invalidRequestOrigin") },
+      { status: 403 }
+    )
+  }
+
+  if (origin && origin !== "null" && !allowedOrigins.has(origin)) {
     return createAuthJsonResponse(
       { error: getAuthMessage(resolvedLocale, "invalidRequestOrigin") },
       { status: 403 }
