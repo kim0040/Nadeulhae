@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   CloudIcon,
   DropletsIcon,
@@ -13,6 +13,7 @@ import {
 import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
+import { getMeteorCount, getParticleCount, shouldRunRichAnimation } from "@/lib/performance"
 import { mockWeatherData } from "@/data/mockData"
 import { dataService, type FireSummaryData, type WeatherData } from "@/services/dataService"
 import { useLanguage } from "@/context/LanguageContext"
@@ -64,6 +65,9 @@ export default function Home() {
     return (now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate()) % 1_000_000
   })
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
+  const particleQuantity = useMemo(() => getParticleCount(20), [])
+  const meteorCount = useMemo(() => getMeteorCount(3), [])
+  const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -224,8 +228,8 @@ export default function Home() {
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden bg-background">
       <section className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden py-24 sm:py-32">
-        <Particles className="absolute inset-0 z-0 opacity-70" quantity={36} ease={80} color={particleColor} />
-        <Meteors number={4} className="z-0" />
+        {particleQuantity > 0 && <Particles className="absolute inset-0 z-0 opacity-70" quantity={particleQuantity} ease={80} color={particleColor} />}
+        {meteorCount > 0 && <Meteors number={meteorCount} className="z-0" />}
 
         <div className="z-10 flex max-w-6xl flex-col items-center gap-6 px-4 text-center">
           {weatherData.isFallback && (
@@ -244,7 +248,7 @@ export default function Home() {
           />
 
           <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card border border-card-border shadow-2xl transition-all hover:scale-105 duration-500">
-            <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />
+            {enableAnimations && <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
               <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-1">{t("hero_score_label")}</span>
               <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.22em] text-foreground/45 mb-2">{t("hero_score_subtitle")}</span>

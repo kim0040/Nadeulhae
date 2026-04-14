@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { 
   AlertTriangle,
   CloudSunIcon, 
@@ -29,6 +30,7 @@ import { useLanguage } from "@/context/LanguageContext"
 import { BorderBeam } from "@/components/magicui/border-beam"
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text"
 import { CalendarClock, Route } from "lucide-react"
+import { getParticleCount, shouldRunRichAnimation } from "@/lib/performance"
 
 const features = [
   {
@@ -96,6 +98,9 @@ const algorithmCards = [
 export default function AboutPage() {
   const { resolvedTheme } = useTheme()
   const { t, language } = useLanguage()
+  const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
+  const particleQuantity = useMemo(() => getParticleCount(30), [])
+  const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
   const devSteps = ["01", "02", "03", "04", "05"]
   
@@ -200,11 +205,13 @@ export default function AboutPage() {
     <main className="min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">
       {/* Hero Section */}
       <section className="relative px-4 pb-20 pt-24 text-center overflow-hidden sm:pt-28">
-        <Particles
-          className="absolute inset-0 z-0"
-          quantity={84}
-          color={resolvedTheme === "dark" ? "#ffffff" : "#87CEEB"}
-        />
+        {particleQuantity > 0 ? (
+          <Particles
+            className="absolute inset-0 z-0"
+            quantity={particleQuantity}
+            color={particleColor}
+          />
+        ) : null}
         <div className="relative z-10 max-w-4xl mx-auto">
           <span className="px-6 py-2 rounded-full bg-sky-blue/10 text-sky-blue text-[10px] font-black uppercase tracking-[0.3em] mb-8 inline-block border border-sky-blue/20">
             {t("about_hero_tag")}
@@ -295,13 +302,15 @@ export default function AboutPage() {
               key={card.titleKey}
               className="relative overflow-hidden rounded-[2.5rem] border border-card-border bg-card p-8 sm:p-10 shadow-xl shadow-[0_22px_70px_-48px_rgba(47,111,228,0.45)]"
             >
-              <BorderBeam
-                size={240}
-                duration={8}
-                delay={index * 1.1}
-                colorFrom="var(--beam-from)"
-                colorTo="var(--beam-to)"
-              />
+              {enableAnimations ? (
+                <BorderBeam
+                  size={240}
+                  duration={8}
+                  delay={index * 1.1}
+                  colorFrom="var(--beam-from)"
+                  colorTo="var(--beam-to)"
+                />
+              ) : null}
               <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-sky-blue/8 to-transparent pointer-events-none" />
               <div className="relative z-10 min-w-0">
                 <div className="inline-flex rounded-2xl border border-sky-blue/20 bg-sky-blue/10 p-4 text-sky-blue">
@@ -534,14 +543,16 @@ export default function AboutPage() {
                 i === contributors.length - 1 && "md:col-span-2 md:mx-auto md:max-w-[34rem] xl:col-span-1 xl:max-w-none"
               )}
             >
-              <BorderBeam
-                size={320}
-                duration={10}
-                delay={i * 1.5}
-                colorFrom="var(--beam-from)"
-                colorTo="var(--beam-to)"
-                borderWidth={1.5}
-              />
+              {enableAnimations ? (
+                <BorderBeam
+                  size={320}
+                  duration={10}
+                  delay={i * 1.5}
+                  colorFrom="var(--beam-from)"
+                  colorTo="var(--beam-to)"
+                  borderWidth={1.5}
+                />
+              ) : null}
               <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-sky-blue/8 to-transparent pointer-events-none" />
 
               <div className="relative z-10 flex h-full w-full flex-col items-center justify-between p-8 sm:p-14">

@@ -1,8 +1,10 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
+
+import { getMeteorCount, shouldRunContinuousAnimation } from "@/lib/performance"
 
 interface MeteorsProps {
   number?: number
@@ -24,8 +26,10 @@ export const Meteors = ({
   className,
 }: MeteorsProps) => {
   const [mounted, setMounted] = useState(false)
+  const [canAnimate, setCanAnimate] = useState(false)
   const { resolvedTheme } = useTheme()
   const [meteorStyles, setMeteorStyles] = useState<Array<React.CSSProperties>>([])
+  const effectiveCount = useMemo(() => getMeteorCount(number), [number])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -33,7 +37,37 @@ export const Meteors = ({
   }, [])
 
   useEffect(() => {
-    const styles = [...new Array(number)].map(() => ({
+    if (!mounted) {
+      return
+    }
+
+    const update = () => setCanAnimate(shouldRunContinuousAnimation())
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    update()
+
+    const onVisibility = () => update()
+    const onFocus = () => update()
+    const onBlur = () => update()
+    const onResize = () => update()
+    const onMediaChange = () => update()
+
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("blur", onBlur)
+    window.addEventListener("resize", onResize)
+    media.addEventListener("change", onMediaChange)
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("blur", onBlur)
+      window.removeEventListener("resize", onResize)
+      media.removeEventListener("change", onMediaChange)
+    }
+  }, [mounted])
+
+  useEffect(() => {
+    const styles = [...new Array(effectiveCount)].map(() => ({
       "--angle": -angle + "deg",
       top: "-5%",
       left: `${Math.floor(Math.random() * 100)}%`,
@@ -42,9 +76,9 @@ export const Meteors = ({
     }))
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMeteorStyles(styles)
-  }, [number, minDelay, maxDelay, minDuration, maxDuration, angle])
+  }, [effectiveCount, minDelay, maxDelay, minDuration, maxDuration, angle])
 
-  if (!mounted) return null
+  if (!mounted || !canAnimate || effectiveCount <= 0) return null
 
   const isDark = resolvedTheme === "dark"
   const meteorColor = isDark ? "bg-white/80" : "bg-active-blue/60"

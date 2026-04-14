@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+
+import { shouldRunContinuousAnimation } from "@/lib/performance"
 import { cn } from "@/lib/utils"
 
 interface ShineBorderProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -17,6 +19,35 @@ export function ShineBorder({
   style,
   ...props
 }: ShineBorderProps) {
+  const [canAnimate, setCanAnimate] = React.useState(false)
+
+  React.useEffect(() => {
+    const update = () => setCanAnimate(shouldRunContinuousAnimation())
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    update()
+
+    const onVisibility = () => update()
+    const onFocus = () => update()
+    const onBlur = () => update()
+    const onMediaChange = () => update()
+
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("blur", onBlur)
+    media.addEventListener("change", onMediaChange)
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("blur", onBlur)
+      media.removeEventListener("change", onMediaChange)
+    }
+  }, [])
+
+  if (!canAnimate) {
+    return null
+  }
+
   return (
     <div
       style={

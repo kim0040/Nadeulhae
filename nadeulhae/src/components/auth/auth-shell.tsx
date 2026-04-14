@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { Sparkles } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -10,6 +11,7 @@ import { MagicCard } from "@/components/magicui/magic-card"
 import { Marquee } from "@/components/magicui/marquee"
 import { Meteors } from "@/components/magicui/meteors"
 import { Particles } from "@/components/magicui/particles"
+import { getMeteorCount, getParticleCount, shouldRunRichAnimation } from "@/lib/performance"
 import { cn } from "@/lib/utils"
 
 interface AuthShellProps {
@@ -53,9 +55,13 @@ export function AuthShell({
   const { resolvedTheme } = useTheme()
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
   const isFastMode = performanceMode === "fast"
+  const richAnimations = useMemo(() => shouldRunRichAnimation(), [])
+  const particleQuantity = useMemo(() => getParticleCount(18), [])
+  const meteorCount = useMemo(() => getMeteorCount(2), [])
+  const useFastLayout = isFastMode || !richAnimations
   const hasBadge = Boolean(badge?.trim())
   const hasSidePanel =
-    !isFastMode &&
+    !useFastLayout &&
     showSidePanel &&
     Boolean(sideEyebrow && sideTitle && sideDescription) &&
     marqueeItems.length > 0 &&
@@ -64,15 +70,15 @@ export function AuthShell({
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden bg-background px-4 pb-24 pt-20 sm:px-6 sm:pb-16 sm:pt-24 lg:px-8">
-      {!isFastMode ? (
+      {!useFastLayout ? (
         <>
           <Particles
             className="absolute inset-0 z-0 opacity-70"
-            quantity={28}
+            quantity={particleQuantity}
             ease={80}
             color={particleColor}
           />
-          <Meteors number={3} className="z-0" />
+          {meteorCount > 0 ? <Meteors number={meteorCount} className="z-0" /> : null}
         </>
       ) : null}
 
@@ -158,7 +164,7 @@ export function AuthShell({
 
         {/* Form card: always visible, full-width on mobile/tablet */}
         <section className={cn(!hasSidePanel && "mx-auto w-full")}>
-          {isFastMode ? (
+          {useFastLayout ? (
             <div className={cn("overflow-hidden rounded-[2rem] sm:rounded-[2.4rem]", panelClassName)}>
               <div className="relative rounded-[2rem] border border-card-border/70 bg-card/95 p-5 shadow-[0_16px_60px_rgba(17,32,39,0.12)] sm:rounded-[2.4rem] sm:p-6 lg:p-8">
                 <div className={cn("relative z-10 mb-9 flex flex-col sm:mb-10", hasBadge && "gap-3")}>

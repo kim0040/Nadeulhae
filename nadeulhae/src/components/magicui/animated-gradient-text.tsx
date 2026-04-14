@@ -1,7 +1,8 @@
 "use client"
 
-import { type ComponentPropsWithoutRef } from "react"
+import { useEffect, useState, type ComponentPropsWithoutRef } from "react"
 
+import { shouldRunContinuousAnimation } from "@/lib/performance"
 import { cn } from "@/lib/utils"
 
 export interface AnimatedGradientTextProps extends ComponentPropsWithoutRef<"span"> {
@@ -18,6 +19,31 @@ export function AnimatedGradientText({
   colorTo = "#2f6fe4",
   ...props
 }: AnimatedGradientTextProps) {
+  const [canAnimate, setCanAnimate] = useState(false)
+
+  useEffect(() => {
+    const update = () => setCanAnimate(shouldRunContinuousAnimation())
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    update()
+
+    const onVisibility = () => update()
+    const onFocus = () => update()
+    const onBlur = () => update()
+    const onMediaChange = () => update()
+
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("blur", onBlur)
+    media.addEventListener("change", onMediaChange)
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("blur", onBlur)
+      media.removeEventListener("change", onMediaChange)
+    }
+  }, [])
+
   return (
     <span
       style={
@@ -28,7 +54,8 @@ export function AnimatedGradientText({
         } as React.CSSProperties
       }
       className={cn(
-        "animate-gradient inline bg-linear-to-r from-(--color-from) via-(--color-to) to-(--color-from) bg-size-[var(--bg-size)_100%] bg-clip-text text-transparent",
+        "inline bg-linear-to-r from-(--color-from) via-(--color-to) to-(--color-from) bg-size-[var(--bg-size)_100%] bg-clip-text text-transparent",
+        canAnimate && "animate-gradient",
         className
       )}
       {...props}

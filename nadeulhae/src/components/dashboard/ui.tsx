@@ -1,6 +1,7 @@
 import * as React from "react"
 import { MagicCard } from "@/components/magicui/magic-card"
 import { BorderBeam } from "@/components/magicui/border-beam"
+import { shouldRunRichAnimation } from "@/lib/performance"
 import { cn } from "@/lib/utils"
 
 export function SelectOptionTile({
@@ -69,7 +70,35 @@ export function SectionCard({
   panelClassName?: string
   contentClassName?: string
 }) {
-  return (
+  const [enableSectionAnimations, setEnableSectionAnimations] = React.useState(false)
+
+  React.useEffect(() => {
+    const update = () => setEnableSectionAnimations(shouldRunRichAnimation())
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    update()
+
+    const onVisibility = () => update()
+    const onResize = () => update()
+    const onFocus = () => update()
+    const onBlur = () => update()
+    const onMediaChange = () => update()
+
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("resize", onResize)
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("blur", onBlur)
+    media.addEventListener("change", onMediaChange)
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("resize", onResize)
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("blur", onBlur)
+      media.removeEventListener("change", onMediaChange)
+    }
+  }, [])
+
+  return enableSectionAnimations ? (
     <MagicCard className={cn("overflow-hidden rounded-[2rem]", className)} gradientSize={220} gradientOpacity={0.7}>
       <div
         className={cn(
@@ -81,6 +110,17 @@ export function SectionCard({
         <div className={cn("relative z-10", contentClassName)}>{children}</div>
       </div>
     </MagicCard>
+  ) : (
+    <div className={cn("overflow-hidden rounded-[2rem]", className)}>
+      <div
+        className={cn(
+          "relative rounded-[2rem] border border-card-border/70 bg-card/90 p-5 backdrop-blur-2xl sm:p-6",
+          panelClassName
+        )}
+      >
+      <div className={cn("relative z-10", contentClassName)}>{children}</div>
+      </div>
+    </div>
   )
 }
 
