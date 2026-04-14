@@ -59,7 +59,10 @@ export default function Home() {
   const [weatherImages, setWeatherImages] = useState<WeatherImageData>(null)
   const [fireSummary, setFireSummary] = useState<FireSummaryData | null>(null)
   const [hourlyForecast, setHourlyForecast] = useState<HourlyForecastItem[]>([])
-  const [heroMessageSeed] = useState(() => Math.floor(Math.random() * 1_000_000))
+  const [heroMessageSeed] = useState(() => {
+    const now = new Date()
+    return (now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate()) % 1_000_000
+  })
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
 
   useEffect(() => {

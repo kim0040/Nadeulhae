@@ -13,7 +13,11 @@ function parseCookies(cookieHeader: string | null) {
       .filter(Boolean)
       .map((part) => {
         const [key, ...rest] = part.split("=")
-        return [key, decodeURIComponent(rest.join("="))]
+        try {
+          return [key, decodeURIComponent(rest.join("="))]
+        } catch {
+          return [key, rest.join("=")]
+        }
       })
   )
 }

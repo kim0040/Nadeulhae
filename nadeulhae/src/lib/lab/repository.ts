@@ -186,8 +186,8 @@ function normalizeOptionalText(value: string | null | undefined, maxLength: numb
   return normalized.length > 0 ? normalized : null
 }
 
-function toCardTermDedupKey(value: string) {
-  return value.toLowerCase().replace(/\s+/g, "")
+function toCardTermDedupKey(term: string, meaning: string) {
+  return `${term.toLowerCase().replace(/\s+/g, "")}|${meaning.toLowerCase().replace(/\s+/g, "")}`
 }
 
 function decryptLabText(value: string | null, context: string, fallback: string | null = null) {
@@ -298,7 +298,7 @@ function computeLearningTransition(input: LabReviewTransitionInput): LabReviewTr
   }
 
   const nextConsecutive = Math.max(0, input.currentConsecutiveCorrect) + 1
-  if (nextConsecutive >= 2) {
+  if (nextConsecutive >= steps.length + 1) {
     const nextStabilityDays = clampNumber(
       Math.max(input.currentStabilityDays, input.grade === LAB_REVIEW_GRADE_EASY ? 3 : 2),
       LAB_MIN_STABILITY_DAYS,
@@ -650,7 +650,7 @@ export async function createLabDeckWithCards(input: {
       continue
     }
 
-    const dedupeKey = toCardTermDedupKey(card.term)
+    const dedupeKey = toCardTermDedupKey(card.term, card.meaning)
     if (seenTerms.has(dedupeKey)) {
       continue
     }

@@ -6,7 +6,6 @@ import { type ChangeEvent, useCallback, useEffect, useMemo, useState, useRef } f
 import {
   Download,
   FileJson,
-  FileSpreadsheet,
   FlaskConical,
   Flame,
   FolderPlus,
@@ -510,6 +509,8 @@ export default function LabPage() {
   const syncQueue = useRef<{cardId: number, grade: number}[]>([])
   const syncTimer = useRef<NodeJS.Timeout | null>(null)
   const loadStateRef = useRef<() => Promise<void>>(async () => {})
+  const stateErrorRef = useRef(copy.stateError)
+  stateErrorRef.current = copy.stateError
 
   const flushSyncQueue = useCallback(async () => {
     if (syncQueue.current.length === 0) return
@@ -546,8 +547,13 @@ export default function LabPage() {
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (syncQueue.current.length > 0) {
-        const blob = new Blob([JSON.stringify({ reviews: syncQueue.current })], { type: 'application/json' });
-        navigator.sendBeacon("/api/lab/review/batch", blob);
+        fetch("/api/lab/review/batch", {
+          method: "POST",
+          credentials: "include",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reviews: syncQueue.current }),
+        }).catch(() => {});
         syncQueue.current = []
       }
     }
@@ -587,7 +593,7 @@ export default function LabPage() {
       }
 
       if (!response.ok) {
-        setStateError(await parseApiError(response, copy.stateError))
+        setStateError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -595,11 +601,11 @@ export default function LabPage() {
       setState(payload.state ?? null)
     } catch (error) {
       console.error("Failed to load lab state:", error)
-      setStateError(copy.stateError)
+      setStateError(stateErrorRef.current)
     } finally {
       setIsLoading(false)
     }
-  }, [copy.stateError, language, router, user?.labEnabled])
+  }, [language, router, user?.labEnabled])
 
   useEffect(() => {
     loadStateRef.current = loadState
@@ -628,7 +634,7 @@ export default function LabPage() {
       }
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -636,11 +642,11 @@ export default function LabPage() {
       setDecks(Array.isArray(payload.decks) ? payload.decks : [])
     } catch (error) {
       console.error("Failed to load lab decks:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsDecksLoading(false)
     }
-  }, [copy.stateError, language, router, user?.labEnabled])
+  }, [language, router, user?.labEnabled])
 
   const loadDeckCards = useCallback(async (deckIdInput?: string) => {
     const targetDeckId = (deckIdInput ?? selectedDeckId).trim()
@@ -667,7 +673,7 @@ export default function LabPage() {
       }
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -677,11 +683,11 @@ export default function LabPage() {
       setDeckCards(Array.isArray(payload.cards) ? payload.cards : [])
     } catch (error) {
       console.error("Failed to load deck cards:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsDeckCardsLoading(false)
     }
-  }, [copy.stateError, language, router, selectedDeckId])
+  }, [language, router, selectedDeckId])
 
   useEffect(() => {
     if (status === "authenticated" && user?.labEnabled) {
@@ -843,7 +849,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setActionError(await parseApiError(response, copy.stateError))
+        setActionError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -855,7 +861,7 @@ export default function LabPage() {
       await loadDecks()
     } catch (error) {
       console.error("Lab generate failed:", error)
-      setActionError(copy.stateError)
+      setActionError(stateErrorRef.current)
     } finally {
       setIsGenerating(false)
     }
@@ -926,7 +932,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -951,7 +957,7 @@ export default function LabPage() {
       await loadState()
     } catch (error) {
       console.error("Deck create failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsCreatingDeck(false)
     }
@@ -977,7 +983,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -990,7 +996,7 @@ export default function LabPage() {
       void loadState()
     } catch (error) {
       console.error("Deck delete failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsDeletingDeck(false)
     }
@@ -1030,7 +1036,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -1047,7 +1053,7 @@ export default function LabPage() {
       await loadState()
     } catch (error) {
       console.error("Deck update failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsSavingDeck(false)
     }
@@ -1076,7 +1082,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -1096,7 +1102,7 @@ export default function LabPage() {
       setManageMessage(copy.messageManualAutofilled)
     } catch (error) {
       console.error("Manual card autofill failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsAutofillingManualCard(false)
     }
@@ -1146,7 +1152,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -1174,7 +1180,7 @@ export default function LabPage() {
       setIsCreateMode(false)
     } catch (error) {
       console.error("Manual card add failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsAddingManualCard(false)
     }
@@ -1200,7 +1206,7 @@ export default function LabPage() {
       }
     } catch (error) {
       console.error("Failed to read import file:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     }
   }
 
@@ -1239,7 +1245,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -1274,7 +1280,7 @@ export default function LabPage() {
       setIsCreateMode(false)
     } catch (error) {
       console.error("Import failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsImporting(false)
     }
@@ -1291,7 +1297,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -1302,7 +1308,7 @@ export default function LabPage() {
       setManageMessage(copy.messageTemplateDownloaded)
     } catch (error) {
       console.error("Template download failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsDownloadingTemplate(false)
     }
@@ -1331,7 +1337,7 @@ export default function LabPage() {
       )
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -1342,7 +1348,7 @@ export default function LabPage() {
       setManageMessage(copy.messageExported)
     } catch (error) {
       console.error("Export failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsExporting(false)
     }
@@ -1408,7 +1414,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -1434,7 +1440,7 @@ export default function LabPage() {
       await loadDecks()
     } catch (error) {
       console.error("Card update failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setIsUpdatingCard(false)
     }
@@ -1460,7 +1466,7 @@ export default function LabPage() {
       })
 
       if (!response.ok) {
-        setManageError(await parseApiError(response, copy.stateError))
+        setManageError(await parseApiError(response, stateErrorRef.current))
         return
       }
 
@@ -1478,7 +1484,7 @@ export default function LabPage() {
       await loadDecks()
     } catch (error) {
       console.error("Card delete failed:", error)
-      setManageError(copy.stateError)
+      setManageError(stateErrorRef.current)
     } finally {
       setDeletingCardId("")
     }

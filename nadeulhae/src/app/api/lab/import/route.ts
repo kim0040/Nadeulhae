@@ -111,7 +111,7 @@ async function handlePOST(request: NextRequest) {
     }
 
     const contentLength = Number(request.headers.get("content-length") ?? "0")
-    if (Number.isFinite(contentLength) && contentLength > LAB_IMPORT_MAX_BYTES) {
+    if (contentLength > LAB_IMPORT_MAX_BYTES) {
       return createAuthJsonResponse(
         { error: LAB_IMPORT_ERRORS[locale].tooLarge },
         { status: 413 }
@@ -173,11 +173,11 @@ async function handlePOST(request: NextRequest) {
       LAB_IMPORT_MAX_BYTES
     )
 
-    if (!source) {
+    if (!source || source.length > LAB_IMPORT_MAX_BYTES) {
       return attachRefreshedAuthCookie(
         createAuthJsonResponse(
-          { error: LAB_IMPORT_ERRORS[locale].empty },
-          { status: 400 }
+          { error: !source ? LAB_IMPORT_ERRORS[locale].empty : LAB_IMPORT_ERRORS[locale].tooLarge },
+          { status: !source ? 400 : 413 }
         ),
         authenticatedSession
       )

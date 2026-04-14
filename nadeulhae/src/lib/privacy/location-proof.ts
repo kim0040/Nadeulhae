@@ -3,6 +3,10 @@ import { createHash } from "node:crypto"
 import { getSessionTokenHash } from "@/lib/auth/session"
 import { executeStatement, getDbPool } from "@/lib/db"
 
+const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
+  process.env.TRUST_PROXY_HEADERS ?? ""
+)
+
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const REQUEST_SESSION_COOKIE_NAME = "nadeulhae_sid"
 
@@ -43,10 +47,12 @@ function parseCookies(cookieHeader: string | null) {
           return [part, ""]
         }
 
-        return [
-          part.slice(0, separatorIndex),
-          decodeURIComponent(part.slice(separatorIndex + 1)),
-        ]
+        const rawValue = part.slice(separatorIndex + 1)
+        try {
+          return [part.slice(0, separatorIndex), decodeURIComponent(rawValue)]
+        } catch {
+          return [part.slice(0, separatorIndex), rawValue]
+        }
       })
   )
 }
@@ -56,6 +62,10 @@ function hashValue(value: string) {
 }
 
 function getClientIp(request: Request) {
+  if (!TRUST_PROXY_HEADERS) {
+    return "anonymous"
+  }
+
   return (
     request.headers.get("cf-connecting-ip")
     || request.headers.get("x-real-ip")

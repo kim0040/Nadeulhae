@@ -15,6 +15,15 @@ const RATE_LIMIT_WINDOW_MS = 5_000
 const rateLimitMap = new Map<string, number>()
 const RATE_LIMIT_MAP_MAX_KEYS = 6_000
 
+function sanitizeHtmlEntities(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+}
+
 const JEONJU_CHAT_ERRORS = {
   ko: {
     loadFailed: "채팅 메시지를 불러오지 못했습니다.",
@@ -158,9 +167,9 @@ export async function POST(request: NextRequest) {
 
     const created = await createChatMessage({
       userId: user.id,
-      nickname: user.nickname || user.displayName,
+      nickname: sanitizeHtmlEntities(user.nickname || user.displayName),
       nicknameTag: user.nicknameTag || "0000",
-      content: maskProfanity(message),
+      content: sanitizeHtmlEntities(maskProfanity(message)),
       isAnonymous,
     })
 
