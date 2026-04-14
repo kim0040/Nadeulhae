@@ -180,8 +180,13 @@ export default function LabPage() {
   const [isReviewing, setIsReviewing] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [answerVisible, setAnswerVisible] = useState(false)
+  const [isCompactViewport, setIsCompactViewport] = useState(false)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
 
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
+  const backgroundMotionEnabled = !prefersReducedMotion
+  const particleQuantity = isCompactViewport ? 26 : 56
+  const meteorCount = isCompactViewport ? 2 : 6
 
   const loadState = useCallback(async () => {
     if (!user?.labEnabled) {
@@ -227,6 +232,31 @@ export default function LabPage() {
       void loadState()
     }
   }, [loadState, status, user?.labEnabled])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const applyMotionPreference = () => {
+      setPrefersReducedMotion(media.matches)
+    }
+    const applyViewportMode = () => {
+      setIsCompactViewport(window.innerWidth < 768)
+    }
+
+    applyMotionPreference()
+    applyViewportMode()
+
+    window.addEventListener("resize", applyViewportMode, { passive: true })
+    media.addEventListener("change", applyMotionPreference)
+
+    return () => {
+      window.removeEventListener("resize", applyViewportMode)
+      media.removeEventListener("change", applyMotionPreference)
+    }
+  }, [])
 
   useEffect(() => {
     if (status === "guest") {
@@ -341,8 +371,18 @@ export default function LabPage() {
   if (!user.labEnabled) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-14 pt-24 sm:px-6 sm:pt-28 lg:px-8">
-        <Particles className="absolute inset-0 z-0 opacity-65" quantity={52} ease={80} color={particleColor} refresh />
-        <Meteors number={6} className="z-0" />
+        {backgroundMotionEnabled ? (
+          <>
+            <Particles
+              className="absolute inset-0 z-0 opacity-65"
+              quantity={particleQuantity}
+              ease={80}
+              color={particleColor}
+              refresh
+            />
+            <Meteors number={meteorCount} className="z-0" />
+          </>
+        ) : null}
         <div className="relative z-10 mx-auto max-w-3xl">
           <SectionCard>
             <div className="space-y-4 text-center">
@@ -371,8 +411,18 @@ export default function LabPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-14 pt-24 sm:px-6 sm:pt-28 lg:px-8">
-      <Particles className="absolute inset-0 z-0 opacity-70" quantity={68} ease={80} color={particleColor} refresh />
-      <Meteors number={8} className="z-0" />
+      {backgroundMotionEnabled ? (
+        <>
+          <Particles
+            className="absolute inset-0 z-0 opacity-70"
+            quantity={particleQuantity}
+            ease={80}
+            color={particleColor}
+            refresh
+          />
+          <Meteors number={meteorCount} className="z-0" />
+        </>
+      ) : null}
 
       <div className="relative z-10 mx-auto max-w-[82rem] 2xl:max-w-[86rem]">
         <SectionCard className="mb-6">
@@ -409,7 +459,7 @@ export default function LabPage() {
                   value={topic}
                   onChange={(event) => setTopic(event.target.value.slice(0, LAB_TOPIC_MAX_LENGTH))}
                   placeholder={copy.topicPlaceholder}
-                  className="h-28 w-full resize-none rounded-[1.2rem] border border-card-border/70 bg-background/80 px-4 py-3 text-sm font-medium text-foreground shadow-inner outline-none transition focus:border-sky-blue/35 focus:ring-2 focus:ring-sky-blue/15"
+                  className="h-28 w-full resize-none rounded-[1.2rem] border border-card-border/70 bg-background/80 px-4 py-3 text-base font-medium text-foreground shadow-inner outline-none transition focus:border-sky-blue/35 focus:ring-2 focus:ring-sky-blue/15 sm:text-sm"
                 />
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <label className="text-xs font-semibold text-muted-foreground">
