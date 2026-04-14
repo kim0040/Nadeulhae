@@ -72,6 +72,7 @@ export function getDbPool() {
     password: requireEnv("DB_PASSWORD"),
     database: requireEnv("DB_NAME"),
     ssl: resolveSslOptions(),
+    timezone: "+00:00",
     waitForConnections: true,
     connectionLimit: Number(process.env.DB_POOL_LIMIT ?? "10"),
     queueLimit: 0,

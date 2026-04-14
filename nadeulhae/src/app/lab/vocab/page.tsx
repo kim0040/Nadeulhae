@@ -85,6 +85,38 @@ type ApiErrorPayload = {
   error?: string
 }
 
+const PART_OF_SPEECH_KO: Record<string, string> = {
+  noun: "명사",
+  verb: "동사",
+  adjective: "형용사",
+  adverb: "부사",
+  pronoun: "대명사",
+  preposition: "전치사",
+  conjunction: "접속사",
+  interjection: "감탄사",
+  article: "관사",
+  determiner: "한정사",
+  particle: "조사",
+  auxiliary: "조동사",
+  numeral: "수사",
+  counter: "조수사",
+  abbreviation: "약어",
+  prefix: "접두사",
+  suffix: "접미사",
+  phrase: "숙어",
+  idiom: "관용구",
+  expression: "표현",
+}
+
+function localizePos(value: string | null, language: string): string {
+  if (!value) return ""
+  if (language === "ko") {
+    const lower = value.toLowerCase().trim()
+    return PART_OF_SPEECH_KO[lower] ?? value
+  }
+  return value
+}
+
 const LAB_COPY = {
   ko: {
     loading: "실험실을 불러오는 중...",
@@ -1799,7 +1831,7 @@ export default function LabPage() {
 
                     {activeCard ? (
                       <MagicCard
-                        className="h-[560px] overflow-hidden rounded-[2rem] sm:h-[640px]"
+                         className="h-[720px] overflow-hidden rounded-[2rem] sm:h-[820px]"
                         gradientSize={200}
                         gradientOpacity={0.72}
                       >
@@ -1829,7 +1861,7 @@ export default function LabPage() {
                                 </p>
                                 {activeCard.partOfSpeech && (
                                   <span className="mt-4 inline-flex items-center rounded-full border border-sky-blue/25 bg-sky-blue/10 px-4 py-1.5 text-xs font-black uppercase tracking-wider text-sky-blue shadow-sm">
-                                    {activeCard.partOfSpeech}
+                                    {localizePos(activeCard.partOfSpeech, language)}
                                   </span>
                                 )}
                               </div>
@@ -2395,7 +2427,7 @@ export default function LabPage() {
                                                 <p className="text-2xl font-black tracking-tight text-foreground">{card.term}</p>
                                                 {card.partOfSpeech ? (
                                                   <span className="inline-flex items-center rounded-full border border-sky-blue/20 bg-sky-blue/8 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-blue transition-colors hover:bg-sky-blue/12">
-                                                    {card.partOfSpeech}
+                                                    {localizePos(card.partOfSpeech, language)}
                                                   </span>
                                                 ) : null}
                                               </div>
