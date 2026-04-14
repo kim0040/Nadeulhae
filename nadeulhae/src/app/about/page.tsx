@@ -439,7 +439,7 @@ export default function AboutPage() {
           </p>
         </div>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 max-w-6xl mx-auto">
-          {liveContent.map((item, index) => (
+          {liveContent.map((item) => (
             <div key={item.title} className="rounded-[2.5rem] border border-card-border bg-card p-8 shadow-[0_18px_42px_-32px_rgba(47,111,228,0.18)]">
               <div className="inline-flex rounded-2xl border border-sky-blue/20 bg-sky-blue/10 p-4 text-sky-blue">
                 <item.icon size={24} />

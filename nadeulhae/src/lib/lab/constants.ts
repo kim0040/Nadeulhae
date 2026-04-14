@@ -1,12 +1,3 @@
-function toBoundedInteger(value: string | undefined, fallback: number, min: number, max: number) {
-  const parsed = Number(value ?? "")
-  if (!Number.isFinite(parsed)) {
-    return fallback
-  }
-
-  return Math.min(max, Math.max(min, Math.floor(parsed)))
-}
-
 export const LAB_DAILY_GENERATION_LIMIT = 10
 
 export const LAB_INPUT_MAX_CHARACTERS = 220

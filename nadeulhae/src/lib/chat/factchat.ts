@@ -6,6 +6,10 @@ import {
   FACTCHAT_MODELS_CACHE_TTL_MS,
 } from "@/lib/chat/constants"
 import type { FactChatCompletionResult } from "@/lib/chat/types"
+import {
+  recordGlobalLlmRequestOutcome,
+  reserveGlobalLlmDailyRequest,
+} from "@/lib/llm/quota"
 
 declare global {
   var __nadeulhaeFactChatModelsCache:
@@ -97,6 +101,15 @@ function extractAssistantText(content: unknown) {
   }
 
   return ""
+}
+
+function getGlobalLlmDailyLimit() {
+  const raw = Number(process.env.LLM_GLOBAL_DAILY_LIMIT ?? "5000")
+  if (!Number.isFinite(raw)) {
+    return 5000
+  }
+
+  return Math.max(1, Math.floor(raw))
 }
 
 async function fetchJson<T>(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
@@ -201,51 +214,79 @@ async function requestCompletion(input: {
   maxTokens: number
   timeoutMs: number
 }) {
-  const { response, json } = await fetchJson<GatewayCompletionPayload | GatewayErrorPayload>(
-    buildGatewayUrl("chat/completions/"),
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${requireFactChatEnv("FACTCHAT_API_KEY")}`,
-      },
-      body: JSON.stringify({
-        model: input.model,
-        messages: input.messages,
-        temperature: input.temperature,
-        max_tokens: input.maxTokens,
-      }),
-      cache: "no-store",
-    },
-    input.timeoutMs
-  )
-
-  if (!response.ok) {
-    const payload = json as GatewayErrorPayload
+  const reservation = await reserveGlobalLlmDailyRequest({
+    limit: getGlobalLlmDailyLimit(),
+  })
+  if (!reservation.allowed) {
     throw new FactChatError(
-      payload.error?.message ?? "FactChat request failed.",
-      response.status,
-      payload.error?.code ? String(payload.error.code) : null
+      "Global daily LLM request limit reached.",
+      429,
+      "global_daily_limit_reached"
     )
   }
 
-  const payload = json as GatewayCompletionPayload
-  const content = extractAssistantText(payload.choices?.[0]?.message?.content)
-  if (!content) {
-    throw new FactChatError("FactChat returned an empty response.", 502, "empty_content")
-  }
+  try {
+    const { response, json } = await fetchJson<GatewayCompletionPayload | GatewayErrorPayload>(
+      buildGatewayUrl("chat/completions/"),
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${requireFactChatEnv("FACTCHAT_API_KEY")}`,
+        },
+        body: JSON.stringify({
+          model: input.model,
+          messages: input.messages,
+          temperature: input.temperature,
+          max_tokens: input.maxTokens,
+        }),
+        cache: "no-store",
+      },
+      input.timeoutMs
+    )
 
-  return {
-    providerRequestId: payload.id ?? null,
-    resolvedModel: payload.model ?? input.model,
-    content,
-    usage: {
-      promptTokens: Math.max(0, payload.usage?.prompt_tokens ?? 0),
-      completionTokens: Math.max(0, payload.usage?.completion_tokens ?? 0),
-      totalTokens: Math.max(0, payload.usage?.total_tokens ?? 0),
-      cachedPromptTokens: Math.max(0, payload.usage?.prompt_tokens_details?.cached_tokens ?? 0),
-    },
+    if (!response.ok) {
+      const payload = json as GatewayErrorPayload
+      throw new FactChatError(
+        payload.error?.message ?? "FactChat request failed.",
+        response.status,
+        payload.error?.code ? String(payload.error.code) : null
+      )
+    }
+
+    const payload = json as GatewayCompletionPayload
+    const content = extractAssistantText(payload.choices?.[0]?.message?.content)
+    if (!content) {
+      throw new FactChatError("FactChat returned an empty response.", 502, "empty_content")
+    }
+
+    await recordGlobalLlmRequestOutcome({
+      metricDate: reservation.usage.metricDate,
+      success: true,
+    }).catch((error) => {
+      console.error("Failed to record global LLM success usage:", error)
+    })
+
+    return {
+      providerRequestId: payload.id ?? null,
+      resolvedModel: payload.model ?? input.model,
+      content,
+      usage: {
+        promptTokens: Math.max(0, payload.usage?.prompt_tokens ?? 0),
+        completionTokens: Math.max(0, payload.usage?.completion_tokens ?? 0),
+        totalTokens: Math.max(0, payload.usage?.total_tokens ?? 0),
+        cachedPromptTokens: Math.max(0, payload.usage?.prompt_tokens_details?.cached_tokens ?? 0),
+      },
+    }
+  } catch (error) {
+    await recordGlobalLlmRequestOutcome({
+      metricDate: reservation.usage.metricDate,
+      success: false,
+    }).catch((recordError) => {
+      console.error("Failed to record global LLM failure usage:", recordError)
+    })
+    throw error
   }
 }
 

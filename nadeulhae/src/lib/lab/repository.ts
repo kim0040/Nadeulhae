@@ -25,6 +25,9 @@ import type {
   LabGeneratedCardInput,
   LabLearningState,
   LabLocale,
+  LabReportSnapshot,
+  LabReportStateBreakdown,
+  LabReportTrendPoint,
   LabReviewGrade,
   LabStateSnapshot,
   LabUsageSnapshot,
@@ -54,7 +57,9 @@ interface LabCardRow extends RowDataPacket {
   user_id: string
   term_text: string
   meaning_text: string
+  pos_text: string | null
   example_text: string | null
+  example_translation_text: string | null
   tip_text: string | null
   learning_state: string
   consecutive_correct: number
@@ -74,6 +79,48 @@ interface LabUsageRow extends RowDataPacket {
   user_id: string
   generation_count: number
   review_count: number
+}
+
+interface LabReportTotalsRow extends RowDataPacket {
+  deck_count: number
+  card_count: number
+  due_count: number
+  mastered_count: number
+  avg_difficulty: number | null
+  avg_stability_days: number | null
+  avg_retrievability: number | null
+}
+
+interface LabTrendRow extends RowDataPacket {
+  metric_date: Date | string
+  generation_count: number
+  review_count: number
+}
+
+interface LabStateCountRow extends RowDataPacket {
+  learning_state: string
+  count: number
+}
+
+interface LabDeckSummaryRow extends RowDataPacket {
+  deck_id: number
+  title_text: string
+  card_count: number
+  due_count: number
+  total_reviews: number
+  avg_difficulty: number | null
+  avg_stability_days: number | null
+}
+
+interface LabDifficultCardRow extends RowDataPacket {
+  card_id: number
+  deck_id: number
+  deck_title_text: string
+  term_text: string
+  difficulty: number
+  lapses: number
+  stage: number
+  next_review_at: Date | string
 }
 
 interface LabReviewTransitionInput {
@@ -137,6 +184,10 @@ function normalizeOptionalText(value: string | null | undefined, maxLength: numb
 
   const normalized = normalizeText(value, maxLength)
   return normalized.length > 0 ? normalized : null
+}
+
+function toCardTermDedupKey(value: string) {
+  return value.toLowerCase().replace(/\s+/g, "")
 }
 
 function decryptLabText(value: string | null, context: string, fallback: string | null = null) {
@@ -386,10 +437,11 @@ function mapCardRow(row: LabCardRow, referenceDate: Date = new Date()): LabCardS
     deckId: String(row.deck_id),
     term: decryptLabText(row.term_text, "lab.card.term", "-") ?? "-",
     meaning: decryptLabText(row.meaning_text, "lab.card.meaning", "-") ?? "-",
+    partOfSpeech: decryptLabText(row.pos_text, "lab.card.pos"),
     example: decryptLabText(row.example_text, "lab.card.example"),
-    tip: decryptLabText(row.tip_text, "lab.card.tip"),
+    exampleTranslation: decryptLabText(row.example_translation_text, "lab.card.example_translation"),
     learningState,
-    stage: learningState === "review"
+    stage: row.learning_state === "learning"
       ? deriveStageFromStabilityDays(stabilityDays)
       : clampStage(Number(row.stage ?? 0)),
     stabilityDays,
@@ -425,6 +477,30 @@ function getKstMetricDate() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date())
+}
+
+function getKstMetricDateRange(days: number) {
+  const safeDays = Math.min(90, Math.max(1, Math.floor(days)))
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+
+  const dates: string[] = []
+  const now = new Date()
+  for (let offset = safeDays - 1; offset >= 0; offset -= 1) {
+    const date = new Date(now.getTime() - offset * DAY_MS)
+    dates.push(formatter.format(date))
+  }
+
+  return {
+    days: safeDays,
+    startDate: dates[0] ?? getKstMetricDate(),
+    endDate: dates[dates.length - 1] ?? getKstMetricDate(),
+    dates,
+  }
 }
 
 function createUsageSnapshot(metricDate: string, generationCount: number, reviewCount: number): LabUsageSnapshot {
@@ -552,14 +628,36 @@ export async function createLabDeckWithCards(input: {
 
   const normalizedTitle = normalizeText(input.title, 120) || "Nadeul Lab"
   const normalizedTopic = normalizeText(input.topic, 200)
-  const normalizedCards = input.cards
-    .map((card) => ({
-      term: normalizeText(card.term, 80),
-      meaning: normalizeText(card.meaning, 220),
-      example: normalizeOptionalText(card.example ?? null, 280),
-      tip: normalizeOptionalText(card.tip ?? null, 200),
-    }))
-    .filter((card) => card.term.length > 0 && card.meaning.length > 0)
+  const normalizedCards: Array<{
+    term: string
+    meaning: string
+    partOfSpeech: string | null
+    example: string | null
+    exampleTranslation: string | null
+  }> = []
+  const seenTerms = new Set<string>()
+
+  for (const rawCard of input.cards) {
+    const card = {
+      term: normalizeText(rawCard.term, 80),
+      meaning: normalizeText(rawCard.meaning, 220),
+      partOfSpeech: normalizeOptionalText(rawCard.partOfSpeech ?? null, 40),
+      example: normalizeOptionalText(rawCard.example ?? null, 280),
+      exampleTranslation: normalizeOptionalText(rawCard.exampleTranslation ?? null, 280),
+    }
+
+    if (!card.term || !card.meaning) {
+      continue
+    }
+
+    const dedupeKey = toCardTermDedupKey(card.term)
+    if (seenTerms.has(dedupeKey)) {
+      continue
+    }
+
+    seenTerms.add(dedupeKey)
+    normalizedCards.push(card)
+  }
 
   if (normalizedCards.length === 0) {
     throw new Error("No valid lab cards were generated.")
@@ -605,8 +703,9 @@ export async function createLabDeckWithCards(input: {
             user_id,
             term_text,
             meaning_text,
+            pos_text,
             example_text,
-            tip_text,
+            example_translation_text,
             learning_state,
             consecutive_correct,
             stage,
@@ -617,15 +716,16 @@ export async function createLabDeckWithCards(input: {
             last_review_outcome,
             next_review_at,
             last_reviewed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'new', 0, 0, ?, ?, 0, 0, NULL, NOW(), NULL)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', 0, 0, ?, ?, 0, 0, NULL, NOW(), NULL)
         `,
         [
           deckId,
           input.userId,
           encryptDatabaseValue(card.term, "lab.card.term"),
           encryptDatabaseValue(card.meaning, "lab.card.meaning"),
+          encryptDatabaseValueSafely(card.partOfSpeech, "lab.card.pos"),
           encryptDatabaseValueSafely(card.example, "lab.card.example"),
-          encryptDatabaseValueSafely(card.tip, "lab.card.tip"),
+          encryptDatabaseValueSafely(card.exampleTranslation, "lab.card.example_translation"),
           LAB_DEFAULT_STABILITY_DAYS,
           LAB_DEFAULT_DIFFICULTY,
         ]
@@ -636,8 +736,9 @@ export async function createLabDeckWithCards(input: {
         deckId: String(deckId),
         term: card.term,
         meaning: card.meaning,
-        example: card.example,
-        tip: card.tip,
+        partOfSpeech: card.partOfSpeech ?? null,
+        example: card.example ?? null,
+        exampleTranslation: card.exampleTranslation ?? null,
         learningState: "new",
         stage: 0,
         stabilityDays: LAB_DEFAULT_STABILITY_DAYS,
@@ -702,7 +803,9 @@ export async function getLabState(userId: string): Promise<LabStateSnapshot> {
           user_id,
           term_text,
           meaning_text,
+          pos_text,
           example_text,
+          example_translation_text,
           tip_text,
           learning_state,
           consecutive_correct,
@@ -758,6 +861,222 @@ export async function getLabState(userId: string): Promise<LabStateSnapshot> {
   }
 }
 
+export async function getLabReportSnapshot(input: {
+  userId: string
+  periodDays?: number
+}): Promise<LabReportSnapshot> {
+  await ensureLabSchema()
+
+  const now = new Date()
+  const metricDate = getKstMetricDate()
+  const range = getKstMetricDateRange(input.periodDays ?? 14)
+
+  const [
+    totalsRows,
+    usageRows,
+    trendRows,
+    stateRows,
+    deckSummaryRows,
+    difficultRows,
+  ] = await Promise.all([
+    queryRows<LabReportTotalsRow[]>(
+      `
+        SELECT
+          (SELECT COUNT(*) FROM lab_decks WHERE user_id = ?) AS deck_count,
+          (SELECT COUNT(*) FROM lab_cards WHERE user_id = ?) AS card_count,
+          (SELECT COUNT(*) FROM lab_cards WHERE user_id = ? AND next_review_at <= NOW()) AS due_count,
+          (SELECT COUNT(*) FROM lab_cards WHERE user_id = ? AND learning_state = 'review' AND stage >= 4) AS mastered_count,
+          (SELECT AVG(difficulty) FROM lab_cards WHERE user_id = ?) AS avg_difficulty,
+          (SELECT AVG(stability_days) FROM lab_cards WHERE user_id = ?) AS avg_stability_days,
+          (
+            SELECT AVG(
+              CASE
+                WHEN c.learning_state = 'review' AND c.stability_days > 0
+                  THEN POW(0.9, GREATEST(TIMESTAMPDIFF(SECOND, COALESCE(c.last_reviewed_at, c.created_at), NOW()), 0) / (c.stability_days * 86400))
+                ELSE NULL
+              END
+            )
+            FROM lab_cards c
+            WHERE c.user_id = ?
+          ) AS avg_retrievability
+      `,
+      [
+        input.userId,
+        input.userId,
+        input.userId,
+        input.userId,
+        input.userId,
+        input.userId,
+        input.userId,
+      ]
+    ),
+    queryRows<LabUsageRow[]>(
+      `
+        SELECT
+          metric_date,
+          user_id,
+          generation_count,
+          review_count
+        FROM lab_daily_usage
+        WHERE metric_date = ?
+          AND user_id = ?
+        LIMIT 1
+      `,
+      [metricDate, input.userId]
+    ),
+    queryRows<LabTrendRow[]>(
+      `
+        SELECT
+          DATE_FORMAT(metric_date, '%Y-%m-%d') AS metric_date,
+          generation_count,
+          review_count
+        FROM lab_daily_usage
+        WHERE user_id = ?
+          AND metric_date >= ?
+          AND metric_date <= ?
+        ORDER BY metric_date ASC
+      `,
+      [input.userId, range.startDate, range.endDate]
+    ),
+    queryRows<LabStateCountRow[]>(
+      `
+        SELECT
+          learning_state,
+          COUNT(*) AS count
+        FROM lab_cards
+        WHERE user_id = ?
+        GROUP BY learning_state
+      `,
+      [input.userId]
+    ),
+    queryRows<LabDeckSummaryRow[]>(
+      `
+        SELECT
+          d.id AS deck_id,
+          d.title_text,
+          COUNT(c.id) AS card_count,
+          SUM(CASE WHEN c.next_review_at <= NOW() THEN 1 ELSE 0 END) AS due_count,
+          SUM(COALESCE(c.total_reviews, 0)) AS total_reviews,
+          AVG(c.difficulty) AS avg_difficulty,
+          AVG(c.stability_days) AS avg_stability_days
+        FROM lab_decks d
+        LEFT JOIN lab_cards c
+          ON c.deck_id = d.id
+          AND c.user_id = d.user_id
+        WHERE d.user_id = ?
+        GROUP BY d.id, d.title_text, d.created_at
+        ORDER BY due_count DESC, card_count DESC, d.created_at DESC
+        LIMIT 8
+      `,
+      [input.userId]
+    ),
+    queryRows<LabDifficultCardRow[]>(
+      `
+        SELECT
+          c.id AS card_id,
+          c.deck_id,
+          d.title_text AS deck_title_text,
+          c.term_text,
+          c.difficulty,
+          c.lapses,
+          c.stage,
+          c.next_review_at
+        FROM lab_cards c
+        JOIN lab_decks d
+          ON d.id = c.deck_id
+          AND d.user_id = c.user_id
+        WHERE c.user_id = ?
+        ORDER BY c.difficulty DESC, c.lapses DESC, c.next_review_at ASC, c.id ASC
+        LIMIT 6
+      `,
+      [input.userId]
+    ),
+  ])
+
+  const totals = totalsRows[0]
+  const usage = usageRows[0]
+
+  const trendMap = new Map<string, LabReportTrendPoint>()
+  for (const row of trendRows) {
+    const dateKey = String(row.metric_date).slice(0, 10)
+    trendMap.set(dateKey, {
+      metricDate: dateKey,
+      generationCount: Math.max(0, Number(row.generation_count ?? 0)),
+      reviewCount: Math.max(0, Number(row.review_count ?? 0)),
+    })
+  }
+
+  const trend: LabReportTrendPoint[] = range.dates.map((dateKey) => {
+    const row = trendMap.get(dateKey)
+    if (row) {
+      return row
+    }
+    return {
+      metricDate: dateKey,
+      generationCount: 0,
+      reviewCount: 0,
+    }
+  })
+
+  const stateCountMap = new Map<LabLearningState, number>([
+    ["new", 0],
+    ["learning", 0],
+    ["review", 0],
+    ["relearning", 0],
+  ])
+  for (const row of stateRows) {
+    const state = normalizeLearningState(row.learning_state)
+    stateCountMap.set(state, Math.max(0, Number(row.count ?? 0)))
+  }
+  const stateBreakdown: LabReportStateBreakdown[] = Array.from(stateCountMap.entries()).map(([state, count]) => ({
+    state,
+    count,
+  }))
+
+  const deckSummaries = deckSummaryRows.map((row) => ({
+    deckId: String(row.deck_id),
+    title: decryptLabText(row.title_text, "lab.deck.title", "Lab Deck") ?? "Lab Deck",
+    cardCount: Math.max(0, Number(row.card_count ?? 0)),
+    dueCount: Math.max(0, Number(row.due_count ?? 0)),
+    totalReviews: Math.max(0, Number(row.total_reviews ?? 0)),
+    avgDifficulty: clampNumber(Number(row.avg_difficulty ?? 0), 0, 10),
+    avgStabilityDays: Math.max(0, Number(row.avg_stability_days ?? 0)),
+  }))
+
+  const difficultCards = difficultRows.map((row) => ({
+    cardId: String(row.card_id),
+    deckId: String(row.deck_id),
+    deckTitle: decryptLabText(row.deck_title_text, "lab.deck.title", "Lab Deck") ?? "Lab Deck",
+    term: decryptLabText(row.term_text, "lab.card.term", "-") ?? "-",
+    difficulty: clampNumber(Number(row.difficulty ?? LAB_DEFAULT_DIFFICULTY), LAB_MIN_DIFFICULTY, LAB_MAX_DIFFICULTY),
+    lapses: Math.max(0, Number(row.lapses ?? 0)),
+    stage: clampStage(Number(row.stage ?? 0)),
+    nextReviewAt: toIsoString(row.next_review_at),
+  }))
+
+  return {
+    generatedAt: now.toISOString(),
+    periodDays: range.days,
+    totals: {
+      deckCount: Math.max(0, Number(totals?.deck_count ?? 0)),
+      cardCount: Math.max(0, Number(totals?.card_count ?? 0)),
+      dueCount: Math.max(0, Number(totals?.due_count ?? 0)),
+      masteredCount: Math.max(0, Number(totals?.mastered_count ?? 0)),
+      generatedToday: Math.max(0, Number(usage?.generation_count ?? 0)),
+      reviewedToday: Math.max(0, Number(usage?.review_count ?? 0)),
+      avgDifficulty: clampNumber(Number(totals?.avg_difficulty ?? 0), 0, 10),
+      avgStabilityDays: Math.max(0, Number(totals?.avg_stability_days ?? 0)),
+      avgRetrievability: Number.isFinite(Number(totals?.avg_retrievability))
+        ? clampNumber(Number(totals?.avg_retrievability), 0, 1)
+        : null,
+    },
+    trend,
+    stateBreakdown,
+    deckSummaries,
+    difficultCards,
+  }
+}
+
 export async function applyLabCardReview(input: {
   userId: string
   cardId: number
@@ -779,7 +1098,9 @@ export async function applyLabCardReview(input: {
           user_id,
           term_text,
           meaning_text,
+          pos_text,
           example_text,
+          example_translation_text,
           tip_text,
           learning_state,
           consecutive_correct,
@@ -918,8 +1239,9 @@ export async function applyLabCardReview(input: {
         deckId: String(current.deck_id),
         term: decryptLabText(current.term_text, "lab.card.term", "-") ?? "-",
         meaning: decryptLabText(current.meaning_text, "lab.card.meaning", "-") ?? "-",
+        partOfSpeech: decryptLabText(current.pos_text, "lab.card.pos"),
         example: decryptLabText(current.example_text, "lab.card.example"),
-        tip: decryptLabText(current.tip_text, "lab.card.tip"),
+        exampleTranslation: decryptLabText(current.example_translation_text, "lab.card.example_translation"),
         learningState: transition.nextState,
         stage: transition.nextStage,
         stabilityDays: transition.nextStabilityDays,
@@ -974,7 +1296,9 @@ export async function applyLabCardReviewBatch(input: {
           user_id,
           term_text,
           meaning_text,
+          pos_text,
           example_text,
+          example_translation_text,
           tip_text,
           learning_state,
           consecutive_correct,
@@ -1079,8 +1403,9 @@ export async function applyLabCardReviewBatch(input: {
         deckId: String(current.deck_id),
         term: decryptLabText(current.term_text, "lab.card.term", "-") ?? "-",
         meaning: decryptLabText(current.meaning_text, "lab.card.meaning", "-") ?? "-",
+        partOfSpeech: decryptLabText(current.pos_text, "lab.card.pos"),
         example: decryptLabText(current.example_text, "lab.card.example"),
-        tip: decryptLabText(current.tip_text, "lab.card.tip"),
+        exampleTranslation: decryptLabText(current.example_translation_text, "lab.card.example_translation"),
         learningState: transition.nextState,
         stage: transition.nextStage,
         stabilityDays: transition.nextStabilityDays,

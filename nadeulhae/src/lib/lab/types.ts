@@ -19,7 +19,6 @@ export interface LabCardSnapshot {
   term: string
   meaning: string
   example: string | null
-  tip: string | null
   learningState: LabLearningState
   stage: number
   stabilityDays: number
@@ -29,6 +28,8 @@ export interface LabCardSnapshot {
   lapses: number
   nextReviewAt: string
   lastReviewedAt: string | null
+  partOfSpeech: string | null
+  exampleTranslation: string | null
   createdAt: string
 }
 
@@ -50,5 +51,60 @@ export interface LabGeneratedCardInput {
   term: string
   meaning: string
   example?: string | null
-  tip?: string | null
+  exampleTranslation?: string | null
+  partOfSpeech?: string | null
+}
+
+export interface LabReportTotals {
+  deckCount: number
+  cardCount: number
+  dueCount: number
+  masteredCount: number
+  generatedToday: number
+  reviewedToday: number
+  avgDifficulty: number
+  avgStabilityDays: number
+  avgRetrievability: number | null
+}
+
+export interface LabReportTrendPoint {
+  metricDate: string
+  generationCount: number
+  reviewCount: number
+}
+
+export interface LabReportStateBreakdown {
+  state: LabLearningState
+  count: number
+}
+
+export interface LabReportDeckSummary {
+  deckId: string
+  title: string
+  cardCount: number
+  dueCount: number
+  totalReviews: number
+  avgDifficulty: number
+  avgStabilityDays: number
+}
+
+export interface LabReportDifficultCard {
+  cardId: string
+  deckId: string
+  deckTitle: string
+  term: string
+  difficulty: number
+  lapses: number
+  stage: number
+  nextReviewAt: string
+}
+
+export interface LabReportSnapshot {
+  generatedAt: string
+  periodDays: number
+  totals: LabReportTotals
+  trend: LabReportTrendPoint[]
+  stateBreakdown: LabReportStateBreakdown[]
+  deckSummaries: LabReportDeckSummary[]
+  difficultCards: LabReportDifficultCard[]
 }

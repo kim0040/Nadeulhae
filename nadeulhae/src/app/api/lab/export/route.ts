@@ -62,6 +62,25 @@ function parseFormat(value: string | null) {
   return null
 }
 
+function toAsciiFilename(value: string) {
+  const ascii = value
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase()
+
+  return ascii || "lab-deck"
+}
+
+function buildContentDisposition(filenameBase: string, extension: "json" | "csv") {
+  const utf8Filename = `${filenameBase}.${extension}`
+  const asciiFallback = `${toAsciiFilename(filenameBase)}.${extension}`
+  const encodedUtf8Filename = encodeURIComponent(utf8Filename)
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedUtf8Filename}`
+}
+
 async function handleGET(request: NextRequest) {
   const locale = getLocale(request)
 
@@ -139,8 +158,9 @@ async function handleGET(request: NextRequest) {
           cards: data.cards.map((card) => ({
             term: card.term,
             meaning: card.meaning,
+            partOfSpeech: card.partOfSpeech,
             example: card.example,
-            tip: card.tip,
+            exampleTranslation: card.exampleTranslation,
             learningState: card.learningState,
             stage: card.stage,
             nextReviewAt: card.nextReviewAt,
@@ -159,7 +179,7 @@ async function handleGET(request: NextRequest) {
         status: 200,
         headers: {
           "Content-Type": "application/json; charset=utf-8",
-          "Content-Disposition": `attachment; filename="${safeName}.json"`,
+          "Content-Disposition": buildContentDisposition(safeName, "json"),
           "Cache-Control": "no-store, max-age=0",
         },
       })
@@ -177,7 +197,7 @@ async function handleGET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${safeName}.csv"`,
+        "Content-Disposition": buildContentDisposition(safeName, "csv"),
         "Cache-Control": "no-store, max-age=0",
       },
     })

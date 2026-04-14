@@ -199,6 +199,16 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
+    if (!parsedImport.parseSucceeded) {
+      return attachRefreshedAuthCookie(
+        createAuthJsonResponse(
+          { error: LAB_IMPORT_ERRORS[locale].invalidRequest },
+          { status: 400 }
+        ),
+        authenticatedSession
+      )
+    }
+
     if (parsedImport.cards.length === 0) {
       return attachRefreshedAuthCookie(
         createAuthJsonResponse(
@@ -266,6 +276,7 @@ async function handlePOST(request: NextRequest) {
         addedCount: saved.addedCount,
         skippedCount: saved.skippedCount,
         totalParsedRows: parsedImport.totalParsedRows,
+        invalidRows: parsedImport.invalidRows,
         state,
       }),
       authenticatedSession

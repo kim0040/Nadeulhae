@@ -113,7 +113,7 @@ function getHazardChips(weatherData: WeatherData, language: "ko" | "en") {
 }
 
 function getHazardSummary(weatherData: WeatherData, language: "ko" | "en") {
-  const { eventData, metadata } = weatherData
+  const { eventData } = weatherData
   const detail = selectOfficialAlertText(weatherData)
 
   if (eventData?.isEarthquake || eventData?.isTsunami || eventData?.isVolcano || eventData?.isWeatherWarning) {

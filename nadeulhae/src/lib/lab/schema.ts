@@ -83,6 +83,16 @@ const addLabCardsLastOutcomeColumnSql = `
     ADD COLUMN IF NOT EXISTS last_review_outcome TINYINT UNSIGNED NULL AFTER lapses
 `
 
+const addLabCardsPosColumnSql = `
+  ALTER TABLE lab_cards
+    ADD COLUMN IF NOT EXISTS pos_text LONGTEXT NULL AFTER tip_text
+`
+
+const addLabCardsExampleTranslationColumnSql = `
+  ALTER TABLE lab_cards
+    ADD COLUMN IF NOT EXISTS example_translation_text LONGTEXT NULL AFTER example_text
+`
+
 const backfillLabCardsLearningStateSql = `
   UPDATE lab_cards
   SET learning_state = CASE
@@ -138,6 +148,8 @@ export async function ensureLabSchema() {
     await pool.query(addLabCardsTotalReviewsColumnSql)
     await pool.query(addLabCardsLapsesColumnSql)
     await pool.query(addLabCardsLastOutcomeColumnSql)
+    await pool.query(addLabCardsPosColumnSql)
+    await pool.query(addLabCardsExampleTranslationColumnSql)
     await pool.query(backfillLabCardsLearningStateSql)
     await pool.query(backfillLabCardsStabilitySql)
     await pool.query(createLabDailyUsageTableSql)
