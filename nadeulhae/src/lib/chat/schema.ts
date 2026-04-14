@@ -34,7 +34,7 @@ const createChatSessionsTableSql = `
   CREATE TABLE IF NOT EXISTS user_chat_sessions (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id CHAR(36) NOT NULL,
-    title VARCHAR(120) NOT NULL,
+    title VARCHAR(512) NOT NULL,
     locale VARCHAR(8) NOT NULL DEFAULT 'und',
     is_auto_title TINYINT(1) NOT NULL DEFAULT 1,
     memory_summary_text LONGTEXT NULL,
