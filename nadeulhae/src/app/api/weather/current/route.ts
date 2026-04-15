@@ -19,6 +19,29 @@ import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/rep
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { wgs84ToTm } from "@/lib/coords-utils"
 import { broadcast } from "@/lib/websocket/broadcast"
+
+interface WeatherAlertPayload {
+  alertType: string
+  message?: string
+  score: number
+  status: string
+  alertSummary?: unknown
+}
+
+let lastAlertKey = ""
+let lastAlertTime = 0
+const ALERT_DEDUP_INTERVAL_MS = 5 * 60 * 1000
+
+function broadcastWeatherAlertOnce(payload: WeatherAlertPayload) {
+  const key = `${payload.alertType}:${payload.message ?? ""}:${payload.status}`
+  const now = Date.now()
+  if (key === lastAlertKey && now - lastAlertTime < ALERT_DEDUP_INTERVAL_MS) {
+    return
+  }
+  lastAlertKey = key
+  lastAlertTime = now
+  broadcast("weather_alert", payload)
+}
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 
 // Simple in-memory cache for nearest stations based on coords (lat_lon -> stationName)
@@ -1267,11 +1290,12 @@ async function handleGET(req: Request) {
   }
 
   if (responsePayload.eventData.isWeatherWarning || responsePayload.eventData.isEarthquake || responsePayload.eventData.isTsunami || responsePayload.eventData.isVolcano) {
-    broadcast("weather_alert", {
-      type: responsePayload.eventData.isEarthquake ? "earthquake" : responsePayload.eventData.isTsunami ? "tsunami" : responsePayload.eventData.isVolcano ? "volcano" : "warning",
+    broadcastWeatherAlertOnce({
+      alertType: responsePayload.eventData.isEarthquake ? "earthquake" : responsePayload.eventData.isTsunami ? "tsunami" : responsePayload.eventData.isVolcano ? "volcano" : "warning",
       message: responsePayload.eventData.warningMessage || undefined,
       score: responsePayload.score,
       status: responsePayload.status,
+      alertSummary: responsePayload.metadata?.alertSummary,
     })
   }
 
