@@ -1,6 +1,13 @@
 import { WebSocketServer, WebSocket } from "ws"
 import type { IncomingMessage } from "node:http"
-import { addClient, removeClient, broadcast, isMaxConnectionsReached, isAllowedClientMessage } from "@/lib/websocket/broadcast"
+import {
+  addClient,
+  removeClient,
+  broadcast,
+  getConnectedCount,
+  isMaxConnectionsReached,
+  isAllowedClientMessage,
+} from "@/lib/websocket/broadcast"
 import { getSessionTokenHash } from "@/lib/auth/session"
 import { findUserBySessionTokenHash } from "@/lib/auth/repository"
 
@@ -51,28 +58,47 @@ async function authenticateWs(req: IncomingMessage): Promise<string | null> {
 }
 
 function setupHeartbeat(ws: WebSocket) {
-  let isAlive = true
+  let timeoutTimer: ReturnType<typeof setTimeout> | null = null
+
+  const clearTimers = () => {
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer)
+      timeoutTimer = null
+    }
+  }
 
   const pingTimer = setInterval(() => {
     if (ws.readyState !== WebSocket.OPEN) {
       clearInterval(pingTimer)
+      clearTimers()
       return
     }
-    if (!isAlive) {
+
+    try {
+      ws.ping()
+      clearTimers()
+      timeoutTimer = setTimeout(() => {
+        ws.terminate()
+      }, PING_TIMEOUT_MS)
+    } catch {
       ws.terminate()
       clearInterval(pingTimer)
-      return
+      clearTimers()
     }
-    isAlive = false
-    ws.ping()
   }, PING_INTERVAL_MS)
 
   ws.on("pong", () => {
-    isAlive = true
+    clearTimers()
   })
 
   ws.on("close", () => {
     clearInterval(pingTimer)
+    clearTimers()
+  })
+
+  ws.on("error", () => {
+    clearInterval(pingTimer)
+    clearTimers()
   })
 }
 
@@ -92,18 +118,26 @@ export function createWebSocketServer(server: import("node:http").Server) {
 
     let userId: string | null = null
 
-    authenticateWs(req).then((id) => {
-      userId = id
-      const added = addClient(ws, userId)
-      if (!added) {
-        ws.close(4429, "Too many connections")
-        return
-      }
+    authenticateWs(req)
+      .then((id) => {
+        userId = id
+        if (ws.readyState !== WebSocket.OPEN) {
+          return
+        }
 
-      broadcast("user_count", { count: wss.clients.size })
-    }).catch(() => {
-      ws.close(4500, "Auth failed")
-    })
+        const added = addClient(ws, userId)
+        if (!added) {
+          ws.close(4429, "Too many connections")
+          return
+        }
+
+        broadcast("user_count", { count: getConnectedCount() })
+      })
+      .catch(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close(4500, "Auth failed")
+        }
+      })
 
     setupHeartbeat(ws)
 
@@ -123,11 +157,12 @@ export function createWebSocketServer(server: import("node:http").Server) {
 
     ws.on("close", () => {
       removeClient(ws)
-      broadcast("user_count", { count: wss.clients.size })
+      broadcast("user_count", { count: getConnectedCount() })
     })
 
     ws.on("error", () => {
       removeClient(ws)
+      broadcast("user_count", { count: getConnectedCount() })
     })
   })
 

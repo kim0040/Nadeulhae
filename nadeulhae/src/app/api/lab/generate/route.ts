@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import { randomUUID } from "node:crypto"
 
 import { withApiAnalytics } from "@/lib/analytics/route"
 import {
@@ -25,6 +26,7 @@ import {
   reserveDailyLabGeneration,
 } from "@/lib/lab/repository"
 import type { LabGeneratedCardInput, LabLocale } from "@/lib/lab/types"
+import { broadcastToUser } from "@/lib/websocket/broadcast"
 
 export const runtime = "nodejs"
 
@@ -33,6 +35,35 @@ const LAB_GENERATE_MAX_PARALLEL = 3
 const LAB_GENERATE_MAX_ROUNDS = 8
 const LAB_GENERATE_MAX_STAGNATION = 2
 const LAB_GENERATE_EXCLUDE_TERMS_LIMIT = 140
+const LAB_GENERATE_REQUEST_ID_MAX = 72
+
+type LabGenerateProgressStatus =
+  | "started"
+  | "round_started"
+  | "round_finished"
+  | "saving"
+  | "completed"
+  | "failed"
+
+type LabGenerateProgressReason =
+  | "daily_limit"
+  | "global_limit"
+  | "provider_failure"
+  | "parse_failure"
+  | "internal_error"
+
+type LabGenerateProgressPayload = {
+  requestId: string
+  status: LabGenerateProgressStatus
+  targetCount: number
+  collectedCount: number
+  at: string
+  round?: number
+  totalRounds?: number
+  addedThisRound?: number
+  providerFailureCount?: number
+  reason?: LabGenerateProgressReason
+}
 
 const LAB_GENERATE_ERRORS = {
   ko: {
@@ -84,6 +115,32 @@ function normalizeCardCount(value: unknown) {
   }
 
   return Math.min(LAB_MAX_CARD_COUNT, Math.max(LAB_MIN_CARD_COUNT, Math.floor(parsed)))
+}
+
+function normalizeClientRequestId(value: unknown) {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.length > LAB_GENERATE_REQUEST_ID_MAX) {
+    return null
+  }
+
+  if (!/^[a-zA-Z0-9:_-]+$/.test(trimmed)) {
+    return null
+  }
+
+  return trimmed
+}
+
+function emitLabGenerateProgress(userId: string, payload: LabGenerateProgressPayload) {
+  try {
+    broadcastToUser(userId, "lab_generate_progress", payload)
+  } catch (error) {
+    // WebSocket progress should never break the primary API response path.
+    console.error("Failed to emit lab generation progress:", error)
+  }
 }
 
 function tryParseJson(value: string) {
@@ -279,9 +336,23 @@ async function handlePOST(request: NextRequest) {
         ? (payload as { cardCount?: unknown }).cardCount
         : LAB_DEFAULT_CARD_COUNT
     )
+    const requestId = normalizeClientRequestId(
+      typeof payload === "object" && payload && "requestId" in payload
+        ? (payload as { requestId?: unknown }).requestId
+        : null
+    ) ?? randomUUID()
 
     const reservation = await reserveDailyLabGeneration(authenticatedSession.user.id)
     if (!reservation.allowed) {
+      emitLabGenerateProgress(authenticatedSession.user.id, {
+        requestId,
+        status: "failed",
+        reason: "daily_limit",
+        targetCount: cardCount,
+        collectedCount: 0,
+        at: new Date().toISOString(),
+      })
+
       return attachRefreshedAuthCookie(
         createAuthJsonResponse(
           {
@@ -306,12 +377,31 @@ async function handlePOST(request: NextRequest) {
       let lastRequestedModel: string | null = null
       let lastResolvedModel: string | null = null
 
+      emitLabGenerateProgress(authenticatedSession.user.id, {
+        requestId,
+        status: "started",
+        targetCount: cardCount,
+        collectedCount: 0,
+        totalRounds: LAB_GENERATE_MAX_ROUNDS,
+        at: new Date().toISOString(),
+      })
+
       while (
         collectedCards.length < cardCount
         && rounds < LAB_GENERATE_MAX_ROUNDS
         && stagnationRounds < LAB_GENERATE_MAX_STAGNATION
       ) {
         rounds++
+        emitLabGenerateProgress(authenticatedSession.user.id, {
+          requestId,
+          status: "round_started",
+          targetCount: cardCount,
+          collectedCount: collectedCards.length,
+          round: rounds,
+          totalRounds: LAB_GENERATE_MAX_ROUNDS,
+          at: new Date().toISOString(),
+        })
+
         const remainingCount = cardCount - collectedCards.length
         const parallelCount = remainingCount <= LAB_MIN_CARD_COUNT
           ? 1
@@ -408,6 +498,18 @@ async function handlePOST(request: NextRequest) {
           stagnationRounds = 0
         }
 
+        emitLabGenerateProgress(authenticatedSession.user.id, {
+          requestId,
+          status: "round_finished",
+          targetCount: cardCount,
+          collectedCount: collectedCards.length,
+          round: rounds,
+          totalRounds: LAB_GENERATE_MAX_ROUNDS,
+          addedThisRound: roundAdded,
+          providerFailureCount,
+          at: new Date().toISOString(),
+        })
+
         if (globalLlmLimitHit && collectedCards.length < cardCount) {
           break
         }
@@ -416,6 +518,15 @@ async function handlePOST(request: NextRequest) {
       if (globalLlmLimitHit && collectedCards.length < LAB_MIN_CARD_COUNT) {
         await refundDailyLabGeneration(authenticatedSession.user.id)
         shouldRefund = false
+        emitLabGenerateProgress(authenticatedSession.user.id, {
+          requestId,
+          status: "failed",
+          reason: "global_limit",
+          targetCount: cardCount,
+          collectedCount: collectedCards.length,
+          providerFailureCount,
+          at: new Date().toISOString(),
+        })
 
         return attachRefreshedAuthCookie(
           createAuthJsonResponse(
@@ -429,6 +540,15 @@ async function handlePOST(request: NextRequest) {
       if (collectedCards.length < LAB_MIN_CARD_COUNT) {
         await refundDailyLabGeneration(authenticatedSession.user.id)
         shouldRefund = false
+        emitLabGenerateProgress(authenticatedSession.user.id, {
+          requestId,
+          status: "failed",
+          reason: providerFailureCount > 0 ? "provider_failure" : "parse_failure",
+          targetCount: cardCount,
+          collectedCount: collectedCards.length,
+          providerFailureCount,
+          at: new Date().toISOString(),
+        })
 
         return attachRefreshedAuthCookie(
           createAuthJsonResponse(
@@ -438,6 +558,14 @@ async function handlePOST(request: NextRequest) {
           authenticatedSession
         )
       }
+
+      emitLabGenerateProgress(authenticatedSession.user.id, {
+        requestId,
+        status: "saving",
+        targetCount: cardCount,
+        collectedCount: collectedCards.length,
+        at: new Date().toISOString(),
+      })
 
       const savedDeck = await createLabDeckWithCards({
         userId: authenticatedSession.user.id,
@@ -451,9 +579,17 @@ async function handlePOST(request: NextRequest) {
 
       shouldRefund = false
       const state = await getLabState(authenticatedSession.user.id)
+      emitLabGenerateProgress(authenticatedSession.user.id, {
+        requestId,
+        status: "completed",
+        targetCount: cardCount,
+        collectedCount: savedDeck.cards.length,
+        at: new Date().toISOString(),
+      })
 
       return attachRefreshedAuthCookie(
         createAuthJsonResponse({
+          requestId,
           deck: savedDeck.deck,
           cards: savedDeck.cards,
           usage: state.usage,
@@ -472,6 +608,15 @@ async function handlePOST(request: NextRequest) {
 
       if (error instanceof FactChatError) {
         if (error.statusCode === 429 && error.code === "global_daily_limit_reached") {
+          emitLabGenerateProgress(authenticatedSession.user.id, {
+            requestId,
+            status: "failed",
+            reason: "global_limit",
+            targetCount: cardCount,
+            collectedCount: 0,
+            at: new Date().toISOString(),
+          })
+
           return attachRefreshedAuthCookie(
             createAuthJsonResponse(
               { error: LAB_GENERATE_ERRORS[locale].globalLlmLimit },
@@ -481,6 +626,15 @@ async function handlePOST(request: NextRequest) {
           )
         }
 
+        emitLabGenerateProgress(authenticatedSession.user.id, {
+          requestId,
+          status: "failed",
+          reason: "provider_failure",
+          targetCount: cardCount,
+          collectedCount: 0,
+          at: new Date().toISOString(),
+        })
+
         return attachRefreshedAuthCookie(
           createAuthJsonResponse(
             { error: LAB_GENERATE_ERRORS[locale].providerFailure },
@@ -489,6 +643,15 @@ async function handlePOST(request: NextRequest) {
           authenticatedSession
         )
       }
+
+      emitLabGenerateProgress(authenticatedSession.user.id, {
+        requestId,
+        status: "failed",
+        reason: "internal_error",
+        targetCount: cardCount,
+        collectedCount: 0,
+        at: new Date().toISOString(),
+      })
 
       throw error
     }
