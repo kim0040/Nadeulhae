@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm"
 
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { useLanguage } from "@/context/LanguageContext"
+import { useWebSocket } from "@/lib/websocket/use-websocket"
 import type { AuthUser } from "@/lib/auth/types"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { ChatConversationMessage, ChatStateResponse } from "@/lib/chat/types"
@@ -219,6 +220,7 @@ export function DashboardChatPanel({
   weatherContext: ChatWeatherContext | null
 }) {
   const { language } = useLanguage()
+  const { subscribe } = useWebSocket()
   const copy = CHAT_PANEL_COPY[language]
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
@@ -473,6 +475,7 @@ export function DashboardChatPanel({
           headers: {
             "Content-Type": "application/json",
             "Accept-Language": language,
+            "Accept": "text/event-stream",
           },
           body: JSON.stringify({
             message: nextMessage,
@@ -481,6 +484,63 @@ export function DashboardChatPanel({
             sessionId: resolvedActiveSessionId,
           }),
         })
+
+        if (response.headers.get("content-type")?.includes("text/event-stream")) {
+          const reader = response.body?.getReader()
+          if (!reader) throw new Error("No stream body")
+
+          const decoder = new TextDecoder()
+          let buffer = ""
+          let streamAccumulated = ""
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const parts = buffer.split("\n\n")
+            buffer = parts.pop() ?? ""
+
+            for (const part of parts) {
+              let eventType = ""
+              let eventData = ""
+              for (const line of part.split("\n")) {
+                if (line.startsWith("event: ")) eventType = line.slice(7)
+                else if (line.startsWith("data: ")) eventData = line.slice(6)
+              }
+
+              if (!eventType || !eventData) continue
+
+              try {
+                const parsed = JSON.parse(eventData)
+
+                if (eventType === "token" && typeof parsed.content === "string") {
+                  streamAccumulated += parsed.content
+                  const accumulatedSoFar = streamAccumulated
+                  setMessages((current) =>
+                    current.map((item) =>
+                      item.id === optimisticAssistantMessage.id
+                        ? { ...item, content: accumulatedSoFar, pending: false }
+                        : item
+                    )
+                  )
+                } else if (eventType === "done") {
+                  syncServerClock((parsed as { serverNow?: unknown })?.serverNow)
+                  applyPayload(parsed as ChatStateResponse)
+                } else if (eventType === "error") {
+                  setMessages((current) =>
+                    current.filter((item) =>
+                      item.id !== optimisticUserMessage.id && item.id !== optimisticAssistantMessage.id
+                    )
+                  )
+                  setChatInput(rawInput)
+                  setErrorMessage(parsed.error ?? copy.sendError)
+                }
+              } catch {}
+            }
+          }
+          return
+        }
 
         const data = await response.json().catch(() => null)
         syncServerClock((data as { serverNow?: unknown } | null)?.serverNow)
