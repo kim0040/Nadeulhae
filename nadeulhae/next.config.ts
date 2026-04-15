@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
+import { resolve } from "node:path";
+
+const turbopackRoot = resolve(process.cwd(), "..");
 
 const nextConfig: NextConfig = {
   turbopack: {
-    root: "..",
+    root: turbopackRoot,
   },
   images: {
     remotePatterns: [
