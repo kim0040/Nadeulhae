@@ -471,17 +471,24 @@ export function mergeRegionProfileWithForecastLocation(
   }
 }
 
+function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+    * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 function getNearestRegionProfile(lat: number, lon: number) {
-  let minDistanceSq = Infinity
+  let minDistance = Infinity
   let nearestProfile = HOME_REGION
 
   for (const profile of REGION_PROFILES) {
-    const dLat = lat - profile.lat
-    const dLon = lon - profile.lon
-    const distanceSq = dLat * dLat + dLon * dLon
-
-    if (distanceSq < minDistanceSq) {
-      minDistanceSq = distanceSq
+    const distance = haversineDistanceKm(lat, lon, profile.lat, profile.lon)
+    if (distance < minDistance) {
+      minDistance = distance
       nearestProfile = profile
     }
   }
@@ -495,16 +502,13 @@ function getNearestRegionProfileByAirSidoName(lat: number, lon: number, airSidoN
     return null
   }
 
-  let minDistanceSq = Infinity
+  let minDistance = Infinity
   let nearestProfile: RegionProfile | null = null
 
   for (const profile of candidates) {
-    const dLat = lat - profile.lat
-    const dLon = lon - profile.lon
-    const distanceSq = dLat * dLat + dLon * dLon
-
-    if (distanceSq < minDistanceSq) {
-      minDistanceSq = distanceSq
+    const distance = haversineDistanceKm(lat, lon, profile.lat, profile.lon)
+    if (distance < minDistance) {
+      minDistance = distance
       nearestProfile = profile
     }
   }
@@ -513,16 +517,13 @@ function getNearestRegionProfileByAirSidoName(lat: number, lon: number, airSidoN
 }
 
 function getNearestForecastLocationPoint(lat: number, lon: number) {
-  let minDistanceSq = Infinity
+  let minDistance = Infinity
   let nearestPoint: ForecastLocationPoint | null = null
 
   for (const point of FORECAST_LOCATION_POINTS) {
-    const dLat = lat - point.lat
-    const dLon = lon - point.lon
-    const distanceSq = dLat * dLat + dLon * dLon
-
-    if (distanceSq < minDistanceSq) {
-      minDistanceSq = distanceSq
+    const distance = haversineDistanceKm(lat, lon, point.lat, point.lon)
+    if (distance < minDistance) {
+      minDistance = distance
       nearestPoint = point
     }
   }

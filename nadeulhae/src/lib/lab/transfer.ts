@@ -260,7 +260,7 @@ function splitLooseTermMeaning(value: string) {
     return { term: "", meaning: "" }
   }
 
-  const delimiters = ["\t", "|", " - ", " – ", " — ", ":", "："]
+  const delimiters = ["\t", "|", " - ", " – ", " — ", " :: ", " : ", ": ", "："]
   for (const delimiter of delimiters) {
     const index = normalized.indexOf(delimiter)
     if (index <= 0) {
@@ -269,6 +269,15 @@ function splitLooseTermMeaning(value: string) {
 
     const term = normalized.slice(0, index).trim()
     const meaning = normalized.slice(index + delimiter.length).trim()
+    if (term && meaning) {
+      return { term, meaning }
+    }
+  }
+
+  const colonIndex = normalized.indexOf(":")
+  if (colonIndex > 0) {
+    const term = normalized.slice(0, colonIndex).trim()
+    const meaning = normalized.slice(colonIndex + 1).trim()
     if (term && meaning) {
       return { term, meaning }
     }
@@ -477,6 +486,7 @@ export function buildLabTemplateCsv() {
     ["term", "meaning", "partOfSpeech", "example", "exampleTranslation"],
     ["breeze", "산들바람", "noun", "A cool breeze makes the trail pleasant.", "시원한 바람이 산길을 쾌적하게 만든다."],
     ["drizzle", "이슬비", "noun", "Light drizzle started near the river.", "강가에 가랑비가 내리기 시작했다."],
+    ["shelter", "대피소", "noun", "We found shelter from the sudden rain.", "갑작스러운 비를 피할 대피소를 찾았다."],
   ]
 
   return `\uFEFF${rows.map((row) => row.map(toCsvCell).join(",")).join("\n")}`
@@ -503,6 +513,13 @@ export function buildLabTemplateJson() {
           partOfSpeech: "noun",
           example: "Light drizzle started near the river.",
           exampleTranslation: "강가에 가랑비가 내리기 시작했다.",
+        },
+        {
+          term: "shelter",
+          meaning: "대피소",
+          partOfSpeech: "noun",
+          example: "We found shelter from the sudden rain.",
+          exampleTranslation: "갑작스러운 비를 피할 대피소를 찾았다.",
         },
       ],
     },
@@ -533,6 +550,7 @@ export function buildLabExportCsv(input: {
       "lapses",
       "difficulty",
       "stabilityDays",
+      "retrievability",
     ],
   ]
 
@@ -553,6 +571,7 @@ export function buildLabExportCsv(input: {
       card.lapses,
       card.difficulty,
       card.stabilityDays,
+      card.retrievability != null ? card.retrievability.toFixed(4) : "",
     ])
   }
 

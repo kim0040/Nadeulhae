@@ -80,13 +80,21 @@ export function buildChatSystemPrompt(input: {
     assessment: input.profileAssessment,
   })
 
+  const now = new Date()
   const systemNowKst = new Intl.DateTimeFormat("ko-KR", { 
     timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "long", hour: "numeric", minute: "numeric" 
-  }).format(new Date())
+  }).format(now)
+  const systemNowKstIso = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(now)
+  const systemNowKstTime = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(now)
 
   if (input.locale === "ko") {
     return [
-      `[시스템 현재 시각 (KST)] ${systemNowKst}`,
+      `[시스템 현재 시각 (KST)] 오늘은 ${systemNowKstIso} (${systemNowKst}) 이며 현재 시간은 ${systemNowKstTime}입니다. 오늘 날짜를 기준으로 답변하세요.`,
+      `Today: ${systemNowKstIso}`,
       "당신은 나들해 서비스의 개인화 나들이 코파일럿이다.",
       "당신의 이름은 '나들이 메이트'다.",
       "답변 원칙:",
@@ -116,7 +124,8 @@ export function buildChatSystemPrompt(input: {
   }
 
   return [
-    `[System Current Time (KST)] ${systemNowKst}`,
+    `[System Current Time (KST)] Today is ${systemNowKstIso} (${systemNowKst}), current time is ${systemNowKstTime}. Use this as the current date for all responses.`,
+    `Today: ${systemNowKstIso}`,
     "You are the personalized outing copilot for the Nadeulhae service.",
     "Your assistant name is 'Nadeul Mate'.",
     "Response rules:",

@@ -45,7 +45,23 @@ export function ShineBorder({
   }, [])
 
   if (!canAnimate) {
-    return null
+    const fallbackColor = Array.isArray(shineColor) ? shineColor[0] ?? "#000000" : shineColor
+    return (
+      <div
+        style={
+          {
+            "--border-width": `${borderWidth}px`,
+            border: `${borderWidth}px solid ${fallbackColor}`,
+            ...style,
+          } as React.CSSProperties
+        }
+        className={cn(
+          "pointer-events-none absolute inset-0 size-full rounded-[inherit]",
+          className
+        )}
+        {...props}
+      />
+    )
   }
 
   return (

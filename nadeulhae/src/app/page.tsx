@@ -247,7 +247,7 @@ export default function Home() {
             className="text-4xl sm:text-5xl md:text-7xl text-sky-blue px-4 font-black tracking-tight"
           />
 
-          <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card border border-card-border shadow-2xl transition-all hover:scale-105 duration-500">
+          <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card shadow-2xl transition-all hover:scale-105 duration-500" style={!enableAnimations ? { boxShadow: `0 0 24px 2px ${scoreColors.primary}40, 0 0 0 3px ${scoreColors.primary}` } : undefined}>
             {enableAnimations && <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
               <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] mb-1">{t("hero_score_label")}</span>

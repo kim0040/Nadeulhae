@@ -11,9 +11,13 @@ export function buildLabGenerationPrompts(input: {
     ? "설명(meaning)은 한국어로 작성하고, 단어(term)는 학습하기 좋은 원문 형태로 간결하게 작성해. 그리고 반드시 exampleTranslation 필드에 예문에 대한 한국어 해설(번역)을 적어줘."
     : "Write meanings in English, keep term as a concise practical word, and MUST include the explanation of the example in the exampleTranslation field."
 
+  const now = new Date()
   const systemNowKst = new Intl.DateTimeFormat("ko-KR", { 
     timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "long", hour: "numeric", minute: "numeric" 
-  }).format(new Date())
+  }).format(now)
+  const systemNowKstIso = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(now)
 
   const systemPrompt = [
     "You are Nadeul Lab, an assistant that creates practical mini study cards.",
@@ -27,7 +31,7 @@ export function buildLabGenerationPrompts(input: {
     "Each exampleTranslation MUST be an accurate explanation or translation of the example sentence.",
     "The partOfSpeech field must contain the word's grammatical category (e.g., noun, verb, 名詞, n. etc.) appropriate for the language.",
     languageGuide,
-    `[System Time (KST)]\n${systemNowKst}`,
+    `[System Time (KST)]\nToday: ${systemNowKstIso}\n${systemNowKst}`,
   ].join("\n")
 
   const profileSummary = input.locale === "ko"
