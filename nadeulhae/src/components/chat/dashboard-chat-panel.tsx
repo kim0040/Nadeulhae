@@ -31,7 +31,7 @@ const CHAT_PANEL_COPY = {
   ko: {
     title: "나들이 메이트",
     description:
-      "원하는 조건을 말하면 전주 나들이 코스, 대체 일정, 준비물을 추천해요. RAG 기반 지식 연결과 고도화 추천은 추후 지원될 예정이에요.",
+      "원하는 조건을 말하면 전주 나들이 코스, 대체 일정, 준비물을 추천해요.",
     canAskLabel: "이렇게 활용해보세요",
     canAsk: ["코스 추천", "우천 대체 일정", "준비물 체크"],
     pending: "열심히 계획 중이에요...",
@@ -43,9 +43,9 @@ const CHAT_PANEL_COPY = {
     sessionDeleteConfirm: "현재 세션을 삭제할까요?",
     sessionLabel: "대화 세션",
     sessionCreate: "새 세션",
-    sessionDelete: "세션 삭제",
-    sessionHint: "세션을 나눠두면 일정별로 대화를 깔끔하게 관리할 수 있어요.",
-    sessionPlaceholder: "세션을 선택해 주세요",
+    sessionDelete: "삭제",
+    sessionHint: "세션을 나눠두면 일정별로 대화를 관리할 수 있어요.",
+    sessionPlaceholder: "세션 선택",
     sessionMessages: "메시지",
     limitReached: "오늘 가능한 대화는 모두 사용했어요. 내일 다시 이어서 도와드릴게요.",
     placeholder: "예: 비 오는 저녁에도 가능한 전주 데이트 코스 추천해줘",
@@ -59,7 +59,7 @@ const CHAT_PANEL_COPY = {
   en: {
     title: "Outing mate",
     description:
-      "Tell me your conditions and I will suggest Jeonju routes, backup plans, and what to prepare. RAG-powered retrieval and smarter recommendation layers are planned for a future update.",
+      "Tell me your conditions and I will suggest Jeonju routes, backup plans, and what to prepare.",
     canAskLabel: "What you can do",
     canAsk: ["Route ideas", "Rainy-day backup", "Preparation list"],
     pending: "Planning your route...",
@@ -69,20 +69,20 @@ const CHAT_PANEL_COPY = {
     sessionCreateError: "Failed to create a new session.",
     sessionDeleteError: "Failed to delete the session.",
     sessionDeleteConfirm: "Delete this session now?",
-    sessionLabel: "Conversation session",
+    sessionLabel: "Session",
     sessionCreate: "New session",
-    sessionDelete: "Delete session",
+    sessionDelete: "Delete",
     sessionHint: "Use separate sessions to keep different outing plans organized.",
     sessionPlaceholder: "Select a session",
     sessionMessages: "messages",
-    limitReached: "You have reached today’s chat limit. Come back tomorrow and we can continue.",
+    limitReached: "You have reached today's chat limit. Come back tomorrow and we can continue.",
     placeholder: "Example: Recommend a Jeonju date course for a rainy evening",
     send: "Send",
     suggestions: "Quick prompts",
     loading: "Loading your mate...",
     emptyTitle: "Ask for your outing plan",
     emptyDescription: "Share weather, timing, and who you are going with for better suggestions.",
-    intro: "Hello. I can build a Jeonju outing plan around your current conditions.",
+    intro: "Hello! I can build a Jeonju outing plan around your current conditions.",
   },
 } as const
 
@@ -105,10 +105,10 @@ function formatTimestamp(value: string, language: "ko" | "en") {
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1 px-1 py-2">
-      <span className="size-1.5 animate-bounce rounded-full bg-foreground/60 [animation-delay:-0.3s]" />
-      <span className="size-1.5 animate-bounce rounded-full bg-foreground/60 [animation-delay:-0.15s]" />
-      <span className="size-1.5 animate-bounce rounded-full bg-foreground/60" />
+    <div className="flex items-center gap-1.5 px-2 py-2">
+      <span className="size-[6px] animate-bounce rounded-full bg-foreground/50 [animation-delay:-0.3s]" />
+      <span className="size-[6px] animate-bounce rounded-full bg-foreground/50 [animation-delay:-0.15s]" />
+      <span className="size-[6px] animate-bounce rounded-full bg-foreground/50" />
     </div>
   )
 }
@@ -116,39 +116,54 @@ function TypingIndicator() {
 function ChatBubble({
   message,
   language,
+  isLastAssistant,
 }: {
   message: UiChatMessage
   language: "ko" | "en"
+  isLastAssistant: boolean
 }) {
-  return (
-    <div
-      className={cn(
-        "max-w-[92%] break-words rounded-[1.4rem] border px-4 py-3 shadow-sm sm:max-w-[85%]",
-        message.role === "assistant"
-          ? "border-card-border/70 bg-background/80 text-foreground"
-          : "ml-auto border-sky-blue/10 bg-sky-blue text-white"
-      )}
-    >
-      {message.pending ? (
-        <TypingIndicator />
-      ) : message.role === "assistant" ? (
-        <div className="prose prose-sm dark:prose-invert max-w-none break-words leading-6 prose-p:my-1 prose-pre:my-2 prose-ul:my-2">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content}
-          </ReactMarkdown>
-        </div>
-      ) : (
-        <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
-      )}
+  const isUser = message.role === "user"
 
-      <p
-        className={cn(
-          "mt-2 text-[11px] font-semibold",
-          message.role === "assistant" ? "text-muted-foreground" : "text-white/75"
-        )}
-      >
-        {formatTimestamp(message.createdAt, language)}
-      </p>
+  return (
+    <div className={cn("flex gap-2.5", isUser ? "flex-row-reverse" : "flex-row")}>
+      {!isUser && (
+        <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+          <Sparkles className="size-3.5" />
+        </div>
+      )}
+      <div className={cn("max-w-[78%] min-w-0 space-y-1", isUser ? "items-end" : "items-start")}>
+        <div
+          className={cn(
+            "rounded-2xl px-3.5 py-2.5 text-[15px] leading-[1.65]",
+            isUser
+              ? "rounded-tr-sm bg-sky-blue text-white"
+              : cn(
+                  "rounded-tl-sm border border-card-border/50 bg-card/90 text-foreground",
+                  isLastAssistant && "shadow-[0_2px_12px_-4px_rgba(47,111,228,0.08)]"
+                )
+          )}
+        >
+          {message.pending ? (
+            <TypingIndicator />
+          ) : isUser ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1.5 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
+        <p
+          className={cn(
+            "px-1 text-[11px] text-muted-foreground/70",
+            isUser ? "text-right" : "text-left"
+          )}
+        >
+          {formatTimestamp(message.createdAt, language)}
+        </p>
+      </div>
     </div>
   )
 }
@@ -262,7 +277,7 @@ export function DashboardChatPanel({
       didInitScrollRef.current = true
       shouldStickToBottomRef.current = true
     } else if (hasNewMessages && shouldStickToBottomRef.current) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" })
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
     }
 
     previousMessageCountRef.current = messages.length
@@ -461,115 +476,106 @@ export function DashboardChatPanel({
     })
   }
 
+  const lastAssistantIndex = messages.findLastIndex((m) => m.role === "assistant")
+
   return (
-    <div className="min-w-0 space-y-4">
-      <div className="rounded-[1.7rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
-        <div className="inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.24em] text-sky-blue">
-          <Sparkles className="size-3.5" />
-          {copy.suggestions}
-        </div>
-        <h2 className="mt-4 text-2xl font-black tracking-tight text-foreground sm:text-3xl">{copy.title}</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">{copy.description}</p>
+    <div className="flex min-w-0 flex-col gap-3">
+      {/* Session Bar */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleCreateSession}
+          disabled={isSessionPending}
+          className="inline-flex items-center gap-1.5 rounded-full border border-card-border/70 bg-background/75 px-3 py-1.5 text-xs font-bold text-foreground transition hover:border-accent/30 hover:text-accent disabled:opacity-50"
+        >
+          {isSessionPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+          {copy.sessionCreate}
+        </button>
 
-        <div className="mt-4">
-          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-muted-foreground">{copy.canAskLabel}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {copy.canAsk.map((item) => (
-              <span
-                key={item}
-                className="rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-semibold text-foreground"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
+        <select
+          value={resolvedActiveSessionId ?? ""}
+          onChange={(event) => handleSessionSelect(event.target.value)}
+          disabled={isSessionPending || isLoading || sessions.length === 0}
+          className="min-w-0 flex-1 rounded-full border border-card-border/70 bg-background/75 px-3 py-1.5 text-sm font-medium text-foreground outline-none transition focus:border-accent/30 disabled:opacity-50"
+        >
+          {sessions.length === 0 ? (
+            <option value="">{copy.sessionPlaceholder}</option>
+          ) : (
+            sessions.map((session) => (
+              <option key={session.id} value={session.id}>
+                {session.title} · {session.messageCount} {copy.sessionMessages}
+              </option>
+            ))
+          )}
+        </select>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {CHAT_SUGGESTIONS[language].map((suggestion) => (
-            <button
-              key={suggestion}
-              type="button"
-              onClick={() => setChatInput(suggestion)}
-              className="rounded-full border border-card-border/70 bg-card/80 px-3 py-2 text-left text-sm font-semibold text-foreground transition hover:border-sky-blue/25 hover:text-sky-blue"
-            >
-              {suggestion}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-5 rounded-[1.3rem] border border-card-border/70 bg-card/70 p-3 sm:p-4">
-          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-muted-foreground">{copy.sessionLabel}</p>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={handleCreateSession}
-              disabled={isSessionPending}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-card-border/70 bg-background/75 px-3 py-2 text-xs font-black text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue disabled:opacity-60"
-            >
-              {isSessionPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-              {copy.sessionCreate}
-            </button>
-
-            <select
-              value={resolvedActiveSessionId ?? ""}
-              onChange={(event) => handleSessionSelect(event.target.value)}
-              disabled={isSessionPending || isLoading || sessions.length === 0}
-              className="min-w-0 flex-1 rounded-full border border-card-border/70 bg-background/75 px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-sky-blue/30 disabled:opacity-60"
-            >
-              {sessions.length === 0 ? (
-                <option value="">{copy.sessionPlaceholder}</option>
-              ) : (
-                sessions.map((session) => (
-                  <option key={session.id} value={session.id}>
-                    {session.title} · {session.messageCount} {copy.sessionMessages}
-                  </option>
-                ))
-              )}
-            </select>
-
-            <button
-              type="button"
-              onClick={handleDeleteSession}
-              disabled={isSessionPending || !resolvedActiveSessionId || sessions.length <= 1}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-danger/25 bg-danger/10 px-3 py-2 text-xs font-black text-danger transition hover:bg-danger/15 disabled:opacity-50"
-            >
-              {isSessionPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-              {copy.sessionDelete}
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">{copy.sessionHint}</p>
-        </div>
+        <button
+          type="button"
+          onClick={handleDeleteSession}
+          disabled={isSessionPending || !resolvedActiveSessionId || sessions.length <= 1}
+          className="inline-flex items-center justify-center rounded-full border border-danger/20 bg-danger/5 p-1.5 text-danger transition hover:bg-danger/10 disabled:opacity-40"
+          title={copy.sessionDelete}
+        >
+          {isSessionPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+        </button>
       </div>
 
-      <div className="overflow-hidden rounded-[1.8rem] border border-card-border/70 bg-card/70 shadow-sm">
+      {/* Chat Container */}
+      <div className="relative flex min-h-[24rem] flex-col overflow-hidden rounded-[1.4rem] border border-card-border/60 bg-background sm:min-h-[28rem]">
+        {/* Messages Area */}
         <div
           ref={messageViewportRef}
           onScroll={handleViewportScroll}
-          className="max-h-[62vh] min-h-[24rem] space-y-4 overflow-y-auto overscroll-contain p-4 custom-scrollbar [overflow-anchor:none] sm:max-h-[68vh] sm:min-h-[28rem] sm:p-5"
+          className="flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 custom-scrollbar sm:px-5 sm:py-4"
         >
           {isLoading ? (
-            <div className="flex items-center gap-3 rounded-[1.4rem] border border-card-border/70 bg-background/80 px-4 py-4 text-sm font-semibold text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin text-sky-blue" />
-              {copy.loading}
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <LoaderCircle className="size-4 animate-spin text-accent" />
+              <span>{copy.loading}</span>
             </div>
           ) : messages.length > 0 ? (
-            messages.map((message) => (
-              <ChatBubble key={message.id} message={message} language={language} />
+            messages.map((message, index) => (
+              <ChatBubble
+                key={message.id}
+                message={message}
+                language={language}
+                isLastAssistant={message.role === "assistant" && index === lastAssistantIndex}
+              />
             ))
           ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-card-border/80 bg-background/75 p-5">
-              <div className="text-sm font-black text-foreground">{copy.emptyTitle}</div>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{copy.emptyDescription}</p>
-              <p className="mt-4 rounded-[1.1rem] bg-sky-blue/8 px-4 py-3 text-sm leading-6 text-foreground">
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-accent/10 text-accent">
+                <Sparkles className="size-5" />
+              </div>
+              <div className="text-sm font-bold text-foreground">{copy.emptyTitle}</div>
+              <p className="max-w-xs text-sm leading-6 text-muted-foreground">{copy.emptyDescription}</p>
+              <div className="max-w-sm rounded-[1.1rem] bg-accent/5 px-4 py-3 text-sm leading-6 text-foreground">
                 {copy.intro}
-              </p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2 pt-1">
+                {CHAT_SUGGESTIONS[language].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => setChatInput(suggestion)}
+                    className="rounded-full border border-card-border/60 bg-card/80 px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-accent/30 hover:text-accent"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
-        <div className="border-t border-card-border/50 bg-background/60 p-3 backdrop-blur-sm sm:p-4">
-          <div className="relative flex items-end gap-2 rounded-[1.6rem] border border-sky-blue/30 bg-background/95 p-2 shadow-inner transition-colors focus-within:border-sky-blue">
+        {/* Input Area */}
+        <div className="border-t border-card-border/40 bg-background/80 px-3 py-3 backdrop-blur-sm sm:px-4">
+          {isLimitReached && (
+            <div className="mb-2 rounded-lg bg-danger/10 px-3 py-1.5 text-xs font-medium text-danger">
+              {copy.limitReached}
+            </div>
+          )}
+          <div className="flex items-end gap-2 rounded-2xl border border-card-border/70 bg-card/80 px-3 py-2 transition-colors focus-within:border-accent/40 focus-within:shadow-[0_0_0_2px_rgba(11,125,113,0.08)]">
             <textarea
               ref={chatInputRef}
               value={chatInput}
@@ -595,30 +601,28 @@ export function DashboardChatPanel({
               }}
               placeholder={copy.placeholder}
               disabled={!canSend}
-              className="max-h-48 min-h-[52px] flex-1 resize-none bg-transparent px-4 py-3.5 text-base leading-6 text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm"
+              rows={1}
+              className="max-h-36 min-h-[44px] flex-1 resize-none bg-transparent py-2 text-[15px] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed disabled:opacity-70"
             />
-
             <ShimmerButton
               type="button"
               onClick={handleSend}
               onMouseDown={(event) => event.preventDefault()}
               disabled={!chatInput.trim() || !canSend}
-              className="mb-1 mr-1 shrink-0 rounded-full px-5 py-3 text-sm font-black"
+              className="mb-0.5 shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold"
             >
-              <span className="inline-flex items-center gap-1.5">
-                {isPending ? <LoaderCircle className="size-4 animate-spin" /> : <SendHorizonal className="size-4" />}
-                <span className="hidden sm:inline">{copy.send}</span>
-              </span>
+              {isPending ? <LoaderCircle className="size-4 animate-spin" /> : <SendHorizonal className="size-4" />}
             </ShimmerButton>
           </div>
         </div>
       </div>
 
+      {/* Error */}
       {errorMessage ? (
         <div
           role="alert"
           aria-live="assertive"
-          className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger"
+          className="rounded-[1.1rem] border border-danger/20 bg-danger/8 px-4 py-3 text-sm font-semibold text-danger"
         >
           {errorMessage}
         </div>
