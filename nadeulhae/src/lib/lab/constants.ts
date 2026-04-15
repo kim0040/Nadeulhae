@@ -35,9 +35,9 @@ export const LAB_MIN_DIFFICULTY = 1
 export const LAB_MAX_DIFFICULTY = 10
 export const LAB_DEFAULT_DIFFICULTY = 5
 
-// Initial learning queue: two successful recalls to graduate.
-export const LAB_LEARNING_STEPS_MINUTES = [10, 1440] as const
-export const LAB_RELEARNING_STEPS_MINUTES = [10, 720] as const
+// Initial learning queue: consecutive learning steps then graduate.
+export const LAB_LEARNING_STEPS_MINUTES = [5, 10] as const
+export const LAB_RELEARNING_STEPS_MINUTES = [5, 10] as const
 
 export const LAB_REVIEW_GRADE_AGAIN = 1
 export const LAB_REVIEW_GRADE_HARD = 2
