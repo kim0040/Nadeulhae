@@ -167,16 +167,16 @@ function formatGenerateProgressMessage(progress: LabGenerateProgressPayload, lan
   switch (progress.status) {
     case "started":
       return language === "ko"
-        ? `요청 접수 · 목표 ${progress.targetCount}장`
-        : `Request accepted · target ${progress.targetCount} cards`
+        ? `LLM API 요청 접수 · 목표 ${progress.targetCount}장`
+        : `LLM API request accepted · target ${progress.targetCount} cards`
     case "round_started":
       return language === "ko"
-        ? `라운드 ${progress.round ?? 1} 생성 요청 중`
-        : `Round ${progress.round ?? 1} generation in progress`
+        ? `LLM API 응답 생성 중 · 라운드 ${progress.round ?? 1}`
+        : `LLM API response in progress · round ${progress.round ?? 1}`
     case "round_finished":
       return language === "ko"
-        ? `라운드 ${progress.round ?? 1} 완료 · +${progress.addedThisRound ?? 0}장 (누적 ${progress.collectedCount}/${progress.targetCount})`
-        : `Round ${progress.round ?? 1} done · +${progress.addedThisRound ?? 0} cards (${progress.collectedCount}/${progress.targetCount})`
+        ? `LLM 응답 수신 · +${progress.addedThisRound ?? 0}장 정제 완료 (누적 ${progress.collectedCount}/${progress.targetCount})`
+        : `LLM response received · +${progress.addedThisRound ?? 0} cards normalized (${progress.collectedCount}/${progress.targetCount})`
     case "saving":
       return language === "ko"
         ? `카드 저장 중 · ${progress.collectedCount}장 준비됨`
@@ -201,6 +201,51 @@ function formatGenerateProgressMessage(progress: LabGenerateProgressPayload, lan
     default:
       return ""
   }
+}
+
+function formatLiveGenerationHeadline(
+  progress: LabGenerateProgressPayload | null,
+  language: "ko" | "en",
+  isGenerating: boolean,
+  elapsedSeconds: number,
+  pulseFrame: number
+) {
+  if (!isGenerating && !progress) {
+    return language === "ko" ? "생성 요청을 시작하면 여기에서 진행 상태를 보여줍니다." : "Progress appears here after you start generation."
+  }
+
+  const dots = ".".repeat((pulseFrame % 3) + 1)
+
+  if (progress?.status === "saving") {
+    return language === "ko" ? `생성 카드 저장 중${dots}` : `Saving generated cards${dots}`
+  }
+  if (progress?.status === "completed") {
+    return language === "ko" ? "생성이 완료되었습니다." : "Generation completed."
+  }
+  if (progress?.status === "failed") {
+    return formatGenerateProgressMessage(progress, language)
+  }
+  if (progress?.status === "round_started") {
+    return language === "ko"
+      ? `LLM API 응답 생성 중 · 라운드 ${progress.round ?? 1}${dots}`
+      : `LLM API is generating responses · round ${progress.round ?? 1}${dots}`
+  }
+  if (progress?.status === "round_finished") {
+    return language === "ko"
+      ? `응답 정제 중 · 누적 ${progress.collectedCount}/${progress.targetCount}장${dots}`
+      : `Normalizing responses · ${progress.collectedCount}/${progress.targetCount}${dots}`
+  }
+
+  if (elapsedSeconds < 4) {
+    return language === "ko" ? `LLM API에 요청 전송 중${dots}` : `Sending request to LLM API${dots}`
+  }
+  if (elapsedSeconds < 18) {
+    return language === "ko" ? `LLM API 답변 생성 중${dots}` : `LLM API is generating responses${dots}`
+  }
+  if (elapsedSeconds < 40) {
+    return language === "ko" ? `응답 정리 및 중복 제거 중${dots}` : `Refining responses and removing duplicates${dots}`
+  }
+  return language === "ko" ? `추가 라운드 생성 중${dots}` : `Running extra generation rounds${dots}`
 }
 
 const PART_OF_SPEECH_KO: Record<string, string> = {
@@ -265,10 +310,8 @@ const LAB_COPY = {
     generating: "생성 중...",
     generateHint: "AI가 주제에 맞춰 학습하기 좋은 실전 단어들을 자동으로 생성해 줍니다. 예문 해설 필드에 해석도 함께 추가됩니다.",
     generateUsageTitle: "자동 생성 현황",
-    generateProgressTitle: "실시간 생성 진행",
-    generateProgressLive: "websocket live",
-    generateProgressFallback: "websocket reconnecting",
-    generateProgressFallbackHint: "실시간 연결이 재시도 중입니다. 진행 이벤트가 늦게 도착할 수 있어요.",
+    generateProgressTitle: "생성 진행",
+    generateProgressRealtime: "실시간 업데이트",
     dueTitle: "지금 복습할 카드",
     reveal: "정답 보기",
     gradeAgain: "다시",
@@ -411,10 +454,8 @@ const LAB_COPY = {
     generating: "Generating...",
     generateHint: "The AI automatically generates practical study cards tailored to your topic, complete with example translations.",
     generateUsageTitle: "Generation Status",
-    generateProgressTitle: "Live Generation Progress",
-    generateProgressLive: "websocket live",
-    generateProgressFallback: "websocket reconnecting",
-    generateProgressFallbackHint: "Realtime connection is reconnecting. Progress events may arrive late.",
+    generateProgressTitle: "Generation Progress",
+    generateProgressRealtime: "Realtime updates",
     dueTitle: "Cards due now",
     reveal: "Reveal answer",
     gradeAgain: "Again",
@@ -619,6 +660,8 @@ export default function LabPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateProgressEvents, setGenerateProgressEvents] = useState<LabGenerateProgressPayload[]>([])
   const [activeGenerateRequestId, setActiveGenerateRequestId] = useState<string | null>(null)
+  const [generateStartedAtMs, setGenerateStartedAtMs] = useState<number | null>(null)
+  const [progressPulseFrame, setProgressPulseFrame] = useState(0)
   const [actionError, setActionError] = useState<string | null>(null)
   const [answerVisible, setAnswerVisible] = useState(false)
   const [isCompactViewport, setIsCompactViewport] = useState(false)
@@ -714,6 +757,19 @@ export default function LabPage() {
 
     return unsubscribe
   }, [appendGenerateProgress, subscribe])
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setProgressPulseFrame(0)
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      setProgressPulseFrame((prev) => (prev + 1) % 3)
+    }, 700)
+
+    return () => window.clearInterval(timer)
+  }, [isGenerating])
 
   const flushSyncQueue = useCallback(async () => {
     if (syncQueue.current.length === 0) return
@@ -1031,19 +1087,20 @@ export default function LabPage() {
     [generateProgressEvents]
   )
 
-  const generateProgressPercent = useMemo(() => {
-    if (!latestGenerateProgress) {
-      return 0
-    }
+  const generateElapsedSeconds = !isGenerating || !generateStartedAtMs
+    ? 0
+    : Math.max(0, Math.floor((Date.now() - generateStartedAtMs) / 1000))
 
-    if (latestGenerateProgress.status === "completed") {
-      return 100
-    }
-
-    const safeTarget = Math.max(1, latestGenerateProgress.targetCount)
-    const ratio = Math.min(0.98, latestGenerateProgress.collectedCount / safeTarget)
-    return Math.max(4, Math.round(ratio * 100))
-  }, [latestGenerateProgress])
+  const liveGenerationHeadline = useMemo(
+    () => formatLiveGenerationHeadline(
+      latestGenerateProgress,
+      language,
+      isGenerating,
+      generateElapsedSeconds,
+      progressPulseFrame
+    ),
+    [generateElapsedSeconds, isGenerating, language, latestGenerateProgress, progressPulseFrame]
+  )
 
   const handleGenerate = async () => {
     const normalizedTopic = topic.replace(/\s+/g, " ").trim()
@@ -1056,6 +1113,7 @@ export default function LabPage() {
     const requestId = `lab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
     setIsGenerating(true)
+    setGenerateStartedAtMs(Date.now())
     setActionError(null)
     setAnswerVisible(false)
     setGenerateProgressEvents([])
@@ -1126,6 +1184,7 @@ export default function LabPage() {
       })
     } finally {
       setIsGenerating(false)
+      setGenerateStartedAtMs(null)
       setActiveGenerateRequestId(null)
       activeGenerateRequestIdRef.current = null
     }
@@ -1966,24 +2025,16 @@ export default function LabPage() {
                       {copy.generateProgressTitle}
                     </p>
                     <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]",
-                        wsConnected
-                          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          : "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                      )}
+                      className="inline-flex items-center gap-1 rounded-full border border-sky-blue/25 bg-sky-blue/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-blue"
                     >
-                      <span className={cn("size-1.5 rounded-full", wsConnected ? "animate-pulse bg-emerald-500" : "bg-amber-500")} />
-                      {wsConnected ? copy.generateProgressLive : copy.generateProgressFallback}
+                      <span className={cn("size-1.5 rounded-full bg-sky-blue", isGenerating && "animate-pulse")} />
+                      {copy.generateProgressRealtime}
                     </span>
                   </div>
 
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-card-border/60">
-                    <div
-                      className="h-full rounded-full bg-sky-blue transition-all duration-300"
-                      style={{ width: `${generateProgressPercent}%` }}
-                    />
-                  </div>
+                  <p className="mt-3 text-sm font-black text-foreground">
+                    {liveGenerationHeadline}
+                  </p>
 
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-muted-foreground">
                     <span>
@@ -1991,18 +2042,15 @@ export default function LabPage() {
                         ? `${latestGenerateProgress.collectedCount}/${latestGenerateProgress.targetCount}`
                         : `0/${cardCount}`}
                     </span>
+                    {isGenerating ? (
+                      <span>{language === "ko" ? `경과 ${generateElapsedSeconds}초` : `${generateElapsedSeconds}s elapsed`}</span>
+                    ) : null}
                     {activeGenerateRequestId ? (
                       <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80">
                         {activeGenerateRequestId.slice(-10)}
                       </span>
                     ) : null}
                   </div>
-
-                  {!wsConnected && isGenerating ? (
-                    <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                      {copy.generateProgressFallbackHint}
-                    </p>
-                  ) : null}
 
                   <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
                     {generateProgressEvents.map((event, index) => (
