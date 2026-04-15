@@ -8,7 +8,6 @@ import remarkGfm from "remark-gfm"
 
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { useLanguage } from "@/context/LanguageContext"
-import { useWebSocket } from "@/lib/websocket/use-websocket"
 import type { AuthUser } from "@/lib/auth/types"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { ChatConversationMessage, ChatStateResponse } from "@/lib/chat/types"
@@ -220,7 +219,6 @@ export function DashboardChatPanel({
   weatherContext: ChatWeatherContext | null
 }) {
   const { language } = useLanguage()
-  const { subscribe } = useWebSocket()
   const copy = CHAT_PANEL_COPY[language]
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
@@ -241,6 +239,7 @@ export function DashboardChatPanel({
   const isComposingRef = useRef(false)
 
   const applyPayload = useCallback((payload: ChatStateResponse) => {
+    // Keep all state slices sourced from one server payload to avoid partial-session mismatches.
     setMessages(payload.messages)
     setUsage(payload.usage)
     setPolicy(payload.policy)
@@ -294,6 +293,7 @@ export function DashboardChatPanel({
   const resolvedActiveSessionId = activeSessionId ?? sessions[0]?.id ?? null
 
   useEffect(() => {
+    // Reset viewport tracking when switching session so first render starts from latest message.
     didInitScrollRef.current = false
     previousMessageCountRef.current = 0
     shouldStickToBottomRef.current = true
@@ -305,6 +305,7 @@ export function DashboardChatPanel({
       return
     }
 
+    // Sticky autoscroll only while user remains near bottom; preserve manual scroll-up reading.
     const distanceToBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
     shouldStickToBottomRef.current = distanceToBottom <= 88
   }, [])
@@ -394,8 +395,11 @@ export function DashboardChatPanel({
           method: "DELETE",
           credentials: "include",
           headers: {
+            // Backend mutation guard expects JSON requests for non-GET routes.
+            "Content-Type": "application/json",
             "Accept-Language": language,
           },
+          body: JSON.stringify({}),
         })
 
         const data = await response.json().catch(() => null)

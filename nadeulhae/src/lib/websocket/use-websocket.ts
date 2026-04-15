@@ -31,6 +31,7 @@ export function useWebSocket() {
   const mountedRef = useRef(true)
 
   const getReconnectDelay = useCallback(() => {
+    // Exponential backoff + jitter avoids reconnect stampede after transient outages.
     const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttemptsRef.current), MAX_RECONNECT_DELAY)
     return delay + Math.random() * 500
   }, [])
@@ -82,6 +83,7 @@ export function useWebSocket() {
       }
 
       if (!mountedRef.current) return
+      // 4403 is authorization/origin policy failure; retrying would loop forever.
       if (NON_RETRIABLE_CLOSE_CODES.has(event.code)) return
 
       reconnectAttemptsRef.current += 1
@@ -126,11 +128,26 @@ export function useWebSocket() {
       }
       handlersRef.current.get(type)!.add(handler)
       return () => {
+        // Keep handler sets clean; stale listeners are a common source of duplicate UI updates.
         handlersRef.current.get(type)?.delete(handler)
       }
     },
     []
   )
+
+  const send = useCallback((type: string, payload?: Record<string, unknown>) => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return false
+    }
+
+    try {
+      ws.send(JSON.stringify({ type, payload }))
+      return true
+    } catch {
+      return false
+    }
+  }, [])
 
   useEffect(() => {
     mountedRef.current = true
@@ -150,5 +167,5 @@ export function useWebSocket() {
     }
   }, [connect])
 
-  return { connected, subscribe }
+  return { connected, subscribe, send }
 }

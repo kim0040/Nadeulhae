@@ -1,25 +1,43 @@
+import { randomUUID } from "node:crypto"
 import { WebSocketServer, WebSocket } from "ws"
 import type { IncomingMessage } from "node:http"
 import {
   addClient,
   removeClient,
   broadcast,
+  broadcastToRoom,
   getConnectedCount,
   isMaxConnectionsReached,
-  isAllowedClientMessage,
+  joinRoom,
+  leaveRoom,
+  parseAllowedClientMessage,
 } from "@/lib/websocket/broadcast"
 import { getSessionTokenHash } from "@/lib/auth/session"
 import { findUserBySessionTokenHash } from "@/lib/auth/repository"
+import { isValidCodeShareSessionId, toCodeShareRoomName } from "@/lib/code-share/constants"
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
+const CODE_SHARE_ACTOR_COOKIE_NAME = process.env.CODE_SHARE_ACTOR_COOKIE_NAME ?? "nadeulhae_code_share_actor"
+const CODE_SHARE_ALIAS_COOKIE_NAME = process.env.CODE_SHARE_ALIAS_COOKIE_NAME ?? "nadeulhae_code_share_alias"
 const PING_INTERVAL_MS = 30_000
 const PING_TIMEOUT_MS = 60_000
+const CODE_SHARE_TYPING_TIMEOUT_MS = 7_500
 const WS_ORIGIN_ALLOWLIST = new Set([
   process.env.APP_BASE_URL,
   "https://nadeulhae.space",
   "https://www.nadeulhae.space",
   "http://localhost:3000",
 ].filter(Boolean))
+
+type CodeSharePresenceActor = {
+  actorId: string
+  alias: string
+  connections: number
+  typing: boolean
+}
+
+const codeSharePresenceBySession = new Map<string, Map<string, CodeSharePresenceActor>>()
+const codeShareTypingTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 function parseCookie(cookieHeader: string | undefined): Record<string, string> {
   const result: Record<string, string> = {}
@@ -35,6 +53,7 @@ function parseCookie(cookieHeader: string | undefined): Record<string, string> {
 }
 
 function validateOrigin(req: IncomingMessage): boolean {
+  // WebSocket does not use CORS preflight. Origin allowlist is explicit server-side protection.
   const origin = req.headers.origin
   if (!origin) return true
   return WS_ORIGIN_ALLOWLIST.has(origin)
@@ -55,6 +74,174 @@ async function authenticateWs(req: IncomingMessage): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+function getActorIdFromRequest(req: IncomingMessage) {
+  const cookieHeader = req.headers.cookie
+  const cookies = parseCookie(cookieHeader)
+  const actorId = cookies[CODE_SHARE_ACTOR_COOKIE_NAME]
+  if (typeof actorId !== "string") {
+    return null
+  }
+
+  const normalized = actorId.trim()
+  if (!/^[a-f0-9-]{36}$/i.test(normalized)) {
+    return null
+  }
+
+  return normalized
+}
+
+function getActorAliasFromRequest(req: IncomingMessage) {
+  const cookieHeader = req.headers.cookie
+  const cookies = parseCookie(cookieHeader)
+  const alias = cookies[CODE_SHARE_ALIAS_COOKIE_NAME]
+  if (typeof alias !== "string") {
+    return null
+  }
+
+  const normalized = alias.trim()
+  if (!/^[A-Za-z0-9가-힣\-_\s]{2,40}$/.test(normalized)) {
+    return null
+  }
+
+  return normalized
+}
+
+function getTypingTimeoutKey(sessionId: string, actorId: string) {
+  return `${sessionId}:${actorId}`
+}
+
+function clearTypingTimeout(sessionId: string, actorId: string) {
+  const key = getTypingTimeoutKey(sessionId, actorId)
+  const timeout = codeShareTypingTimeouts.get(key)
+  if (timeout) {
+    clearTimeout(timeout)
+    codeShareTypingTimeouts.delete(key)
+  }
+}
+
+function getOrCreatePresenceMap(sessionId: string) {
+  if (!codeSharePresenceBySession.has(sessionId)) {
+    codeSharePresenceBySession.set(sessionId, new Map())
+  }
+  return codeSharePresenceBySession.get(sessionId)!
+}
+
+function joinCodeSharePresence(sessionId: string, actorId: string, alias: string) {
+  const presenceMap = getOrCreatePresenceMap(sessionId)
+  const existing = presenceMap.get(actorId)
+
+  if (existing) {
+    // Same actor may open multiple tabs; track connection count per actor.
+    existing.connections += 1
+    existing.alias = alias
+    return
+  }
+
+  presenceMap.set(actorId, {
+    actorId,
+    alias,
+    connections: 1,
+    typing: false,
+  })
+}
+
+function leaveCodeSharePresence(sessionId: string, actorId: string) {
+  const presenceMap = codeSharePresenceBySession.get(sessionId)
+  if (!presenceMap) {
+    return
+  }
+
+  const existing = presenceMap.get(actorId)
+  if (!existing) {
+    return
+  }
+
+  existing.connections -= 1
+  if (existing.connections <= 0) {
+    presenceMap.delete(actorId)
+    clearTypingTimeout(sessionId, actorId)
+  }
+
+  if (presenceMap.size === 0) {
+    codeSharePresenceBySession.delete(sessionId)
+  }
+}
+
+function setCodeShareTyping(sessionId: string, actorId: string, isTyping: boolean) {
+  const presenceMap = codeSharePresenceBySession.get(sessionId)
+  if (!presenceMap) {
+    return
+  }
+
+  const existing = presenceMap.get(actorId)
+  if (!existing) {
+    return
+  }
+
+  if (!isTyping) {
+    existing.typing = false
+    clearTypingTimeout(sessionId, actorId)
+    return
+  }
+
+  existing.typing = true
+  clearTypingTimeout(sessionId, actorId)
+
+  const timeoutKey = getTypingTimeoutKey(sessionId, actorId)
+  // Auto-clear typing status if client disconnects abruptly without sending isTyping=false.
+  const timeout = setTimeout(() => {
+    const latestMap = codeSharePresenceBySession.get(sessionId)
+    const latest = latestMap?.get(actorId)
+    if (!latest) {
+      codeShareTypingTimeouts.delete(timeoutKey)
+      return
+    }
+
+    latest.typing = false
+    codeShareTypingTimeouts.delete(timeoutKey)
+    broadcastCodeSharePresence(sessionId)
+  }, CODE_SHARE_TYPING_TIMEOUT_MS)
+
+  codeShareTypingTimeouts.set(timeoutKey, timeout)
+}
+
+function buildCodeSharePresencePayload(sessionId: string) {
+  const actors = codeSharePresenceBySession.get(sessionId)
+  if (!actors) {
+    return {
+      sessionId,
+      count: 0,
+      participants: [] as Array<{
+        actorId: string
+        alias: string
+        typing: boolean
+      }>,
+    }
+  }
+
+  const participants = [...actors.values()]
+    .sort((a, b) => a.alias.localeCompare(b.alias))
+    .map((actor) => ({
+      actorId: actor.actorId,
+      alias: actor.alias,
+      typing: actor.typing,
+    }))
+
+  // Count tracks active socket connections (not unique actors) to mirror "currently connected tabs".
+  const count = [...actors.values()].reduce((sum, actor) => sum + Math.max(0, actor.connections), 0)
+
+  return {
+    sessionId,
+    count,
+    participants,
+  }
+}
+
+function broadcastCodeSharePresence(sessionId: string) {
+  const room = toCodeShareRoomName(sessionId)
+  broadcastToRoom(room, "code_share_presence", buildCodeSharePresencePayload(sessionId))
 }
 
 function setupHeartbeat(ws: WebSocket) {
@@ -116,16 +303,38 @@ export function createWebSocketServer(server: import("node:http").Server) {
       return
     }
 
-    let userId: string | null = null
+    const actorId = getActorIdFromRequest(req) ?? `guest-${randomUUID()}`
+    const actorAlias = getActorAliasFromRequest(req) ?? `Guest-${actorId.slice(-4)}`
+    const subscribedCodeShareSessions = new Set<string>()
+    let cleanedUp = false
 
+    const cleanup = () => {
+      if (cleanedUp) {
+        return
+      }
+      cleanedUp = true
+
+      const affectedSessionIds = [...subscribedCodeShareSessions]
+      for (const sessionId of affectedSessionIds) {
+        leaveCodeSharePresence(sessionId, actorId)
+      }
+
+      removeClient(ws)
+      broadcast("user_count", { count: getConnectedCount() })
+
+      for (const sessionId of affectedSessionIds) {
+        broadcastCodeSharePresence(sessionId)
+      }
+    }
+
+    // Auth is optional for code-share guest usage, but user id is attached when cookie session is valid.
     authenticateWs(req)
-      .then((id) => {
-        userId = id
+      .then((userId) => {
         if (ws.readyState !== WebSocket.OPEN) {
           return
         }
 
-        const added = addClient(ws, userId)
+        const added = addClient(ws, userId, actorId, actorAlias)
         if (!added) {
           ws.close(4429, "Too many connections")
           return
@@ -143,27 +352,77 @@ export function createWebSocketServer(server: import("node:http").Server) {
 
     ws.on("message", (data) => {
       const str = typeof data === "string" ? data : data.toString("utf-8")
-      if (!isAllowedClientMessage(str)) {
+      const parsed = parseAllowedClientMessage(str)
+      if (!parsed) {
         return
       }
 
-      try {
-        const parsed = JSON.parse(str)
-        if (parsed.type === "ping") {
-          ws.send(JSON.stringify({ type: "pong", payload: { ts: Date.now() } }))
+      if (parsed.type === "ping") {
+        ws.send(JSON.stringify({ type: "pong", payload: { ts: Date.now() } }))
+        return
+      }
+
+      const sessionId = parsed.payload.sessionId
+      if (!isValidCodeShareSessionId(sessionId)) {
+        return
+      }
+
+      const room = toCodeShareRoomName(sessionId)
+
+      if (parsed.type === "code_share_subscribe") {
+        const joined = joinRoom(ws, room)
+        if (!joined) {
+          return
         }
-      } catch {}
+
+        subscribedCodeShareSessions.add(sessionId)
+        joinCodeSharePresence(sessionId, actorId, actorAlias)
+        broadcastCodeSharePresence(sessionId)
+        return
+      }
+
+      if (parsed.type === "code_share_unsubscribe") {
+        leaveRoom(ws, room)
+        subscribedCodeShareSessions.delete(sessionId)
+        leaveCodeSharePresence(sessionId, actorId)
+        broadcastCodeSharePresence(sessionId)
+        return
+      }
+
+      if (parsed.type === "code_share_typing") {
+        if (!subscribedCodeShareSessions.has(sessionId)) {
+          return
+        }
+
+        setCodeShareTyping(sessionId, actorId, parsed.payload.isTyping)
+        broadcastCodeSharePresence(sessionId)
+        return
+      }
+
+      if (parsed.type === "code_share_saved") {
+        if (!subscribedCodeShareSessions.has(sessionId)) {
+          return
+        }
+
+        // Secondary sync signal: clients use this to trigger silent refresh when direct patch event is missed.
+        broadcastToRoom(
+          room,
+          "code_share_saved",
+          {
+            sessionId,
+            version: parsed.payload.version,
+            actor: {
+              actorId,
+              alias: actorAlias,
+            },
+          },
+          ws
+        )
+      }
     })
 
-    ws.on("close", () => {
-      removeClient(ws)
-      broadcast("user_count", { count: getConnectedCount() })
-    })
-
-    ws.on("error", () => {
-      removeClient(ws)
-      broadcast("user_count", { count: getConnectedCount() })
-    })
+    ws.on("close", cleanup)
+    ws.on("error", cleanup)
   })
 
   return wss
