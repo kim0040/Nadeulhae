@@ -18,6 +18,7 @@ import { withApiAnalytics } from "@/lib/analytics/route"
 import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/repository"
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { wgs84ToTm } from "@/lib/coords-utils"
+import { broadcast } from "@/lib/websocket/broadcast"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 
 // Simple in-memory cache for nearest stations based on coords (lat_lon -> stationName)
@@ -1263,6 +1264,15 @@ async function handleGET(req: Request) {
     const oldestKey = currentResponseCache.keys().next().value as string | undefined
     if (!oldestKey) break
     currentResponseCache.delete(oldestKey)
+  }
+
+  if (responsePayload.eventData.isWeatherWarning || responsePayload.eventData.isEarthquake || responsePayload.eventData.isTsunami || responsePayload.eventData.isVolcano) {
+    broadcast("weather_alert", {
+      type: responsePayload.eventData.isEarthquake ? "earthquake" : responsePayload.eventData.isTsunami ? "tsunami" : responsePayload.eventData.isVolcano ? "volcano" : "warning",
+      message: responsePayload.eventData.warningMessage || undefined,
+      score: responsePayload.score,
+      status: responsePayload.status,
+    })
   }
 
   const response = NextResponse.json(responsePayload)

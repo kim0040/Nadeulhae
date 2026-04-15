@@ -11,7 +11,7 @@ import {
   CHAT_CONTEXT_MESSAGE_LIMIT,
   CHAT_INPUT_MAX_CHARACTERS,
 } from "@/lib/chat/constants"
-import { FactChatError, createFactChatCompletion } from "@/lib/chat/factchat"
+import { FactChatError, createFactChatCompletion, createFactChatCompletionStream } from "@/lib/chat/factchat"
 import {
   buildChatSystemPrompt,
   buildProfileMemoryPrompt,
@@ -513,6 +513,7 @@ async function handlePOST(request: NextRequest) {
 
   let resolvedSessionId: number | null = null
   let lockedUserId: string | null = null
+  let lockReleased = false
   let contextMessageCount = 0
 
   try {
@@ -604,20 +605,121 @@ async function handlePOST(request: NextRequest) {
     ])
     contextMessageCount = contextMessages.length
 
+    const acceptSSE = request.headers.get("accept")?.includes("text/event-stream")
+    const chatMessages = buildChatPayload(
+      contextMessages,
+      buildChatSystemPrompt({
+        locale,
+        user: authenticatedSession.user,
+        memorySummary: latestSessionMemory?.summary ?? null,
+        profileSummary: profileMemory?.summary ?? null,
+        profileAssessment: profileMemory?.assessment ?? null,
+        weatherContext,
+      }),
+      message
+    )
+
+    if (acceptSSE) {
+      const encoder = new TextEncoder()
+      let accumulated = ""
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          const sendEvent = (event: string, data: unknown) => {
+            try {
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+            } catch {}
+          }
+
+          try {
+            const completionResult = await createFactChatCompletionStream({
+              requestKind: "chat",
+              messages: chatMessages,
+              onToken: (token) => {
+                accumulated += token
+                sendEvent("token", { content: token })
+              },
+            })
+
+            const assistantMessage = enforceAssistantIdentity(accumulated, locale)
+
+            await persistChatExchange({
+              userId: authenticatedSession.user.id,
+              sessionId: resolvedSession.activeSessionId,
+              locale,
+              userMessage: message,
+              assistantMessage,
+              requestedModel: completionResult.requestedModel,
+              resolvedModel: completionResult.resolvedModel,
+              providerRequestId: completionResult.providerRequestId,
+              usage: completionResult.usage,
+              latencyMs: Date.now() - requestStartedAt,
+              contextMessageCount: contextMessages.length,
+            })
+
+            refreshUserProfileMemory({
+              userId: authenticatedSession.user.id,
+              locale,
+            }).catch((e) => { console.error("Profile memory refresh failed:", e) })
+
+            const state = await getChatState({
+              userId: authenticatedSession.user.id,
+              locale,
+              requestedSessionId: String(resolvedSession.activeSessionId),
+            })
+
+            sendEvent("done", {
+              ...withServerNow(sanitizeChatStateIdentity(state, locale)),
+              resolvedModel: completionResult.resolvedModel,
+            })
+
+            controller.close()
+          } catch (streamError) {
+            const providerError = streamError instanceof FactChatError ? streamError : null
+            const isGlobalLlmLimitError = providerError?.statusCode === 429
+              && providerError.code === "global_daily_limit_reached"
+            const errorMessage = isGlobalLlmLimitError
+              ? getErrorMessage(locale, "globalLlmLimit")
+              : providerError
+                ? getErrorMessage(locale, "providerFailure")
+                : getErrorMessage(locale, "unexpected")
+
+            sendEvent("error", { error: errorMessage })
+
+            if (authenticatedSession) {
+              await markDailyChatFailure({
+                userId: authenticatedSession.user.id,
+                sessionId: resolvedSessionId,
+                locale,
+                latencyMs: Date.now() - requestStartedAt,
+                inputCharacters: message.length,
+                messageCount: contextMessageCount,
+                errorCode: providerError?.code ?? "chat_failed",
+                errorMessage: providerError?.message ?? "Chat request failed.",
+              }).catch(() => {})
+            }
+
+            controller.close()
+          } finally {
+            lockReleased = true
+            releaseChatUserLock(lockedUserId)
+          }
+        },
+      })
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-store",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      })
+    }
+
     const completionResult = await createFactChatCompletion({
       requestKind: "chat",
-      messages: buildChatPayload(
-        contextMessages,
-        buildChatSystemPrompt({
-          locale,
-          user: authenticatedSession.user,
-          memorySummary: latestSessionMemory?.summary ?? null,
-          profileSummary: profileMemory?.summary ?? null,
-          profileAssessment: profileMemory?.assessment ?? null,
-          weatherContext,
-        }),
-        message
-      ),
+      messages: chatMessages,
     })
     const assistantMessage = enforceAssistantIdentity(completionResult.content, locale)
 
@@ -695,7 +797,9 @@ async function handlePOST(request: NextRequest) {
       ? attachRefreshedAuthCookie(response, authenticatedSession)
       : response
   } finally {
-    releaseChatUserLock(lockedUserId)
+    if (!lockReleased) {
+      releaseChatUserLock(lockedUserId)
+    }
   }
 }
 
