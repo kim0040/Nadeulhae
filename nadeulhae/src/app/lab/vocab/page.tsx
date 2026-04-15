@@ -30,6 +30,7 @@ import { VocabReportPanel } from "@/components/lab/vocab-report-panel"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
 import { formatServerDateTime, parseServerTimestamp } from "@/lib/time/server-time"
+import { useWebSocket } from "@/lib/websocket/use-websocket"
 import { cn } from "@/lib/utils"
 
 const LAB_MIN_CARD_COUNT = 4
@@ -83,6 +84,123 @@ type LabStateSnapshot = {
 
 type ApiErrorPayload = {
   error?: string
+}
+
+type LabGenerateProgressStatus =
+  | "started"
+  | "round_started"
+  | "round_finished"
+  | "saving"
+  | "completed"
+  | "failed"
+
+type LabGenerateProgressPayload = {
+  requestId: string
+  status: LabGenerateProgressStatus
+  targetCount: number
+  collectedCount: number
+  at: string
+  round?: number
+  totalRounds?: number
+  addedThisRound?: number
+  providerFailureCount?: number
+  reason?: "daily_limit" | "global_limit" | "provider_failure" | "parse_failure" | "internal_error"
+}
+
+const LAB_GENERATE_PROGRESS_STATUS_SET = new Set<LabGenerateProgressStatus>([
+  "started",
+  "round_started",
+  "round_finished",
+  "saving",
+  "completed",
+  "failed",
+])
+
+function parseGenerateProgressPayload(payload: unknown): LabGenerateProgressPayload | null {
+  if (!payload || typeof payload !== "object") {
+    return null
+  }
+
+  const source = payload as Record<string, unknown>
+  if (
+    typeof source.requestId !== "string"
+    || !LAB_GENERATE_PROGRESS_STATUS_SET.has(source.status as LabGenerateProgressStatus)
+    || typeof source.targetCount !== "number"
+    || typeof source.collectedCount !== "number"
+    || typeof source.at !== "string"
+  ) {
+    return null
+  }
+
+  return {
+    requestId: source.requestId,
+    status: source.status as LabGenerateProgressStatus,
+    targetCount: Math.max(0, Math.floor(source.targetCount)),
+    collectedCount: Math.max(0, Math.floor(source.collectedCount)),
+    at: source.at,
+    round: typeof source.round === "number" ? Math.max(1, Math.floor(source.round)) : undefined,
+    totalRounds: typeof source.totalRounds === "number" ? Math.max(1, Math.floor(source.totalRounds)) : undefined,
+    addedThisRound: typeof source.addedThisRound === "number" ? Math.max(0, Math.floor(source.addedThisRound)) : undefined,
+    providerFailureCount: typeof source.providerFailureCount === "number"
+      ? Math.max(0, Math.floor(source.providerFailureCount))
+      : undefined,
+    reason: typeof source.reason === "string"
+      ? source.reason as LabGenerateProgressPayload["reason"]
+      : undefined,
+  }
+}
+
+function formatGenerateProgressTime(value: string, language: "ko" | "en") {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return ""
+  }
+
+  return parsed.toLocaleTimeString(language === "ko" ? "ko-KR" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
+function formatGenerateProgressMessage(progress: LabGenerateProgressPayload, language: "ko" | "en") {
+  switch (progress.status) {
+    case "started":
+      return language === "ko"
+        ? `요청 접수 · 목표 ${progress.targetCount}장`
+        : `Request accepted · target ${progress.targetCount} cards`
+    case "round_started":
+      return language === "ko"
+        ? `라운드 ${progress.round ?? 1} 생성 요청 중`
+        : `Round ${progress.round ?? 1} generation in progress`
+    case "round_finished":
+      return language === "ko"
+        ? `라운드 ${progress.round ?? 1} 완료 · +${progress.addedThisRound ?? 0}장 (누적 ${progress.collectedCount}/${progress.targetCount})`
+        : `Round ${progress.round ?? 1} done · +${progress.addedThisRound ?? 0} cards (${progress.collectedCount}/${progress.targetCount})`
+    case "saving":
+      return language === "ko"
+        ? `카드 저장 중 · ${progress.collectedCount}장 준비됨`
+        : `Saving deck · ${progress.collectedCount} cards prepared`
+    case "completed":
+      return language === "ko"
+        ? `완료 · ${progress.collectedCount}장 저장`
+        : `Completed · ${progress.collectedCount} cards saved`
+    case "failed":
+      if (language === "ko") {
+        if (progress.reason === "daily_limit") return "실패 · 오늘 생성 한도 초과"
+        if (progress.reason === "global_limit") return "실패 · 글로벌 AI 요청 한도 도달"
+        if (progress.reason === "provider_failure") return "실패 · 생성 모델 응답 실패"
+        if (progress.reason === "parse_failure") return "실패 · 생성 결과 파싱 실패"
+        return "실패 · 내부 오류"
+      }
+      if (progress.reason === "daily_limit") return "Failed · daily generation limit reached"
+      if (progress.reason === "global_limit") return "Failed · global AI quota reached"
+      if (progress.reason === "provider_failure") return "Failed · model generation error"
+      if (progress.reason === "parse_failure") return "Failed · parse error"
+      return "Failed · internal error"
+    default:
+      return ""
+  }
 }
 
 const PART_OF_SPEECH_KO: Record<string, string> = {
@@ -147,6 +265,10 @@ const LAB_COPY = {
     generating: "생성 중...",
     generateHint: "AI가 주제에 맞춰 학습하기 좋은 실전 단어들을 자동으로 생성해 줍니다. 예문 해설 필드에 해석도 함께 추가됩니다.",
     generateUsageTitle: "자동 생성 현황",
+    generateProgressTitle: "실시간 생성 진행",
+    generateProgressLive: "websocket live",
+    generateProgressFallback: "websocket reconnecting",
+    generateProgressFallbackHint: "실시간 연결이 재시도 중입니다. 진행 이벤트가 늦게 도착할 수 있어요.",
     dueTitle: "지금 복습할 카드",
     reveal: "정답 보기",
     gradeAgain: "다시",
@@ -289,6 +411,10 @@ const LAB_COPY = {
     generating: "Generating...",
     generateHint: "The AI automatically generates practical study cards tailored to your topic, complete with example translations.",
     generateUsageTitle: "Generation Status",
+    generateProgressTitle: "Live Generation Progress",
+    generateProgressLive: "websocket live",
+    generateProgressFallback: "websocket reconnecting",
+    generateProgressFallbackHint: "Realtime connection is reconnecting. Progress events may arrive late.",
     dueTitle: "Cards due now",
     reveal: "Reveal answer",
     gradeAgain: "Again",
@@ -482,6 +608,7 @@ export default function LabPage() {
   const { user, status } = useAuth()
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
+  const { subscribe, connected: wsConnected } = useWebSocket()
   const copy = LAB_COPY[language]
 
   const [state, setState] = useState<LabStateSnapshot | null>(null)
@@ -490,6 +617,8 @@ export default function LabPage() {
   const [topic, setTopic] = useState("")
   const [cardCount, setCardCount] = useState(LAB_DEFAULT_CARD_COUNT)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generateProgressEvents, setGenerateProgressEvents] = useState<LabGenerateProgressPayload[]>([])
+  const [activeGenerateRequestId, setActiveGenerateRequestId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [answerVisible, setAnswerVisible] = useState(false)
   const [isCompactViewport, setIsCompactViewport] = useState(false)
@@ -540,9 +669,51 @@ export default function LabPage() {
 
   const syncQueue = useRef<{cardId: number, grade: number}[]>([])
   const syncTimer = useRef<NodeJS.Timeout | null>(null)
+  const activeGenerateRequestIdRef = useRef<string | null>(null)
   const loadStateRef = useRef<() => Promise<void>>(async () => {})
   const stateErrorRef = useRef(copy.stateError)
   stateErrorRef.current = copy.stateError
+
+  const appendGenerateProgress = useCallback((nextEvent: LabGenerateProgressPayload) => {
+    setGenerateProgressEvents((previous) => {
+      const last = previous.at(-1)
+      if (
+        last
+        && last.requestId === nextEvent.requestId
+        && last.status === nextEvent.status
+        && last.round === nextEvent.round
+        && last.collectedCount === nextEvent.collectedCount
+        && last.targetCount === nextEvent.targetCount
+      ) {
+        return previous
+      }
+
+      const merged = [...previous, nextEvent]
+      if (merged.length <= 32) {
+        return merged
+      }
+
+      return merged.slice(-32)
+    })
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = subscribe("lab_generate_progress", (payload: unknown) => {
+      const parsed = parseGenerateProgressPayload(payload)
+      if (!parsed) {
+        return
+      }
+
+      const activeRequestId = activeGenerateRequestIdRef.current
+      if (!activeRequestId || parsed.requestId !== activeRequestId) {
+        return
+      }
+
+      appendGenerateProgress(parsed)
+    })
+
+    return unsubscribe
+  }, [appendGenerateProgress, subscribe])
 
   const flushSyncQueue = useCallback(async () => {
     if (syncQueue.current.length === 0) return
@@ -855,6 +1026,25 @@ export default function LabPage() {
     return ((safeStage + 1) / LAB_SRS_TOTAL_STAGES) * 100
   }, [activeCard])
 
+  const latestGenerateProgress = useMemo(
+    () => generateProgressEvents.at(-1) ?? null,
+    [generateProgressEvents]
+  )
+
+  const generateProgressPercent = useMemo(() => {
+    if (!latestGenerateProgress) {
+      return 0
+    }
+
+    if (latestGenerateProgress.status === "completed") {
+      return 100
+    }
+
+    const safeTarget = Math.max(1, latestGenerateProgress.targetCount)
+    const ratio = Math.min(0.98, latestGenerateProgress.collectedCount / safeTarget)
+    return Math.max(4, Math.round(ratio * 100))
+  }, [latestGenerateProgress])
+
   const handleGenerate = async () => {
     const normalizedTopic = topic.replace(/\s+/g, " ").trim()
     if (normalizedTopic.length < 2) {
@@ -862,9 +1052,22 @@ export default function LabPage() {
       return
     }
 
+    const requestedCardCount = cardCount
+    const requestId = `lab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
     setIsGenerating(true)
     setActionError(null)
     setAnswerVisible(false)
+    setGenerateProgressEvents([])
+    setActiveGenerateRequestId(requestId)
+    activeGenerateRequestIdRef.current = requestId
+    appendGenerateProgress({
+      requestId,
+      status: "started",
+      targetCount: requestedCardCount,
+      collectedCount: 0,
+      at: new Date().toISOString(),
+    })
 
     try {
       const response = await fetch("/api/lab/generate", {
@@ -876,12 +1079,21 @@ export default function LabPage() {
         credentials: "include",
         body: JSON.stringify({
           topic: normalizedTopic,
-          cardCount,
+          cardCount: requestedCardCount,
+          requestId,
         }),
       })
 
       if (!response.ok) {
         setActionError(await parseApiError(response, stateErrorRef.current))
+        appendGenerateProgress({
+          requestId,
+          status: "failed",
+          reason: "internal_error",
+          targetCount: requestedCardCount,
+          collectedCount: 0,
+          at: new Date().toISOString(),
+        })
         return
       }
 
@@ -891,11 +1103,31 @@ export default function LabPage() {
       setManageMessage(null)
       setManageError(null)
       await loadDecks()
+
+      if (!wsConnected) {
+        appendGenerateProgress({
+          requestId,
+          status: "completed",
+          targetCount: requestedCardCount,
+          collectedCount: requestedCardCount,
+          at: new Date().toISOString(),
+        })
+      }
     } catch (error) {
       console.error("Lab generate failed:", error)
       setActionError(stateErrorRef.current)
+      appendGenerateProgress({
+        requestId,
+        status: "failed",
+        reason: "internal_error",
+        targetCount: requestedCardCount,
+        collectedCount: 0,
+        at: new Date().toISOString(),
+      })
     } finally {
       setIsGenerating(false)
+      setActiveGenerateRequestId(null)
+      activeGenerateRequestIdRef.current = null
     }
   }
 
@@ -1693,6 +1925,7 @@ export default function LabPage() {
                 <textarea
                   value={topic}
                   onChange={(event) => setTopic(event.target.value.slice(0, LAB_TOPIC_MAX_LENGTH))}
+                  disabled={isGenerating}
                   placeholder={copy.topicPlaceholder}
                   className="h-28 w-full resize-none rounded-[1.2rem] border border-card-border/70 bg-background/80 px-4 py-3 text-base font-medium text-foreground shadow-inner outline-none transition focus:border-sky-blue/35 focus:ring-2 focus:ring-sky-blue/15 sm:text-sm"
                 />
@@ -1706,6 +1939,7 @@ export default function LabPage() {
                     max={LAB_MAX_CARD_COUNT}
                     value={cardCount}
                     onChange={(event) => setCardCount(Number(event.target.value))}
+                    disabled={isGenerating}
                     className="h-2 w-full cursor-pointer appearance-none rounded-full bg-card-border/60 accent-sky-blue sm:w-56"
                   />
                 </div>
@@ -1721,6 +1955,77 @@ export default function LabPage() {
               </ShimmerButton>
 
               <p className="text-sm leading-7 text-muted-foreground">{copy.generateHint}</p>
+
+              {(isGenerating || generateProgressEvents.length > 0) ? (
+                <div
+                  aria-live="polite"
+                  className="rounded-[1.2rem] border border-card-border/70 bg-background/70 px-4 py-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
+                      {copy.generateProgressTitle}
+                    </p>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]",
+                        wsConnected
+                          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      )}
+                    >
+                      <span className={cn("size-1.5 rounded-full", wsConnected ? "animate-pulse bg-emerald-500" : "bg-amber-500")} />
+                      {wsConnected ? copy.generateProgressLive : copy.generateProgressFallback}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-card-border/60">
+                    <div
+                      className="h-full rounded-full bg-sky-blue transition-all duration-300"
+                      style={{ width: `${generateProgressPercent}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-muted-foreground">
+                    <span>
+                      {latestGenerateProgress
+                        ? `${latestGenerateProgress.collectedCount}/${latestGenerateProgress.targetCount}`
+                        : `0/${cardCount}`}
+                    </span>
+                    {activeGenerateRequestId ? (
+                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80">
+                        {activeGenerateRequestId.slice(-10)}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {!wsConnected && isGenerating ? (
+                    <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                      {copy.generateProgressFallbackHint}
+                    </p>
+                  ) : null}
+
+                  <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+                    {generateProgressEvents.map((event, index) => (
+                      <li
+                        key={`${event.requestId}:${event.at}:${index}`}
+                        className={cn(
+                          "flex items-start justify-between gap-3 rounded-[0.9rem] border px-3 py-2",
+                          event.status === "failed"
+                            ? "border-danger/30 bg-danger/10 text-danger"
+                            : event.status === "completed"
+                              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "border-card-border/70 bg-card/70 text-foreground"
+                        )}
+                      >
+                        <span className="text-xs font-semibold">{formatGenerateProgressMessage(event, language)}</span>
+                        <span className="shrink-0 text-[10px] font-bold text-muted-foreground/70">
+                          {formatGenerateProgressTime(event.at, language)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               {actionError ? (
                 <p className="rounded-[1rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">

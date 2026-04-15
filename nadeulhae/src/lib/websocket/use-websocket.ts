@@ -18,11 +18,14 @@ function getWsUrl() {
 
 const RECONNECT_BASE_DELAY = 1000
 const MAX_RECONNECT_DELAY = 30000
+const NON_RETRIABLE_CLOSE_CODES = new Set([4403])
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
+  const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const connectRef = useRef<() => void>(() => {})
   const handlersRef = useRef(new Map<string, Set<(payload: unknown) => void>>())
   const [connected, setConnected] = useState(false)
   const mountedRef = useRef(true)
@@ -40,20 +43,51 @@ export function useWebSocket() {
     const url = getWsUrl()
     if (!url) return
 
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
+
     const ws = new WebSocket(url)
 
     ws.onopen = () => {
       reconnectAttemptsRef.current = 0
       setConnected(true)
+
+      // Keep browser and server heartbeat in sync to detect half-open sockets fast.
+      pingTimerRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify({ type: "ping" }))
+          } catch {
+            if (pingTimerRef.current) {
+              clearInterval(pingTimerRef.current)
+              pingTimerRef.current = null
+            }
+          }
+        } else if (pingTimerRef.current) {
+          clearInterval(pingTimerRef.current)
+          pingTimerRef.current = null
+        }
+      }, 25000)
     }
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       setConnected(false)
       wsRef.current = null
+
+      if (pingTimerRef.current) {
+        clearInterval(pingTimerRef.current)
+        pingTimerRef.current = null
+      }
+
       if (!mountedRef.current) return
+      if (NON_RETRIABLE_CLOSE_CODES.has(event.code)) return
+
+      reconnectAttemptsRef.current += 1
 
       reconnectTimerRef.current = setTimeout(() => {
-        if (mountedRef.current) connect()
+        if (mountedRef.current) connectRef.current()
       }, getReconnectDelay())
     }
 
@@ -63,6 +97,10 @@ export function useWebSocket() {
 
     ws.onmessage = (event) => {
       try {
+        if (typeof event.data !== "string") {
+          return
+        }
+
         const message: WsMessage = JSON.parse(event.data)
         if (message.type === "pong") return
         const handlers = handlersRef.current.get(message.type)
@@ -75,21 +113,11 @@ export function useWebSocket() {
     }
 
     wsRef.current = ws
-
-    const pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        try {
-          ws.send(JSON.stringify({ type: "ping" }))
-        } catch {
-          clearInterval(pingInterval)
-        }
-      } else {
-        clearInterval(pingInterval)
-      }
-    }, 25000)
-
-    ws.addEventListener("close", () => clearInterval(pingInterval))
   }, [getReconnectDelay])
+
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
 
   const subscribe = useCallback(
     (type: string, handler: (payload: unknown) => void) => {
@@ -111,6 +139,11 @@ export function useWebSocket() {
       mountedRef.current = false
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
+      if (pingTimerRef.current) {
+        clearInterval(pingTimerRef.current)
+        pingTimerRef.current = null
       }
       wsRef.current?.close()
       wsRef.current = null

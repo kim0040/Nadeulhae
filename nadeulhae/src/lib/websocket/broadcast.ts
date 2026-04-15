@@ -1,4 +1,4 @@
-import type { WebSocket } from "ws"
+import { WebSocket } from "ws"
 
 type ClientMeta = { userId: string | null; connectedAt: number }
 
@@ -7,6 +7,19 @@ const MAX_MESSAGE_SIZE = 4096
 const ALLOWED_MESSAGE_TYPES = new Set(["ping"])
 
 const clients = new Map<WebSocket, ClientMeta>()
+
+function safeSend(ws: WebSocket, data: string): boolean {
+  if (ws.readyState !== WebSocket.OPEN) {
+    return false
+  }
+
+  try {
+    ws.send(data)
+    return true
+  } catch {
+    return false
+  }
+}
 
 export function addClient(ws: WebSocket, userId: string | null): boolean {
   if (clients.size >= MAX_WS_CONNECTIONS) {
@@ -25,8 +38,8 @@ export function broadcast(type: string, payload: unknown, excludeWs?: WebSocket)
   const data = JSON.stringify({ type, payload })
   for (const [ws] of clients) {
     if (ws === excludeWs) continue
-    if (ws.readyState === ws.OPEN) {
-      ws.send(data)
+    if (!safeSend(ws, data)) {
+      clients.delete(ws)
     }
   }
 }
@@ -35,8 +48,8 @@ export function broadcastToUser(userId: string, type: string, payload: unknown) 
   const data = JSON.stringify({ type, payload })
   for (const [ws, meta] of clients) {
     if (meta.userId !== userId) continue
-    if (ws.readyState === ws.OPEN) {
-      ws.send(data)
+    if (!safeSend(ws, data)) {
+      clients.delete(ws)
     }
   }
 }
@@ -44,7 +57,7 @@ export function broadcastToUser(userId: string, type: string, payload: unknown) 
 export function getConnectedCount() {
   let count = 0
   for (const [ws] of clients) {
-    if (ws.readyState === ws.OPEN) {
+    if (ws.readyState === WebSocket.OPEN) {
       count++
     }
   }
