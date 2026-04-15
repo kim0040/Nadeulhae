@@ -1,370 +1,322 @@
-# Nadeulhae
+# Nadeulhae Integrated Guide (통합 완전판)
 
-나들해는 공공 기상·환경 데이터를 바탕으로 현재 위치 또는 기본 지역의 야외 활동 적합도를 계산하고, 브리핑, 예보 캘린더, 기상 이미지를 함께 보여주는 Next.js 기반 웹 애플리케이션입니다.  
-현재는 실시간 판단과 예보 중심 기능이 동작하며, 로그인/회원, 장소 DB, 장기 아카이브 같은 기능은 추후 서버 및 DB와 연결될 예정입니다.
+Nadeulhae는 **날씨·대기 데이터 기반 야외 판단 서비스 + 대시보드 채팅 + 실험실 기능(단어암기/코드공유)**를 하나로 통합한 Next.js 애플리케이션입니다.
 
-## 프로젝트 구성
+이 문서는 현재 코드베이스 기준으로 **개발/배포/운영/트러블슈팅/테스트**를 한 번에 관리하는 기준 문서입니다.
+
+## 1. Repository Layout
 
-이 저장소는 두 층으로 나뉩니다.
+- App root: [`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae)
+- This root README: [`/Users/gimhyeonmin/test/Nadeulhae/README.md`](/Users/gimhyeonmin/test/Nadeulhae/README.md)
+- Deploy doc (auth + Ubuntu): [`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/docs/ubuntu-server-deploy-auth.md`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/docs/ubuntu-server-deploy-auth.md)
+
+## 2. High-Level Architecture
+
+```mermaid
+flowchart TD
+  U[Browser User] --> NGINX[Nginx Reverse Proxy]
+  NGINX --> APP[Next.js Custom Server\nserver.ts]
+
+  APP --> WEB[App Router Pages\n/dashboard /lab /lab/vocab /lab/code-share /code-share/:id]
+  APP --> API[REST APIs\n/api/weather/*\n/api/chat*\n/api/lab/*\n/api/code-share/*]
+  APP --> WS[WebSocket /ws\nPresence/Typing/Sync Events]
+
+  API --> DB[(TiDB/MySQL)]
+  API --> EXT[External Weather APIs\nKMA / AirKorea / weather.go.kr]
+  WS --> MEM[(In-memory WS Room State)]
+  API --> MEM
+```
 
-- 웹 애플리케이션: [`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae)
-- 문서 및 참고 자료: 저장소 루트의 `api_data_list.md`, 기획 문서들
+## 3. Major Modules
+
+### 3.1 Weather Intelligence
 
-실제 실행과 개발은 모두 [`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae) 디렉토리에서 이뤄집니다.
+- Current + forecast + image + archive + trend/insight API
+- Location-aware scoring and safety/event summaries
+- Weather/air quality cache + rate-limit strategy in API layer
 
-## 무엇을 하는 서비스인가
+### 3.2 Dashboard Chat
 
-나들해는 단순히 현재 날씨를 보여주는 앱이 아니라, 여러 실시간 데이터를 한데 묶어 "지금 밖에 나가기 괜찮은지"를 빠르게 판단해 주는 서비스입니다.
+- Session-based conversation management
+- Weather context attachment
+- Session create/delete/select UX in dashboard panel
+- JSON-only mutation handling (previous delete issue fixed)
 
-- 현재 위치 또는 기본 위치(전주) 기준으로 날씨 데이터를 수집합니다.
-- 실황, 예보, 대기질, 통보문, 특보, 지진/지진해일/화산 정보를 종합합니다.
-- 규칙 기반 피크닉 지수를 계산합니다.
-- 결과를 한글/영문 브리핑, 캘린더, 기상 이미지 패널로 시각화합니다.
+### 3.3 Lab Hub
 
-## 현재 구현된 주요 기능
+- `/lab`에서 실험 기능 진입
+- 현재 실험 기능:
+  - `/lab/vocab` (단어 암기)
+  - `/lab/code-share` (코드공유 허브)
 
-### 1. 위치 기반 실시간 피크닉 지수
+### 3.4 Code Share (실시간 협업)
 
-메인 페이지는 브라우저 위치 권한이 허용되면 현재 좌표를 사용하고, 거부되면 전주 기본 프로필로 동작합니다.
+- 허브: `/lab/code-share`
+  - 새 세션 만들기(1개 CTA)
+  - 이전 세션 리스트/재오픈/삭제
+- 워크스페이스:
+  - 공유용: `/code-share/[sessionId]`
+  - 허브 내에서 열기 가능
+- 로그인 없이 링크 공유로 협업 가능
+- 1시간 비활동 시 자동 종료(기록 유지, 읽기 전용)
 
-- 실시간 기온, 습도, 풍속, 풍향, 강수량
-- 미세먼지, 초미세먼지, 오존, 이산화질소, 통합대기지수(KHAI)
-- 체감 온도 계산
-- 인근 측정소 연결
-- 지역별 통보문/특보문 반영
+## 4. Code Share Data + Realtime Model
 
-### 2. Knock-out 기반 피크닉 점수 계산
+### 4.1 Session Lifecycle
 
-피크닉 지수는 [`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/api/weather/current/route.ts`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/api/weather/current/route.ts)에서 계산합니다.
+```mermaid
+stateDiagram-v2
+  [*] --> Active: Session created
+  Active --> Active: Patch/Read activity
+  Active --> Closed: No activity for 1h
+  Closed --> [*]
+```
 
-- 기상특보, 지진, 지진해일, 화산 정보가 활성 상태면 즉시 `0점`
-- 현재 강수가 감지되면 즉시 `10점`
-- 일반 상황에서는 아래 항목을 합산
-  - 대기질: 최대 40점
-  - 기온: 최대 30점
-  - 하늘상태: 최대 20점
-  - 풍속: 최대 10점
+### 4.2 API Surface
 
-### 3. 오늘의 나들이 브리핑
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/code-share/sessions` | 내 세션 목록 조회 |
+| POST | `/api/code-share/sessions` | 새 세션 생성 |
+| GET | `/api/code-share/sessions/:sessionId` | 세션 상세 조회 |
+| PATCH | `/api/code-share/sessions/:sessionId` | 코드/제목/언어 수정 (버전 체크) |
+| DELETE | `/api/code-share/sessions/:sessionId` | 세션 삭제 (생성자만) |
 
-브리핑 패널은 단순 숫자 나열이 아니라 실제 상황을 읽기 쉽게 재구성합니다.
+### 4.3 WebSocket Events
 
-- 지역 및 측정소 정보
-- 위험 상태 요약
-- 공식 통보문 정리
-- 점수 해석 문장
-- 실시간 수치 그리드
-- KMA/AirKorea 동기화 시각 및 출처
+| Direction | Event | Description |
+|---|---|---|
+| Client -> Server | `code_share_subscribe` | 세션 방 입장 |
+| Client -> Server | `code_share_unsubscribe` | 세션 방 이탈 |
+| Client -> Server | `code_share_typing` | 타이핑 상태 전송 |
+| Client -> Server | `code_share_saved` | 저장 완료 신호 브로드캐스트 요청 |
+| Server -> Client | `code_share_presence` | 접속자 수/목록/타이핑 상태 |
+| Server -> Client | `code_share_patch` | API PATCH 반영 스냅샷 |
+| Server -> Client | `code_share_saved` | peer 저장 신호(보조 동기화 트리거) |
+| Server -> Client | `code_share_deleted` | 세션 삭제 알림 |
 
-### 4. 예보 캘린더
+### 4.4 Sync Strategy (충돌/재접속 대응)
 
-캘린더 페이지와 전주 전용 페이지에서 예보 카드를 확인할 수 있습니다.
+```mermaid
+sequenceDiagram
+  participant A as Editor A
+  participant API as API PATCH
+  participant WS as WebSocket Room
+  participant B as Editor B
 
-- 단기예보 + 중기예보를 합성한 10일 예보
-- 날짜별 점수, 강수확률, 예상 강수량, 야외 팁
-- 추천일 강조 표시
+  A->>API: PATCH(sessionId, code, expectedVersion)
+  API-->>A: session(version+1) or 409
+  API->>WS: code_share_patch(snapshot)
+  A->>WS: code_share_saved(sessionId, version)
+  WS-->>B: code_share_saved(actor/version)
+  B->>API: GET latest (silent refresh)
+```
 
-### 5. 피크닉 아카이브 뷰
+동기화 안전장치:
 
-현재 아카이브 UI는 월 단위 달력으로 추천일 패턴을 보여줍니다.
+- optimistic version (`expectedVersion`) 기반 충돌 제어
+- `409 version_conflict` 시 최신본 반환 + 클라이언트 자동 동기화
+- `code_share_saved` 신호 + **2.5초 폴링 fallback**으로 유실 방지
+- 재입장 시 세션 상세 재조회 + presence 재구독
 
-- 반짝 아이콘 날짜는 피크닉 점수 80점 이상 추천일
-- 현재는 예보 데이터를 월 단위로 재구성해 미리보기 형태로 동작
-- 장기 과거 데이터 저장소(DB)와 직접 연결하는 구조는 아직 포함되지 않음
+## 5. Identity, Access, and Safety
 
-### 6. 기상 이미지 패널
+### 5.1 Guest Identity
 
-[`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/api/weather/images/route.ts`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/api/weather/images/route.ts)에서 KMA 이미지 REST를 사용합니다.
+- 쿠키 기반 actor/alias 발급
+  - `nadeulhae_code_share_actor`
+  - `nadeulhae_code_share_alias`
+- 비회원도 링크 입장 가능
+- 랜덤 닉네임 자동 생성
 
-- 기본: 레이더, 위성
-- 조건부: 황사(dust), 낙뢰(lgt)
-- 실제 접근 가능한 최신 이미지 URL만 선택
+### 5.2 Ownership and Deletion
 
-### 7. 전주 특화 페이지
+- 삭제는 생성자(actor/user)만 가능
+- 타인은 편집 가능하더라도 삭제 불가
 
-[`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/jeonju/page.tsx`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/app/jeonju/page.tsx)는 전주 기준으로 고정된 경험을 제공합니다.
+### 5.3 WebSocket Safety Guards
 
-- 전주 기준 브리핑
-- 전주 기준 예보 캘린더
-- 전주 특화 기능 로드맵
-- 전주 명소 마키 섹션
+- Origin allowlist 검증 (`APP_BASE_URL` + 서비스 도메인 + localhost)
+- 최대 연결 수 제한 (`MAX_WS_CONNECTIONS=500`)
+- 최대 메시지 크기 제한 (`MAX_MESSAGE_SIZE=4096`)
+- 클라이언트당 최대 room 수 제한 (`MAX_ROOMS_PER_CLIENT=40`)
+- heartbeat + ping/pong timeout으로 half-open 정리
 
-### 8. 한글/영문 지원
+## 6. Local Development
 
-[`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/context/LanguageContext.tsx`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/src/context/LanguageContext.tsx)에서 UI 텍스트를 관리합니다.
-
-- 한국어/영어 전환
-- 점수/상황 기반 랜덤 문구 지원
-- 지역별 문맥 문구 지원
-
-## 페이지 구성
-
-- `/`
-  메인 실시간 피크닉 판단 페이지
-- `/about`
-  서비스 소개 및 구조 설명
-- `/statistics/calendar`
-  예보 캘린더 + 아카이브 뷰
-- `/jeonju`
-  전주 전용 페이지
-- `/login`
-  로그인 UI 플레이스홀더
-- `/signup`
-  회원가입 UI 플레이스홀더
-
-## 내부 API 구성
-
-### `GET /api/weather/current`
-
-역할:
-
-- 초단기실황 + 초단기예보 + 대기질 + UV + 통보/특보 + 지진/지진해일/화산 통합
-- 위치/관측소/권역 매핑
-- 피크닉 점수 계산
-- 브리핑용 응답 생성
-
-주요 응답:
-
-- `score`, `status`, `message`
-- `eventData`
-- `details`
-- `metadata.scoreBreakdown`
-- `metadata.alertSummary`
-- `metadata.locationContext`
-
-### `GET /api/weather/forecast`
-
-역할:
-
-- 단기예보(`VilageFcst`)와 중기예보(`MidFcst`)를 합성
-- 오늘부터 10일 예보 구성
-
-주요 응답:
-
-- `daily[].date`
-- `daily[].tempMin`
-- `daily[].tempMax`
-- `daily[].sky`
-- `daily[].precipChance`
-- `daily[].precipAmount`
-- `daily[].score`
-
-### `GET /api/weather/images`
-
-역할:
-
-- 레이더, 위성, 조건부 추가 이미지 반환
-
-주요 응답:
-
-- `radar`
-- `satellite`
-- `extras.dust`
-- `extras.lgt`
-
-### `GET /api/weather/archives`
-
-역할:
-
-- 월 단위 추천일 하이라이트 구성
-- 현재는 예보 기반 월 뷰 프리뷰 제공
-
-### 목업 기반 API
-
-다음 엔드포인트는 현재 프론트 데모/확장 포인트 성격이 강합니다.
-
-- `GET /api/weather/insights`
-- `GET /api/weather/trends`
-- `POST /api/weather/recommendations/generate`
-
-## 캐시와 호출 제어
-
-현재 구현은 서버 메모리 기반 `Map` 캐시입니다.
-
-### `current` API
-
-- 사용자 응답 캐시: 5분
-- 실황 공용 캐시: 격자 + 기준시각 기반
-- 대기질: 60분
-- UV: 60분
-- 통보/특보/지진/지진해일/화산: 15분
-- 인근 측정소 매핑: 24시간
-- 레이트리밋: IP 기준 분당 60회
-
-### `forecast` API
-
-- 사용자 응답 캐시: 5분
-- 단기예보 캐시: 3시간
-- 중기예보 캐시: 12시간
-- 레이트리밋: IP 기준 분당 30회
-
-### `images` API
-
-- 레이더: 5분
-- 위성: 2분
-- dust: 10분
-- lgt: 5분
-
-이 구조는 새로고침이 잦아도 외부 API 호출이 불필요하게 늘지 않도록 하기 위한 장치입니다.
-
-## 외부 데이터 소스
-
-- 기상청 API Hub
-  - 초단기실황/예보
-  - 단기예보
-  - 중기예보
-  - 지진해일
-  - 화산 정보
-- data.go.kr / AirKorea
-  - 대기질
-  - 인근 측정소
-  - 생활기상지수(UV)
-  - 기상 통보/특보
-  - 지진 정보
-- weather.go.kr 이미지 REST
-  - 레이더
-  - 위성
-  - 황사
-  - 낙뢰
-
-## 기술 스택
-
-- Next.js 16
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- Framer Motion
-- Lucide React
-- next-themes
-- date-fns
-- proj4
-- Magic UI 기반 커스텀 컴포넌트
-
-## 로컬 실행
-
-앱 디렉토리에서 실행합니다.
+> 반드시 앱 디렉토리에서 실행하세요.
 
 ```bash
 cd /Users/gimhyeonmin/test/Nadeulhae/nadeulhae
 npm install
+```
+
+### 6.1 Frontend/API dev
+
+```bash
 npm run dev
 ```
 
-개발 서버 기본 주소:
+- URL: `http://localhost:3000`
+- 참고: `npm run dev`는 기본 Next dev 서버이므로 WebSocket `/ws` 실시간 기능은 제한될 수 있습니다.
 
-```bash
-http://localhost:3000
-```
-
-빌드/검증:
+### 6.2 Full realtime verification mode
 
 ```bash
 npm run build
-npm run start
+NODE_ENV=production PORT=3000 npm run start
 ```
 
-## 환경 변수
+- 커스텀 서버(`server.ts`)로 HTTP + WS 함께 검증
 
-설정 파일:
+## 7. Build and Test Matrix
 
-- [`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/.env.local`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/.env.local)
+### 7.1 Mandatory checks
 
-필수:
-
-```env
-KMA_API_KEY=...
-AIRKOREA_API_KEY=...
+```bash
+npm run lint
+npm run build
+npm run test:lab
 ```
 
-선택:
+### 7.2 Code-share realtime integration test
 
-```env
-NEXT_PUBLIC_API_URL=/api/weather
-NEXT_PUBLIC_MOCK_MODE=false
-KMA_NX=63
-KMA_NY=89
-AIRKOREA_STATION_NAME=송천동
-AIRKOREA_DAILY_LIMIT=500
+추가 스크립트:
+
+- [`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/scripts/test-code-share-ws.mjs`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/scripts/test-code-share-ws.mjs)
+
+실행 순서:
+
+```bash
+# terminal 1
+cd /Users/gimhyeonmin/test/Nadeulhae/nadeulhae
+NODE_ENV=production PORT=3101 npm run start
+
+# terminal 2
+cd /Users/gimhyeonmin/test/Nadeulhae/nadeulhae
+npm run test:code-share
 ```
 
-설명:
+환경변수로 엔드포인트 오버라이드 가능:
 
-- `KMA_API_KEY`
-  기상청 API Hub 호출 키
-- `AIRKOREA_API_KEY`
-  AirKorea/data.go.kr 호출 키
-- `KMA_NX`, `KMA_NY`
-  위치 비허용 시 기본 격자
-- `AIRKOREA_STATION_NAME`
-  기본 측정소 이름
-- `AIRKOREA_DAILY_LIMIT`
-  일일 대기 API 사용 제한 상한
-- `NEXT_PUBLIC_MOCK_MODE`
-  클라이언트 서비스 레이어에서 목업 응답 사용 여부
+- `CODE_SHARE_TEST_BASE_URL`
+- `CODE_SHARE_TEST_WS_URL`
 
-## 보안 및 운영 메모
+## 8. Production Deployment (PM2 + Nginx)
 
-- 비밀키는 `NEXT_PUBLIC_` 접두사 없이 서버 라우트에서만 사용합니다.
-- `.env*`는 gitignore 대상입니다.
-- 현재 캐시는 프로세스 메모리 기반입니다.
-- 멀티 인스턴스 운영이나 서버리스 환경으로 확장할 경우 Redis 같은 외부 캐시 계층이 적절합니다.
-- 기상/재난 정보는 참고용 보조 정보이며, 실제 대응은 반드시 공식 기관 안내를 우선해야 합니다.
+### 8.1 PM2 start (recommended)
 
-## 현재 상태
+```bash
+cd /home/<user>/web/Nadeulhae/nadeulhae
+npm install --include=dev
+npm run build
+NODE_ENV=production pm2 start npm --name nadeulhae --cwd /home/<user>/web/Nadeulhae/nadeulhae -- run start
+pm2 save
+```
 
-### 이미 동작하는 것
+### 8.2 Nginx reverse proxy (WS upgrade required)
 
-- 메인 실시간 피크닉 판단
-- 브리핑 패널
-- 기상 이미지 패널
-- 예보 캘린더
-- 전주 특화 페이지
-- 한글/영문 UI
-- 위치 기반 지역/측정소 매핑
-- 캐시/레이트리밋
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:3000;
+  proxy_http_version 1.1;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
 
-### 아직 서버·DB가 직접 연결되지 않은 영역
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+}
+```
 
-- 로그인/회원 인증
-- 장소 데이터베이스
-- 과거 장기 아카이브
-- AI 반나절 코스 실제 생성 백엔드
+## 9. Troubleshooting (실전 이슈 기준)
 
-## 디렉토리 구조
+### 9.1 `502 Bad Gateway`
+
+주요 원인:
+
+- PM2가 잘못된 시작 명령(예: 이전 경로의 `server.ts`)을 잡고 재시작 루프
+- 앱 빌드 누락 후 `next start`/custom start 실행
+- Nginx 업스트림 포트 불일치
+
+점검 순서:
+
+```bash
+pm2 ls
+pm2 describe nadeulhae
+pm2 logs nadeulhae --lines 200
+curl -I http://127.0.0.1:3000
+curl -I https://<your-domain>
+```
+
+### 9.2 `Can't resolve 'tailwindcss' in .../Nadeulhae`
+
+원인:
+
+- 실행 cwd가 앱 루트가 아닌 상위 디렉토리
+- Turbopack root가 cwd에 종속
+
+대응:
+
+- 앱 루트에서 실행: `cd .../nadeulhae && npm run dev`
+- `next.config.ts`에서 turbopack root를 config 파일 절대경로로 고정(적용 완료)
+
+### 9.3 코드공유 화면 `연결 재시도 중`
+
+원인 후보:
+
+- `npm run dev`만 실행 중 (WS 커스텀 서버 부재)
+- reverse proxy에서 Upgrade 헤더 미설정
+- 일시 네트워크 단절/탭 백그라운드 전환
+
+대응:
+
+- 실시간 검증 시 `NODE_ENV=production npm run start` 사용
+- Nginx websocket upgrade 설정 확인
+- 클라이언트는 자동 재연결(backoff) + 폴링 fallback 동작
+
+## 10. Environment Variables
+
+기준 샘플: [`/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/.env.example`](/Users/gimhyeonmin/test/Nadeulhae/nadeulhae/.env.example)
+
+핵심 그룹:
+
+- Weather API: `KMA_API_KEY`, `AIRKOREA_API_KEY`, `APIHUB_KEY`
+- DB: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+- Auth/Security: `AUTH_PEPPER`, `DATA_PROTECTION_KEY`, `AUTH_COOKIE_NAME`
+- Runtime: `APP_BASE_URL`, `ALWAYS_SECURE_COOKIES`, `TRUST_PROXY_HEADERS`
+
+## 11. Directory Map (Current Focus)
 
 ```text
 Nadeulhae/
 ├─ README.md
-├─ api_data_list.md
-├─ 나들해 계획서.md
-├─ 나들해 UIUX 및 컴포넌트 설계서.md
 └─ nadeulhae/
-   ├─ package.json
+   ├─ server.ts
+   ├─ next.config.ts
+   ├─ scripts/
+   │  ├─ test-lab-features.mjs
+   │  └─ test-code-share-ws.mjs
    ├─ src/
    │  ├─ app/
-   │  │  ├─ page.tsx
-   │  │  ├─ about/page.tsx
-   │  │  ├─ jeonju/page.tsx
-   │  │  ├─ login/page.tsx
-   │  │  ├─ signup/page.tsx
-   │  │  ├─ statistics/calendar/page.tsx
-   │  │  └─ api/weather/*/route.ts
+   │  │  ├─ dashboard/page.tsx
+   │  │  ├─ lab/page.tsx
+   │  │  ├─ lab/code-share/page.tsx
+   │  │  ├─ code-share/[sessionId]/page.tsx
+   │  │  └─ api/code-share/sessions/**/route.ts
    │  ├─ components/
-   │  │  ├─ navbar.tsx
-   │  │  ├─ picnic-briefing.tsx
-   │  │  ├─ picnic-calendar.tsx
-   │  │  ├─ picnic-archive-calendar.tsx
-   │  │  ├─ weather-image-panel.tsx
-   │  │  └─ magicui/*
-   │  ├─ context/
-   │  │  └─ LanguageContext.tsx
-   │  ├─ data/
-   │  │  └─ mockData.ts
+   │  │  ├─ chat/dashboard-chat-panel.tsx
+   │  │  └─ lab/code-share-*.tsx
    │  ├─ lib/
-   │  │  ├─ coords-utils.ts
-   │  │  ├─ request-session.ts
-   │  │  └─ weather-utils.ts
-   │  └─ services/
-   │     └─ dataService.ts
-   └─ public/
+   │  │  ├─ code-share/*.ts
+   │  │  └─ websocket/*.ts
+   │  └─ services/dataService.ts
+   └─ docs/ubuntu-server-deploy-auth.md
 ```
+
+## 12. Operational Notes
+
+- 코드공유는 현재 텍스트 기반 에디터(`textarea`) 협업 모델입니다.
+- 고급 CRDT/OT 엔진은 아직 미도입이며, 버전 체크 + 최신본 재동기화 전략으로 운영됩니다.
+- 장기적으로는 Redis pub/sub(멀티 인스턴스 WS fanout), rate limiter 외부화, 감사로그 분리를 권장합니다.

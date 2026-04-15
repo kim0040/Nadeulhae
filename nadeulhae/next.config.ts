@@ -1,9 +1,13 @@
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+
+const appRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   turbopack: {
-    // Keep Turbopack root on the app directory so module resolution uses this package's node_modules.
-    root: process.cwd(),
+    // Resolve against the config file location, not the shell cwd, so npm --prefix/start.command runs stay stable.
+    root: appRoot,
   },
   images: {
     remotePatterns: [
