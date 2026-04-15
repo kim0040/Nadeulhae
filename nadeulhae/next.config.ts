@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
-import { resolve } from "node:path";
-
-const turbopackRoot = resolve(process.cwd(), "..");
 
 const nextConfig: NextConfig = {
   turbopack: {
-    root: turbopackRoot,
+    // Keep Turbopack root on the app directory so module resolution uses this package's node_modules.
+    root: process.cwd(),
   },
   images: {
     remotePatterns: [
