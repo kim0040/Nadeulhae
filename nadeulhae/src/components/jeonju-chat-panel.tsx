@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   User,
   UserX,
+  WifiOff,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -20,6 +21,7 @@ import {
   formatServerRelativeTime,
   getServerNowMs,
 } from "@/lib/time/server-time"
+import { useWebSocket } from "@/lib/websocket/use-websocket"
 import { cn } from "@/lib/utils"
 
 interface ChatMessage {
@@ -73,8 +75,6 @@ const COPY = {
     anonymous: "Anonymous",
   },
 } as const
-
-const CHAT_POLL_INTERVAL_MS = 10_000
 
 function formatChatTime(iso: string, language: "ko" | "en", nowMs: number) {
   return formatServerRelativeTime(iso, nowMs, language)
@@ -176,6 +176,7 @@ export function JeonjuChatPanel() {
   const { language } = useLanguage()
   const { user } = useAuth()
   const copy = COPY[language]
+  const { subscribe, connected: wsConnected } = useWebSocket()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -186,13 +187,10 @@ export function JeonjuChatPanel() {
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const lastMessageIdRef = useRef<number | null>(null)
   const didInitScrollRef = useRef(false)
   const previousMessageCountRef = useRef(0)
   const shouldStickToBottomRef = useRef(true)
   const isComposingRef = useRef(false)
-  const isPollingRef = useRef(false)
 
   const loadMessages = useCallback(async () => {
     try {
@@ -224,7 +222,6 @@ export function JeonjuChatPanel() {
       }
 
       setMessages(data.messages)
-      lastMessageIdRef.current = data.messages[data.messages.length - 1]?.id ?? null
       setError(null)
     } catch {
       setError(copy.error)
@@ -233,63 +230,34 @@ export function JeonjuChatPanel() {
     }
   }, [copy.error, language])
 
-  // Poll for new messages
-  const pollNewMessages = useCallback(async () => {
-    const lastId = lastMessageIdRef.current
-    if (!lastId || isPollingRef.current) return
-
-    isPollingRef.current = true
-    try {
-      const res = await fetch(`/api/jeonju-chat?after_id=${lastId}`, {
-        cache: "no-store",
-        credentials: "include",
-        headers: {
-          "Accept-Language": language,
-        },
-      })
-      const data = (await res.json().catch(() => null)) as { messages?: ChatMessage[]; serverNow?: unknown } | null
-      const offsetMs = computeServerClockOffsetMs(data?.serverNow)
-      if (offsetMs != null) {
-        setServerClockOffsetMs(offsetMs)
-      }
-      if (res.ok && Array.isArray(data?.messages) && data.messages.length > 0) {
-        const incomingMessages = data.messages
-        setMessages((prev) => [...prev, ...incomingMessages])
-      }
-    } catch {
-      // Silently ignore polling errors
-    } finally {
-      isPollingRef.current = false
-    }
-  }, [language])
-
   useEffect(() => {
     void loadMessages()
   }, [loadMessages])
 
   useEffect(() => {
-    const runPoll = () => {
-      if (document.hidden) {
-        return
-      }
-      void pollNewMessages()
-    }
+    const unsubscribe = subscribe("jeonju_chat_message", (payload: unknown) => {
+      const msg = payload as ChatMessage | null
+      if (!msg || typeof msg !== "object" || !("id" in msg)) return
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev
+        return [...prev, msg]
+      })
+    })
+    return unsubscribe
+  }, [subscribe])
 
-    const onVisibilityChange = () => {
-      if (!document.hidden) {
-        void pollNewMessages()
-      }
-    }
-
-    runPoll()
-    pollingRef.current = setInterval(runPoll, CHAT_POLL_INTERVAL_MS)
-    document.addEventListener("visibilitychange", onVisibilityChange)
-
+  useEffect(() => {
+    if (wsConnected) return
+    let cancelled = false
+    const timer = setInterval(() => {
+      if (cancelled || wsConnected) return
+      void loadMessages()
+    }, 30_000)
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current)
-      document.removeEventListener("visibilitychange", onVisibilityChange)
+      cancelled = true
+      clearInterval(timer)
     }
-  }, [pollNewMessages])
+  }, [wsConnected, loadMessages])
 
   const handleScroll = useCallback(() => {
     const viewport = scrollRef.current
@@ -321,7 +289,6 @@ export function JeonjuChatPanel() {
     }
 
     previousMessageCountRef.current = messages.length
-    lastMessageIdRef.current = messages[messages.length - 1]?.id ?? null
   }, [messages])
 
   const focusInputWithoutScroll = useCallback(() => {
@@ -387,8 +354,10 @@ export function JeonjuChatPanel() {
       }
 
       if (data?.message) {
-        const createdMessage = data.message
-        setMessages(prev => [...prev, createdMessage])
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === data.message!.id)) return prev
+          return [...prev, data.message!]
+        })
       }
     } catch {
       setInput(msgText)
@@ -416,10 +385,17 @@ export function JeonjuChatPanel() {
                 <MessageCircle className="size-3" />
                 {copy.sectionTag}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                {copy.onlineLabel}
-              </span>
+              {wsConnected ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                  <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
+                  {copy.onlineLabel}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                  <WifiOff className="size-3" />
+                  {copy.onlineLabel}
+                </span>
+              )}
             </div>
             <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
               {copy.title}
