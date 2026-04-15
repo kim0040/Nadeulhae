@@ -113,32 +113,73 @@ function TypingIndicator() {
   )
 }
 
+type MessageGroup = {
+  role: "user" | "assistant"
+  messages: UiChatMessage[]
+}
+
+function groupMessages(messages: UiChatMessage[]): MessageGroup[] {
+  const groups: MessageGroup[] = []
+  for (const message of messages) {
+    const lastGroup = groups[groups.length - 1]
+    if (lastGroup && lastGroup.role === message.role && !message.pending) {
+      lastGroup.messages.push(message)
+    } else {
+      groups.push({ role: message.role, messages: [message] })
+    }
+  }
+  return groups
+}
+
 function ChatBubble({
   message,
   language,
   isLastAssistant,
+  groupPosition,
 }: {
   message: UiChatMessage
   language: "ko" | "en"
   isLastAssistant: boolean
+  groupPosition: "first" | "middle" | "last" | "only"
 }) {
   const isUser = message.role === "user"
+  const showAvatar = !isUser && (groupPosition === "first" || groupPosition === "only")
+  const showTimestamp = groupPosition === "last" || groupPosition === "only"
+
+  const roundedClass = isUser
+    ? groupPosition === "only"
+      ? "rounded-2xl rounded-tr-sm"
+      : groupPosition === "first"
+        ? "rounded-2xl rounded-tr-sm rounded-br-sm rounded-bl-sm"
+        : groupPosition === "last"
+          ? "rounded-2xl rounded-tr-sm rounded-tl-sm rounded-bl-sm"
+          : "rounded-xl rounded-tr-sm"
+    : groupPosition === "only"
+      ? "rounded-2xl rounded-tl-sm"
+      : groupPosition === "first"
+        ? "rounded-2xl rounded-tl-sm rounded-br-sm rounded-bl-sm"
+        : groupPosition === "last"
+          ? "rounded-2xl rounded-tl-sm rounded-tr-sm rounded-br-sm"
+          : "rounded-xl rounded-tl-sm"
 
   return (
     <div className={cn("flex gap-2.5", isUser ? "flex-row-reverse" : "flex-row")}>
-      {!isUser && (
+      {showAvatar ? (
         <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
           <Sparkles className="size-3.5" />
         </div>
-      )}
-      <div className={cn("max-w-[78%] min-w-0 space-y-1", isUser ? "items-end" : "items-start")}>
+      ) : !isUser ? (
+        <div className="w-7 shrink-0" />
+      ) : null}
+      <div className={cn("max-w-[78%] min-w-0", isUser ? "items-end" : "items-start")}>
         <div
           className={cn(
-            "rounded-2xl px-3.5 py-2.5 text-[15px] leading-[1.65]",
+            "px-3.5 py-2.5 text-[15px] leading-[1.65]",
+            roundedClass,
             isUser
-              ? "rounded-tr-sm bg-sky-blue text-white"
+              ? "bg-sky-blue text-white"
               : cn(
-                  "rounded-tl-sm border border-card-border/50 bg-card/90 text-foreground",
+                  "border border-card-border/50 bg-card/90 text-foreground",
                   isLastAssistant && "shadow-[0_2px_12px_-4px_rgba(47,111,228,0.08)]"
                 )
           )}
@@ -155,14 +196,16 @@ function ChatBubble({
             </div>
           )}
         </div>
-        <p
-          className={cn(
-            "px-1 text-[11px] text-muted-foreground/70",
-            isUser ? "text-right" : "text-left"
-          )}
-        >
-          {formatTimestamp(message.createdAt, language)}
-        </p>
+        {showTimestamp && (
+          <p
+            className={cn(
+              "mt-1 px-1 text-[11px] text-muted-foreground/70",
+              isUser ? "text-right" : "text-left"
+            )}
+          >
+            {formatTimestamp(message.createdAt, language)}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -476,6 +519,7 @@ export function DashboardChatPanel({
     })
   }
 
+  const messageGroups = groupMessages(messages)
   const lastAssistantIndex = messages.findLastIndex((m) => m.role === "assistant")
 
   return (
@@ -526,7 +570,7 @@ export function DashboardChatPanel({
         <div
           ref={messageViewportRef}
           onScroll={handleViewportScroll}
-          className="flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 custom-scrollbar sm:px-5 sm:py-4"
+          className="flex-1 overflow-y-auto overscroll-contain p-4 custom-scrollbar sm:px-5 sm:py-4"
         >
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
@@ -534,14 +578,32 @@ export function DashboardChatPanel({
               <span>{copy.loading}</span>
             </div>
           ) : messages.length > 0 ? (
-            messages.map((message, index) => (
-              <ChatBubble
-                key={message.id}
-                message={message}
-                language={language}
-                isLastAssistant={message.role === "assistant" && index === lastAssistantIndex}
-              />
-            ))
+            <div className="flex flex-col gap-3">
+              {messageGroups.map((group, groupIndex) => (
+                <div key={`group-${groupIndex}`} className="flex flex-col gap-0.5">
+                  {group.messages.map((message, msgIndex) => {
+                    const groupLength = group.messages.length
+                    const groupPosition = groupLength === 1
+                      ? "only"
+                      : msgIndex === 0
+                        ? "first"
+                        : msgIndex === groupLength - 1
+                          ? "last"
+                          : "middle"
+
+                    return (
+                      <ChatBubble
+                        key={message.id}
+                        message={message}
+                        language={language}
+                        isLastAssistant={message.role === "assistant" && messages.indexOf(message) === lastAssistantIndex}
+                        groupPosition={groupPosition}
+                      />
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-8 text-center">
               <div className="flex size-12 items-center justify-center rounded-full bg-accent/10 text-accent">

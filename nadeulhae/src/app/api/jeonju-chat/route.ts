@@ -11,7 +11,7 @@ import {
 
 export const runtime = "nodejs"
 
-const RATE_LIMIT_WINDOW_MS = 5_000
+const RATE_LIMIT_WINDOW_MS = 2_000
 const rateLimitMap = new Map<string, number>()
 const RATE_LIMIT_MAP_MAX_KEYS = 6_000
 
