@@ -8,6 +8,7 @@ import {
   getMessagesSince,
   getRecentMessages,
 } from "@/lib/jeonju-chat/repository"
+import { broadcast } from "@/lib/websocket/broadcast"
 
 export const runtime = "nodejs"
 
@@ -172,6 +173,8 @@ export async function POST(request: NextRequest) {
       content: sanitizeHtmlEntities(maskProfanity(message)),
       isAnonymous,
     })
+
+    broadcast("jeonju_chat_message", created)
 
     return NextResponse.json(
       {

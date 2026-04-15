@@ -43,3 +43,9 @@ PRODUCTION_ENV_TEMPLATE.env
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dev scripts & artifacts
+test-reset.ts
+test-check.ts
+air_raw.json
+lint_output.txt
