@@ -622,24 +622,40 @@ async function handlePOST(request: NextRequest) {
     if (acceptSSE) {
       const encoder = new TextEncoder()
       let accumulated = ""
+      const abortController = new AbortController()
+      request.signal.addEventListener("abort", () => {
+        abortController.abort()
+      }, { once: true })
 
       const stream = new ReadableStream({
         async start(controller) {
+          let clientDisconnected = false
+
           const sendEvent = (event: string, data: unknown) => {
+            if (clientDisconnected) return
             try {
               controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
-            } catch {}
+            } catch {
+              clientDisconnected = true
+            }
           }
+
+          const checkAlive = () => !clientDisconnected && !abortController.signal.aborted
 
           try {
             const completionResult = await createFactChatCompletionStream({
               requestKind: "chat",
               messages: chatMessages,
               onToken: (token) => {
+                if (!checkAlive()) return
                 accumulated += token
                 sendEvent("token", { content: token })
               },
             })
+
+            if (!checkAlive()) {
+              return
+            }
 
             const assistantMessage = enforceAssistantIdentity(accumulated, locale)
 
@@ -656,6 +672,10 @@ async function handlePOST(request: NextRequest) {
               latencyMs: Date.now() - requestStartedAt,
               contextMessageCount: contextMessages.length,
             })
+
+            if (!checkAlive()) {
+              return
+            }
 
             refreshUserProfileMemory({
               userId: authenticatedSession.user.id,

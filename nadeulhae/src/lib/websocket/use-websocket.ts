@@ -16,13 +16,24 @@ function getWsUrl() {
   return `${proto}//${window.location.host}/ws`
 }
 
+const RECONNECT_BASE_DELAY = 1000
+const MAX_RECONNECT_DELAY = 30000
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptsRef = useRef(0)
   const handlersRef = useRef(new Map<string, Set<(payload: unknown) => void>>())
   const [connected, setConnected] = useState(false)
+  const mountedRef = useRef(true)
+
+  const getReconnectDelay = useCallback(() => {
+    const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttemptsRef.current), MAX_RECONNECT_DELAY)
+    return delay + Math.random() * 500
+  }, [])
 
   const connect = useCallback(() => {
+    if (!mountedRef.current) return
     if (wsRef.current?.readyState === WebSocket.OPEN) return
     if (wsRef.current?.readyState === WebSocket.CONNECTING) return
 
@@ -32,15 +43,18 @@ export function useWebSocket() {
     const ws = new WebSocket(url)
 
     ws.onopen = () => {
+      reconnectAttemptsRef.current = 0
       setConnected(true)
     }
 
     ws.onclose = () => {
       setConnected(false)
       wsRef.current = null
+      if (!mountedRef.current) return
+
       reconnectTimerRef.current = setTimeout(() => {
-        connect()
-      }, 3000)
+        if (mountedRef.current) connect()
+      }, getReconnectDelay())
     }
 
     ws.onerror = () => {
@@ -50,6 +64,7 @@ export function useWebSocket() {
     ws.onmessage = (event) => {
       try {
         const message: WsMessage = JSON.parse(event.data)
+        if (message.type === "pong") return
         const handlers = handlersRef.current.get(message.type)
         if (handlers) {
           for (const handler of handlers) {
@@ -60,7 +75,21 @@ export function useWebSocket() {
     }
 
     wsRef.current = ws
-  }, [])
+
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: "ping" }))
+        } catch {
+          clearInterval(pingInterval)
+        }
+      } else {
+        clearInterval(pingInterval)
+      }
+    }, 25000)
+
+    ws.addEventListener("close", () => clearInterval(pingInterval))
+  }, [getReconnectDelay])
 
   const subscribe = useCallback(
     (type: string, handler: (payload: unknown) => void) => {
@@ -76,8 +105,10 @@ export function useWebSocket() {
   )
 
   useEffect(() => {
+    mountedRef.current = true
     connect()
     return () => {
+      mountedRef.current = false
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current)
       }
