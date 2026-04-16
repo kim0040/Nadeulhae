@@ -358,6 +358,12 @@ export function CodeShareWorkspace({
   const typingLastSentAtRef = useRef(0)
   const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Track the absolute most recent typed state to prevent sync overwrites during flight.
+  const draftsRef = useRef({ code: "", title: "", language: "" })
+  useEffect(() => {
+    draftsRef.current = { code: codeDraft, title: titleDraft, language: languageDraft }
+  }, [codeDraft, titleDraft, languageDraft])
+
   // Public share URL is calculated on client only.
   const shareUrl = useMemo(() => {
     if (!selectedSessionId || typeof window === "undefined") {
@@ -821,6 +827,11 @@ export function CodeShareWorkspace({
     }
 
     // Debounced autosave: collapse burst typing into fewer PATCH calls.
+    const codeToSave = codeDraft
+    const titleToSave = titleDraft
+    const languageToSave = languageDraft
+
+    // Increase debounce from 520ms to 1200ms to reduce database load and network jank.
     const timer = window.setTimeout(async () => {
       setIsSaving(true)
 
@@ -832,9 +843,9 @@ export function CodeShareWorkspace({
           },
           credentials: "include",
           body: JSON.stringify({
-            title: titleDraft,
-            language: languageDraft,
-            code: codeDraft,
+            title: titleToSave,
+            language: languageToSave,
+            code: codeToSave,
             version: sessionDetail.version,
           }),
         })
@@ -867,7 +878,20 @@ export function CodeShareWorkspace({
         }
 
         applyViewerIfPresent(payload.viewer)
-        applySessionDetail(payload.session)
+
+        // Only obliterate the user's typing delta if they haven't typed *since* we fired the save request.
+        // Otherwise, just bump the metadata (version) so the next save knows the correct target.
+        if (
+          draftsRef.current.code === codeToSave &&
+          draftsRef.current.title === titleToSave &&
+          draftsRef.current.language === languageToSave
+        ) {
+          applySessionDetail(payload.session)
+        } else {
+          setSessionDetail(payload.session)
+          upsertSessionSummary(toSummaryFromDetail(payload.session))
+        }
+
         // Secondary signal so peers can refresh even if direct patch broadcast is delayed/missed.
         send("code_share_saved", {
           sessionId: payload.session.sessionId,
@@ -1290,9 +1314,6 @@ export function CodeShareWorkspace({
                           {copy.readonly}
                         </span>
                       )}
-                      <span className="rounded-full border border-card-border/70 bg-card/60 px-2 py-0.5 font-bold text-muted-foreground">
-                        v{sessionDetail.version}
-                      </span>
                     </div>
 
                     {/* Typing indicators */}
