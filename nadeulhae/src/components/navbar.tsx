@@ -49,14 +49,6 @@ async function readErrorMessage(response: Response, fallback: string) {
   return fallback
 }
 
-function useIsClient() {
-  return useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false
-  )
-}
-
 export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -64,7 +56,11 @@ export function Navbar() {
   const { theme, setTheme } = useTheme()
   const { user, setAuthenticatedUser } = useAuth()
   const copy = NAVBAR_COPY[language]
-  const mounted = useIsClient()
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
   const [isVisible, setIsVisible] = useState(true)
   const [isPending, startTransition] = useTransition()
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
@@ -163,7 +159,7 @@ export function Navbar() {
           <span
             className={cn(
               "text-sm font-black tracking-tighter text-foreground transition-colors group-hover:text-sky-blue lg:text-base xl:text-[1.6rem]",
-              mounted && language === "en" && "xl:block"
+              language === "en" && "xl:block"
             )}
           >
             {t("logo_text")}
@@ -175,10 +171,8 @@ export function Navbar() {
         <div
           className={cn(
             "flex max-w-full shrink items-center rounded-full border border-[var(--card-border)] bg-[var(--card)] shadow-xl shadow-active-blue/10 backdrop-blur-2xl transition-all",
-            mounted
-              ? language === "en"
-                ? "gap-0.5 px-2 py-1 sm:gap-1.5 sm:px-3 sm:py-1.5 md:gap-2 md:px-3.5 md:py-2 lg:gap-3 lg:px-4 lg:py-2 xl:gap-4 xl:px-5 xl:py-2.5"
-                : "gap-1 px-2 py-1 sm:gap-2 sm:px-3 sm:py-1.5 md:gap-2.5 md:px-3.5 md:py-2 lg:gap-3 lg:px-4 lg:py-2 xl:gap-4 xl:px-5 xl:py-2.5"
+            language === "en"
+              ? "gap-0.5 px-2 py-1 sm:gap-1.5 sm:px-3 sm:py-1.5 md:gap-2 md:px-3.5 md:py-2 lg:gap-3 lg:px-4 lg:py-2 xl:gap-4 xl:px-5 xl:py-2.5"
               : "gap-1 px-2 py-1 sm:gap-2 sm:px-3 sm:py-1.5 md:gap-2.5 md:px-3.5 md:py-2 lg:gap-3 lg:px-4 lg:py-2 xl:gap-4 xl:px-5 xl:py-2.5"
           )}
         >
@@ -195,7 +189,7 @@ export function Navbar() {
                   )}
                 >
                   <item.icon size={15} className="shrink-0 sm:size-[16px] md:size-[17px] lg:size-[18px]" />
-                  <span className="max-w-[4.5rem] truncate sm:max-w-[5.5rem] md:max-w-none md:inline">
+                  <span className="hidden max-w-[4.5rem] truncate sm:inline sm:max-w-[5.5rem] md:max-w-none">
                     {item.name}
                   </span>
                 </Link>
@@ -269,7 +263,7 @@ export function Navbar() {
           <span
             className={cn(
               "text-sm font-black tracking-tighter text-foreground lg:text-base xl:text-[1.6rem]",
-              mounted && language === "en" && "xl:block"
+              language === "en" && "xl:block"
             )}
           >
             {t("logo_text")}

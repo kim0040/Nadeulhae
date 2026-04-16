@@ -13,7 +13,8 @@ type WeatherImageSnapshot = {
   url: string
 }
 
-type ExtraImageKey = "dust" | "lgt" | "fog"
+type ExtraImageKey = "dust" | "lgt" | "fog" | "earthquake" | "typhoon" | "tsunami" | "volcano"
+type HazardExtraKey = "typhoon" | "tsunami" | "volcano"
 
 type ImageCacheEntry = {
   data: WeatherImageSnapshot | null
@@ -45,7 +46,7 @@ const SATELLITE_CACHE_MINUTES = 2
 const RADAR_CACHE_TTL = RADAR_CACHE_MINUTES * 60 * 1000
 const SATELLITE_CACHE_TTL = SATELLITE_CACHE_MINUTES * 60 * 1000
 
-const EXTRA_IMAGE_CONFIG: Record<Exclude<ExtraImageKey, "fog" | "dust">, { endpoint: string; cacheMinutes: number }> = {
+const EXTRA_IMAGE_CONFIG: Record<Exclude<ExtraImageKey, "fog" | "dust" | "earthquake" | "typhoon" | "tsunami" | "volcano">, { endpoint: string; cacheMinutes: number }> = {
   lgt: {
     endpoint: "https://www.weather.go.kr/w/wnuri-img/rest/lgt/images.do",
     cacheMinutes: 5,
@@ -58,6 +59,10 @@ const extraImageCaches: Record<ExtraImageKey, ImageCacheEntry | null> = {
   dust: null,
   lgt: null,
   fog: null,
+  earthquake: null,
+  typhoon: null,
+  tsunami: null,
+  volcano: null,
 }
 
 function resolveImageUrl(url: string) {
@@ -118,6 +123,21 @@ async function fetchJsonObject(url: string) {
     return JSON.parse(text)
   } catch {
     return null
+  }
+}
+
+async function fetchText(url: string) {
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Nadeulhae/1.0)",
+      },
+    })
+    if (!response.ok) return ""
+    return await response.text()
+  } catch {
+    return ""
   }
 }
 
@@ -268,6 +288,279 @@ async function fetchAdpsImage() {
   } satisfies WeatherImageSnapshot
 }
 
+function parseNumber(value: unknown, fallback = Number.NaN) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function stripHtmlTags(value: string) {
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+}
+
+function toArray<T>(value: T | T[] | null | undefined) {
+  if (!value) return []
+  return Array.isArray(value) ? value : [value]
+}
+
+function getShiftedKstDate(offsetDays: number) {
+  const date = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000)
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date)
+  const year = parts.find((part) => part.type === "year")?.value ?? "0000"
+  const month = parts.find((part) => part.type === "month")?.value ?? "01"
+  const day = parts.find((part) => part.type === "day")?.value ?? "01"
+  return `${year}${month}${day}`
+}
+
+function formatEarthquakeTitle(location: string, magnitude: number) {
+  if (!location && !Number.isFinite(magnitude)) return "지진 발생 지점"
+  if (!location) return `규모 ${magnitude.toFixed(1)} 지진`
+  if (!Number.isFinite(magnitude)) return location
+  return `${location} 규모 ${magnitude.toFixed(1)}`
+}
+
+function getEarthquakeTimeLabel(value: string) {
+  if (!value) return ""
+  const compact = value.replace(/\D/g, "")
+  if (compact.length >= 12) return compact.slice(0, 12)
+  return compact
+}
+
+function truncateText(value: string, max = 120) {
+  if (!value) return ""
+  return value.length <= max ? value : `${value.slice(0, max - 1).trimEnd()}…`
+}
+
+function extractXmlBlocks(xml: string, tag: string) {
+  const regex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "gi")
+  const matches: string[] = []
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(xml))) {
+    matches.push(match[1] || "")
+  }
+  return matches
+}
+
+function extractXmlTag(xml: string, tag: string) {
+  const regex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "i")
+  const match = xml.match(regex)
+  return stripHtmlTags(match?.[1] || "")
+}
+
+function parseKstDateTime(raw: string) {
+  const compact = raw.replace(/\D/g, "")
+  if (compact.length < 12) return null
+  const yyyy = Number(compact.slice(0, 4))
+  const mm = Number(compact.slice(4, 6))
+  const dd = Number(compact.slice(6, 8))
+  const hh = Number(compact.slice(8, 10))
+  const mi = Number(compact.slice(10, 12))
+  if (![yyyy, mm, dd, hh, mi].every(Number.isFinite)) return null
+  return new Date(Date.UTC(yyyy, mm - 1, dd, hh - 9, mi))
+}
+
+function isRecentIssue(raw: string, hours: number) {
+  const parsed = parseKstDateTime(raw)
+  if (!parsed) return false
+  return Date.now() - parsed.getTime() <= hours * 60 * 60 * 1000
+}
+
+function buildHazardSnapshot(
+  key: HazardExtraKey,
+  input: { title: string; tm?: string; note?: string }
+): WeatherImageSnapshot {
+  const params = new URLSearchParams()
+  params.set("kind", "hazard")
+  params.set("type", key)
+  params.set("title", truncateText(input.title || `${key} alert`, 120))
+  if (input.tm) {
+    params.set("tm", getEarthquakeTimeLabel(input.tm))
+  }
+  if (input.note) {
+    params.set("note", truncateText(input.note, 180))
+  }
+
+  return {
+    name: truncateText(input.title || `${key} alert`, 80),
+    tm: input.tm || "",
+    url: `/api/weather/images/asset?${params.toString()}`,
+  }
+}
+
+type HazardHintMap = Partial<Record<HazardExtraKey, { title: string; tm?: string; note?: string }>>
+
+function isHazardExtraKey(key: ExtraImageKey): key is HazardExtraKey {
+  return key === "typhoon" || key === "tsunami" || key === "volcano"
+}
+
+function parseHazardHints(request: NextRequest): HazardHintMap {
+  const get = (key: string) => (request.nextUrl.searchParams.get(key) || "").trim()
+  const hints: HazardHintMap = {}
+
+  const typhoonTitle = get("typhoonTitle")
+  const tsunamiTitle = get("tsunamiTitle")
+  const volcanoTitle = get("volcanoTitle")
+  if (typhoonTitle) {
+    hints.typhoon = {
+      title: typhoonTitle,
+      tm: get("typhoonTm"),
+      note: get("typhoonNote"),
+    }
+  }
+  if (tsunamiTitle) {
+    hints.tsunami = {
+      title: tsunamiTitle,
+      tm: get("tsunamiTm"),
+      note: get("tsunamiNote"),
+    }
+  }
+  if (volcanoTitle) {
+    hints.volcano = {
+      title: volcanoTitle,
+      tm: get("volcanoTm"),
+      note: get("volcanoNote"),
+    }
+  }
+
+  return hints
+}
+
+async function fetchEarthquakeImage() {
+  const serviceKey = process.env.AIRKOREA_API_KEY
+  if (!serviceKey) return null
+
+  const fromTmFc = getShiftedKstDate(-2)
+  const toTmFc = getShiftedKstDate(0)
+  const url = `https://apis.data.go.kr/1360000/EqkInfoService/getEqkMsg?serviceKey=${serviceKey}&pageNo=1&numOfRows=20&dataType=JSON&fromTmFc=${fromTmFc}&toTmFc=${toTmFc}`
+  const data = await fetchJsonObject(url)
+  const items = toArray(data?.response?.body?.items?.item)
+
+  const latest = items
+    .map((item: any) => ({
+      location: stripHtmlTags(String(item?.loc || "")),
+      magnitude: parseNumber(item?.mt ?? item?.mag, Number.NaN),
+      occurredAt: String(item?.tmEqk || ""),
+      latitude: parseNumber(item?.lat ?? item?.latitude ?? item?.eqkLat ?? item?.latEqk, Number.NaN),
+      longitude: parseNumber(item?.lon ?? item?.longitude ?? item?.eqkLon ?? item?.lonEqk, Number.NaN),
+    }))
+    .filter((item) => item.occurredAt.length > 0)
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0]
+
+  if (!latest) return null
+
+  const params = new URLSearchParams()
+  params.set("kind", "earthquake")
+  if (Number.isFinite(latest.latitude) && Number.isFinite(latest.longitude)) {
+    params.set("lat", latest.latitude.toFixed(4))
+    params.set("lon", latest.longitude.toFixed(4))
+  }
+  if (Number.isFinite(latest.magnitude)) {
+    params.set("mag", latest.magnitude.toFixed(1))
+  }
+  if (latest.location) {
+    params.set("loc", latest.location.slice(0, 80))
+  }
+  const timeLabel = getEarthquakeTimeLabel(latest.occurredAt)
+  if (timeLabel) {
+    params.set("tm", timeLabel)
+  }
+
+  return {
+    name: formatEarthquakeTitle(latest.location, latest.magnitude),
+    tm: latest.occurredAt,
+    url: `/api/weather/images/asset?${params.toString()}`,
+  } satisfies WeatherImageSnapshot
+}
+
+async function fetchTyphoonImage() {
+  const serviceKey = process.env.AIRKOREA_API_KEY
+  if (!serviceKey) return null
+
+  const fromTmFc = getShiftedKstDate(-1)
+  const toTmFc = getShiftedKstDate(1)
+  const url = `https://apis.data.go.kr/1360000/WthrWrnInfoService/getWthrWrnList?serviceKey=${serviceKey}&pageNo=1&numOfRows=30&dataType=JSON&fromTmFc=${fromTmFc}&toTmFc=${toTmFc}`
+  const data = await fetchJsonObject(url)
+  const items = toArray(data?.response?.body?.items?.item)
+  const latest = items
+    .map((item: any) => {
+      const title = stripHtmlTags(String(item?.title || ""))
+      const content = stripHtmlTags(String(item?.content || ""))
+      return {
+        title,
+        content,
+        joined: `${title} ${content}`.trim(),
+        tm: String(item?.tmFc || item?.tmSeq || item?.tmEf || ""),
+      }
+    })
+    .filter((item) => /(태풍|typhoon)/i.test(item.joined) && !/해제/.test(item.joined))
+    .sort((a, b) => b.tm.localeCompare(a.tm))[0]
+
+  if (!latest) return null
+  return buildHazardSnapshot("typhoon", {
+    title: latest.title || "태풍 감시",
+    tm: latest.tm,
+    note: latest.content,
+  })
+}
+
+async function fetchTsunamiImage() {
+  const authKey = process.env.APIHUB_KEY || process.env.KMA_API_KEY
+  if (!authKey) return null
+
+  const url = `https://apihub.kma.go.kr/api/typ09/url/tsnm/urlTsnmList.do?orderTy=xml&orderCm=L&authKey=${authKey}`
+  const xml = await fetchText(url)
+  const info = extractXmlBlocks(xml, "info")[0] || ""
+  if (!info) return null
+
+  const messageType = extractXmlTag(info, "msgKo")
+  const issueTime = extractXmlTag(info, "tmIssue")
+  const warningHigh = extractXmlTag(info, "wrnHighLoc")
+  const warningLow = extractXmlTag(info, "wrnLowLoc")
+  const location = extractXmlTag(info, "eqkLoc")
+  const magnitude = parseNumber(extractXmlTag(info, "eqkMag"), Number.NaN)
+  const hasWarningRegion = [warningHigh, warningLow].some((value) => value && value !== "-")
+  const hasAlertWord = /(특보|경보|주의보)/.test(`${messageType} ${warningHigh} ${warningLow}`)
+  const active = (hasWarningRegion || hasAlertWord) && isRecentIssue(issueTime, 72)
+  if (!active) return null
+
+  return buildHazardSnapshot("tsunami", {
+    title: formatEarthquakeTitle(location, magnitude) || "지진해일 감시",
+    tm: issueTime,
+    note: [messageType, warningHigh !== "-" ? warningHigh : "", warningLow !== "-" ? warningLow : ""].filter(Boolean).join(" / "),
+  })
+}
+
+async function fetchVolcanoImage() {
+  const authKey = process.env.APIHUB_KEY || process.env.KMA_API_KEY
+  if (!authKey) return null
+
+  const url = `https://apihub.kma.go.kr/api/typ09/url/volc/selectVolcInfoList.do?orderTy=xml&orderCm=L&authKey=${authKey}`
+  const xml = await fetchText(url)
+  const info = extractXmlBlocks(xml, "info")[0] || ""
+  if (!info) return null
+
+  const messageType = extractXmlTag(info, "msgCodeKo")
+  const issueTime = extractXmlTag(info, "tmIssue")
+  const name = extractXmlTag(info, "volcName")
+  const warningRegion = extractXmlTag(info, "wrnLoc")
+  const remark = extractXmlTag(info, "refer")
+  const hasWarningRegion = warningRegion && warningRegion !== "-"
+  const hasAlertWord = /(특보|주의|경보)/.test(`${messageType} ${warningRegion}`)
+  const hasDomesticImpact = !/국내영향\s*예상\s*안\s*됨|국내영향없음/.test(remark)
+  const active = (hasWarningRegion || hasAlertWord || hasDomesticImpact) && isRecentIssue(issueTime, 72)
+  if (!active) return null
+
+  return buildHazardSnapshot("volcano", {
+    title: name ? `${name} 화산 정보` : (messageType || "화산 감시"),
+    tm: issueTime,
+    note: warningRegion && warningRegion !== "-" ? warningRegion : remark,
+  })
+}
+
 function parseRequestedExtras(request: NextRequest): ExtraImageKey[] {
   const value = request.nextUrl.searchParams.get("extras")
   if (!value) return []
@@ -276,12 +569,21 @@ function parseRequestedExtras(request: NextRequest): ExtraImageKey[] {
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean)
   const unique = Array.from(new Set(candidates))
-  return unique.filter((item): item is ExtraImageKey => item === "dust" || item === "lgt" || item === "fog")
+  return unique.filter((item): item is ExtraImageKey =>
+    item === "dust"
+    || item === "lgt"
+    || item === "fog"
+    || item === "earthquake"
+    || item === "typhoon"
+    || item === "tsunami"
+    || item === "volcano"
+  )
 }
 
 async function handleGET(request: NextRequest) {
   const now = Date.now()
   const requestedExtras = parseRequestedExtras(request)
+  const hazardHints = parseHazardHints(request)
 
   if (!radarCache || radarCache.expiry <= now) {
     const latest = await fetchRadarImage()
@@ -321,15 +623,30 @@ async function handleGET(request: NextRequest) {
 
   for (const key of requestedExtras) {
     const cached = extraImageCaches[key]
-    const cacheMinutes = key === "fog" || key === "dust" ? 10 : EXTRA_IMAGE_CONFIG[key].cacheMinutes
+    const cacheMinutes = key === "fog" || key === "dust"
+      ? 10
+      : key === "earthquake" || key === "typhoon" || key === "tsunami" || key === "volcano"
+        ? 5
+        : EXTRA_IMAGE_CONFIG[key].cacheMinutes
     const ttl = cacheMinutes * 60 * 1000
 
     if (!cached || cached.expiry <= now) {
-      const latest = key === "fog"
-        ? await fetchFogImage()
-        : key === "dust"
-          ? await fetchAdpsImage()
-          : pickLatestItem(await fetchJsonArray(EXTRA_IMAGE_CONFIG[key].endpoint))
+      let latest: WeatherImageSnapshot | null = null
+      if (key === "fog") {
+        latest = await fetchFogImage()
+      } else if (key === "dust") {
+        latest = await fetchAdpsImage()
+      } else if (key === "earthquake") {
+        latest = await fetchEarthquakeImage()
+      } else if (key === "typhoon") {
+        latest = await fetchTyphoonImage()
+      } else if (key === "tsunami") {
+        latest = await fetchTsunamiImage()
+      } else if (key === "volcano") {
+        latest = await fetchVolcanoImage()
+      } else {
+        latest = pickLatestItem(await fetchJsonArray(EXTRA_IMAGE_CONFIG[key].endpoint))
+      }
       if (latest || !cached) {
         extraImageCaches[key] = {
           data: latest,
@@ -344,7 +661,16 @@ async function handleGET(request: NextRequest) {
       }
     }
 
-    extras[key] = extraImageCaches[key]?.data ?? null
+    let resolved = extraImageCaches[key]?.data ?? null
+    if (!resolved && isHazardExtraKey(key)) {
+      const hint = hazardHints[key]
+      if (hint?.title) {
+        // Hint-based fallback must stay request-scoped and should never pollute the shared cache.
+        resolved = buildHazardSnapshot(key, hint)
+      }
+    }
+
+    extras[key] = resolved
     extraCacheMinutes[key] = cacheMinutes
     extraFetchedAt[key] = extraImageCaches[key]?.fetchedAt ?? new Date(0).toISOString()
   }

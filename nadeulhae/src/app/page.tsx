@@ -145,13 +145,39 @@ export default function Home() {
           || weatherData.eventData?.isTyphoon
           || weatherData.eventData?.isTsunami
         )
+        const hasTyphoonSignal = Boolean(weatherData.eventData?.isTyphoon)
+        const hasTsunamiSignal = Boolean(weatherData.eventData?.isTsunami)
+        const hasVolcanoSignal = Boolean(weatherData.eventData?.isVolcano)
 
         if (hasDustIssue) extras.add("dust")
         if (hasFogSignal) extras.add("fog")
         if (hasSevereSignal) extras.add("lgt")
+        if (hasTyphoonSignal) extras.add("typhoon")
+        if (hasTsunamiSignal) extras.add("tsunami")
+        if (hasVolcanoSignal) extras.add("volcano")
 
-        const query = extras.size > 0 ? `?extras=${encodeURIComponent(Array.from(extras).join(","))}` : ""
-        const response = await fetch(`/api/weather/images${query}`, { cache: "no-store" })
+        const params = new URLSearchParams()
+        if (extras.size > 0) {
+          params.set("extras", Array.from(extras).join(","))
+        }
+        if (hasTyphoonSignal) {
+          params.set("typhoonTitle", weatherData.metadata?.alertSummary?.warningTitle || weatherData.eventData?.warningMessage || "태풍 감시")
+          params.set("typhoonTm", weatherData.metadata?.alertSummary?.warningUpdatedAt || "")
+          params.set("typhoonNote", weatherData.eventData?.warningMessage || "")
+        }
+        if (hasTsunamiSignal) {
+          params.set("tsunamiTitle", weatherData.metadata?.alertSummary?.tsunamiTitle || "지진해일 감시")
+          params.set("tsunamiTm", weatherData.metadata?.alertSummary?.tsunamiUpdatedAt || "")
+          params.set("tsunamiNote", weatherData.eventData?.warningMessage || "")
+        }
+        if (hasVolcanoSignal) {
+          params.set("volcanoTitle", weatherData.metadata?.alertSummary?.volcanoTitle || "화산 감시")
+          params.set("volcanoTm", weatherData.metadata?.alertSummary?.volcanoUpdatedAt || "")
+          params.set("volcanoNote", weatherData.eventData?.warningMessage || "")
+        }
+
+        const query = params.toString()
+        const response = await fetch(`/api/weather/images${query ? `?${query}` : ""}`, { cache: "no-store" })
         if (!response.ok) return
         const data = await response.json()
         setWeatherImages(data)
