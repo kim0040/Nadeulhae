@@ -222,8 +222,8 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     if (breakdown.knockout === "warning") {
       return {
         text: language === "ko"
-          ? "기상특보 또는 지진 정보가 감지되어 피크닉 지수는 즉시 0점으로 처리됩니다."
-          : "An active weather warning or earthquake bulletin triggers the knock-out rule, so the picnic score is forced to 0.",
+          ? "기상특보, 지진해일, 화산 또는 규모 4.0 이상 지진이 감지되어 피크닉 지수는 즉시 0점으로 처리됩니다."
+          : "An active weather warning, tsunami/volcano signal, or earthquake at M4.0+ triggers the knock-out rule and forces the score to 0.",
         type: "warning" as const,
         icon: <AlertCircle size={18} />,
         fullWidth: true,

@@ -145,6 +145,12 @@ export interface WeatherData {
       warningUpdatedAt?: string;
       earthquakeTitle?: string;
       earthquakeUpdatedAt?: string;
+      earthquakeMagnitude?: number;
+      earthquakeCoordinates?: {
+        lat?: number | null;
+        lon?: number | null;
+      } | null;
+      earthquakeImageUrl?: string;
       tsunamiTitle?: string;
       tsunamiUpdatedAt?: string;
       volcanoTitle?: string;

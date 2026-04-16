@@ -14,6 +14,10 @@ export type WeatherImageData = {
     dust?: { name: string; tm: string; url: string } | null
     lgt?: { name: string; tm: string; url: string } | null
     fog?: { name: string; tm: string; url: string } | null
+    earthquake?: { name: string; tm: string; url: string } | null
+    typhoon?: { name: string; tm: string; url: string } | null
+    tsunami?: { name: string; tm: string; url: string } | null
+    volcano?: { name: string; tm: string; url: string } | null
   }
   metadata?: {
     dataSource?: string
@@ -30,7 +34,7 @@ export type WeatherImageData = {
 
 interface WeatherImagePanelProps {
   data: WeatherImageData
-  weather?: Pick<WeatherData, "eventData" | "details">
+  weather?: Pick<WeatherData, "eventData" | "details" | "metadata">
 }
 
 function formatTm(tm: string | undefined) {
@@ -100,6 +104,7 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
         contextTitle: "상황 모니터",
         weatherWarning: "기상특보 감시",
         earthquake: "지진 통보 감시",
+        earthquakeEpicenter: "지진 발생 지점",
         rain: "강수 추적",
         fog: "안개 신호",
         dust: "황사 탐지",
@@ -118,6 +123,7 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
         contextTitle: "Situation Monitor",
         weatherWarning: "Weather Warning",
         earthquake: "Earthquake Bulletin",
+        earthquakeEpicenter: "Earthquake Epicenter",
         rain: "Precipitation Tracking",
         fog: "Fog Signal",
         dust: "Dust Detection",
@@ -190,6 +196,33 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
       title: labels.lgt,
       icon: <Zap size={16} className="text-yellow-500" />,
       image: data.extras.lgt,
+    })
+  }
+
+  if (data?.extras?.typhoon?.url) {
+    cards.push({
+      key: "typhoon",
+      title: labels.typhoon,
+      icon: <AlertTriangle size={16} className="text-red-500" />,
+      image: data.extras.typhoon,
+    })
+  }
+
+  if (data?.extras?.tsunami?.url) {
+    cards.push({
+      key: "tsunami",
+      title: labels.tsunami,
+      icon: <AlertTriangle size={16} className="text-orange-500" />,
+      image: data.extras.tsunami,
+    })
+  }
+
+  if (data?.extras?.volcano?.url) {
+    cards.push({
+      key: "volcano",
+      title: labels.volcano,
+      icon: <AlertTriangle size={16} className="text-amber-500" />,
+      image: data.extras.volcano,
     })
   }
 

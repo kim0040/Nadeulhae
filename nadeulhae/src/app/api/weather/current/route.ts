@@ -122,6 +122,8 @@ type EarthquakeSnapshot = {
   magnitude: number
   remark: string
   occurredAt: string
+  latitude: number | null
+  longitude: number | null
 }
 
 type TsunamiSnapshot = {
@@ -209,6 +211,7 @@ function getBulletinFallbackStationIds(profile: RegionProfile) {
 const currentWeatherCache = new Map<string, CacheEntry<CurrentWeatherSnapshot>>()
 const MAX_USER_RESPONSE_CACHE_KEYS = 500
 const currentResponseCache = new Map<string, UserCacheEntry<Record<string, unknown>>>()
+const EARTHQUAKE_KNOCKOUT_MAGNITUDE = 4.0
 
 const WEATHER_CACHE_DURATION = 90 * 60 * 1000
 const AIR_CACHE_DURATION = 60 * 60 * 1000
@@ -471,6 +474,38 @@ function formatEarthquakeTitle(location: string, magnitude: number) {
   if (!location) return `규모 ${magnitude.toFixed(1)} 지진`
   if (!Number.isFinite(magnitude)) return location
   return `${location} 규모 ${magnitude.toFixed(1)}`
+}
+
+function getEarthquakeTimeLabel(value: string) {
+  if (!value) return ""
+  const compact = value.replace(/\D/g, "")
+  if (compact.length >= 12) return compact.slice(0, 12)
+  return compact
+}
+
+function buildEarthquakeImageUrl(snapshot: EarthquakeSnapshot) {
+  const params = new URLSearchParams()
+  params.set("kind", "earthquake")
+
+  if (Number.isFinite(snapshot.latitude) && Number.isFinite(snapshot.longitude)) {
+    params.set("lat", Number(snapshot.latitude).toFixed(4))
+    params.set("lon", Number(snapshot.longitude).toFixed(4))
+  }
+
+  if (Number.isFinite(snapshot.magnitude) && snapshot.magnitude > 0) {
+    params.set("mag", snapshot.magnitude.toFixed(1))
+  }
+
+  if (snapshot.location) {
+    params.set("loc", snapshot.location.slice(0, 80))
+  }
+
+  const timeLabel = getEarthquakeTimeLabel(snapshot.occurredAt)
+  if (timeLabel) {
+    params.set("tm", timeLabel)
+  }
+
+  return `/api/weather/images/asset?${params.toString()}`
 }
 
 function getAirScore(khaiGrade: number) {
@@ -866,6 +901,8 @@ async function fetchEarthquakeInfo(serviceKey: string) {
       title: stripHtmlTags(String(item?.rem || "")),
       location: stripHtmlTags(String(item?.loc || "")),
       magnitude: parseNumber(item?.mt ?? item?.mag, Number.NaN),
+      latitude: parseNumber(item?.lat ?? item?.latitude ?? item?.eqkLat ?? item?.latEqk, Number.NaN),
+      longitude: parseNumber(item?.lon ?? item?.longitude ?? item?.eqkLon ?? item?.lonEqk, Number.NaN),
       remark: stripHtmlTags(String(item?.rem || "")),
       occurredAt: String(item?.tmEqk || ""),
     }))
@@ -879,6 +916,8 @@ async function fetchEarthquakeInfo(serviceKey: string) {
     magnitude: latest?.magnitude || 0,
     remark: latest?.remark || "",
     occurredAt: latest?.occurredAt || "--:--",
+    latitude: Number.isFinite(latest?.latitude) ? latest.latitude : null,
+    longitude: Number.isFinite(latest?.longitude) ? latest.longitude : null,
   }
 
   earthquakeCache.set("national", { data: snapshot, lastUpdate: Date.now() })
@@ -1098,6 +1137,7 @@ async function handleGET(req: Request) {
     || weatherData.forecastRn1 > 0
   )
   const isEarthquake = earthquake.active
+  const isSevereEarthquake = isEarthquake && earthquake.magnitude >= EARTHQUAKE_KNOCKOUT_MAGNITUDE
   const isTsunami = tsunami.active
   const isVolcano = volcano.active
   const isWeatherWarning = warning.active || bulletin.hasAlert
@@ -1115,7 +1155,7 @@ async function handleGET(req: Request) {
   let statusKey = "status_good"
   let messageKey = isHomeRegion ? "msg_home_good" : "msg_away_good"
 
-  if (isRain || isEarthquake || isWeatherWarning || isTsunami || isVolcano) {
+  if (isRain || isSevereEarthquake || isWeatherWarning || isTsunami || isVolcano) {
     score = isRain ? 10 : 0
     scoreBreakdown.knockout = isRain ? "rain" : "warning"
     scoreBreakdown.total = score
@@ -1166,6 +1206,11 @@ async function handleGET(req: Request) {
   if (isEarthquake) {
     warningMessage = earthquake.title || earthquake.remark
   }
+
+  const hasEarthquakeRecord = Boolean(
+    earthquake.title
+    || (earthquake.occurredAt && earthquake.occurredAt !== "--:--")
+  )
 
   const hazardSourceItems = [
     warning.title,
@@ -1243,6 +1288,16 @@ async function handleGET(req: Request) {
         warningUpdatedAt: warning.lastUpdate,
         earthquakeTitle: earthquake.title,
         earthquakeUpdatedAt: earthquake.occurredAt,
+        earthquakeMagnitude: hasEarthquakeRecord && Number.isFinite(earthquake.magnitude)
+          ? Number(earthquake.magnitude.toFixed(1))
+          : 0,
+        earthquakeCoordinates: hasEarthquakeRecord
+          ? {
+            lat: earthquake.latitude,
+            lon: earthquake.longitude,
+          }
+          : null,
+        earthquakeImageUrl: hasEarthquakeRecord ? buildEarthquakeImageUrl(earthquake) : "",
         tsunamiTitle: isTsunami ? tsunami.title : "",
         tsunamiUpdatedAt: isTsunami ? tsunami.issuedAt : "",
         volcanoTitle: isVolcano ? volcano.title : "",
