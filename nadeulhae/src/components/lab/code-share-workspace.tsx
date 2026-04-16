@@ -364,6 +364,11 @@ export function CodeShareWorkspace({
     draftsRef.current = { code: codeDraft, title: titleDraft, language: languageDraft }
   }, [codeDraft, titleDraft, languageDraft])
 
+  const sessionVersionRef = useRef(0)
+  useEffect(() => {
+    sessionVersionRef.current = sessionDetail?.version ?? 0
+  }, [sessionDetail?.version])
+
   // Public share URL is calculated on client only.
   const shareUrl = useMemo(() => {
     if (!selectedSessionId || typeof window === "undefined") {
@@ -687,6 +692,11 @@ export function CodeShareWorkspace({
         return
       }
 
+      if (next.version <= sessionVersionRef.current) {
+        // Echo or stale message: we already have this version (or newer).
+        return
+      }
+
       if (isDirty || isSaving) {
         // Do not clobber local unsaved edits; queue latest remote and apply after local save settles.
         setQueuedRemoteDetail(next)
@@ -831,7 +841,7 @@ export function CodeShareWorkspace({
     const titleToSave = titleDraft
     const languageToSave = languageDraft
 
-    // Increase debounce from 520ms to 1200ms to reduce database load and network jank.
+    // User-requested debounce duration: wait 2.5s after typing stops before auto-saving.
     const timer = window.setTimeout(async () => {
       setIsSaving(true)
 
