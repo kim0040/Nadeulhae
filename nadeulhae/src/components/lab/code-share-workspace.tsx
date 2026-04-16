@@ -1210,7 +1210,7 @@ export function CodeShareWorkspace({
                     </div>
 
                     {/* Center: language selector */}
-                    <label className="hidden sm:flex items-center gap-1.5 rounded-lg border border-card-border/60 bg-card/50 px-2.5 py-1 text-xs font-bold text-muted-foreground">
+                    <label className="flex items-center gap-1.5 rounded-lg border border-card-border/60 bg-card/50 px-2.5 py-1 text-xs font-bold text-muted-foreground">
                       {copy.language}
                       <input
                         value={languageDraft}

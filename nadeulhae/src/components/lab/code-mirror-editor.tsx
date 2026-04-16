@@ -128,8 +128,8 @@ const siteThemeBase = EditorView.baseTheme({
 
 const siteLightTheme = EditorView.theme({
   "&": {
-    backgroundColor: "rgba(255, 255, 255, 0.6)",
-    color: "#112027",
+    backgroundColor: "rgba(255, 255, 255, 0.6) !important",
+    color: "#112027 !important",
   },
   ".cm-gutters": {
     backgroundColor: "rgba(245, 251, 250, 0.6)",
@@ -151,8 +151,8 @@ const siteLightTheme = EditorView.theme({
 
 const siteDarkTheme = EditorView.theme({
   "&": {
-    backgroundColor: "rgba(10, 24, 32, 0.5)",
-    color: "#e9f5f3",
+    backgroundColor: "rgba(10, 24, 32, 0.5) !important",
+    color: "#e9f5f3 !important",
   },
   ".cm-gutters": {
     backgroundColor: "rgba(7, 17, 24, 0.5)",
@@ -227,6 +227,7 @@ export function CodeMirrorEditor({
     <div className={cn("overflow-hidden rounded-xl border border-card-border/70", className)}>
       <CodeMirror
         value={value}
+        theme={resolvedTheme === "dark" ? "dark" : "light"}
         onChange={onChange}
         onBlur={onBlur}
         readOnly={readOnly}
