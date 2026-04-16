@@ -22,6 +22,17 @@ export const metadata: Metadata = {
   description: "날씨 기반 피크닉 지수와 지역별 나들이 브리핑 서비스",
 };
 
+import type { Viewport } from "next";
+
+// Prevent iOS Safari auto-zoom on input focus (font-size < 16px triggers zoom).
+// maximum-scale=1 stops the zoom while user-scalable=yes keeps pinch-zoom accessible.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 import { Navbar } from "@/components/navbar";
 
 import { LanguageProvider } from "@/context/LanguageContext";

@@ -290,6 +290,13 @@ export function DashboardChatPanel({
     void loadChatState(null)
   }, [loadChatState, user.id])
 
+  // Auto-dismiss error messages after 5 seconds.
+  useEffect(() => {
+    if (!errorMessage) return
+    const timer = window.setTimeout(() => setErrorMessage(null), 5_000)
+    return () => window.clearTimeout(timer)
+  }, [errorMessage])
+
   const resolvedActiveSessionId = activeSessionId ?? sessions[0]?.id ?? null
 
   useEffect(() => {
@@ -629,7 +636,7 @@ export function DashboardChatPanel({
       </div>
 
       {/* Chat Container */}
-      <div className="relative flex min-h-[24rem] flex-col overflow-hidden rounded-[1.4rem] border border-card-border/60 bg-background sm:min-h-[28rem]">
+      <div className="relative flex max-h-[36rem] min-h-[24rem] flex-col overflow-hidden rounded-[1.4rem] border border-card-border/60 bg-background sm:max-h-[42rem] sm:min-h-[28rem]">
         {/* Messages Area */}
         <div
           ref={messageViewportRef}
@@ -705,7 +712,13 @@ export function DashboardChatPanel({
             <textarea
               ref={chatInputRef}
               value={chatInput}
-              onChange={(event) => setChatInput(event.target.value.slice(0, maxInputCharacters))}
+              onChange={(event) => {
+                setChatInput(event.target.value.slice(0, maxInputCharacters))
+                // Auto-resize to fit content (max 6 lines)
+                const el = event.target
+                el.style.height = "auto"
+                el.style.height = `${Math.min(el.scrollHeight, 144)}px`
+              }}
               onCompositionStart={() => {
                 isComposingRef.current = true
               }}

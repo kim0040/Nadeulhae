@@ -94,7 +94,13 @@ export function useWebSocket() {
     }
 
     ws.onerror = () => {
-      ws.close()
+      // onerror is always followed by onclose. Explicit close() ensures cleanup
+      // but must be guarded because close() on a CONNECTING socket throws in some browsers.
+      try {
+        ws.close()
+      } catch {
+        // no-op: onclose handler will still fire and handle reconnection.
+      }
     }
 
     ws.onmessage = (event) => {
@@ -129,7 +135,14 @@ export function useWebSocket() {
       handlersRef.current.get(type)!.add(handler)
       return () => {
         // Keep handler sets clean; stale listeners are a common source of duplicate UI updates.
-        handlersRef.current.get(type)?.delete(handler)
+        const handlers = handlersRef.current.get(type)
+        if (handlers) {
+          handlers.delete(handler)
+          // Remove empty sets from the map to avoid unbounded key growth.
+          if (handlers.size === 0) {
+            handlersRef.current.delete(type)
+          }
+        }
       }
     },
     []

@@ -65,6 +65,8 @@ export interface LabReportTotals {
   avgDifficulty: number
   avgStabilityDays: number
   avgRetrievability: number | null
+  totalReviews: number
+  totalLapses: number
 }
 
 export interface LabReportTrendPoint {
@@ -99,10 +101,26 @@ export interface LabReportDifficultCard {
   nextReviewAt: string
 }
 
+export interface LabReportInsights {
+  /** Percentage of cards in "review" state out of all cards. */
+  reviewRatePercent: number
+  /** Percentage of cards that are mastered (stage >= 4) out of all cards. */
+  masteryPercent: number
+  /** Lapse rate: lapses / totalReviews. Lower is better. */
+  lapseRatePercent: number
+  /** Number of consecutive days with at least 1 review in this period. */
+  activeStreakDays: number
+  /** Average reviews per active day in this period. */
+  avgReviewsPerActiveDay: number
+  /** Estimated days until current due queue is cleared at current pace. */
+  estimatedClearDays: number | null
+}
+
 export interface LabReportSnapshot {
   generatedAt: string
   periodDays: number
   totals: LabReportTotals
+  insights: LabReportInsights
   trend: LabReportTrendPoint[]
   stateBreakdown: LabReportStateBreakdown[]
   deckSummaries: LabReportDeckSummary[]
