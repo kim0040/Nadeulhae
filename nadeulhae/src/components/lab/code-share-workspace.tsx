@@ -879,17 +879,21 @@ export function CodeShareWorkspace({
 
         applyViewerIfPresent(payload.viewer)
 
-        // Only obliterate the user's typing delta if they haven't typed *since* we fired the save request.
-        // Otherwise, just bump the metadata (version) so the next save knows the correct target.
+        setSessionDetail(payload.session)
+        upsertSessionSummary(toSummaryFromDetail(payload.session))
+
+        // Only clear the dirty flag if the user hasn't typed *since* we fired the save request.
+        // We purposefully DO NOT call `applySessionDetail` (which runs setCodeDraft) because
+        // overwriting the React state with the identical string will interrupt the browser's
+        // IME composition (Korean character composing) and cause the jumping/disappearing text.
         if (
           draftsRef.current.code === codeToSave &&
           draftsRef.current.title === titleToSave &&
           draftsRef.current.language === languageToSave
         ) {
-          applySessionDetail(payload.session)
-        } else {
-          setSessionDetail(payload.session)
-          upsertSessionSummary(toSummaryFromDetail(payload.session))
+          setIsDirty(false)
+          setQueuedRemoteDetail(null)
+          setNeedsRemoteRefresh(false)
         }
 
         // Secondary signal so peers can refresh even if direct patch broadcast is delayed/missed.
