@@ -25,6 +25,7 @@ import type {
   LabGeneratedCardInput,
   LabLearningState,
   LabLocale,
+  LabReportInsights,
   LabReportSnapshot,
   LabReportStateBreakdown,
   LabReportTrendPoint,
@@ -89,6 +90,8 @@ interface LabReportTotalsRow extends RowDataPacket {
   avg_difficulty: number | null
   avg_stability_days: number | null
   avg_retrievability: number | null
+  total_reviews: number
+  total_lapses: number
 }
 
 interface LabTrendRow extends RowDataPacket {
@@ -888,6 +891,8 @@ export async function getLabReportSnapshot(input: {
           (SELECT COUNT(*) FROM lab_cards WHERE user_id = ? AND learning_state = 'review' AND stage >= 4) AS mastered_count,
           (SELECT AVG(difficulty) FROM lab_cards WHERE user_id = ?) AS avg_difficulty,
           (SELECT AVG(stability_days) FROM lab_cards WHERE user_id = ?) AS avg_stability_days,
+          (SELECT COALESCE(SUM(total_reviews), 0) FROM lab_cards WHERE user_id = ?) AS total_reviews,
+          (SELECT COALESCE(SUM(lapses), 0) FROM lab_cards WHERE user_id = ?) AS total_lapses,
           (
             SELECT AVG(
               CASE
@@ -901,6 +906,8 @@ export async function getLabReportSnapshot(input: {
           ) AS avg_retrievability
       `,
       [
+        input.userId,
+        input.userId,
         input.userId,
         input.userId,
         input.userId,
@@ -1054,14 +1061,65 @@ export async function getLabReportSnapshot(input: {
     nextReviewAt: toIsoString(row.next_review_at),
   }))
 
+  // --- Compute actionable insights ---
+  const totalCardCount = Math.max(0, Number(totals?.card_count ?? 0))
+  const totalDueCount = Math.max(0, Number(totals?.due_count ?? 0))
+  const totalMasteredCount = Math.max(0, Number(totals?.mastered_count ?? 0))
+  const totalReviewsSum = Math.max(0, Number(totals?.total_reviews ?? 0))
+  const totalLapsesSum = Math.max(0, Number(totals?.total_lapses ?? 0))
+  const reviewStateCount = stateCountMap.get("review") ?? 0
+
+  const reviewRatePercent = totalCardCount > 0
+    ? Math.round((reviewStateCount / totalCardCount) * 100)
+    : 0
+
+  const masteryPercent = totalCardCount > 0
+    ? Math.round((totalMasteredCount / totalCardCount) * 100)
+    : 0
+
+  const lapseRatePercent = totalReviewsSum > 0
+    ? Math.round((totalLapsesSum / totalReviewsSum) * 100)
+    : 0
+
+  // Active streak: count consecutive days from today backwards that have reviewCount > 0
+  let activeStreakDays = 0
+  for (let i = trend.length - 1; i >= 0; i -= 1) {
+    if (trend[i].reviewCount > 0) {
+      activeStreakDays += 1
+    } else {
+      break
+    }
+  }
+
+  // Average reviews per active day
+  const activeDays = trend.filter((t) => t.reviewCount > 0).length
+  const totalReviewsInPeriod = trend.reduce((sum, t) => sum + t.reviewCount, 0)
+  const avgReviewsPerActiveDay = activeDays > 0
+    ? Math.round((totalReviewsInPeriod / activeDays) * 10) / 10
+    : 0
+
+  // Estimated days to clear due queue at current pace
+  const estimatedClearDays = avgReviewsPerActiveDay > 0 && totalDueCount > 0
+    ? Math.round((totalDueCount / avgReviewsPerActiveDay) * 10) / 10
+    : null
+
+  const insights: LabReportInsights = {
+    reviewRatePercent,
+    masteryPercent,
+    lapseRatePercent,
+    activeStreakDays,
+    avgReviewsPerActiveDay,
+    estimatedClearDays,
+  }
+
   return {
     generatedAt: now.toISOString(),
     periodDays: range.days,
     totals: {
       deckCount: Math.max(0, Number(totals?.deck_count ?? 0)),
-      cardCount: Math.max(0, Number(totals?.card_count ?? 0)),
-      dueCount: Math.max(0, Number(totals?.due_count ?? 0)),
-      masteredCount: Math.max(0, Number(totals?.mastered_count ?? 0)),
+      cardCount: totalCardCount,
+      dueCount: totalDueCount,
+      masteredCount: totalMasteredCount,
       generatedToday: Math.max(0, Number(usage?.generation_count ?? 0)),
       reviewedToday: Math.max(0, Number(usage?.review_count ?? 0)),
       avgDifficulty: clampNumber(Number(totals?.avg_difficulty ?? 0), 0, 10),
@@ -1069,7 +1127,10 @@ export async function getLabReportSnapshot(input: {
       avgRetrievability: Number.isFinite(Number(totals?.avg_retrievability))
         ? clampNumber(Number(totals?.avg_retrievability), 0, 1)
         : null,
+      totalReviews: totalReviewsSum,
+      totalLapses: totalLapsesSum,
     },
+    insights,
     trend,
     stateBreakdown,
     deckSummaries,

@@ -18,6 +18,7 @@ import { BorderBeam } from "@/components/magicui/border-beam"
 import { MagicCard } from "@/components/magicui/magic-card"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { SectionCard } from "@/components/dashboard/ui"
+import { CodeMirrorEditor } from "@/components/lab/code-mirror-editor"
 import { useLanguage } from "@/context/LanguageContext"
 import { useWebSocket } from "@/lib/websocket/use-websocket"
 import { cn } from "@/lib/utils"
@@ -979,7 +980,7 @@ export function CodeShareWorkspace({
   const activeStatusLabel = sessionDetail?.status === "closed"
     ? copy.sessionStatusClosed
     : copy.sessionStatusActive
-  const isSharedView = !showSessionList
+
 
   return (
     <main className={cn(
@@ -994,6 +995,7 @@ export function CodeShareWorkspace({
           ? "max-w-7xl space-y-6"
           : "h-[calc(100dvh-3.5rem)] w-full sm:h-[calc(100dvh-4rem)]"
       )}>
+        {/* Header - only in list mode */}
         {showSessionList ? (
           <SectionCard>
           <div className="space-y-4">
@@ -1017,11 +1019,12 @@ export function CodeShareWorkspace({
         <div className={cn(
           "grid",
           showSessionList
-            ? "gap-6 lg:grid-cols-[340px_1fr]"
-            : "h-full grid-cols-1 px-2 pb-2 sm:px-4 sm:pb-4"
+            ? "gap-6 lg:grid-cols-[280px_1fr]"
+            : "h-full grid-cols-1"
         )}>
+          {/* Session list sidebar */}
           {showSessionList ? (
-            <SectionCard className="h-full">
+            <SectionCard className="h-fit sticky top-28">
               <div className="space-y-4">
                 <div className="space-y-1">
                   <p className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">{copy.listTitle}</p>
@@ -1047,7 +1050,7 @@ export function CodeShareWorkspace({
                   )}
                 </ShimmerButton>
 
-                <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+                <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
                   {isListLoading ? (
                     <p className="rounded-[1rem] border border-card-border/70 bg-background/70 px-3 py-4 text-sm text-muted-foreground">
                       {copy.loadFailed}
@@ -1099,248 +1102,220 @@ export function CodeShareWorkspace({
             </SectionCard>
           ) : null}
 
-          <SectionCard
-            className={cn(!showSessionList && "h-full rounded-none")}
-            panelClassName={cn(
-              !showSessionList && "h-full rounded-none border-x-0 border-b-0 bg-card/80 p-2 sm:p-3"
-            )}
-          >
+          {/* Main editor area */}
+          <div className={cn(
+            "flex flex-col",
+            showSessionList ? "min-w-0" : "h-full px-2 pb-2 sm:px-4 sm:pb-4"
+          )}>
             {!selectedSessionId ? (
-              <div className="space-y-3 rounded-[1.2rem] border border-card-border/70 bg-background/70 px-4 py-6 text-sm text-muted-foreground">
-                <p>{copy.noSessionSelected}</p>
-                <ShimmerButton
-                  type="button"
-                  className="rounded-[1rem] px-4 py-2.5 text-sm font-black"
-                  onClick={() => void createSession()}
-                  disabled={isCreating}
-                >
-                  {isCreating ? copy.creating : copy.createSession}
-                </ShimmerButton>
-              </div>
+              <SectionCard>
+                <div className="space-y-3 rounded-[1.2rem] border border-card-border/70 bg-background/70 px-4 py-6 text-sm text-muted-foreground">
+                  <p>{copy.noSessionSelected}</p>
+                  <ShimmerButton
+                    type="button"
+                    className="rounded-[1rem] px-4 py-2.5 text-sm font-black"
+                    onClick={() => void createSession()}
+                    disabled={isCreating}
+                  >
+                    {isCreating ? copy.creating : copy.createSession}
+                  </ShimmerButton>
+                </div>
+              </SectionCard>
             ) : isSessionLoading ? (
-              <div className="flex items-center justify-center rounded-[1.2rem] border border-card-border/70 bg-background/70 px-4 py-8 text-sm text-muted-foreground">
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                {copy.loadFailed}
-              </div>
+              <SectionCard>
+                <div className="flex items-center justify-center rounded-[1.2rem] border border-card-border/70 bg-background/70 px-4 py-8 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  {copy.loadFailed}
+                </div>
+              </SectionCard>
             ) : !sessionDetail ? (
-              <div className="space-y-3 rounded-[1.2rem] border border-card-border/70 bg-background/70 px-4 py-6">
-                <p className="text-sm text-muted-foreground">{error ?? copy.notFound}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedSessionId) {
-                      void loadSessionDetail(selectedSessionId)
-                    }
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-card/60 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-muted-foreground transition hover:border-sky-blue/35 hover:text-foreground"
-                >
-                  <RefreshCcw className="size-3.5" />
-                  {copy.refresh}
-                </button>
-              </div>
+              <SectionCard>
+                <div className="space-y-3 rounded-[1.2rem] border border-card-border/70 bg-background/70 px-4 py-6">
+                  <p className="text-sm text-muted-foreground">{error ?? copy.notFound}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedSessionId) {
+                        void loadSessionDetail(selectedSessionId)
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-card/60 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-muted-foreground transition hover:border-sky-blue/35 hover:text-foreground"
+                  >
+                    <RefreshCcw className="size-3.5" />
+                    {copy.refresh}
+                  </button>
+                </div>
+              </SectionCard>
             ) : (
               <MagicCard
                 className={cn(
-                  "overflow-hidden",
+                  "overflow-hidden flex flex-col",
                   showSessionList ? "rounded-[1.6rem]" : "h-full rounded-[1.15rem]"
                 )}
                 gradientSize={190}
                 gradientOpacity={0.68}
               >
                 <div className={cn(
-                  "relative border border-card-border/70 bg-background/80",
+                  "relative flex flex-col border border-card-border/70 bg-background/80",
                   showSessionList
-                    ? "rounded-[1.6rem] p-4 sm:p-5"
-                    : "flex h-full flex-col rounded-[1.15rem] p-3 sm:p-4"
+                    ? "rounded-[1.6rem] flex-1"
+                    : "h-full rounded-[1.15rem]"
                 )}>
                   <BorderBeam size={160} duration={12} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
-                  <div className={cn(
-                    "relative z-10",
-                    showSessionList ? "space-y-4" : "flex h-full flex-col gap-3"
-                  )}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <label className="block space-y-1">
-                          <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">{copy.titleLabel}</span>
-                          <input
-                            type="text"
-                            value={titleDraft}
-                            disabled={!sessionDetail.canEdit}
-                            onChange={(event) => handleTitleChange(event.target.value)}
-                            className="w-full rounded-[0.9rem] border border-card-border/70 bg-card/70 px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-sky-blue/45 focus:ring-2 focus:ring-sky-blue/15 disabled:cursor-not-allowed disabled:opacity-70"
-                            maxLength={120}
-                          />
-                        </label>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={cn(
-                            "rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.15em]",
-                            sessionDetail.status === "active"
-                              ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-400"
-                              : "border-zinc-400/35 bg-zinc-400/10 text-zinc-300"
-                          )}>
-                            {activeStatusLabel}
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full border border-card-border/70 bg-card/70 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">
-                            <Users className="size-3" />
-                            {copy.activeUsers} {presenceCount}
-                          </span>
-                          <span className="rounded-full border border-card-border/70 bg-card/70 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">
-                            v{sessionDetail.version}
-                          </span>
-                        </div>
-                      </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void copyShareLink()}
-                          disabled={!shareUrl}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-card-border/70 bg-card/70 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground transition hover:border-sky-blue/35 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Copy className="size-3.5" />
-                          {copy.shareLink}
-                        </button>
-                        {showSessionList ? (
-                          <Link
-                            href={shareUrl || `/code-share/${selectedSessionId}`}
-                            target="_blank"
-                            className="inline-flex items-center gap-1.5 rounded-full border border-card-border/70 bg-card/70 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground transition hover:border-sky-blue/35 hover:text-foreground"
-                          >
-                            <Link2 className="size-3.5" />
-                            {copy.openPublicPage}
-                          </Link>
-                        ) : null}
-                        {sessionDetail.canDelete ? (
-                          <button
-                            type="button"
-                            onClick={() => void deleteSession()}
-                            disabled={isDeleting}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-rose-400/35 bg-rose-500/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-rose-300 transition hover:border-rose-300 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-                            {isDeleting ? copy.deleting : copy.delete}
-                          </button>
-                        ) : null}
-                      </div>
+                  {/* === Toolbar === */}
+                  <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 border-b border-card-border/50 px-3 py-2.5 sm:px-4">
+                    {/* Left: title + status */}
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <input
+                        type="text"
+                        value={titleDraft}
+                        disabled={!sessionDetail.canEdit}
+                        onChange={(event) => handleTitleChange(event.target.value)}
+                        className="min-w-0 flex-1 truncate rounded-lg bg-transparent px-2 py-1 text-sm font-bold text-foreground outline-none transition hover:bg-card/60 focus:bg-card/80 focus:ring-1 focus:ring-sky-blue/30 disabled:cursor-not-allowed disabled:opacity-70"
+                        maxLength={120}
+                      />
+                      <span className={cn(
+                        "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.15em]",
+                        sessionDetail.status === "active"
+                          ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-400"
+                          : "border-zinc-400/35 bg-zinc-400/10 text-zinc-300"
+                      )}>
+                        {activeStatusLabel}
+                      </span>
                     </div>
 
-                    {showSessionList ? (
-                      <>
-                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                          <label className="flex min-w-0 items-center gap-2 rounded-[0.9rem] border border-card-border/70 bg-card/70 px-3 py-2 text-xs font-bold text-muted-foreground">
-                            {copy.languageFormat}
-                            <input
-                              value={languageDraft}
-                              list="code-share-language-options"
-                              onChange={(event) => handleLanguageChange(event.target.value)}
-                              disabled={!sessionDetail.canEdit}
-                              className="min-w-0 flex-1 rounded border border-card-border/70 bg-background/80 px-2 py-1 text-xs text-foreground outline-none focus:border-sky-blue/45"
-                              maxLength={40}
-                              placeholder={copy.languageHint}
-                            />
-                            <datalist id="code-share-language-options">
-                              {CODE_SHARE_LANGUAGE_PRESETS.map((option) => (
-                                <option key={option} value={option} />
-                              ))}
-                            </datalist>
-                          </label>
-
-                          <div className="rounded-[0.9rem] border border-card-border/70 bg-card/70 px-3 py-2 text-xs text-muted-foreground">
-                            <p className="font-black uppercase tracking-[0.14em] text-foreground/90">{copy.shareSettings}</p>
-                            <p className="mt-1"><span className="font-semibold text-foreground/85">{copy.shareAccess}:</span> {copy.shareAccessValue}</p>
-                            <p className="mt-0.5">{copy.shareRule}</p>
-                          </div>
-
-                          <span className="text-xs text-muted-foreground sm:col-span-2">
-                            {copy.sessionClosedHint}
-                          </span>
-                        </div>
-
-                        <div className="space-y-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">{copy.participants}</p>
-                          <div className="flex flex-wrap gap-2">
-                            {participants.length === 0 ? (
-                              <span className="rounded-full border border-card-border/70 bg-card/70 px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                                {copy.activeUsers} {presenceCount}
-                              </span>
-                            ) : participants.map((participant) => {
-                              const isMe = viewer?.actorId === participant.actorId
-                              return (
-                                <span
-                                  key={participant.actorId}
-                                  className={cn(
-                                    "rounded-full border px-2.5 py-1 text-xs font-semibold",
-                                    participant.typing
-                                      ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-300"
-                                      : "border-card-border/70 bg-card/70 text-muted-foreground"
-                                  )}
-                                >
-                                  {participant.alias}
-                                  {isMe ? ` (${copy.me})` : ""}
-                                  {participant.typing ? ` · ${copy.typing}` : ""}
-                                </span>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <label className="flex min-w-0 items-center gap-2 rounded-[0.9rem] border border-card-border/70 bg-card/70 px-3 py-2 text-xs font-bold text-muted-foreground">
-                        {copy.language}
-                        <input
-                          value={languageDraft}
-                          list="code-share-language-options"
-                          onChange={(event) => handleLanguageChange(event.target.value)}
-                          disabled={!sessionDetail.canEdit}
-                          className="min-w-0 flex-1 rounded border border-card-border/70 bg-background/80 px-2 py-1 text-xs text-foreground outline-none focus:border-sky-blue/45"
-                          maxLength={40}
-                          placeholder={copy.languageHint}
-                        />
-                        <datalist id="code-share-language-options">
-                          {CODE_SHARE_LANGUAGE_PRESETS.map((option) => (
-                            <option key={option} value={option} />
-                          ))}
-                        </datalist>
-                      </label>
-                    )}
-
-	                    <div className={cn(
-	                      "rounded-[1.2rem] border border-card-border/70 bg-background/70 p-2",
-	                      isSharedView && "min-h-0 flex-1"
-	                    )}>
-                      <textarea
-                        value={codeDraft}
-                        onChange={(event) => handleCodeChange(event.target.value)}
-                        onBlur={handleCodeBlur}
+                    {/* Center: language selector */}
+                    <label className="hidden sm:flex items-center gap-1.5 rounded-lg border border-card-border/60 bg-card/50 px-2.5 py-1 text-xs font-bold text-muted-foreground">
+                      {copy.language}
+                      <input
+                        value={languageDraft}
+                        list="code-share-language-options"
+                        onChange={(event) => handleLanguageChange(event.target.value)}
                         disabled={!sessionDetail.canEdit}
-                        spellCheck={false}
-                        placeholder={copy.editorPlaceholder}
-	                        className={cn(
-	                          "w-full rounded-[0.9rem] border border-card-border/70 bg-background/80 px-3 py-3 font-mono text-sm leading-6 text-foreground outline-none transition focus:border-sky-blue/45 focus:ring-2 focus:ring-sky-blue/15 disabled:cursor-not-allowed disabled:opacity-70",
-	                          showSessionList
-	                            ? "min-h-[52vh] resize-y"
-	                            : "h-full min-h-0 resize-none"
-	                        )}
-	                      />
-	                    </div>
+                        className="min-w-0 w-24 rounded bg-transparent px-1.5 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-sky-blue/30"
+                        maxLength={40}
+                        placeholder={copy.languageHint}
+                      />
+                      <datalist id="code-share-language-options">
+                        {CODE_SHARE_LANGUAGE_PRESETS.map((option) => (
+                          <option key={option} value={option} />
+                        ))}
+                      </datalist>
+                    </label>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {/* Right: presence + actions */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-card-border/70 bg-card/60 px-2 py-0.5 text-[10px] font-black text-muted-foreground">
+                        <Users className="size-3" />
+                        {presenceCount}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void copyShareLink()}
+                        disabled={!shareUrl}
+                        className="inline-flex items-center gap-1 rounded-full border border-card-border/70 bg-card/60 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground transition hover:border-sky-blue/35 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Copy className="size-3" />
+                        {copy.shareLink}
+                      </button>
+                      {showSessionList ? (
+                        <Link
+                          href={shareUrl || `/code-share/${selectedSessionId}`}
+                          target="_blank"
+                          className="inline-flex items-center gap-1 rounded-full border border-card-border/70 bg-card/60 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground transition hover:border-sky-blue/35 hover:text-foreground"
+                        >
+                          <Link2 className="size-3" />
+                        </Link>
+                      ) : null}
+                      {sessionDetail.canDelete ? (
+                        <button
+                          type="button"
+                          onClick={() => void deleteSession()}
+                          disabled={isDeleting}
+                          className="inline-flex items-center gap-1 rounded-full border border-rose-400/35 bg-rose-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-rose-300 transition hover:border-rose-300 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isDeleting ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Mobile language selector */}
+                  <div className="flex sm:hidden items-center gap-2 border-b border-card-border/50 px-3 py-1.5">
+                    <label className="flex flex-1 items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                      {copy.language}
+                      <input
+                        value={languageDraft}
+                        list="code-share-language-options-mobile"
+                        onChange={(event) => handleLanguageChange(event.target.value)}
+                        disabled={!sessionDetail.canEdit}
+                        className="min-w-0 flex-1 rounded bg-transparent px-1.5 py-0.5 text-xs text-foreground outline-none"
+                        maxLength={40}
+                        placeholder={copy.languageHint}
+                      />
+                      <datalist id="code-share-language-options-mobile">
+                        {CODE_SHARE_LANGUAGE_PRESETS.map((option) => (
+                          <option key={option} value={option} />
+                        ))}
+                      </datalist>
+                    </label>
+                  </div>
+
+                  {/* === Editor === */}
+                  <div className={cn(
+                    "relative z-10 flex-1",
+                    showSessionList ? "min-h-[60vh]" : "min-h-0"
+                  )}>
+                    <CodeMirrorEditor
+                      value={codeDraft}
+                      onChange={handleCodeChange}
+                      onBlur={handleCodeBlur}
+                      language={languageDraft}
+                      readOnly={!sessionDetail.canEdit}
+                      placeholder={copy.editorPlaceholder}
+                      className="h-full rounded-none border-0"
+                    />
+                  </div>
+
+                  {/* === Status Bar === */}
+                  <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 border-t border-card-border/50 px-3 py-1.5 text-[11px] sm:px-4">
+                    <div className="flex items-center gap-2">
                       {sessionDetail.canEdit ? (
-                        <span className="rounded-full border border-card-border/70 bg-card/70 px-2.5 py-1 font-bold text-muted-foreground">
+                        <span className="rounded-full border border-card-border/70 bg-card/60 px-2 py-0.5 font-bold text-muted-foreground">
                           {isSaving ? copy.saving : isDirty ? copy.saving : copy.saved}
                         </span>
                       ) : (
-                        <span className="rounded-full border border-zinc-500/40 bg-zinc-500/10 px-2.5 py-1 font-bold text-zinc-300">
+                        <span className="rounded-full border border-zinc-500/40 bg-zinc-500/10 px-2 py-0.5 font-bold text-zinc-300">
                           {copy.readonly}
                         </span>
                       )}
+                      <span className="rounded-full border border-card-border/70 bg-card/60 px-2 py-0.5 font-bold text-muted-foreground">
+                        v{sessionDetail.version}
+                      </span>
+                    </div>
+
+                    {/* Typing indicators */}
+                    <div className="flex items-center gap-2">
+                      {participants.filter((p) => p.typing && p.actorId !== viewer?.actorId).map((p) => (
+                        <span
+                          key={p.actorId}
+                          className="inline-flex items-center gap-1 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 font-bold text-emerald-300"
+                        >
+                          <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
+                          {p.alias} · {copy.typing}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       {message ? (
-                        <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 font-bold text-emerald-300">
+                        <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 font-bold text-emerald-300">
                           {message}
                         </span>
                       ) : null}
                       {error ? (
-                        <span className="rounded-full border border-rose-400/30 bg-rose-500/10 px-2.5 py-1 font-bold text-rose-300">
+                        <span className="rounded-full border border-rose-400/30 bg-rose-500/10 px-2 py-0.5 font-bold text-rose-300">
                           {error}
                         </span>
                       ) : null}
@@ -1349,7 +1324,7 @@ export function CodeShareWorkspace({
                 </div>
               </MagicCard>
             )}
-          </SectionCard>
+          </div>
         </div>
       </div>
     </main>

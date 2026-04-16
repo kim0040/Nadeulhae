@@ -159,6 +159,21 @@ export function addClient(
   return true
 }
 
+// Update fields on an already-registered client (e.g. after async auth resolves).
+export function updateClientMeta(
+  ws: WebSocket,
+  patch: Partial<Pick<ClientMeta, "userId" | "actorId" | "actorAlias">>
+) {
+  const meta = clients.get(ws)
+  if (!meta) {
+    return
+  }
+
+  if (patch.userId !== undefined) meta.userId = patch.userId
+  if (patch.actorId !== undefined) meta.actorId = patch.actorId
+  if (patch.actorAlias !== undefined) meta.actorAlias = patch.actorAlias
+}
+
 export function getClientMeta(ws: WebSocket) {
   return clients.get(ws) ?? null
 }
@@ -253,7 +268,9 @@ export function getRoomConnectionCount(room: string) {
 
 export function broadcast(type: string, payload: unknown, excludeWs?: WebSocket) {
   const data = JSON.stringify({ type, payload })
-  for (const [ws] of clients) {
+  // Snapshot avoids mutation issues if safeSend failure triggers removeClient during iteration.
+  const snapshot = [...clients.keys()]
+  for (const ws of snapshot) {
     if (ws === excludeWs) continue
     if (!safeSend(ws, data)) {
       removeClient(ws)
@@ -268,7 +285,9 @@ export function broadcastToRoom(room: string, type: string, payload: unknown, ex
   }
 
   const data = JSON.stringify({ type, payload })
-  for (const ws of roomClients) {
+  // Snapshot avoids mutation issues if safeSend failure triggers removeClient during iteration.
+  const snapshot = [...roomClients]
+  for (const ws of snapshot) {
     if (ws === excludeWs) {
       continue
     }

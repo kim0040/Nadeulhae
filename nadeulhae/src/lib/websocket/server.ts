@@ -4,6 +4,7 @@ import type { IncomingMessage } from "node:http"
 import {
   addClient,
   removeClient,
+  updateClientMeta,
   broadcast,
   broadcastToRoom,
   getConnectedCount,
@@ -308,6 +309,16 @@ export function createWebSocketServer(server: import("node:http").Server) {
     const subscribedCodeShareSessions = new Set<string>()
     let cleanedUp = false
 
+    // Register client immediately so room joins work even before async auth completes.
+    // userId is set to null here and updated once authenticateWs resolves.
+    const added = addClient(ws, null, actorId, actorAlias)
+    if (!added) {
+      ws.close(4429, "Too many connections")
+      return
+    }
+
+    broadcast("user_count", { count: getConnectedCount() })
+
     const cleanup = () => {
       if (cleanedUp) {
         return
@@ -334,13 +345,8 @@ export function createWebSocketServer(server: import("node:http").Server) {
           return
         }
 
-        const added = addClient(ws, userId, actorId, actorAlias)
-        if (!added) {
-          ws.close(4429, "Too many connections")
-          return
-        }
-
-        broadcast("user_count", { count: getConnectedCount() })
+        // Client is already registered; just patch the userId from auth result.
+        updateClientMeta(ws, { userId })
       })
       .catch(() => {
         if (ws.readyState === WebSocket.OPEN) {

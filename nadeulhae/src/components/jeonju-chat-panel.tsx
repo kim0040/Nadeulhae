@@ -97,6 +97,8 @@ function ChatBubble({
     ? (language === "ko" ? "익명" : "Anonymous")
     : `${message.nickname}#${message.nicknameTag}`
 
+  const showTimestamp = showProfile
+
   return (
     <div
       className={cn(
@@ -146,23 +148,23 @@ function ChatBubble({
           </p>
         )}
         <div className="flex items-end gap-1.5">
-          {isMine && (
-             <p className="text-[10px] font-semibold text-muted-foreground/60 shrink-0 mb-1">
+          {isMine && showTimestamp && (
+             <p className="text-[10px] font-semibold text-muted-foreground/50 shrink-0 mb-0.5">
                {formatChatTime(message.createdAt, language, nowMs)}
              </p>
           )}
           <div
             className={cn(
-              "break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+              "break-words rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed",
               isMine
-                ? "rounded-tr-md bg-sky-blue text-white"
+                ? "rounded-tr-md bg-sky-blue text-white shadow-sm"
                 : "rounded-tl-md border border-card-border/70 bg-card/90 text-foreground"
             )}
           >
             {message.content}
           </div>
-          {!isMine && (
-             <p className="text-[10px] font-semibold text-muted-foreground/60 shrink-0 mb-1">
+          {!isMine && showTimestamp && (
+             <p className="text-[10px] font-semibold text-muted-foreground/50 shrink-0 mb-0.5">
                {formatChatTime(message.createdAt, language, nowMs)}
              </p>
           )}
@@ -416,7 +418,7 @@ export function JeonjuChatPanel() {
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="max-h-[35rem] min-h-[21rem] space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none] sm:max-h-[44rem] sm:min-h-[26rem] sm:p-5"
+              className="max-h-[42rem] min-h-[26rem] space-y-3 overflow-y-auto overscroll-contain p-4 custom-scrollbar [overflow-anchor:none] sm:max-h-[48rem] sm:min-h-[30rem] sm:p-5"
             >
               {isLoading ? (
                 <div className="flex h-32 items-center justify-center text-sm font-semibold text-muted-foreground">
@@ -431,9 +433,11 @@ export function JeonjuChatPanel() {
                   {error}
                 </div>
               ) : messages.length === 0 ? (
-                <div className="flex h-32 flex-col items-center justify-center gap-2 text-center">
-                  <MessageCircle className="size-8 text-muted-foreground/30" />
-                  <p className="text-sm font-semibold text-muted-foreground/60">
+                <div className="flex h-40 flex-col items-center justify-center gap-3 text-center">
+                  <div className="flex size-14 items-center justify-center rounded-full bg-sky-blue/10">
+                    <MessageCircle className="size-6 text-sky-blue" />
+                  </div>
+                  <p className="text-sm font-semibold text-muted-foreground">
                     {copy.empty}
                   </p>
                 </div>
@@ -502,7 +506,13 @@ export function JeonjuChatPanel() {
                       <textarea
                         ref={inputRef}
                         value={input}
-                        onChange={(e) => setInput(e.target.value.slice(0, 500))}
+                        onChange={(e) => {
+                          setInput(e.target.value.slice(0, 500))
+                          // Auto-resize textarea to fit content (max 4 lines)
+                          const el = e.target
+                          el.style.height = "auto"
+                          el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+                        }}
                         onCompositionStart={() => {
                           isComposingRef.current = true
                         }}
@@ -522,7 +532,7 @@ export function JeonjuChatPanel() {
                         }}
                         placeholder={copy.placeholder}
                         rows={1}
-                        className="w-full resize-none rounded-xl border border-card-border/60 bg-background/80 px-3.5 py-2.5 text-base leading-relaxed text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-sky-blue/30 sm:text-sm"
+                        className="w-full resize-none rounded-xl border border-card-border/60 bg-background/80 px-3.5 py-2.5 text-[15px] leading-relaxed text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-sky-blue/30 sm:text-sm"
                       />
                       <div className="flex items-center justify-between gap-2">
                         <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-bold text-muted-foreground transition hover:text-foreground">
@@ -546,7 +556,7 @@ export function JeonjuChatPanel() {
                       onClick={() => void handleSend()}
                       onMouseDown={(event) => event.preventDefault()}
                       disabled={!input.trim() || isSending}
-                      className="mb-7 shrink-0 rounded-xl px-4 py-2.5 text-sm font-black"
+                      className="shrink-0 self-end rounded-xl px-4 py-2.5 text-sm font-black"
                     >
                       <span className="inline-flex items-center gap-1.5">
                         <Send className="size-3.5" />
