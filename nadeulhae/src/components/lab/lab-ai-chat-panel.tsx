@@ -1,12 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { Children, isValidElement, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
   ArrowDown,
   ArrowUp,
   Bot,
   Check,
   ChevronDown,
+  Copy,
   Lightbulb,
   LoaderCircle,
   MessageSquarePlus,
@@ -17,7 +18,7 @@ import {
   X,
 } from "lucide-react"
 
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 import { useLanguage } from "@/context/LanguageContext"
@@ -38,6 +39,7 @@ type LabAiChatStateApiResponse = LabAiChatStateResponse & {
 }
 
 const MODEL_STORAGE_KEY = "nadeulhae:lab-ai-chat:model-id"
+const THINKING_PANEL_STORAGE_KEY = "nadeulhae:lab-ai-chat:thinking-panel-open"
 
 const COPY = {
   ko: {
@@ -53,6 +55,12 @@ const COPY = {
     loadError: "대화를 불러오지 못했어요.",
     sendError: "메시지를 보내지 못했어요. 다시 시도해 주세요.",
     pending: "나들 AI가 답변을 작성하고 있어요.",
+    thinkingPanelTitle: "답변 준비 과정",
+    thinkingPanelDescription: "나들 AI가 질문을 정리하고 답변 흐름을 구성하고 있어요.",
+    thinkingPanelShow: "과정 보기",
+    thinkingPanelHide: "과정 숨기기",
+    thinkingPanelNote: "내부 사고 원문이 아니라 진행 상태를 이해하기 쉽게 요약해 보여줍니다.",
+    thinkingSteps: ["질문 의도 확인", "대화 맥락 반영", "답변 구조 구성", "답변 작성"],
     loading: "준비 중...",
     welcomeTitle: "나들 AI에게 무엇이든 물어보세요",
     welcomeDescription: "나들이 추천 전용이 아니라 일상, 업무, 학습, 창작을 함께 다루는 다용도 AI 채팅입니다.",
@@ -70,6 +78,8 @@ const COPY = {
     openSidebar: "대화 기록 열기",
     closeSidebar: "대화 기록 닫기",
     send: "보내기",
+    copyCode: "복사",
+    copiedCode: "복사됨",
     scrollBottom: "최신 메시지로 이동",
     shortcutHint: "Enter로 보내고 Shift+Enter로 줄을 바꿀 수 있어요.",
     footerHint: "나들 AI는 실수를 할 수 있으니 중요한 내용은 한 번 더 확인해 주세요.",
@@ -87,6 +97,12 @@ const COPY = {
     loadError: "Failed to load conversations.",
     sendError: "Failed to send message. Please try again.",
     pending: "Nadeul AI is writing a reply.",
+    thinkingPanelTitle: "Response progress",
+    thinkingPanelDescription: "Nadeul AI is organizing the request and shaping the answer.",
+    thinkingPanelShow: "Show progress",
+    thinkingPanelHide: "Hide progress",
+    thinkingPanelNote: "This is a concise progress view, not raw internal reasoning.",
+    thinkingSteps: ["Read intent", "Use conversation context", "Shape the answer", "Write response"],
     loading: "Preparing...",
     welcomeTitle: "Ask Nadeul AI anything",
     welcomeDescription: "This is a general-purpose AI chat for daily work, study, writing, coding, and creative tasks.",
@@ -104,11 +120,222 @@ const COPY = {
     openSidebar: "Open chat history",
     closeSidebar: "Close chat history",
     send: "Send",
+    copyCode: "Copy",
+    copiedCode: "Copied",
     scrollBottom: "Jump to latest message",
     shortcutHint: "Enter to send, Shift+Enter for a new line.",
     footerHint: "Nadeul AI can make mistakes. Check important details before acting.",
   },
 } as const
+
+type HighlightKind = "plain" | "comment" | "function" | "keyword" | "meta" | "number" | "operator" | "property" | "string" | "type"
+
+type HighlightToken = {
+  text: string
+  kind: HighlightKind
+}
+
+const LANGUAGE_ALIASES: Record<string, { id: string; label: string }> = {
+  bash: { id: "shell", label: "Shell" },
+  c: { id: "c", label: "C" },
+  cc: { id: "cpp", label: "C++" },
+  cpp: { id: "cpp", label: "C++" },
+  "c++": { id: "cpp", label: "C++" },
+  cs: { id: "csharp", label: "C#" },
+  csharp: { id: "csharp", label: "C#" },
+  css: { id: "css", label: "CSS" },
+  go: { id: "go", label: "Go" },
+  golang: { id: "go", label: "Go" },
+  html: { id: "html", label: "HTML" },
+  java: { id: "java", label: "Java" },
+  js: { id: "javascript", label: "JavaScript" },
+  javascript: { id: "javascript", label: "JavaScript" },
+  json: { id: "json", label: "JSON" },
+  jsx: { id: "jsx", label: "JSX" },
+  md: { id: "markdown", label: "Markdown" },
+  markdown: { id: "markdown", label: "Markdown" },
+  py: { id: "python", label: "Python" },
+  python: { id: "python", label: "Python" },
+  rs: { id: "rust", label: "Rust" },
+  rust: { id: "rust", label: "Rust" },
+  sh: { id: "shell", label: "Shell" },
+  shell: { id: "shell", label: "Shell" },
+  sql: { id: "sql", label: "SQL" },
+  ts: { id: "typescript", label: "TypeScript" },
+  tsx: { id: "tsx", label: "TSX" },
+  typescript: { id: "typescript", label: "TypeScript" },
+  xml: { id: "html", label: "XML" },
+  yaml: { id: "yaml", label: "YAML" },
+  yml: { id: "yaml", label: "YAML" },
+  zsh: { id: "shell", label: "Shell" },
+}
+
+const KEYWORDS = new Set([
+  "abstract", "and", "as", "assert", "async", "await", "auto", "bool", "boolean", "break", "case", "catch", "char",
+  "class", "const", "constexpr", "continue", "crate", "def", "defer", "delete", "do", "double", "elif", "else", "enum",
+  "export", "extends", "extern", "false", "False", "finally", "float", "fn", "for", "from", "func", "function", "global",
+  "go", "if", "impl", "implements", "import", "in", "include", "inline", "instanceof", "int", "interface", "is", "lambda",
+  "let", "long", "match", "mod", "mut", "namespace", "new", "nil", "None", "nonlocal", "not", "null", "nullptr", "of",
+  "or", "package", "pass", "private", "protected", "pub", "public", "range", "return", "select", "self", "short", "static",
+  "struct", "super", "switch", "template", "this", "throw", "trait", "true", "True", "try", "type", "typedef", "typename",
+  "undefined", "union", "use", "using", "var", "void", "volatile", "where", "while", "with", "yield",
+  "SELECT", "FROM", "WHERE", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "GROUP", "ORDER", "BY", "HAVING", "INSERT",
+  "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "TABLE", "INDEX", "VALUES", "INTO", "LIMIT", "OFFSET", "PRIMARY",
+  "KEY", "FOREIGN", "REFERENCES", "NULL", "NOT", "DEFAULT", "DISTINCT", "COUNT", "SUM", "AVG", "MIN", "MAX",
+])
+
+const TYPE_WORDS = new Set([
+  "Array", "BigInt", "Boolean", "Date", "Dict", "Error", "List", "Map", "Number", "Object", "Promise", "Record", "Set",
+  "String", "Tuple", "any", "bigint", "bool", "boolean", "byte", "char", "dict", "double", "float", "int", "integer",
+  "long", "number", "short", "str", "string", "symbol", "unknown", "void",
+])
+
+const TOKEN_CLASS_BY_KIND: Record<HighlightKind, string> = {
+  plain: "text-[#d8ecff]",
+  comment: "text-[#8aa3ad] italic",
+  function: "text-[#52c0b1]",
+  keyword: "text-[#7db3ff]",
+  meta: "text-[#f1ba47]",
+  number: "text-[#f1ba47]",
+  operator: "text-[#d8ecff]/70",
+  property: "text-[#d6b4ff]",
+  string: "text-[#84d99d]",
+  type: "text-[#ffb86b]",
+}
+
+function normalizeCodeLanguage(rawLanguage?: string | null) {
+  const key = String(rawLanguage ?? "").trim().toLowerCase()
+  return LANGUAGE_ALIASES[key] ?? {
+    id: key || "text",
+    label: key ? key.toUpperCase() : "Text",
+  }
+}
+
+function getCommentPattern(languageId: string) {
+  if (languageId === "html") return String.raw`<!--[\s\S]*?-->`
+  if (languageId === "python" || languageId === "shell" || languageId === "yaml") return String.raw`#[^\n]*`
+  if (languageId === "sql") return String.raw`--[^\n]*|\/\*[\s\S]*?\*\/`
+  return String.raw`\/\/[^\n]*|\/\*[\s\S]*?\*\/`
+}
+
+function classifyToken(text: string, languageId: string): HighlightKind {
+  if (!text) return "plain"
+  if (/^(\/\/|\/\*|#|--|<!--)/.test(text)) return "comment"
+  if (/^(['"`])/.test(text)) return "string"
+  if (/^(0x[\da-f]+|\d[\d_]*(\.\d[\d_]*)?)/i.test(text)) return "number"
+  if (languageId === "html" && /^<\/?[A-Za-z]/.test(text)) return "meta"
+  if (languageId === "css" && /^[A-Za-z-]+(?=\s*:)/.test(text)) return "property"
+  if (TYPE_WORDS.has(text)) return "type"
+  if (KEYWORDS.has(text)) return "keyword"
+  if (/^[A-Za-z_$][\w$]*(?=\s*\()/.test(text)) return "function"
+  if (/^[{}()[\].,;:+\-*/%=<>!&|^~?]+$/.test(text)) return "operator"
+  return "plain"
+}
+
+function highlightCode(code: string, languageId: string): HighlightToken[] {
+  if (!code) return []
+
+  const commentPattern = getCommentPattern(languageId)
+  const keywordPattern = String.raw`\b(?:${[...KEYWORDS].sort((a, b) => b.length - a.length).join("|")})\b`
+  const templateStringPattern = "`(?:\\\\.|[^`\\\\])*`"
+  const tokenPattern = languageId === "html"
+    ? String.raw`${commentPattern}|<\/?[A-Za-z][^>]*>|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|0x[\da-fA-F]+|\b\d[\d_]*(?:\.\d[\d_]*)?\b|\b[A-Za-z_$][\w$]*(?=\s*\()|[{}()[\].,;:+\-*/%=<>!&|^~?]+`
+    : String.raw`${commentPattern}|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|${templateStringPattern}|0x[\da-fA-F]+|\b\d[\d_]*(?:\.\d[\d_]*)?\b|${keywordPattern}|\b[A-Za-z_$][\w$]*(?=\s*\()|[{}()[\].,;:+\-*/%=<>!&|^~?]+`
+
+  const matcher = new RegExp(tokenPattern, "g")
+  const tokens: HighlightToken[] = []
+  let cursor = 0
+  let match: RegExpExecArray | null
+
+  while ((match = matcher.exec(code)) !== null) {
+    if (match.index > cursor) {
+      tokens.push({ text: code.slice(cursor, match.index), kind: "plain" })
+    }
+
+    const text = match[0]
+    tokens.push({ text, kind: classifyToken(text, languageId) })
+    cursor = match.index + text.length
+  }
+
+  if (cursor < code.length) {
+    tokens.push({ text: code.slice(cursor), kind: "plain" })
+  }
+
+  return tokens
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const textarea = document.createElement("textarea")
+  textarea.value = text
+  textarea.setAttribute("readonly", "true")
+  textarea.style.position = "fixed"
+  textarea.style.left = "-9999px"
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand("copy")
+  document.body.removeChild(textarea)
+}
+
+function MarkdownCodeBlock({
+  code,
+  language,
+  copyLabel,
+  copiedLabel,
+}: {
+  code: string
+  language: string | null
+  copyLabel: string
+  copiedLabel: string
+}) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<number | null>(null)
+  const normalizedLanguage = useMemo(() => normalizeCodeLanguage(language), [language])
+  const tokens = useMemo(() => highlightCode(code, normalizedLanguage.id), [code, normalizedLanguage.id])
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current != null) window.clearTimeout(timeoutRef.current)
+    }
+  }, [])
+
+  const handleCopy = useCallback(async () => {
+    await copyTextToClipboard(code)
+    setCopied(true)
+    if (timeoutRef.current != null) window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = window.setTimeout(() => setCopied(false), 1600)
+  }, [code])
+
+  return (
+    <div className="not-prose my-4 overflow-hidden rounded-lg border border-border bg-[#101820] shadow-sm dark:border-white/10 dark:bg-black/35">
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-3 py-2">
+        <span className="truncate text-xs font-semibold text-[#d8ecff]/80">{normalizedLanguage.label}</span>
+        <button
+          type="button"
+          onClick={() => void handleCopy()}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.06] px-2.5 text-xs font-semibold text-[#d8ecff] transition hover:bg-white/[0.12] active:scale-[0.98]"
+          aria-label={copied ? copiedLabel : copyLabel}
+        >
+          {copied ? <Check className="size-3.5 text-[#84d99d]" /> : <Copy className="size-3.5" />}
+          {copied ? copiedLabel : copyLabel}
+        </button>
+      </div>
+      <pre className="m-0 max-h-[34rem] overflow-auto p-4 text-left custom-scrollbar">
+        <code className="block min-w-full whitespace-pre font-mono text-[13px] leading-6">
+          {tokens.map((token, index) => (
+            <span key={`${index}-${token.kind}`} className={TOKEN_CLASS_BY_KIND[token.kind]}>
+              {token.text}
+            </span>
+          ))}
+        </code>
+      </pre>
+    </div>
+  )
+}
 
 function TypingDots() {
   return (
@@ -133,6 +360,75 @@ function NadeulAiMark({ className }: { className?: string }) {
   )
 }
 
+function ThinkingProgressPanel({
+  isOpen,
+  onToggle,
+  title,
+  description,
+  showLabel,
+  hideLabel,
+  note,
+  steps,
+}: {
+  isOpen: boolean
+  onToggle: () => void
+  title: string
+  description: string
+  showLabel: string
+  hideLabel: string
+  note: string
+  steps: readonly string[]
+}) {
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card/70 px-3 py-2 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
+      >
+        <Lightbulb className="size-4 text-accent" />
+        {showLabel}
+      </button>
+    )
+  }
+
+  return (
+    <div className="lab-chat-rise max-w-xl rounded-lg border border-border bg-card/75 p-3 text-sm text-muted-foreground shadow-sm backdrop-blur transition-colors duration-300">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 font-semibold text-foreground">
+            <Lightbulb className="size-4 text-accent" />
+            {title}
+          </p>
+          <p className="mt-1 leading-6">{description}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          {hideLabel}
+          <ChevronDown className="size-3.5 rotate-180" />
+        </button>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {steps.map((step, index) => (
+          <div key={step} className="flex items-center gap-2 rounded-lg bg-muted/55 px-3 py-2">
+            <span
+              className="size-1.5 animate-pulse rounded-full bg-accent"
+              style={{ animationDelay: `${index * 140}ms` }}
+            />
+            <span className="text-xs font-semibold text-foreground/85">{step}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 border-t border-border pt-2 text-xs leading-5 text-muted-foreground">{note}</p>
+    </div>
+  )
+}
+
 export function LabAiChatPanel() {
   const { language } = useLanguage()
   const copy = COPY[language]
@@ -152,6 +448,7 @@ export function LabAiChatPanel() {
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
+  const [isThinkingPanelOpen, setIsThinkingPanelOpen] = useState(true)
   const [isNearBottom, setIsNearBottom] = useState(true)
 
   const messageViewportRef = useRef<HTMLDivElement | null>(null)
@@ -239,6 +536,18 @@ export function LabAiChatPanel() {
     if (typeof window === "undefined") return
     const stored = window.localStorage.getItem(MODEL_STORAGE_KEY)
     if (stored) setSelectedModelId(stored)
+    const storedThinkingPanel = window.localStorage.getItem(THINKING_PANEL_STORAGE_KEY)
+    if (storedThinkingPanel === "closed") setIsThinkingPanelOpen(false)
+  }, [])
+
+  const handleThinkingPanelToggle = useCallback(() => {
+    setIsThinkingPanelOpen((current) => {
+      const next = !current
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(THINKING_PANEL_STORAGE_KEY, next ? "open" : "closed")
+      }
+      return next
+    })
   }, [])
 
   useEffect(() => {
@@ -332,6 +641,7 @@ export function LabAiChatPanel() {
 
   const isThinkingMode = Boolean(resolvedModelId && resolvedModelId === activeModel?.thinkingId)
   const activeModelLabel = activeModel ? `${activeModel.label}${isThinkingMode ? ` · ${copy.thinking}` : ""}` : copy.modelLabel
+  const activeModelDescription = activeModel?.description ?? copy.modelMenuHint
 
   const remainingRequests = usage?.remainingRequests ?? policy?.dailyLimit ?? 0
   const isLimitReached = !isLoading && remainingRequests <= 0
@@ -524,7 +834,7 @@ export function LabAiChatPanel() {
                   const snapshot = streamAcc
                   setMessages((current) => current.map((message) => (
                     message.id === optimisticAssistant.id
-                      ? { ...message, content: snapshot, pending: false }
+                      ? { ...message, content: snapshot, pending: true }
                       : message
                   )))
                 } else if (eventType === "done") {
@@ -588,6 +898,46 @@ export function LabAiChatPanel() {
 
   const hasMessages = messages.length > 0
   const sidebarToggleLabel = isSidebarOpen ? copy.closeSidebar : copy.openSidebar
+  const markdownComponents = useMemo<Components>(() => ({
+    pre({ children, node, ...props }) {
+      void node
+      const childArray = Children.toArray(children)
+      if (childArray.length === 1 && isValidElement(childArray[0]) && childArray[0].type === MarkdownCodeBlock) {
+        return <>{childArray[0]}</>
+      }
+
+      return <pre {...props}>{children}</pre>
+    },
+    code({ children, className, node, ...props }) {
+      void node
+      const codeText = Children.toArray(children).join("").replace(/\n$/, "")
+      const language = /language-([A-Za-z0-9_+#.-]+)/.exec(className ?? "")?.[1] ?? null
+      const isBlock = Boolean(language) || codeText.includes("\n")
+
+      if (isBlock) {
+        return (
+          <MarkdownCodeBlock
+            code={codeText}
+            language={language}
+            copyLabel={copy.copyCode}
+            copiedLabel={copy.copiedCode}
+          />
+        )
+      }
+
+      return (
+        <code
+          {...props}
+          className={cn(
+            "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground",
+            className
+          )}
+        >
+          {children}
+        </code>
+      )
+    },
+  }), [copy.copiedCode, copy.copyCode])
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 overflow-hidden bg-background text-foreground">
@@ -728,6 +1078,7 @@ export function LabAiChatPanel() {
                 disabled={models.length === 0 || isPending}
                 className="inline-flex h-9 max-w-[10rem] items-center justify-center gap-1.5 rounded-lg border border-border bg-card/75 px-2.5 text-sm font-semibold text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:max-w-[14rem] sm:px-3"
                 aria-expanded={isModelMenuOpen}
+                title={`${activeModelLabel}: ${activeModelDescription}`}
               >
                 <Bot className="size-4 shrink-0 text-accent" />
                 <span className="truncate">{activeModelLabel}</span>
@@ -735,10 +1086,10 @@ export function LabAiChatPanel() {
               </button>
 
               {isModelMenuOpen ? (
-                <div className="lab-chat-popover absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-lg border border-border bg-background/95 shadow-2xl shadow-foreground/10 backdrop-blur-xl">
+                <div className="lab-chat-popover absolute right-0 top-full mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-lg border border-border bg-background/95 shadow-2xl shadow-foreground/10 backdrop-blur-xl">
                   <div className="border-b border-border px-3 py-2">
                     <p className="text-sm font-semibold text-foreground">{copy.modelLabel}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{copy.modelMenuHint}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{activeModelDescription}</p>
                   </div>
                   <div className="max-h-[22rem] overflow-y-auto p-1.5 custom-scrollbar">
                     {models.map((model) => {
@@ -809,14 +1160,36 @@ export function LabAiChatPanel() {
                             <p className="whitespace-pre-wrap break-words">{message.content}</p>
                           </div>
                         ) : message.pending ? (
-                          <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-card/70 px-4 py-3 text-sm text-muted-foreground shadow-sm transition-colors duration-300">
-                            <TypingDots />
-                            <span className="sr-only">{copy.pending}</span>
+                          <div className="flex flex-col items-start gap-3">
+                            <ThinkingProgressPanel
+                              isOpen={isThinkingPanelOpen}
+                              onToggle={handleThinkingPanelToggle}
+                              title={copy.thinkingPanelTitle}
+                              description={copy.thinkingPanelDescription}
+                              showLabel={copy.thinkingPanelShow}
+                              hideLabel={copy.thinkingPanelHide}
+                              note={copy.thinkingPanelNote}
+                              steps={copy.thinkingSteps}
+                            />
+                            {message.content ? (
+                              <div className="rounded-lg border border-transparent px-0 py-1 text-base leading-7 text-foreground transition-colors duration-300">
+                                <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                                    {message.content}
+                                  </ReactMarkdown>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-card/70 px-4 py-3 text-sm text-muted-foreground shadow-sm transition-colors duration-300">
+                                <TypingDots />
+                                <span>{copy.pending}</span>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="rounded-lg border border-transparent px-0 py-1 text-base leading-7 text-foreground transition-colors duration-300">
                             <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                                 {message.content}
                               </ReactMarkdown>
                             </div>

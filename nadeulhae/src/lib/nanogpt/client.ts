@@ -68,7 +68,7 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
     slug: "deepseek-v3-2",
     label: "DeepSeek V3.2",
-    description: "균형 잡힌 범용 모델",
+    description: "빠른 범용 대화와 코딩·분석 작업에 균형이 좋아요.",
     candidates: [
       "deepseek/deepseek-v3.2",
       "TEE/deepseek-v3.2",
@@ -84,7 +84,7 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
     slug: "kimi-k2-5",
     label: "Kimi K2.5",
-    description: "장문·추론에 강한 모델",
+    description: "긴 문서와 복잡한 맥락을 이어가는 작업에 적합해요.",
     candidates: [
       "moonshotai/kimi-k2.5",
       "TEE/kimi-k2.5",
@@ -98,7 +98,7 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
     slug: "qwen-3-5",
     label: "Qwen 3.5",
-    description: "범용 대화 모델",
+    description: "다국어 대화와 일반 지식·코딩 보조에 강해요.",
     candidates: [
       "qwen/qwen3.5-397b-a17b",
       "TEE/qwen3.5-397b-a17b",
@@ -113,7 +113,7 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
     slug: "glm-5",
     label: "GLM 5",
-    description: "일반 작업 모델",
+    description: "간결한 답변과 실무형 정리·작성에 안정적이에요.",
     candidates: [
       "zai-org/glm-5",
       "TEE/glm-5",
@@ -126,7 +126,7 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
     slug: "minimax-m2-7",
     label: "MiniMax M2.7",
-    description: "긴 문맥 처리 모델",
+    description: "긴 맥락 대화와 창작·요약을 부드럽게 이어가요.",
     candidates: [
       "minimax/minimax-m2.7",
       "minimax/minimax-m2.7-turbo",
@@ -135,16 +135,25 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
     slug: "gpt-oss-120b",
     label: "GPT-OSS 120B",
-    description: "오픈소스 대형 모델",
+    description: "큰 오픈 모델로 깊이 있는 추론과 코딩 분석에 적합해요.",
     candidates: [
       "openai/gpt-oss-120b",
       "TEE/gpt-oss-120b",
     ],
   },
   {
+    slug: "gpt-oss-20b",
+    label: "GPT-OSS 20B",
+    description: "가벼운 오픈 모델로 빠른 답변과 일상 작업에 적합해요.",
+    candidates: [
+      "openai/gpt-oss-20b",
+      "TEE/gpt-oss-20b",
+    ],
+  },
+  {
     slug: "gemma-4",
     label: "Gemma 4",
-    description: "경량 범용 모델",
+    description: "가벼운 범용 모델로 짧은 질의와 빠른 초안 작성에 좋아요.",
     candidates: [
       "google/gemma-4-31b-it",
       "TEE/gemma4-31b",
