@@ -300,15 +300,11 @@ export async function updateCodeShareSession(input: CodeShareUpdateInput): Promi
 }
 
 function isOwner(owner: CodeShareOwnerRow, actorId: string, userId: string | null) {
-  if (owner.owner_actor_id === actorId) {
-    return true
+  if (owner.owner_user_id) {
+    return Boolean(userId && owner.owner_user_id === userId)
   }
 
-  if (userId && owner.owner_user_id && owner.owner_user_id === userId) {
-    return true
-  }
-
-  return false
+  return owner.owner_actor_id === actorId
 }
 
 export async function deleteCodeShareSessionById(params: {

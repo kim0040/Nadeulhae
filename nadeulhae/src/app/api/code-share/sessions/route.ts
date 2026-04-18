@@ -5,6 +5,11 @@ import { NextRequest } from "next/server"
 import { withApiAnalytics } from "@/lib/analytics/route"
 import { createAuthJsonResponse, validateAuthMutationRequest } from "@/lib/auth/request-security"
 import {
+  attachRefreshedAuthCookie,
+  clearAuthCookie,
+  getAuthenticatedSessionFromRequest,
+} from "@/lib/auth/session"
+import {
   ensureCodeShareIdentityCookies,
   getOrCreateCodeShareActorId,
   getOrCreateCodeShareAlias,
@@ -26,10 +31,14 @@ export const runtime = "nodejs"
 
 const CODE_SHARE_ERRORS = {
   ko: {
+    unauthorized: "로그인이 필요합니다.",
+    disabled: "실험실 기능을 활성화한 사용자만 코드공유 세션을 만들 수 있습니다.",
     invalidRequest: "코드공유 요청 형식이 올바르지 않습니다.",
     failed: "코드공유 세션 처리 중 오류가 발생했습니다.",
   },
   en: {
+    unauthorized: "You need to log in first.",
+    disabled: "Only users with lab access enabled can create code-share sessions.",
     invalidRequest: "Invalid code-share request.",
     failed: "Failed to process code-share sessions.",
   },
@@ -92,11 +101,34 @@ async function handleGET(request: NextRequest) {
     // Keep list responses truthful by closing stale sessions before querying.
     await closeInactiveCodeShareSessions()
 
+    const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
+    if (!authenticatedSession) {
+      return clearAuthCookie(
+        createAuthJsonResponse(
+          { error: CODE_SHARE_ERRORS[locale].unauthorized },
+          { status: 401 }
+        )
+      )
+    }
+
+    if (!authenticatedSession.user.labEnabled) {
+      return attachRefreshedAuthCookie(
+        createAuthJsonResponse(
+          { error: CODE_SHARE_ERRORS[locale].disabled },
+          { status: 403 }
+        ),
+        authenticatedSession
+      )
+    }
+
     const identity = {
       actorId: getOrCreateCodeShareActorId(request),
       alias: getOrCreateCodeShareAlias(request),
     }
-    const sessions = await listCodeShareSessionsByOwner({ actorId: identity.actorId })
+    const sessions = await listCodeShareSessionsByOwner({
+      actorId: identity.actorId,
+      userId: authenticatedSession.user.id,
+    })
 
     const finalResponse = createAuthJsonResponse({
       sessions,
@@ -107,7 +139,7 @@ async function handleGET(request: NextRequest) {
       serverNow: new Date().toISOString(),
     })
     ensureCodeShareIdentityCookies(request, finalResponse, identity)
-    return finalResponse
+    return attachRefreshedAuthCookie(finalResponse, authenticatedSession)
   } catch (error) {
     console.error("Code-share sessions GET API failed:", error)
     return createAuthJsonResponse(
@@ -138,6 +170,26 @@ async function handlePOST(request: NextRequest) {
 
     await closeInactiveCodeShareSessions()
 
+    const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
+    if (!authenticatedSession) {
+      return clearAuthCookie(
+        createAuthJsonResponse(
+          { error: CODE_SHARE_ERRORS[locale].unauthorized },
+          { status: 401 }
+        )
+      )
+    }
+
+    if (!authenticatedSession.user.labEnabled) {
+      return attachRefreshedAuthCookie(
+        createAuthJsonResponse(
+          { error: CODE_SHARE_ERRORS[locale].disabled },
+          { status: 403 }
+        ),
+        authenticatedSession
+      )
+    }
+
     const identity = {
       actorId: getOrCreateCodeShareActorId(request),
       alias: getOrCreateCodeShareAlias(request),
@@ -167,7 +219,7 @@ async function handlePOST(request: NextRequest) {
         createdSession = await createCodeShareSession({
           sessionId,
           ownerActorId: identity.actorId,
-          ownerUserId: null,
+          ownerUserId: authenticatedSession.user.id,
           title,
           language,
           code,
@@ -206,7 +258,7 @@ async function handlePOST(request: NextRequest) {
       { status: 201 }
     )
     ensureCodeShareIdentityCookies(request, finalResponse, identity)
-    return finalResponse
+    return attachRefreshedAuthCookie(finalResponse, authenticatedSession)
   } catch (error) {
     console.error("Code-share sessions POST API failed:", error)
     return createAuthJsonResponse(

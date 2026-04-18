@@ -190,17 +190,27 @@ export function CodeMirrorEditor({
   className?: string
 }) {
   const { resolvedTheme } = useTheme()
+  const normalizedLanguage = language.toLowerCase()
 
-  const [langExt, setLangExt] = useState<import("@codemirror/language").LanguageSupport | null>(null)
+  const [langExtState, setLangExtState] = useState<{
+    language: string
+    extension: Awaited<ReturnType<typeof getLanguageExtension>>
+  }>({
+    language: normalizedLanguage,
+    extension: null,
+  })
 
   // Load language extension on mount and when language prop changes.
   useEffect(() => {
     let cancelled = false
-    setLangExt(null)
+    const targetLanguage = language.toLowerCase()
 
-    getCachedLanguageExtension(language).then((ext) => {
-      if (!cancelled && ext) {
-        setLangExt(ext)
+    getCachedLanguageExtension(targetLanguage).then((ext) => {
+      if (!cancelled) {
+        setLangExtState({
+          language: targetLanguage,
+          extension: ext,
+        })
       }
     })
 
@@ -208,6 +218,8 @@ export function CodeMirrorEditor({
       cancelled = true
     }
   }, [language])
+
+  const langExt = langExtState.language === normalizedLanguage ? langExtState.extension : null
 
   const extensions = useMemo(() => {
     const exts = [
@@ -252,4 +264,3 @@ export function CodeMirrorEditor({
     </div>
   )
 }
-

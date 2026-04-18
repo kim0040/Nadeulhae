@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { BookOpenCheck, Code2, FlaskConical, Sparkles } from "lucide-react"
+import { BookOpenCheck, Bot, Code2, FlaskConical, Sparkles } from "lucide-react"
 
 import { BorderBeam } from "@/components/magicui/border-beam"
 import { MagicCard } from "@/components/magicui/magic-card"
@@ -27,6 +27,9 @@ const LAB_HUB_COPY = {
     introNote:
       "프론트/서버 담당 김현민이 쓰려고 만든 기능인데, 다 같이 써도 됩니다.",
     availableTitle: "사용 가능한 기능",
+    aiChatTitle: "나들 AI 채팅",
+    aiChatDescription:
+      "글쓰기, 코딩, 공부, 번역, 요약, 아이디어 정리까지 나들 AI와 이어서 대화할 수 있는 다용도 채팅입니다.",
     vocabTitle: "단어 암기 실험실",
     vocabDescription:
       "프로필 기반 주제로 카드를 생성하고, 간격 반복 복습으로 기억 유지까지 이어지는 학습 실험 기능입니다.",
@@ -49,6 +52,9 @@ const LAB_HUB_COPY = {
     introNote:
       "Built by Hyunmin Kim (frontend/backend) mainly as his own utility feature, but open for everyone.",
     availableTitle: "Available features",
+    aiChatTitle: "Nadeul AI Chat",
+    aiChatDescription:
+      "Continue with Nadeul AI across writing, coding, studying, translation, summaries, and idea work.",
     vocabTitle: "Vocabulary Memory Lab",
     vocabDescription:
       "Generate profile-based cards and retain them with spaced-repetition review.",
@@ -176,6 +182,34 @@ export default function LabHubPage() {
           <div className="space-y-4">
             <p className="text-xs font-black uppercase tracking-[0.28em] text-muted-foreground">{copy.availableTitle}</p>
             <div className="grid gap-4">
+              <MagicCard
+                className="overflow-hidden rounded-[1.8rem]"
+                gradientSize={reduceVisualEffects ? 150 : 210}
+                gradientOpacity={reduceVisualEffects ? 0.55 : 0.72}
+              >
+                <div className="relative rounded-[1.8rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
+                  {!reduceVisualEffects ? (
+                    <BorderBeam size={170} duration={10.5} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
+                  ) : null}
+                  <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="space-y-2">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
+                        <Bot className="size-3.5" />
+                        {copy.aiChatTitle}
+                      </span>
+                      <p className="max-w-2xl text-base leading-8 text-muted-foreground">{copy.aiChatDescription}</p>
+                    </div>
+                    <ShimmerButton
+                      type="button"
+                      onClick={() => router.push("/lab/ai-chat")}
+                      className="rounded-[1.1rem] px-5 py-3 text-base font-black sm:shrink-0"
+                    >
+                      {copy.openFeature}
+                    </ShimmerButton>
+                  </div>
+                </div>
+              </MagicCard>
+
               <MagicCard
                 className="overflow-hidden rounded-[1.8rem]"
                 gradientSize={reduceVisualEffects ? 150 : 210}

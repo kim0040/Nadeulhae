@@ -71,8 +71,15 @@ async function authenticateWs(req: IncomingMessage): Promise<string | null> {
   try {
     const tokenHash = getSessionTokenHash(token)
     const session = await findUserBySessionTokenHash(tokenHash)
-    return session?.user?.id ?? null
-  } catch {
+    
+    if (!session || !session.user) {
+      console.warn("[WebSocket] Invalid session token during auth")
+      return null
+    }
+    
+    return session.user.id
+  } catch (error) {
+    console.error("[WebSocket] Auth error:", error instanceof Error ? error.message : error)
     return null
   }
 }
@@ -427,8 +434,16 @@ export function createWebSocketServer(server: import("node:http").Server) {
       }
     })
 
-    ws.on("close", cleanup)
-    ws.on("error", cleanup)
+    ws.on("close", (code) => {
+      if (code === 4403) {
+        console.warn("[WebSocket] Connection rejected: Forbidden origin")
+      }
+      cleanup()
+    })
+    ws.on("error", (error) => {
+      console.error("[WebSocket] Error:", error.message)
+      cleanup()
+    })
   })
 
   return wss

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server"
 
 import {
   findUserById,
+  NicknameTagExhaustedError,
   recordAuthSecurityEventSafely,
   toPublicUser,
   updateUserProfile,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/auth/request-security"
 import {
   attachRefreshedAuthCookie,
+  clearAuthSessionCacheByToken,
   clearAuthCookie,
   getAuthenticatedSessionFromRequest,
 } from "@/lib/auth/session"
@@ -111,6 +113,8 @@ async function handlePATCH(request: NextRequest) {
       })
     }
 
+    clearAuthSessionCacheByToken(authenticatedSession.token)
+
     const response = attachRefreshedAuthCookie(
       createAuthJsonResponse({
         user: toPublicUser({
@@ -139,10 +143,13 @@ async function handlePATCH(request: NextRequest) {
     )
     return response
   } catch (error) {
-    const duplicateNickname = typeof error === "object"
-      && error !== null
-      && "code" in error
-      && String((error as { code?: unknown }).code) === "ER_DUP_ENTRY"
+    const duplicateNickname = error instanceof NicknameTagExhaustedError
+      || (
+        typeof error === "object"
+        && error !== null
+        && "code" in error
+        && String((error as { code?: unknown }).code) === "ER_DUP_ENTRY"
+      )
 
     if (duplicateNickname) {
       return createAuthJsonResponse(

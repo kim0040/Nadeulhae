@@ -60,6 +60,7 @@ type StationCacheEntry = {
 
 const stationCache = new Map<string, StationCacheEntry>()
 const STATION_CACHE_TTL = 30 * 60 * 1000 // 30 minutes
+const MAX_STATION_CACHE_KEYS = 2000
 
 type CacheEntry<T> = {
   data: T
@@ -162,6 +163,8 @@ type HazardFlags = {
   volcano: boolean
 }
 
+const MAX_CACHE_KEYS = 2000
+
 const airQualityCache = new Map<string, CacheEntry<AirQualitySnapshot>>()
 const uvCache = new Map<string, CacheEntry<string>>()
 const bulletinCache = new Map<string, CacheEntry<RegionalBulletinSnapshot>>()
@@ -169,6 +172,15 @@ const warningCache = new Map<string, CacheEntry<RegionalWarningSnapshot>>()
 const earthquakeCache = new Map<string, CacheEntry<EarthquakeSnapshot>>()
 const tsunamiCache = new Map<string, CacheEntry<TsunamiSnapshot>>()
 const volcanoCache = new Map<string, CacheEntry<VolcanoSnapshot>>()
+
+function setCacheWithLimit<T>(map: Map<string, CacheEntry<T>>, key: string, value: CacheEntry<T>) {
+  map.set(key, value)
+  while (map.size > MAX_CACHE_KEYS) {
+    const oldestKey = map.keys().next().value as string | undefined
+    if (!oldestKey) break
+    map.delete(oldestKey)
+  }
+}
 
 const BULLETIN_FALLBACK_STATION_IDS: Partial<Record<string, string>> = {
   gwangyang: "156",
@@ -213,16 +225,15 @@ const MAX_USER_RESPONSE_CACHE_KEYS = 500
 const currentResponseCache = new Map<string, UserCacheEntry<Record<string, unknown>>>()
 const EARTHQUAKE_KNOCKOUT_MAGNITUDE = 4.0
 
-const WEATHER_CACHE_DURATION = 90 * 60 * 1000
-const AIR_CACHE_DURATION = 60 * 60 * 1000
-const UV_CACHE_DURATION = 60 * 60 * 1000
-const ALERT_CACHE_DURATION = 15 * 60 * 1000
-const USER_RESPONSE_CACHE_DURATION = 5 * 60 * 1000
+const WEATHER_CACHE_DURATION = 30 * 60 * 1000
+const AIR_CACHE_DURATION = 30 * 60 * 1000
+const UV_CACHE_DURATION = 30 * 60 * 1000
+const ALERT_CACHE_DURATION = 5 * 60 * 1000
+const USER_RESPONSE_CACHE_DURATION = 3 * 60 * 1000
 const AIR_DAILY_LIMIT = Number(process.env.AIRKOREA_DAILY_LIMIT ?? 500)
 const CURRENT_RATE_LIMIT_WINDOW = 60 * 1000
 const CURRENT_MAX_REQUESTS_PER_WINDOW = 60
 const CACHE_SWEEP_INTERVAL = 5 * 60 * 1000
-const MAX_CURRENT_WEATHER_CACHE_KEYS = 2000
 
 let airQuotaState = {
   date: "",
@@ -255,14 +266,7 @@ function getCachedValue<T>(map: Map<string, CacheEntry<T>>, key: string, ttl: nu
   return cached.data
 }
 
-function setCacheWithLimit<T>(map: Map<string, CacheEntry<T>>, key: string, value: CacheEntry<T>, maxKeys: number) {
-  map.set(key, value)
-  while (map.size > maxKeys) {
-    const oldestKey = map.keys().next().value as string | undefined
-    if (!oldestKey) break
-    map.delete(oldestKey)
-  }
-}
+
 
 function getKstComparableDateTime(dateValue?: string, timeValue?: string) {
   if (!dateValue || !timeValue || dateValue.length !== 8 || timeValue.length !== 4) return null
@@ -304,6 +308,20 @@ function cleanupExpiringCache<T extends { expiry: number }>(map: Map<string, T>,
     if (value.expiry <= now) {
       map.delete(key)
     }
+  }
+}
+
+function setExpiringCacheWithLimit<T extends { expiry: number }>(
+  map: Map<string, T>,
+  key: string,
+  value: T,
+  maxKeys: number
+) {
+  map.set(key, value)
+  while (map.size > maxKeys) {
+    const oldestKey = map.keys().next().value as string | undefined
+    if (!oldestKey) break
+    map.delete(oldestKey)
   }
 }
 
@@ -704,7 +722,7 @@ async function fetchCurrentWeather(nx: number, ny: number, apiKey: string) {
     lastUpdate: formatKmaDateTime(baseDate, baseTime),
   }
 
-  setCacheWithLimit(currentWeatherCache, cacheKey, { data: snapshot, lastUpdate: Date.now() }, MAX_CURRENT_WEATHER_CACHE_KEYS)
+  setCacheWithLimit(currentWeatherCache, cacheKey, { data: snapshot, lastUpdate: Date.now() })
   return snapshot
 }
 
@@ -727,7 +745,7 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
       const stationData = await fetchJsonSafely(stationUrl)
       const stationItems = toArray(stationData?.response?.body?.items?.item)
       const exactStation = stationItems.find(
-        (item: any) => String(item?.stationName ?? "").trim() === normalizedStationName
+        (item) => String((item as any)?.stationName ?? "").trim() === normalizedStationName
       )
       const station = exactStation ?? stationItems[0] ?? null
 
@@ -737,8 +755,8 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
           : cacheKey
         const snapshot = buildAirQualitySnapshot(station)
 
-        airQualityCache.set(resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
-        airQualityCache.set(profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
+        setCacheWithLimit(airQualityCache, resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
+        setCacheWithLimit(airQualityCache, profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
         return { data: snapshot, isFallback: false }
       }
     }
@@ -757,8 +775,8 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
           : cacheKey
         const snapshot = buildAirQualitySnapshot(station)
 
-        airQualityCache.set(resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
-        airQualityCache.set(profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
+        setCacheWithLimit(airQualityCache, resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
+        setCacheWithLimit(airQualityCache, profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
         return { data: snapshot, isFallback: false }
       }
     }
@@ -777,8 +795,8 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
     return { data: homeCached, isFallback: true }
   }
 
-  airQualityCache.set(homeProfileCacheKey, { data: DEFAULT_AIR_QUALITY, lastUpdate: Date.now() })
-  airQualityCache.set(HOME_REGION.key, { data: DEFAULT_AIR_QUALITY, lastUpdate: Date.now() })
+  setCacheWithLimit(airQualityCache, homeProfileCacheKey, { data: DEFAULT_AIR_QUALITY, lastUpdate: Date.now() })
+  setCacheWithLimit(airQualityCache, HOME_REGION.key, { data: DEFAULT_AIR_QUALITY, lastUpdate: Date.now() })
   return { data: DEFAULT_AIR_QUALITY, isFallback: true }
 }
 
@@ -805,7 +823,7 @@ async function fetchUvIndex(profile: RegionProfile, serviceKey: string) {
     else label = "위험"
   }
 
-  uvCache.set(cacheKey, { data: label, lastUpdate: Date.now() })
+  setCacheWithLimit(uvCache, cacheKey, { data: label, lastUpdate: Date.now() })
   return label
 }
 
@@ -843,7 +861,7 @@ async function fetchRegionalBulletin(profile: RegionProfile, serviceKey: string)
     lastUpdate: String(item?.tmFc || item?.tmSeq || "--:--"),
   }
 
-  bulletinCache.set(cacheKey, { data: snapshot, lastUpdate: Date.now() })
+  setCacheWithLimit(bulletinCache, cacheKey, { data: snapshot, lastUpdate: Date.now() })
   return snapshot
 }
 
@@ -882,7 +900,7 @@ async function fetchRegionalWarning(profile: RegionProfile, serviceKey: string) 
     lastUpdate: latest?.timestamp || "--:--",
   }
 
-  warningCache.set(cacheKey, { data: snapshot, lastUpdate: Date.now() })
+  setCacheWithLimit(warningCache, cacheKey, { data: snapshot, lastUpdate: Date.now() })
   return snapshot
 }
 
@@ -897,15 +915,18 @@ async function fetchEarthquakeInfo(serviceKey: string) {
   const items = toArray(data?.response?.body?.items?.item)
 
   const latest = items
-    .map((item: any) => ({
-      title: stripHtmlTags(String(item?.rem || "")),
-      location: stripHtmlTags(String(item?.loc || "")),
-      magnitude: parseNumber(item?.mt ?? item?.mag, Number.NaN),
-      latitude: parseNumber(item?.lat ?? item?.latitude ?? item?.eqkLat ?? item?.latEqk, Number.NaN),
-      longitude: parseNumber(item?.lon ?? item?.longitude ?? item?.eqkLon ?? item?.lonEqk, Number.NaN),
-      remark: stripHtmlTags(String(item?.rem || "")),
-      occurredAt: String(item?.tmEqk || ""),
-    }))
+    .map((item) => {
+      const typedItem = item as any
+      return {
+        title: stripHtmlTags(String(typedItem?.rem || "")),
+        location: stripHtmlTags(String(typedItem?.loc || "")),
+        magnitude: parseNumber(typedItem?.mt ?? typedItem?.mag, Number.NaN),
+        latitude: parseNumber(typedItem?.lat ?? typedItem?.latitude ?? typedItem?.eqkLat ?? typedItem?.latEqk, Number.NaN),
+        longitude: parseNumber(typedItem?.lon ?? typedItem?.longitude ?? typedItem?.eqkLon ?? typedItem?.lonEqk, Number.NaN),
+        remark: stripHtmlTags(String(typedItem?.rem || "")),
+        occurredAt: String(typedItem?.tmEqk || ""),
+      }
+    })
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0]
 
   const active = Boolean(latest) && latest.occurredAt.length > 0 && !/국내영향없음|국내 영향 없음|영향없음/.test(latest.remark)
@@ -920,7 +941,7 @@ async function fetchEarthquakeInfo(serviceKey: string) {
     longitude: Number.isFinite(latest?.longitude) ? latest.longitude : null,
   }
 
-  earthquakeCache.set("national", { data: snapshot, lastUpdate: Date.now() })
+  setCacheWithLimit(earthquakeCache, "national", { data: snapshot, lastUpdate: Date.now() })
   return snapshot
 }
 
@@ -953,7 +974,7 @@ async function fetchTsunamiInfo(apiHubKey: string) {
     issuedAt: issueTime || eqkTime || "--:--",
   }
 
-  tsunamiCache.set("national", { data: snapshot, lastUpdate: Date.now() })
+  setCacheWithLimit(tsunamiCache, "national", { data: snapshot, lastUpdate: Date.now() })
   return snapshot
 }
 
@@ -988,7 +1009,7 @@ async function fetchVolcanoInfo(apiHubKey: string) {
     issuedAt: issueTime || "--:--",
   }
 
-  volcanoCache.set("global", { data: snapshot, lastUpdate: Date.now() })
+  setCacheWithLimit(volcanoCache, "global", { data: snapshot, lastUpdate: Date.now() })
   return snapshot
 }
 
@@ -1065,7 +1086,8 @@ async function handleGET(req: Request) {
   const publicServiceKey = process.env.AIRKOREA_API_KEY
 
   if (!kmaKey || !publicServiceKey) {
-    return NextResponse.json({ error: "API Keys not configured" }, { status: 500 })
+    console.error("Weather API keys not configured - KMA:", !!kmaKey, "AIRKOREA:", !!publicServiceKey)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 
   // 1. Dynamic Nearest Station Lookup
@@ -1102,13 +1124,13 @@ async function handleGET(req: Request) {
       if (nearestStation) {
         dynamicStationName = nearestStation
         stationLookupSource = "live_api"
-        stationCache.set(coordsKey, {
+        setExpiringCacheWithLimit(stationCache, coordsKey, {
           name: nearestStation,
           tmX,
           tmY,
           candidates: nearbyStationCandidates,
           expiry: Date.now() + STATION_CACHE_TTL,
-        })
+        }, MAX_STATION_CACHE_KEYS)
       }
     }
   }

@@ -3,6 +3,11 @@ import { NextRequest } from "next/server"
 import { withApiAnalytics } from "@/lib/analytics/route"
 import { createAuthJsonResponse, validateAuthMutationRequest } from "@/lib/auth/request-security"
 import {
+  attachRefreshedAuthCookie,
+  clearAuthCookie,
+  getAuthenticatedSessionFromRequest,
+} from "@/lib/auth/session"
+import {
   ensureCodeShareIdentityCookies,
   getOrCreateCodeShareActorId,
   getOrCreateCodeShareAlias,
@@ -35,6 +40,7 @@ const CODE_SHARE_DETAIL_ERRORS = {
     notFound: "코드공유 세션을 찾을 수 없습니다.",
     closed: "세션이 종료되어 더 이상 수정할 수 없습니다.",
     versionConflict: "다른 사용자의 변경이 먼저 반영되었습니다. 최신 상태로 동기화해 주세요.",
+    unauthorized: "세션 삭제는 로그인한 생성자만 할 수 있습니다.",
     forbidden: "이 세션은 생성자만 삭제할 수 있습니다.",
     failed: "코드공유 세션 처리 중 오류가 발생했습니다.",
   },
@@ -44,6 +50,7 @@ const CODE_SHARE_DETAIL_ERRORS = {
     notFound: "Code-share session not found.",
     closed: "This session has been closed and is read-only.",
     versionConflict: "Another participant updated first. Please sync with the latest state.",
+    unauthorized: "Only the signed-in creator can delete this session.",
     forbidden: "Only the creator can delete this session.",
     failed: "Failed to process code-share session.",
   },
@@ -160,7 +167,12 @@ async function handleGET(
       alias: getOrCreateCodeShareAlias(request),
     }
     const actorId = identity.actorId
-    const isOwner = await isCodeShareSessionOwner({ sessionId, actorId })
+    const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
+    const isOwner = await isCodeShareSessionOwner({
+      sessionId,
+      actorId,
+      userId: authenticatedSession?.user.id ?? null,
+    })
 
     // Reads from active sessions count as activity so collaborative sessions remain open while viewed.
     if (session.status === "active") {
@@ -184,7 +196,7 @@ async function handleGET(
       serverNow: new Date().toISOString(),
     })
     ensureCodeShareIdentityCookies(request, response, identity)
-    return response
+    return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Code-share session GET API failed:", error)
     return createAuthJsonResponse(
@@ -265,10 +277,15 @@ async function handlePATCH(
       alias: getOrCreateCodeShareAlias(request),
     }
     const actorId = identity.actorId
+    const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
 
     if (!updateResult.ok) {
       const isOwner = updateResult.session
-        ? await isCodeShareSessionOwner({ sessionId, actorId })
+        ? await isCodeShareSessionOwner({
+          sessionId,
+          actorId,
+          userId: authenticatedSession?.user.id ?? null,
+        })
         : false
 
       if (updateResult.reason === "not_found") {
@@ -289,7 +306,7 @@ async function handlePATCH(
           { status: 409 }
         )
         ensureCodeShareIdentityCookies(request, response, identity)
-        return response
+        return attachRefreshedAuthCookie(response, authenticatedSession)
       }
 
       // For conflict responses we include latest server snapshot so clients can recover without extra request.
@@ -303,17 +320,21 @@ async function handlePATCH(
         { status: 409 }
       )
       ensureCodeShareIdentityCookies(request, response, identity)
-      return response
+      return attachRefreshedAuthCookie(response, authenticatedSession)
     }
 
-    const isOwner = await isCodeShareSessionOwner({ sessionId, actorId })
+    const isOwner = await isCodeShareSessionOwner({
+      sessionId,
+      actorId,
+      userId: authenticatedSession?.user.id ?? null,
+    })
 
     // Broadcast full snapshot so connected peers can update immediately.
     broadcastToRoom(
       toCodeShareRoomName(sessionId),
       "code_share_patch",
       {
-        session: withSessionPermissions(updateResult.session, isOwner),
+        session: withSessionPermissions(updateResult.session, false),
         actor: {
           actorId: identity.actorId,
           alias: identity.alias,
@@ -330,7 +351,7 @@ async function handlePATCH(
       serverNow: new Date().toISOString(),
     })
     ensureCodeShareIdentityCookies(request, response, identity)
-    return response
+    return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Code-share session PATCH API failed:", error)
     return createAuthJsonResponse(
@@ -366,10 +387,20 @@ async function handleDELETE(
       alias: getOrCreateCodeShareAlias(request),
     }
     const actorId = identity.actorId
+    const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
+    if (!authenticatedSession) {
+      return clearAuthCookie(
+        createAuthJsonResponse(
+          { error: CODE_SHARE_DETAIL_ERRORS[locale].unauthorized },
+          { status: 401 }
+        )
+      )
+    }
 
     const deleteResult = await deleteCodeShareSessionById({
       sessionId,
       actorId,
+      userId: authenticatedSession.user.id,
     })
 
     if (!deleteResult.ok) {
@@ -409,7 +440,7 @@ async function handleDELETE(
       serverNow: new Date().toISOString(),
     })
     ensureCodeShareIdentityCookies(request, response, identity)
-    return response
+    return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     console.error("Code-share session DELETE API failed:", error)
     return createAuthJsonResponse(

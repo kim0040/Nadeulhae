@@ -13,6 +13,7 @@
     "db:auth:init": "node scripts/bootstrap-auth-db.mjs",
     "test:auth": "node scripts/test-auth-flows.mjs",
     "test:chat": "node scripts/test-chat-flow.mjs",
+    "test:lab-ai-chat": "node scripts/test-lab-ai-chat-flow.mjs",
     "test:lab": "node scripts/test-lab-features.mjs",
     "test:code-share": "node scripts/test-code-share-ws.mjs"
   },

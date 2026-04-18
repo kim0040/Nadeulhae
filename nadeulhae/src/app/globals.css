@@ -51,6 +51,26 @@
     50% { background-position: 100% 100%; }
     100% { background-position: 0% 0%; }
   }
+  @keyframes lab-chat-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes lab-chat-popover {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 
   --animate-marquee: marquee var(--duration) linear infinite;
   --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
@@ -58,6 +78,8 @@
   --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
   --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
   --animate-shine: shine var(--duration) infinite linear;
+  --animate-lab-chat-rise: lab-chat-rise 220ms ease-out both;
+  --animate-lab-chat-popover: lab-chat-popover 160ms ease-out both;
 }
 
 :root {
@@ -148,6 +170,45 @@ body {
   .dark .custom-scrollbar::-webkit-scrollbar-thumb {
     background: rgba(125, 179, 255, 0.38);
     background-clip: padding-box;
+  }
+  .lab-chat-rise {
+    animation: var(--animate-lab-chat-rise);
+  }
+  .lab-chat-message {
+    animation: var(--animate-lab-chat-rise);
+  }
+  .lab-chat-popover {
+    animation: var(--animate-lab-chat-popover);
+    transform-origin: top right;
+  }
+  .lab-chat-suggestion {
+    animation: var(--animate-lab-chat-rise);
+  }
+  .lab-chat-suggestion:nth-child(2) {
+    animation-delay: 50ms;
+  }
+  .lab-chat-suggestion:nth-child(3) {
+    animation-delay: 100ms;
+  }
+  .lab-chat-suggestion:nth-child(4) {
+    animation-delay: 150ms;
+  }
+  .lab-chat-composer {
+    transform: translateZ(0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lab-chat-rise,
+    .lab-chat-message,
+    .lab-chat-popover,
+    .lab-chat-suggestion {
+      animation: none;
+    }
+    .lab-chat-composer,
+    .lab-chat-suggestion,
+    .lab-chat-message,
+    .lab-chat-popover {
+      transition-duration: 1ms;
+    }
   }
 }
 

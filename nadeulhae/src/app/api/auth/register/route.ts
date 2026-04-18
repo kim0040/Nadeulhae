@@ -11,6 +11,7 @@ import {
   createUser,
   findActiveAuthBlock,
   findUserByEmail,
+  NicknameTagExhaustedError,
   recordAuthSecurityEventSafely,
   toPublicUser,
 } from "@/lib/auth/repository"
@@ -28,6 +29,25 @@ import { attachAnalyticsConsentCookie } from "@/lib/analytics/consent"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
+
+function getDuplicateErrorContext(error: unknown) {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return { isDuplicate: false, message: "" }
+  }
+
+  const mysqlError = error as { code?: unknown; sqlMessage?: unknown; message?: unknown }
+  const mysqlCode = String(mysqlError.code ?? "")
+  const mysqlMessage = typeof mysqlError.sqlMessage === "string"
+    ? mysqlError.sqlMessage
+    : typeof mysqlError.message === "string"
+      ? mysqlError.message
+      : ""
+
+  return {
+    isDuplicate: mysqlCode === "ER_DUP_ENTRY",
+    message: mysqlMessage,
+  }
+}
 
 async function handlePOST(request: NextRequest) {
   const locale = resolveAuthLocale(request.headers.get("accept-language"))
@@ -269,10 +289,26 @@ async function handlePOST(request: NextRequest) {
     )
     return response
   } catch (error) {
-    const duplicateEmail = typeof error === "object"
-      && error !== null
-      && "code" in error
-      && String(error.code) === "ER_DUP_ENTRY"
+    const duplicateContext = getDuplicateErrorContext(error)
+    const duplicateNickname = error instanceof NicknameTagExhaustedError
+      || (duplicateContext.isDuplicate && /uq_users_nickname_hash_tag|nickname_tag/i.test(duplicateContext.message))
+
+    if (duplicateNickname) {
+      await recordAuthSecurityEventSafely({
+        eventType: "register_duplicate_nickname",
+        action: "register",
+        outcome: "rejected",
+        ipAddress,
+        userAgent,
+      })
+
+      return createAuthJsonResponse(
+        { error: getAuthMessage(locale, "duplicateNickname") },
+        { status: 409 }
+      )
+    }
+
+    const duplicateEmail = duplicateContext.isDuplicate
 
     if (duplicateEmail) {
       await recordAuthSecurityEventSafely({
