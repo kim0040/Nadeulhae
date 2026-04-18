@@ -451,19 +451,6 @@ async function handlePOST(request: NextRequest) {
     })
     resolvedSessionId = resolvedSession.activeSessionId
 
-    const sessionMemory = await getLabAiChatSessionMemorySnapshot({
-      userId: authenticatedSession.user.id,
-      sessionId: resolvedSession.activeSessionId,
-    })
-
-    await compactLabAiChatMemory({
-      userId: authenticatedSession.user.id,
-      sessionId: resolvedSession.activeSessionId,
-      locale,
-      memorySummary: sessionMemory?.summary ?? null,
-      modelId: selectedModelId,
-    })
-
     const reservation = await reserveDailyLabAiChatRequest(authenticatedSession.user.id)
     if (!reservation.allowed) {
       await logLabAiChatRequestEvent({
@@ -497,6 +484,19 @@ async function handlePOST(request: NextRequest) {
         authenticatedSession
       )
     }
+
+    const sessionMemory = await getLabAiChatSessionMemorySnapshot({
+      userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
+    })
+
+    await compactLabAiChatMemory({
+      userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
+      locale,
+      memorySummary: sessionMemory?.summary ?? null,
+      modelId: selectedModelId,
+    })
 
     const [latestSessionMemory, contextMessages] = await Promise.all([
       getLabAiChatSessionMemorySnapshot({
