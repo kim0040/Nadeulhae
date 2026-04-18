@@ -42,6 +42,7 @@ interface NanoGptCompletionPayload {
   id?: string
   model?: string
   choices?: Array<{
+    finish_reason?: unknown
     message?: {
       content?: unknown
     }
@@ -218,6 +219,10 @@ function extractAssistantText(content: unknown) {
   }
 
   return ""
+}
+
+function normalizeFinishReason(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
 }
 
 function getGlobalLlmDailyLimit() {
@@ -417,7 +422,8 @@ async function requestCompletion(input: {
     }
 
     const payload = json as NanoGptCompletionPayload
-    const content = extractAssistantText(payload.choices?.[0]?.message?.content)
+    const firstChoice = payload.choices?.[0]
+    const content = extractAssistantText(firstChoice?.message?.content)
     if (!content) {
       throw new NanoGptError("NanoGPT returned an empty response.", 502, "empty_content")
     }
@@ -433,6 +439,7 @@ async function requestCompletion(input: {
       providerRequestId: payload.id ?? null,
       resolvedModel: payload.model ?? input.model,
       content,
+      finishReason: normalizeFinishReason(firstChoice?.finish_reason),
       usage: {
         promptTokens: Math.max(0, payload.usage?.prompt_tokens ?? 0),
         completionTokens: Math.max(0, payload.usage?.completion_tokens ?? 0),
@@ -485,6 +492,7 @@ export async function createNanoGptCompletion(input: {
     requestedModel: input.model,
     resolvedModel: primaryResult.resolvedModel,
     content: primaryResult.content,
+    finishReason: primaryResult.finishReason,
     usage: primaryResult.usage,
   }
 }
@@ -552,6 +560,7 @@ async function requestCompletionStream(input: {
     let buffer = ""
     let providerRequestId: string | null = null
     let resolvedModel: string | null = input.model
+    let finishReason: string | null = null
 
     while (true) {
       const { done, value } = await reader.read()
@@ -580,6 +589,7 @@ async function requestCompletionStream(input: {
               id?: string
               model?: string
               choices?: Array<{
+                finish_reason?: unknown
                 delta?: {
                   content?: string
                 }
@@ -587,6 +597,7 @@ async function requestCompletionStream(input: {
             }
             providerRequestId = parsed.id ?? providerRequestId
             resolvedModel = parsed.model ?? resolvedModel
+            finishReason = normalizeFinishReason(parsed.choices?.[0]?.finish_reason) ?? finishReason
 
             const token = typeof parsed.choices?.[0]?.delta?.content === "string"
               ? parsed.choices[0].delta.content
@@ -621,6 +632,7 @@ async function requestCompletionStream(input: {
       requestedModel: input.model,
       resolvedModel: resolvedModel ?? input.model,
       content: accumulated,
+      finishReason,
       usage: {
         promptTokens: 0,
         completionTokens: Math.max(1, estimateLabAiChatTokens(accumulated)),

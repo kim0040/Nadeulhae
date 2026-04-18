@@ -255,6 +255,30 @@ function enforceAssistantIdentity(content: string, locale: LabAiChatLocale) {
   return sanitized
 }
 
+function addLengthLimitNotice(content: string, locale: LabAiChatLocale) {
+  const trimmed = content.trim()
+  if (!trimmed) {
+    return trimmed
+  }
+
+  const notice = locale === "ko"
+    ? "답변이 길어져 여기서 잠시 멈췄어요. '계속'이라고 보내면 이어서 작성할게요."
+    : "The answer got long, so I paused here. Send \"continue\" and I will keep going."
+
+  if (trimmed.includes(notice)) {
+    return trimmed
+  }
+
+  return `${trimmed}\n\n${notice}`
+}
+
+function finalizeAssistantMessage(content: string, locale: LabAiChatLocale, finishReason?: string | null) {
+  const assistantMessage = enforceAssistantIdentity(content, locale)
+  return finishReason === "length"
+    ? addLengthLimitNotice(assistantMessage, locale)
+    : assistantMessage
+}
+
 function sanitizeStateIdentity(state: LabAiChatStateResponse, locale: LabAiChatLocale): LabAiChatStateResponse {
   return {
     ...state,
@@ -644,7 +668,11 @@ async function handlePOST(request: NextRequest) {
               sendEvent("token", { content: visibleTail })
             }
 
-            const assistantMessage = enforceAssistantIdentity(accumulated || completionResult.content, locale)
+            const assistantMessage = finalizeAssistantMessage(
+              accumulated || completionResult.content,
+              locale,
+              completionResult.finishReason
+            )
 
             await persistLabAiChatExchange({
               userId: authenticatedSession.user.id,
@@ -723,7 +751,11 @@ async function handlePOST(request: NextRequest) {
       requestKind: "chat",
       messages: chatMessages,
     })
-    const assistantMessage = enforceAssistantIdentity(completionResult.content, locale)
+    const assistantMessage = finalizeAssistantMessage(
+      completionResult.content,
+      locale,
+      completionResult.finishReason
+    )
 
     await persistLabAiChatExchange({
       userId: authenticatedSession.user.id,
