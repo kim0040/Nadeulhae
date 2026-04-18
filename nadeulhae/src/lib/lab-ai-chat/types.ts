@@ -85,5 +85,6 @@ export interface NanoGptCompletionResult {
   requestedModel: string | null
   resolvedModel: string | null
   content: string
+  finishReason: string | null
   usage: NanoGptUsage
 }
