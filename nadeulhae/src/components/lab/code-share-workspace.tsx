@@ -940,6 +940,7 @@ export function CodeShareWorkspace({
     selectedSessionId,
     sessionDetail,
     titleDraft,
+    upsertSessionSummary,
   ])
 
   useEffect(() => {

@@ -66,6 +66,13 @@ export interface AuthSecurityEventInput {
   metadata?: Record<string, unknown> | null
 }
 
+export class NicknameTagExhaustedError extends Error {
+  constructor() {
+    super("All nickname tags are exhausted for this nickname.")
+    this.name = "NicknameTagExhaustedError"
+  }
+}
+
 function parseJsonArray(value: unknown) {
   if (Array.isArray(value)) {
     return value.filter((item): item is string => typeof item === "string")
@@ -262,6 +269,7 @@ async function generateUniqueNicknameTag(nickname: string): Promise<string> {
   const normalizedNickname = normalizeNickname(nickname)
   const nicknameHash = createBlindIndex(normalizedNickname, "users.nickname")
   const maxAttempts = 20
+  
   for (let i = 0; i < maxAttempts; i++) {
     const tag = String(Math.floor(Math.random() * 10000)).padStart(4, '0')
     const existing = await queryRows<RowDataPacket[]>(
@@ -270,17 +278,19 @@ async function generateUniqueNicknameTag(nickname: string): Promise<string> {
     )
     if (existing.length === 0) return tag
   }
-  // Fallback: sequential scan for available tag
+  
   const usedTags = await queryRows<RowDataPacket[]>(
     'SELECT nickname_tag FROM users WHERE nickname_hash = ? OR nickname = ?',
     [nicknameHash, normalizedNickname]
   )
   const usedSet = new Set(usedTags.map(r => r.nickname_tag))
+  
   for (let n = 0; n < 10000; n++) {
     const tag = String(n).padStart(4, '0')
     if (!usedSet.has(tag)) return tag
   }
-  throw new Error('All nickname tags exhausted for this nickname')
+
+  throw new NicknameTagExhaustedError()
 }
 
 export async function createUser(input: {
@@ -623,6 +633,10 @@ export async function deleteUserAccount(userId: string) {
     await connection.execute("DELETE FROM user_chat_memory WHERE user_id = ?", [userId])
     await connection.execute("DELETE FROM user_chat_usage_daily WHERE user_id = ?", [userId])
     await connection.execute("DELETE FROM user_chat_request_events WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM lab_ai_chat_messages WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM lab_ai_chat_sessions WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM lab_ai_chat_usage_daily WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM lab_ai_chat_request_events WHERE user_id = ?", [userId])
 
     await connection.execute("DELETE FROM lab_cards WHERE user_id = ?", [userId])
     await connection.execute("DELETE FROM lab_decks WHERE user_id = ?", [userId])
@@ -640,6 +654,8 @@ export async function deleteUserAccount(userId: string) {
   }
 }
 
+const MAX_AUTH_SCOPE_KEYS = 10
+
 export async function findActiveAuthBlock(action: string, scopeKeys: string[]) {
   await ensureAuthSchema()
 
@@ -647,7 +663,8 @@ export async function findActiveAuthBlock(action: string, scopeKeys: string[]) {
     return null
   }
 
-  const placeholders = scopeKeys.map(() => "?").join(", ")
+  const limitedScopeKeys = scopeKeys.slice(0, MAX_AUTH_SCOPE_KEYS)
+  const placeholders = limitedScopeKeys.map(() => "?").join(", ")
   const rows = await queryRows<AttemptBucketRow[]>(
     `
       SELECT
@@ -666,7 +683,7 @@ export async function findActiveAuthBlock(action: string, scopeKeys: string[]) {
       ORDER BY blocked_until DESC
       LIMIT 1
     `,
-    [action, ...scopeKeys]
+    [action, ...limitedScopeKeys]
   )
 
   if (!rows[0]) {
@@ -827,14 +844,15 @@ export async function clearAuthRateLimits(action: string, scopeKeys: string[]) {
     return
   }
 
-  const placeholders = scopeKeys.map(() => "?").join(", ")
+  const limitedScopeKeys = scopeKeys.slice(0, MAX_AUTH_SCOPE_KEYS)
+  const placeholders = limitedScopeKeys.map(() => "?").join(", ")
   await executeStatement(
     `
       DELETE FROM auth_attempt_buckets
       WHERE action = ?
         AND scope_key IN (${placeholders})
     `,
-    [action, ...scopeKeys]
+    [action, ...limitedScopeKeys]
   )
 }
 

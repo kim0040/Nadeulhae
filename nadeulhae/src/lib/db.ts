@@ -65,6 +65,9 @@ export function getDbPool() {
     return globalThis.__nadeulhaeDbPool
   }
 
+  const connectionLimit = Number(process.env.DB_POOL_LIMIT ?? "10")
+  const isProduction = process.env.NODE_ENV === "production"
+
   const config: PoolOptions = {
     host: requireEnv("DB_HOST"),
     port: Number(process.env.DB_PORT ?? "4000"),
@@ -74,8 +77,8 @@ export function getDbPool() {
     ssl: resolveSslOptions(),
     timezone: "+00:00",
     waitForConnections: true,
-    connectionLimit: Number(process.env.DB_POOL_LIMIT ?? "10"),
-    queueLimit: 0,
+    connectionLimit: isProduction ? connectionLimit : Math.max(2, connectionLimit),
+    queueLimit: isProduction ? 0 : 100,
     enableKeepAlive: true,
   }
 

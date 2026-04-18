@@ -136,6 +136,14 @@ function deleteAuthSessionCache(tokenHash: string) {
   getAuthSessionCache().delete(tokenHash)
 }
 
+export function clearAuthSessionCacheByToken(token: string | null | undefined) {
+  if (!token) {
+    return
+  }
+
+  deleteAuthSessionCache(getSessionTokenHash(token))
+}
+
 export function getSessionTokenHash(token: string) {
   return createHash("sha256").update(token).digest("hex")
 }
