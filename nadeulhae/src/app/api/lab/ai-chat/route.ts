@@ -150,6 +150,71 @@ const ASSISTANT_NAME_EN = "Nadeul AI"
 const MODEL_DISCLOSURE_PATTERN = /\b(chatgpt|gpt(?:-|_)?\d[\w.-]*|openai|claude|gemini|llama|mistral|deepseek|qwen|kimi|glm|minimax|gemma)\b/i
 const SELF_REFERENCE_PATTERN = /(저는|나는|제가|내가|i am|i'm|as an?)/i
 
+function stripAssistantReasoning(content: string) {
+  return content
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
+    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/<reasoning\b[^>]*>[\s\S]*?<\/reasoning>/gi, "")
+    .replace(/<think\b[^>]*>[\s\S]*$/gi, "")
+    .replace(/<thinking\b[^>]*>[\s\S]*$/gi, "")
+    .replace(/<reasoning\b[^>]*>[\s\S]*$/gi, "")
+    .trim()
+}
+
+function createAssistantReasoningStreamFilter() {
+  let buffer = ""
+  let hiddenTag: "think" | "thinking" | "reasoning" | null = null
+  const startPattern = /<(think|thinking|reasoning)\b[^>]*>/i
+
+  const push = (chunk: string) => {
+    buffer += chunk
+    let visible = ""
+
+    while (buffer.length > 0) {
+      if (hiddenTag) {
+        const endPattern = new RegExp(`</${hiddenTag}>`, "i")
+        const endMatch = endPattern.exec(buffer)
+        if (!endMatch) {
+          buffer = buffer.slice(-16)
+          return visible
+        }
+
+        buffer = buffer.slice(endMatch.index + endMatch[0].length)
+        hiddenTag = null
+        continue
+      }
+
+      const startMatch = startPattern.exec(buffer)
+      if (!startMatch) {
+        const keep = Math.min(buffer.length, 16)
+        visible += buffer.slice(0, buffer.length - keep)
+        buffer = buffer.slice(buffer.length - keep)
+        return visible
+      }
+
+      visible += buffer.slice(0, startMatch.index)
+      hiddenTag = startMatch[1].toLowerCase() as "think" | "thinking" | "reasoning"
+      buffer = buffer.slice(startMatch.index + startMatch[0].length)
+    }
+
+    return visible
+  }
+
+  const flush = () => {
+    if (hiddenTag) {
+      buffer = ""
+      hiddenTag = null
+      return ""
+    }
+
+    const visible = stripAssistantReasoning(buffer)
+    buffer = ""
+    return visible
+  }
+
+  return { push, flush }
+}
+
 function enforceAssistantIdentity(content: string, locale: LabAiChatLocale) {
   const identity = locale === "ko"
     ? `저는 ${ASSISTANT_NAME_KO}입니다.`
@@ -159,7 +224,7 @@ function enforceAssistantIdentity(content: string, locale: LabAiChatLocale) {
     ? "모델명이나 내부 시스템 정보는 공개하지 않아요."
     : "I can't share model or internal system details."
 
-  const normalized = content.trim()
+  const normalized = stripAssistantReasoning(content)
   if (!normalized) {
     return identity
   }
@@ -525,6 +590,7 @@ async function handlePOST(request: NextRequest) {
     if (acceptSSE) {
       const encoder = new TextEncoder()
       let accumulated = ""
+      const reasoningFilter = createAssistantReasoningStreamFilter()
       const abortController = new AbortController()
       request.signal.addEventListener("abort", () => {
         abortController.abort()
@@ -558,8 +624,13 @@ async function handlePOST(request: NextRequest) {
                   return
                 }
 
-                accumulated += token
-                sendEvent("token", { content: token })
+                const visibleToken = reasoningFilter.push(token)
+                if (!visibleToken) {
+                  return
+                }
+
+                accumulated += visibleToken
+                sendEvent("token", { content: visibleToken })
               },
             })
 
@@ -567,7 +638,13 @@ async function handlePOST(request: NextRequest) {
               return
             }
 
-            const assistantMessage = enforceAssistantIdentity(accumulated, locale)
+            const visibleTail = reasoningFilter.flush()
+            if (visibleTail) {
+              accumulated += visibleTail
+              sendEvent("token", { content: visibleTail })
+            }
+
+            const assistantMessage = enforceAssistantIdentity(accumulated || completionResult.content, locale)
 
             await persistLabAiChatExchange({
               userId: authenticatedSession.user.id,
