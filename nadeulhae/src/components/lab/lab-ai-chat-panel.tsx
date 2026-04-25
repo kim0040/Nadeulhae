@@ -59,11 +59,11 @@ const COPY = {
     loadError: "대화를 불러오지 못했어요.",
     sendError: "메시지를 보내지 못했어요. 다시 시도해 주세요.",
     pending: "나들 AI가 답변을 작성하고 있어요.",
-    thinkingPanelTitle: "답변 준비 과정",
-    thinkingPanelDescription: "나들 AI가 질문을 정리하고 답변 흐름을 구성하고 있어요.",
-    thinkingPanelShow: "과정 보기",
-    thinkingPanelHide: "과정 숨기기",
-    thinkingPanelNote: "내부 사고 원문이 아니라 진행 상태를 이해하기 쉽게 요약해 보여줍니다.",
+    thinkingPanelTitle: "답변 처리 기준",
+    thinkingPanelDescription: "나들 AI가 요청을 읽고 답변 기준을 정리하고 있어요.",
+    thinkingPanelShow: "처리 기준 보기",
+    thinkingPanelHide: "접기",
+    thinkingPanelNote: "모델의 숨은 사고 원문이 아니라, 답변에 반영하는 기준을 요약해 보여줍니다.",
     thinkingSteps: ["질문 의도 확인", "대화 맥락 반영", "답변 구조 구성", "답변 작성"],
     loading: "준비 중...",
     welcomeTitle: "나들 AI에게 무엇이든 물어보세요",
@@ -107,11 +107,11 @@ const COPY = {
     loadError: "Failed to load conversations.",
     sendError: "Failed to send message. Please try again.",
     pending: "Nadeul AI is writing a reply.",
-    thinkingPanelTitle: "Response progress",
-    thinkingPanelDescription: "Nadeul AI is organizing the request and shaping the answer.",
-    thinkingPanelShow: "Show progress",
-    thinkingPanelHide: "Hide progress",
-    thinkingPanelNote: "This is a concise progress view, not raw internal reasoning.",
+    thinkingPanelTitle: "Response Criteria",
+    thinkingPanelDescription: "Nadeul AI is reading the request and setting up the answer.",
+    thinkingPanelShow: "Show criteria",
+    thinkingPanelHide: "Collapse",
+    thinkingPanelNote: "This summarizes answer criteria, not hidden raw reasoning.",
     thinkingSteps: ["Read intent", "Use conversation context", "Shape the answer", "Write response"],
     loading: "Preparing...",
     welcomeTitle: "Ask Nadeul AI anything",
@@ -200,6 +200,12 @@ const THOUGHT_SUMMARIES = {
 } as const
 
 type ThoughtSummaryKind = keyof typeof THOUGHT_SUMMARIES.ko
+
+type ThoughtSummaryDetails = {
+  title: string
+  description: string
+  points: string[]
+}
 
 type HighlightKind = "plain" | "comment" | "function" | "keyword" | "meta" | "number" | "operator" | "property" | "string" | "type"
 
@@ -454,6 +460,79 @@ function getPreviousUserMessage(messages: UiChatMessage[], messageIndex: number)
   return ""
 }
 
+function compactRequestText(content: string) {
+  return content
+    .replace(/\[[^\]]*(?:첨부 파일|Attached file)[^\]]*\]/gi, "")
+    .replace(/---[\s\S]*?---/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 96)
+}
+
+function extractRequestSignals(content: string, language: "ko" | "en") {
+  const normalized = content.replace(/\r\n?/g, "\n")
+  const lines = normalized
+    .split("\n")
+    .map((line) => line.replace(/^[-*•\d.)\s]+/, "").trim())
+    .filter((line) => line.length > 0 && line.length <= 90)
+
+  const constraints = lines.filter((line) => (
+    /(예산|시간|오늘|내일|조건|제한|모바일|오류|파일|코드|budget|time|limit|mobile|error|file|code)/i.test(line)
+  )).slice(0, 2)
+
+  if (constraints.length > 0) {
+    return constraints.join(" / ")
+  }
+
+  const compact = compactRequestText(content)
+  if (compact) {
+    return compact
+  }
+
+  return language === "ko" ? "최근 요청과 대화 흐름" : "The latest request and conversation context"
+}
+
+function buildThoughtSummaryDetails(input: {
+  kind: ThoughtSummaryKind
+  language: "ko" | "en"
+  userMessage: string
+  modelLabel: string
+  isThinkingMode: boolean
+}): ThoughtSummaryDetails {
+  const base = THOUGHT_SUMMARIES[input.language][input.kind]
+  const signal = extractRequestSignals(input.userMessage, input.language)
+
+  if (input.language === "ko") {
+    const mode = input.isThinkingMode
+      ? `${input.modelLabel}로 더 신중하게 검토`
+      : `${input.modelLabel}로 빠르게 답변 구성`
+
+    return {
+      title: base.title,
+      description: base.description,
+      points: [
+        `요청 유형: ${base.title.replace(/ 정리$| 구성$| 구조화$/g, "")}`,
+        `반영 기준: ${signal}`,
+        `답변 방식: ${mode}`,
+      ],
+    }
+  }
+
+  const mode = input.isThinkingMode
+    ? `Using ${input.modelLabel} for a more deliberate pass`
+    : `Using ${input.modelLabel} for a direct response`
+
+  return {
+    title: base.title,
+    description: base.description,
+    points: [
+      `Request type: ${base.title}`,
+      `Criteria: ${signal}`,
+      `Mode: ${mode}`,
+    ],
+  }
+}
+
 function isSupportedTextAttachment(file: File) {
   const fileName = file.name.toLowerCase()
   const fileType = file.type.toLowerCase()
@@ -511,6 +590,7 @@ function ThinkingProgressPanel({
   note,
   thoughtTitle,
   thoughtDescription,
+  thoughtPoints,
 }: {
   isOpen: boolean
   onToggle: () => void
@@ -520,13 +600,14 @@ function ThinkingProgressPanel({
   note: string
   thoughtTitle: string
   thoughtDescription: string
+  thoughtPoints: string[]
 }) {
   if (!isOpen) {
     return (
       <button
         type="button"
         onClick={onToggle}
-        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card/70 px-3 py-2 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
+        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card/70 px-3 py-2 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground active:scale-[0.98]"
       >
         <Lightbulb className="size-4 text-accent" />
         {showLabel}
@@ -535,7 +616,7 @@ function ThinkingProgressPanel({
   }
 
   return (
-    <div className="lab-chat-rise max-w-xl rounded-lg border border-border bg-card/75 p-3 text-sm text-muted-foreground shadow-sm backdrop-blur transition-colors duration-300">
+    <div className="lab-chat-rise w-full max-w-xl rounded-lg border border-border bg-card/75 p-3 text-sm text-muted-foreground shadow-sm backdrop-blur transition-colors duration-300 sm:p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 font-semibold text-foreground">
@@ -553,9 +634,17 @@ function ThinkingProgressPanel({
         </button>
       </div>
 
-      <div className="mt-3 border-l-2 border-accent/35 pl-3 italic">
+      <div className="mt-3 border-l-2 border-accent/35 pl-3">
         <p className="font-semibold text-foreground not-italic">{thoughtTitle}</p>
-        <p className="mt-2 leading-6">{thoughtDescription}</p>
+        <p className="mt-1.5 leading-6">{thoughtDescription}</p>
+        <ul className="mt-2 space-y-1.5">
+          {thoughtPoints.map((point) => (
+            <li key={point} className="flex gap-2 leading-5">
+              <span className="mt-2 size-1 shrink-0 rounded-full bg-accent/70" />
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <p className="mt-3 border-t border-border pt-2 text-xs leading-5 text-muted-foreground">{note}</p>
@@ -1230,7 +1319,7 @@ export function LabAiChatPanel() {
       </aside>
 
       <section className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="relative z-20 flex shrink-0 flex-col gap-2 border-b border-border bg-background/85 px-3 py-2 backdrop-blur-xl transition-colors duration-300 sm:h-14 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0">
+        <header className="relative z-20 flex shrink-0 flex-col gap-2 border-b border-border bg-background/90 px-2.5 py-2 backdrop-blur-xl transition-colors duration-300 sm:h-14 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0">
           <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
@@ -1245,41 +1334,25 @@ export function LabAiChatPanel() {
               <p className="truncate text-sm font-semibold text-foreground sm:text-base">{copy.assistantName}</p>
               <p className="hidden truncate text-xs text-muted-foreground md:block">{copy.assistantDescription}</p>
             </div>
+            <button
+              type="button"
+              onClick={handleCreateSession}
+              disabled={isSessionPending}
+              className="ml-auto inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card/75 text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:hidden"
+              aria-label={copy.newChat}
+              title={copy.newChat}
+            >
+              {isSessionPending ? <LoaderCircle className="size-4 animate-spin" /> : <MessageSquarePlus className="size-4" />}
+            </button>
           </div>
 
           <div
             className={cn(
               "grid min-w-0 items-center gap-1.5 sm:flex sm:w-auto sm:gap-2",
-              activeModel?.thinkingId ? "grid-cols-[auto_auto_minmax(0,1fr)]" : "grid-cols-[auto_minmax(0,1fr)]"
+              activeModel?.thinkingId ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"
             )}
           >
-            <button
-              type="button"
-              onClick={handleCreateSession}
-              disabled={isSessionPending}
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-card/75 px-2.5 text-sm font-semibold text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
-            >
-              {isSessionPending ? <LoaderCircle className="size-4 animate-spin" /> : <MessageSquarePlus className="size-4" />}
-              <span className="hidden sm:inline">{copy.newChat}</span>
-            </button>
-
-            {activeModel?.thinkingId ? (
-              <button
-                type="button"
-                onClick={handleThinkingToggle}
-                className={cn(
-                  "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition duration-200 active:scale-[0.98]",
-                  isThinkingMode
-                    ? "border-accent/35 bg-accent/10 text-accent dark:bg-accent/15"
-                    : "border-border bg-card/75 text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <Lightbulb className="size-4" />
-                <span className="hidden sm:inline">{copy.thinking}</span>
-              </button>
-            ) : null}
-
-            <div className="relative z-30" ref={modelMenuRef}>
+            <div className="relative z-30 min-w-0" ref={modelMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsModelMenuOpen((current) => !current)}
@@ -1294,7 +1367,7 @@ export function LabAiChatPanel() {
               </button>
 
               {isModelMenuOpen ? (
-                <div className="lab-chat-popover absolute right-0 top-full mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-lg border border-border bg-background/95 shadow-2xl shadow-foreground/10 backdrop-blur-xl">
+                <div className="lab-chat-popover fixed inset-x-2.5 top-20 z-50 max-h-[min(32rem,calc(100svh-6rem))] overflow-hidden rounded-lg border border-border bg-background/95 shadow-2xl shadow-foreground/10 backdrop-blur-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[min(22rem,calc(100vw-1.5rem))]">
                   <div className="border-b border-border px-3 py-2">
                     <p className="text-sm font-semibold text-foreground">{copy.modelLabel}</p>
                     <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{activeModelDescription}</p>
@@ -1305,7 +1378,7 @@ export function LabAiChatPanel() {
                       </p>
                     ) : null}
                   </div>
-                  <div className="max-h-[22rem] overflow-y-auto p-1.5 custom-scrollbar">
+                  <div className="max-h-[min(26rem,calc(100svh-12rem))] overflow-y-auto p-1.5 custom-scrollbar sm:max-h-[22rem]">
                     {models.map((model) => {
                       const nextModelId = isThinkingMode && model.thinkingId ? model.thinkingId : model.id
                       const isSelected = resolvedModelId === model.id || resolvedModelId === model.thinkingId
@@ -1341,6 +1414,32 @@ export function LabAiChatPanel() {
                 </div>
               ) : null}
             </div>
+
+            {activeModel?.thinkingId ? (
+              <button
+                type="button"
+                onClick={handleThinkingToggle}
+                className={cn(
+                  "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition duration-200 active:scale-[0.98]",
+                  isThinkingMode
+                    ? "border-accent/35 bg-accent/10 text-accent dark:bg-accent/15"
+                    : "border-border bg-card/75 text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Lightbulb className="size-4" />
+                <span className="hidden sm:inline">{copy.thinking}</span>
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={handleCreateSession}
+              disabled={isSessionPending}
+              className="hidden h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-card/75 px-3 text-sm font-semibold text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
+            >
+              {isSessionPending ? <LoaderCircle className="size-4 animate-spin" /> : <MessageSquarePlus className="size-4" />}
+              <span>{copy.newChat}</span>
+            </button>
           </div>
         </header>
 
@@ -1357,14 +1456,21 @@ export function LabAiChatPanel() {
               </div>
             </div>
           ) : hasMessages ? (
-            <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-end px-3 py-4 sm:px-5 sm:py-6 lg:px-6">
-              <div className="flex flex-col gap-5 sm:gap-6">
+            <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-end px-2.5 py-3 sm:px-5 sm:py-6 lg:px-6">
+              <div className="flex flex-col gap-4 sm:gap-6">
                 {messages.map((message, messageIndex) => {
                   const isUser = message.role === "user"
-                  const thoughtKind = !isUser && message.pending
-                    ? getThoughtSummaryKind(getPreviousUserMessage(messages, messageIndex))
-                    : "general"
-                  const thoughtSummary = THOUGHT_SUMMARIES[language][thoughtKind]
+                  const previousUserMessage = !isUser && message.pending
+                    ? getPreviousUserMessage(messages, messageIndex)
+                    : ""
+                  const thoughtKind = previousUserMessage ? getThoughtSummaryKind(previousUserMessage) : "general"
+                  const thoughtSummary = buildThoughtSummaryDetails({
+                    kind: thoughtKind,
+                    language,
+                    userMessage: previousUserMessage,
+                    modelLabel: activeModelLabel,
+                    isThinkingMode,
+                  })
                   return (
                     <div
                       key={message.id}
@@ -1377,11 +1483,11 @@ export function LabAiChatPanel() {
                       <div
                         className={cn(
                           "min-w-0",
-                          isUser ? "max-w-[min(90%,42rem)] sm:max-w-[min(82%,42rem)]" : "max-w-[min(100%,48rem)] flex-1"
+                          isUser ? "max-w-[min(94%,42rem)] sm:max-w-[min(82%,42rem)]" : "max-w-[min(100%,48rem)] flex-1"
                         )}
                       >
                         {isUser ? (
-                          <div className="rounded-lg bg-accent px-4 py-3 text-base leading-7 text-accent-foreground shadow-sm transition-colors duration-300">
+                          <div className="rounded-lg bg-accent px-3.5 py-2.5 text-[15px] leading-7 text-accent-foreground shadow-sm transition-colors duration-300 sm:px-4 sm:py-3 sm:text-base">
                             <p className="whitespace-pre-wrap break-words">{message.content}</p>
                           </div>
                         ) : message.pending ? (
@@ -1395,9 +1501,10 @@ export function LabAiChatPanel() {
                               note={copy.thinkingPanelNote}
                               thoughtTitle={thoughtSummary.title}
                               thoughtDescription={thoughtSummary.description}
+                              thoughtPoints={thoughtSummary.points}
                             />
                             {message.content ? (
-                              <div className="rounded-lg border border-transparent px-0 py-1 text-base leading-7 text-foreground transition-colors duration-300">
+                              <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base">
                                 <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
                                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                                     {message.content}
@@ -1412,7 +1519,7 @@ export function LabAiChatPanel() {
                             )}
                           </div>
                         ) : (
-                          <div className="rounded-lg border border-transparent px-0 py-1 text-base leading-7 text-foreground transition-colors duration-300">
+                          <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base">
                             <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
                               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                                 {message.content}
@@ -1461,7 +1568,7 @@ export function LabAiChatPanel() {
           ) : null}
         </div>
 
-        <footer className="sticky bottom-0 z-20 shrink-0 border-t border-border bg-background/90 px-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl transition-colors duration-300 sm:px-5">
+        <footer className="sticky bottom-0 z-20 shrink-0 border-t border-border bg-background/90 px-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 backdrop-blur-xl transition-colors duration-300 sm:px-5 sm:pt-3">
           <div className="mx-auto w-full max-w-3xl">
             {isLimitReached ? (
               <div className="lab-chat-rise mb-2 rounded-lg border border-danger/20 bg-danger/10 px-4 py-2.5 text-sm font-semibold text-danger" role="status">
@@ -1474,7 +1581,7 @@ export function LabAiChatPanel() {
               </div>
             ) : null}
 
-            <div className="lab-chat-composer flex items-end gap-2 rounded-lg border border-border bg-card/90 px-2.5 py-2 shadow-lg shadow-foreground/5 backdrop-blur transition duration-200 focus-within:border-accent/45 focus-within:bg-background focus-within:shadow-accent/10 sm:px-3 dark:bg-card/80 dark:focus-within:bg-background">
+            <div className="lab-chat-composer flex items-end gap-1.5 rounded-lg border border-border bg-card/90 px-2 py-1.5 shadow-lg shadow-foreground/5 backdrop-blur transition duration-200 focus-within:border-accent/45 focus-within:bg-background focus-within:shadow-accent/10 sm:gap-2 sm:px-3 sm:py-2 dark:bg-card/80 dark:focus-within:bg-background">
               <input
                 ref={attachmentInputRef}
                 type="file"
@@ -1514,7 +1621,7 @@ export function LabAiChatPanel() {
                 disabled={!canType}
                 rows={1}
                 aria-label={copy.placeholder}
-                className="max-h-[42svh] min-h-11 flex-1 resize-none bg-transparent py-2 text-base leading-7 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-h-[180px]"
+                className="max-h-[34svh] min-h-10 flex-1 resize-none bg-transparent py-2 text-base leading-7 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-h-[180px] sm:min-h-11"
               />
               <button
                 type="button"
@@ -1533,7 +1640,7 @@ export function LabAiChatPanel() {
               </button>
             </div>
 
-            <div className="mt-2 flex flex-col gap-1 text-center text-xs leading-5 text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:text-left">
+            <div className="mt-2 hidden flex-col gap-1 text-center text-xs leading-5 text-muted-foreground sm:flex sm:flex-row sm:items-center sm:justify-between sm:text-left">
               <span>{copy.shortcutHint}</span>
               <span className="hidden sm:inline">{copy.footerHint}</span>
             </div>

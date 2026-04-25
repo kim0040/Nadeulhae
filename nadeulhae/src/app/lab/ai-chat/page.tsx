@@ -88,7 +88,7 @@ export default function LabAiChatPage() {
   }
 
   return (
-    <main className="flex h-[100svh] flex-col overflow-hidden bg-background pt-20 sm:pt-24">
+    <main className="flex h-[100svh] flex-col overflow-hidden bg-background pt-16 sm:pt-24">
       <LabAiChatPanel />
     </main>
   )
