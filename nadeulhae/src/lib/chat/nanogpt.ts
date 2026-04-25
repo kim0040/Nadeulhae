@@ -1,28 +1,23 @@
 import {
-  LAB_AI_CHAT_PROVIDER_TIMEOUT_MS,
-  LAB_AI_CHAT_STREAMING_TIMEOUT_MS,
-  LAB_AI_CHAT_SUMMARY_MAX_TOKENS,
-  LAB_AI_CHAT_SUMMARY_PROVIDER_TIMEOUT_MS,
-  LAB_AI_CHAT_COMPLETION_MAX_TOKENS,
-  NANOGPT_MODELS_CACHE_TTL_MS,
-  estimateLabAiChatTokens,
-} from "@/lib/lab-ai-chat/constants"
-import type {
-  LabAiChatModelOption,
-  NanoGptCompletionResult,
-  NanoGptUsage,
-} from "@/lib/lab-ai-chat/types"
+  CHAT_COMPLETION_MAX_TOKENS,
+  CHAT_PROVIDER_TIMEOUT_MS,
+  CHAT_STREAMING_TIMEOUT_MS,
+  CHAT_SUMMARY_MAX_TOKENS,
+  CHAT_SUMMARY_PROVIDER_TIMEOUT_MS,
+  FACTCHAT_MODELS_CACHE_TTL_MS,
+  estimateTextTokens,
+} from "@/lib/chat/constants"
+import type { FactChatCompletionResult } from "@/lib/chat/types"
 import {
   recordGlobalLlmRequestOutcome,
   reserveGlobalLlmDailyRequest,
 } from "@/lib/llm/quota"
 
 declare global {
-  var __nadeulhaeNanoGptModelsCache:
+  var __nadeulhaeChatNanoGptModelsCache:
     | {
       fetchedAt: number
       ids: string[]
-      allowed: LabAiChatModelOption[]
     }
     | undefined
 }
@@ -34,7 +29,7 @@ interface NanoGptErrorPayload {
   }
 }
 
-interface NanoGptModelsPayload {
+interface NanoGptModelPayload {
   data?: Array<{ id?: string }>
 }
 
@@ -42,7 +37,6 @@ interface NanoGptCompletionPayload {
   id?: string
   model?: string
   choices?: Array<{
-    finish_reason?: unknown
     message?: {
       content?: unknown
     }
@@ -57,128 +51,16 @@ interface NanoGptCompletionPayload {
   }
 }
 
-type AllowedModelSpec = {
-  slug: string
-  label: string
-  description: string
-  warning?: string
-  candidates: string[]
-  thinkingCandidates?: string[]
-  thinkingWarning?: string
-}
+const DASHBOARD_CHAT_MODEL = "deepseek/deepseek-v4-flash"
+const DASHBOARD_CHAT_FALLBACK_MODEL = "deepseek/deepseek-v4-pro"
 
-const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
-  {
-    slug: "deepseek-v4-flash",
-    label: "DeepSeek V4 Flash",
-    description: "1M 컨텍스트를 지원하는 효율형 MoE 모델로, 빠른 대화·코딩·일상 작업에 좋아요.",
-    candidates: [
-      "deepseek/deepseek-v4-flash",
-    ],
-    thinkingCandidates: [
-      "deepseek/deepseek-v4-flash:thinking",
-    ],
-    thinkingWarning: "생각 모드는 일반 모드보다 응답 시작이 느릴 수 있어요.",
-  },
-  {
-    slug: "deepseek-v4-pro",
-    label: "DeepSeek V4 Pro",
-    description: "1.6T급 V4 상위 모델로, 긴 맥락 분석·추론·복잡한 코드 작업에 적합해요.",
-    candidates: [
-      "deepseek/deepseek-v4-pro",
-    ],
-    thinkingCandidates: [
-      "deepseek/deepseek-v4-pro:thinking",
-    ],
-    thinkingWarning: "생각 모드는 느리고 긴 답변에서 중간에 멈출 수 있어요.",
-  },
-  {
-    slug: "kimi-k2-6",
-    label: "Kimi K2.6",
-    description: "장기 코딩, 문서 기반 작업, 에이전트형 워크플로를 길게 이어가는 데 강해요.",
-    candidates: [
-      "moonshotai/kimi-k2.6",
-    ],
-    thinkingCandidates: [
-      "moonshotai/kimi-k2.6:thinking",
-    ],
-    thinkingWarning: "현재 생각 모드는 빈 응답이 나올 수 있어 사용에 주의가 필요해요.",
-  },
-  {
-    slug: "qwen-3-6",
-    label: "Qwen 3.6",
-    description: "35B/3B 활성 MoE 모델로, 빠른 일반 대화와 실무형 코딩 보조에 무난해요.",
-    candidates: [
-      "Qwen/Qwen3.6-35B-A3B",
-    ],
-    thinkingCandidates: [
-      "Qwen/Qwen3.6-35B-A3B:thinking",
-    ],
-    thinkingWarning: "생각 모드는 최종 답변보다 reasoning 텍스트가 노출될 수 있어요.",
-  },
-  {
-    slug: "glm-5-1",
-    label: "GLM 5.1",
-    description: "에이전트형 엔지니어링과 긴 코딩 작업에 초점을 둔 모델이에요.",
-    warning: "실측 기준 응답 완료가 느린 편이에요.",
-    candidates: [
-      "zai-org/glm-5.1",
-    ],
-    thinkingCandidates: [
-      "zai-org/glm-5.1:thinking",
-    ],
-    thinkingWarning: "현재 생각 모드는 타임아웃 가능성이 높아 사용에 주의가 필요해요.",
-  },
-  {
-    slug: "minimax-m2-7",
-    label: "MiniMax M2.7",
-    description: "긴 맥락 대화와 창작·요약을 부드럽게 이어가요.",
-    candidates: [
-      "minimax/minimax-m2.7",
-      "minimax/minimax-m2.7-turbo",
-    ],
-  },
-  {
-    slug: "gpt-oss-120b",
-    label: "GPT-OSS 120B",
-    description: "큰 오픈 모델로 깊이 있는 추론과 코딩 분석에 적합해요.",
-    candidates: [
-      "openai/gpt-oss-120b",
-      "TEE/gpt-oss-120b",
-    ],
-  },
-  {
-    slug: "gpt-oss-20b",
-    label: "GPT-OSS 20B",
-    description: "가벼운 오픈 모델로 빠른 답변과 일상 작업에 적합해요.",
-    candidates: [
-      "openai/gpt-oss-20b",
-      "TEE/gpt-oss-20b",
-    ],
-  },
-  {
-    slug: "gemma-4",
-    label: "Gemma 4",
-    description: "가벼운 범용 모델로 짧은 질의와 빠른 초안 작성에 좋아요.",
-    candidates: [
-      "google/gemma-4-31b-it",
-      "TEE/gemma4-31b",
-      "google/gemma-4-26b-a4b-it",
-    ],
-    thinkingCandidates: [
-      "google/gemma-4-31b-it:thinking",
-      "google/gemma-4-26b-a4b-it:thinking",
-    ],
-  },
-]
-
-export class NanoGptError extends Error {
+export class NanoGptChatError extends Error {
   statusCode: number
   code: string | null
 
   constructor(message: string, statusCode: number, code?: string | null) {
     super(message)
-    this.name = "NanoGptError"
+    this.name = "NanoGptChatError"
     this.statusCode = statusCode
     this.code = code ?? null
   }
@@ -226,10 +108,6 @@ function extractAssistantText(content: unknown) {
   return ""
 }
 
-function normalizeFinishReason(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
-}
-
 function getGlobalLlmDailyLimit() {
   const raw = Number(process.env.LLM_GLOBAL_DAILY_LIMIT ?? "5000")
   if (!Number.isFinite(raw)) {
@@ -259,7 +137,51 @@ async function fetchJson<T>(input: RequestInfo | URL, init: RequestInit, timeout
   }
 }
 
-function pickModelCandidate(preferred: string, available: string[]) {
+async function listNanoGptModels() {
+  const cache = globalThis.__nadeulhaeChatNanoGptModelsCache
+  if (cache && Date.now() - cache.fetchedAt < FACTCHAT_MODELS_CACHE_TTL_MS) {
+    return cache.ids
+  }
+
+  const { response, json } = await fetchJson<NanoGptModelPayload>(
+    buildNanoGptUrl("models"),
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${requireNanoGptEnv("NANOGPT_API_KEY")}`,
+      },
+      cache: "no-store",
+    },
+    CHAT_PROVIDER_TIMEOUT_MS
+  )
+
+  if (!response.ok) {
+    const payload = json as NanoGptErrorPayload
+    throw new NanoGptChatError(
+      payload.error?.message ?? "Failed to fetch NanoGPT models.",
+      response.status,
+      payload.error?.code ? String(payload.error.code) : null
+    )
+  }
+
+  const ids = (json.data ?? [])
+    .map((item) => item.id?.trim())
+    .filter((value): value is string => Boolean(value))
+
+  globalThis.__nadeulhaeChatNanoGptModelsCache = {
+    fetchedAt: Date.now(),
+    ids,
+  }
+
+  return ids
+}
+
+function pickModelCandidate(preferred: string | null, available: string[]) {
+  if (!preferred) {
+    return null
+  }
+
   const exact = available.find((modelId) => modelId === preferred)
   if (exact) {
     return exact
@@ -278,105 +200,19 @@ function pickModelCandidate(preferred: string, available: string[]) {
   )
 }
 
-async function listNanoGptModelIds() {
-  const cache = globalThis.__nadeulhaeNanoGptModelsCache
-  if (cache && Date.now() - cache.fetchedAt < NANOGPT_MODELS_CACHE_TTL_MS) {
-    return cache.ids
+async function resolveModelPair() {
+  const available = await listNanoGptModels()
+  if (available.length === 0) {
+    throw new Error("No NanoGPT models are available for the current API key.")
   }
 
-  const { response, json } = await fetchJson<NanoGptModelsPayload>(
-    buildNanoGptUrl("models"),
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${requireNanoGptEnv("NANOGPT_API_KEY")}`,
-      },
-      cache: "no-store",
-    },
-    LAB_AI_CHAT_PROVIDER_TIMEOUT_MS
-  )
+  const primary = pickModelCandidate(DASHBOARD_CHAT_MODEL, available) || available[0]
+  const secondary = pickModelCandidate(DASHBOARD_CHAT_FALLBACK_MODEL, available) || null
 
-  if (!response.ok) {
-    const payload = json as NanoGptErrorPayload
-    throw new NanoGptError(
-      payload.error?.message ?? "Failed to fetch NanoGPT models.",
-      response.status,
-      payload.error?.code ? String(payload.error.code) : null
-    )
+  return {
+    primary,
+    secondary: secondary && secondary !== primary ? secondary : null,
   }
-
-  const ids = (json.data ?? [])
-    .map((item) => item.id?.trim())
-    .filter((value): value is string => Boolean(value))
-
-  globalThis.__nadeulhaeNanoGptModelsCache = {
-    fetchedAt: Date.now(),
-    ids,
-    allowed: cache?.allowed ?? [],
-  }
-
-  return ids
-}
-
-export async function resolveAllowedNanoGptModels() {
-  const cache = globalThis.__nadeulhaeNanoGptModelsCache
-  if (cache && Date.now() - cache.fetchedAt < NANOGPT_MODELS_CACHE_TTL_MS && cache.allowed.length > 0) {
-    return cache.allowed
-  }
-
-  const available = await listNanoGptModelIds()
-  const allowed = ALLOWED_MODEL_SPECS.flatMap((spec) => {
-    const matched = spec.candidates
-      .map((candidate) => pickModelCandidate(candidate, available))
-      .find((value): value is string => Boolean(value))
-
-    if (!matched) {
-      return []
-    }
-
-    const thinkingMatched = spec.thinkingCandidates
-      ?.map((candidate) => pickModelCandidate(candidate, available))
-      ?.find((value): value is string => Boolean(value))
-
-    return [{
-      id: matched,
-      slug: spec.slug,
-      label: spec.label,
-      description: spec.description,
-      warning: spec.warning,
-      thinkingId: thinkingMatched,
-      thinkingWarning: spec.thinkingWarning,
-    } satisfies LabAiChatModelOption]
-  })
-
-  if (allowed.length === 0) {
-    throw new Error("No allowed NanoGPT models are available for the configured API key.")
-  }
-
-  globalThis.__nadeulhaeNanoGptModelsCache = {
-    fetchedAt: Date.now(),
-    ids: available,
-    allowed,
-  }
-
-  return allowed
-}
-
-export function resolveRequestedNanoGptModel(
-  allowedModels: LabAiChatModelOption[],
-  requestedModel: string | null | undefined
-) {
-  const normalizedRequested = typeof requestedModel === "string" ? requestedModel.trim() : ""
-  if (!normalizedRequested) {
-    return allowedModels[0]
-  }
-
-  return allowedModels.find((item) => 
-    item.id === normalizedRequested || 
-    item.slug === normalizedRequested || 
-    item.thinkingId === normalizedRequested
-  ) ?? allowedModels[0]
 }
 
 async function requestCompletion(input: {
@@ -390,7 +226,7 @@ async function requestCompletion(input: {
     limit: getGlobalLlmDailyLimit(),
   })
   if (!reservation.allowed) {
-    throw new NanoGptError(
+    throw new NanoGptChatError(
       "Global daily LLM request limit reached.",
       429,
       "global_daily_limit_reached"
@@ -412,7 +248,6 @@ async function requestCompletion(input: {
           messages: input.messages,
           temperature: input.temperature,
           max_tokens: input.maxTokens,
-          stream: false,
         }),
         cache: "no-store",
       },
@@ -421,7 +256,7 @@ async function requestCompletion(input: {
 
     if (!response.ok) {
       const payload = json as NanoGptErrorPayload
-      throw new NanoGptError(
+      throw new NanoGptChatError(
         payload.error?.message ?? "NanoGPT request failed.",
         response.status,
         payload.error?.code ? String(payload.error.code) : null
@@ -429,10 +264,9 @@ async function requestCompletion(input: {
     }
 
     const payload = json as NanoGptCompletionPayload
-    const firstChoice = payload.choices?.[0]
-    const content = extractAssistantText(firstChoice?.message?.content)
+    const content = extractAssistantText(payload.choices?.[0]?.message?.content)
     if (!content) {
-      throw new NanoGptError("NanoGPT returned an empty response.", 502, "empty_content")
+      throw new NanoGptChatError("NanoGPT returned an empty response.", 502, "empty_content")
     }
 
     await recordGlobalLlmRequestOutcome({
@@ -446,13 +280,12 @@ async function requestCompletion(input: {
       providerRequestId: payload.id ?? null,
       resolvedModel: payload.model ?? input.model,
       content,
-      finishReason: normalizeFinishReason(firstChoice?.finish_reason),
       usage: {
         promptTokens: Math.max(0, payload.usage?.prompt_tokens ?? 0),
         completionTokens: Math.max(0, payload.usage?.completion_tokens ?? 0),
         totalTokens: Math.max(0, payload.usage?.total_tokens ?? 0),
         cachedPromptTokens: Math.max(0, payload.usage?.prompt_tokens_details?.cached_tokens ?? 0),
-      } satisfies NanoGptUsage,
+      },
     }
   } catch (error) {
     await recordGlobalLlmRequestOutcome({
@@ -466,41 +299,62 @@ async function requestCompletion(input: {
 }
 
 function shouldFallback(error: unknown) {
-  if (!(error instanceof NanoGptError)) {
+  if (!(error instanceof NanoGptChatError)) {
     return true
   }
 
   return ![401, 402].includes(error.statusCode)
 }
 
-export async function createNanoGptCompletion(input: {
-  model: string
+export async function createNanoGptChatCompletion(input: {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
   requestKind: "chat" | "summary"
-}): Promise<NanoGptCompletionResult> {
+}): Promise<FactChatCompletionResult> {
+  const models = await resolveModelPair()
   const timeoutMs = input.requestKind === "summary"
-    ? LAB_AI_CHAT_SUMMARY_PROVIDER_TIMEOUT_MS
-    : LAB_AI_CHAT_PROVIDER_TIMEOUT_MS
+    ? CHAT_SUMMARY_PROVIDER_TIMEOUT_MS
+    : CHAT_PROVIDER_TIMEOUT_MS
   const maxTokens = input.requestKind === "summary"
-    ? LAB_AI_CHAT_SUMMARY_MAX_TOKENS
-    : LAB_AI_CHAT_COMPLETION_MAX_TOKENS
+    ? CHAT_SUMMARY_MAX_TOKENS
+    : CHAT_COMPLETION_MAX_TOKENS
   const temperature = input.requestKind === "summary" ? 0.2 : 0.55
 
-  const primaryResult = await requestCompletion({
-    model: input.model,
-    messages: input.messages,
-    temperature,
-    maxTokens,
-    timeoutMs,
-  })
+  try {
+    const primaryResult = await requestCompletion({
+      model: models.primary,
+      messages: input.messages,
+      temperature,
+      maxTokens,
+      timeoutMs,
+    })
 
-  return {
-    providerRequestId: primaryResult.providerRequestId,
-    requestedModel: input.model,
-    resolvedModel: primaryResult.resolvedModel,
-    content: primaryResult.content,
-    finishReason: primaryResult.finishReason,
-    usage: primaryResult.usage,
+    return {
+      providerRequestId: primaryResult.providerRequestId,
+      requestedModel: models.primary,
+      resolvedModel: primaryResult.resolvedModel,
+      content: primaryResult.content,
+      usage: primaryResult.usage,
+    }
+  } catch (error) {
+    if (!models.secondary || !shouldFallback(error)) {
+      throw error
+    }
+
+    const fallbackResult = await requestCompletion({
+      model: models.secondary,
+      messages: input.messages,
+      temperature,
+      maxTokens,
+      timeoutMs,
+    })
+
+    return {
+      providerRequestId: fallbackResult.providerRequestId,
+      requestedModel: models.secondary,
+      resolvedModel: fallbackResult.resolvedModel,
+      content: fallbackResult.content,
+      usage: fallbackResult.usage,
+    }
   }
 }
 
@@ -511,12 +365,12 @@ async function requestCompletionStream(input: {
   maxTokens: number
   timeoutMs: number
   onToken: (token: string) => void
-}) {
+}): Promise<FactChatCompletionResult> {
   const reservation = await reserveGlobalLlmDailyRequest({
     limit: getGlobalLlmDailyLimit(),
   })
   if (!reservation.allowed) {
-    throw new NanoGptError(
+    throw new NanoGptChatError(
       "Global daily LLM request limit reached.",
       429,
       "global_daily_limit_reached"
@@ -550,7 +404,7 @@ async function requestCompletionStream(input: {
       try {
         errorPayload = await response.json()
       } catch {}
-      throw new NanoGptError(
+      throw new NanoGptChatError(
         errorPayload.error?.message ?? "NanoGPT request failed.",
         response.status,
         errorPayload.error?.code ? String(errorPayload.error.code) : null
@@ -559,15 +413,14 @@ async function requestCompletionStream(input: {
 
     const reader = response.body?.getReader()
     if (!reader) {
-      throw new NanoGptError("No response body for streaming.", 502, "no_body")
+      throw new NanoGptChatError("No response body for streaming.", 502, "no_body")
     }
 
     const decoder = new TextDecoder()
     let accumulated = ""
     let buffer = ""
     let providerRequestId: string | null = null
-    let resolvedModel: string | null = input.model
-    let finishReason: string | null = null
+    let resolvedModel = input.model
 
     while (true) {
       const { done, value } = await reader.read()
@@ -596,7 +449,6 @@ async function requestCompletionStream(input: {
               id?: string
               model?: string
               choices?: Array<{
-                finish_reason?: unknown
                 delta?: {
                   content?: string
                 }
@@ -604,7 +456,6 @@ async function requestCompletionStream(input: {
             }
             providerRequestId = parsed.id ?? providerRequestId
             resolvedModel = parsed.model ?? resolvedModel
-            finishReason = normalizeFinishReason(parsed.choices?.[0]?.finish_reason) ?? finishReason
 
             const token = typeof parsed.choices?.[0]?.delta?.content === "string"
               ? parsed.choices[0].delta.content
@@ -631,21 +482,20 @@ async function requestCompletionStream(input: {
     })
 
     if (!accumulated.trim()) {
-      throw new NanoGptError("NanoGPT returned an empty streaming response.", 502, "empty_content")
+      throw new NanoGptChatError("NanoGPT returned an empty streaming response.", 502, "empty_content")
     }
 
     return {
       providerRequestId,
       requestedModel: input.model,
-      resolvedModel: resolvedModel ?? input.model,
+      resolvedModel,
       content: accumulated,
-      finishReason,
       usage: {
         promptTokens: 0,
-        completionTokens: Math.max(1, estimateLabAiChatTokens(accumulated)),
-        totalTokens: Math.max(1, estimateLabAiChatTokens(accumulated)),
+        completionTokens: Math.max(1, estimateTextTokens(accumulated)),
+        totalTokens: Math.max(1, estimateTextTokens(accumulated)),
         cachedPromptTokens: 0,
-      } satisfies NanoGptUsage,
+      },
     }
   } catch (error) {
     await recordGlobalLlmRequestOutcome({
@@ -660,33 +510,59 @@ async function requestCompletionStream(input: {
   }
 }
 
-export async function createNanoGptCompletionStream(input: {
-  model: string
-  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
-  requestKind: "chat" | "summary"
-  onToken: (token: string) => void
-}): Promise<NanoGptCompletionResult> {
+export async function createNanoGptChatCompletionStream(
+  input: {
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
+    requestKind: "chat" | "summary"
+    onToken: (token: string) => void
+  }
+): Promise<FactChatCompletionResult> {
+  const models = await resolveModelPair()
   const timeoutMs = input.requestKind === "summary"
-    ? LAB_AI_CHAT_SUMMARY_PROVIDER_TIMEOUT_MS
-    : LAB_AI_CHAT_STREAMING_TIMEOUT_MS
+    ? CHAT_SUMMARY_PROVIDER_TIMEOUT_MS
+    : CHAT_STREAMING_TIMEOUT_MS
   const maxTokens = input.requestKind === "summary"
-    ? LAB_AI_CHAT_SUMMARY_MAX_TOKENS
-    : LAB_AI_CHAT_COMPLETION_MAX_TOKENS
+    ? CHAT_SUMMARY_MAX_TOKENS
+    : CHAT_COMPLETION_MAX_TOKENS
   const temperature = input.requestKind === "summary" ? 0.2 : 0.55
 
   try {
-    return await requestCompletionStream({
-      model: input.model,
+    const primaryResult = await requestCompletionStream({
+      model: models.primary,
       messages: input.messages,
       temperature,
       maxTokens,
       timeoutMs,
       onToken: input.onToken,
     })
+
+    return {
+      providerRequestId: primaryResult.providerRequestId,
+      requestedModel: models.primary,
+      resolvedModel: primaryResult.resolvedModel,
+      content: primaryResult.content,
+      usage: primaryResult.usage,
+    }
   } catch (error) {
-    if (!shouldFallback(error)) {
+    if (!models.secondary || !shouldFallback(error)) {
       throw error
     }
-    throw error
+
+    const fallbackResult = await requestCompletionStream({
+      model: models.secondary,
+      messages: input.messages,
+      temperature,
+      maxTokens,
+      timeoutMs,
+      onToken: input.onToken,
+    })
+
+    return {
+      providerRequestId: fallbackResult.providerRequestId,
+      requestedModel: models.secondary,
+      resolvedModel: fallbackResult.resolvedModel,
+      content: fallbackResult.content,
+      usage: fallbackResult.usage,
+    }
   }
 }
