@@ -11,7 +11,11 @@ import {
   CHAT_CONTEXT_MESSAGE_LIMIT,
   CHAT_INPUT_MAX_CHARACTERS,
 } from "@/lib/chat/constants"
-import { FactChatError, createFactChatCompletion, createFactChatCompletionStream } from "@/lib/chat/factchat"
+import {
+  NanoGptChatError,
+  createNanoGptChatCompletion,
+  createNanoGptChatCompletionStream,
+} from "@/lib/chat/nanogpt"
 import {
   buildChatSystemPrompt,
   buildProfileMemoryPrompt,
@@ -329,7 +333,7 @@ async function compactUserMemory(input: {
   const summaryStartedAt = Date.now()
 
   try {
-    const summaryResult = await createFactChatCompletion({
+    const summaryResult = await createNanoGptChatCompletion({
       requestKind: "summary",
       messages: [
         {
@@ -364,7 +368,7 @@ async function compactUserMemory(input: {
     })
   } catch (error) {
     console.error("Chat memory compaction failed:", error)
-    const providerError = error instanceof FactChatError ? error : null
+    const providerError = error instanceof NanoGptChatError ? error : null
     await logChatRequestEvent({
       userId: input.userId,
       sessionId: input.sessionId,
@@ -392,7 +396,7 @@ async function refreshUserProfileMemory(input: {
   const refreshStartedAt = Date.now()
 
   try {
-    const result = await createFactChatCompletion({
+    const result = await createNanoGptChatCompletion({
       requestKind: "summary",
       messages: [
         {
@@ -427,7 +431,7 @@ async function refreshUserProfileMemory(input: {
     })
   } catch (error) {
     console.error("Profile memory refresh failed:", error)
-    const providerError = error instanceof FactChatError ? error : null
+    const providerError = error instanceof NanoGptChatError ? error : null
     await logChatRequestEvent({
       userId: input.userId,
       requestKind: "summary",
@@ -643,7 +647,7 @@ async function handlePOST(request: NextRequest) {
           const checkAlive = () => !clientDisconnected && !abortController.signal.aborted
 
           try {
-            const completionResult = await createFactChatCompletionStream({
+            const completionResult = await createNanoGptChatCompletionStream({
               requestKind: "chat",
               messages: chatMessages,
               onToken: (token) => {
@@ -695,7 +699,7 @@ async function handlePOST(request: NextRequest) {
 
             controller.close()
           } catch (streamError) {
-            const providerError = streamError instanceof FactChatError ? streamError : null
+            const providerError = streamError instanceof NanoGptChatError ? streamError : null
             const isGlobalLlmLimitError = providerError?.statusCode === 429
               && providerError.code === "global_daily_limit_reached"
             const errorMessage = isGlobalLlmLimitError
@@ -737,7 +741,7 @@ async function handlePOST(request: NextRequest) {
       })
     }
 
-    const completionResult = await createFactChatCompletion({
+    const completionResult = await createNanoGptChatCompletion({
       requestKind: "chat",
       messages: chatMessages,
     })
@@ -773,7 +777,7 @@ async function handlePOST(request: NextRequest) {
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request).catch(() => null)
-    const providerError = error instanceof FactChatError ? error : null
+    const providerError = error instanceof NanoGptChatError ? error : null
     const runtimeError = error instanceof Error ? error : null
     const runtimeErrorCode = runtimeError?.name
       ? `chat_runtime_${runtimeError.name}`.slice(0, 64)

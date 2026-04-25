@@ -2,6 +2,7 @@
 
 import { Children, isValidElement, type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   Bot,
@@ -776,6 +777,11 @@ export function LabAiChatPanel() {
   const isThinkingMode = Boolean(resolvedModelId && resolvedModelId === activeModel?.thinkingId)
   const activeModelLabel = activeModel ? `${activeModel.label}${isThinkingMode ? ` · ${copy.thinking}` : ""}` : copy.modelLabel
   const activeModelDescription = activeModel?.description ?? copy.modelMenuHint
+  const activeModelWarning = activeModel
+    ? isThinkingMode
+      ? activeModel.thinkingWarning
+      : activeModel.warning
+    : null
 
   const remainingRequests = usage?.remainingRequests ?? policy?.dailyLimit ?? 0
   const isLimitReached = !isLoading && remainingRequests <= 0
@@ -1292,11 +1298,18 @@ export function LabAiChatPanel() {
                   <div className="border-b border-border px-3 py-2">
                     <p className="text-sm font-semibold text-foreground">{copy.modelLabel}</p>
                     <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{activeModelDescription}</p>
+                    {activeModelWarning ? (
+                      <p className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="size-3 shrink-0" />
+                        <span>{activeModelWarning}</span>
+                      </p>
+                    ) : null}
                   </div>
                   <div className="max-h-[22rem] overflow-y-auto p-1.5 custom-scrollbar">
                     {models.map((model) => {
                       const nextModelId = isThinkingMode && model.thinkingId ? model.thinkingId : model.id
                       const isSelected = resolvedModelId === model.id || resolvedModelId === model.thinkingId
+                      const modelWarning = isThinkingMode && model.thinkingId ? model.thinkingWarning : model.warning
                       return (
                         <button
                           key={model.id}
@@ -1313,6 +1326,12 @@ export function LabAiChatPanel() {
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-semibold">{model.label}</span>
                             <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{model.description}</span>
+                            {modelWarning ? (
+                              <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium leading-4 text-amber-700 dark:text-amber-300">
+                                <AlertTriangle className="size-3 shrink-0" />
+                                <span>{modelWarning}</span>
+                              </span>
+                            ) : null}
                           </span>
                           {isSelected ? <Check className="mt-0.5 size-4 shrink-0 text-accent" /> : null}
                         </button>

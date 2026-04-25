@@ -56,7 +56,9 @@ export interface LabAiChatModelOption {
   slug: string
   label: string
   description: string
+  warning?: string
   thinkingId?: string
+  thinkingWarning?: string
 }
 
 export interface LabAiChatStateCore {
