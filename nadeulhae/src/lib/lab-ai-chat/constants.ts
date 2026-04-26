@@ -23,6 +23,14 @@ function parsePositiveIntEnv(raw: string | undefined, fallback: number) {
   return Math.max(1, Math.floor(parsed))
 }
 
+function parseFractionEnv(raw: string | undefined, fallback: number) {
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed)) {
+    return fallback
+  }
+  return Math.min(1, Math.max(0, parsed))
+}
+
 export const LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT = parsePositiveIntEnv(
   process.env.LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT,
   5
@@ -31,6 +39,11 @@ export const LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT = parsePositiveIntEnv(
 export const LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT = parsePositiveIntEnv(
   process.env.LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT,
   800
+)
+
+export const LAB_AI_CHAT_WEB_SEARCH_RESULT_SCORE_THRESHOLD = parseFractionEnv(
+  process.env.LAB_AI_CHAT_WEB_SEARCH_RESULT_SCORE_THRESHOLD,
+  0.3
 )
 
 export function estimateLabAiChatTokens(text: string) {
