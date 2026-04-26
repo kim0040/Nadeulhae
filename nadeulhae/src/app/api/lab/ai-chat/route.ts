@@ -340,18 +340,82 @@ async function buildStateResponse(input: {
   }
 }
 
+type LabAiChatStatusKind =
+  | "memory_check"
+  | "memory_compacting"
+  | "memory_compacted"
+  | "memory_skip"
+  | "memory_failed"
+  | "context_loading"
+  | "response_generating"
+  | "response_saving"
+  | "state_syncing"
+
+function getLabAiChatStatusMessage(locale: LabAiChatLocale, kind: LabAiChatStatusKind) {
+  if (locale === "ko") {
+    switch (kind) {
+      case "memory_check":
+        return "세션 메모리 상태를 점검하는 중..."
+      case "memory_compacting":
+        return "세션 메모리를 요약 정리하는 중..."
+      case "memory_compacted":
+        return "세션 메모리 요약이 완료되었어요."
+      case "memory_skip":
+        return "세션 메모리 점검 완료."
+      case "memory_failed":
+        return "세션 메모리 요약에 실패해 기존 메모리로 진행합니다."
+      case "context_loading":
+        return "대화 맥락을 불러오는 중..."
+      case "response_generating":
+        return "답변을 생성하는 중..."
+      case "response_saving":
+        return "답변을 저장하는 중..."
+      case "state_syncing":
+        return "최종 상태를 반영하는 중..."
+      default:
+        return ""
+    }
+  }
+
+  switch (kind) {
+    case "memory_check":
+      return "Checking session memory status..."
+    case "memory_compacting":
+      return "Compacting session memory..."
+    case "memory_compacted":
+      return "Session memory compaction completed."
+    case "memory_skip":
+      return "Session memory check completed."
+    case "memory_failed":
+      return "Memory compaction failed; continuing with current memory."
+    case "context_loading":
+      return "Loading conversation context..."
+    case "response_generating":
+      return "Generating the response..."
+    case "response_saving":
+      return "Saving the response..."
+    case "state_syncing":
+      return "Syncing final state..."
+    default:
+      return ""
+  }
+}
+
 async function compactLabAiChatMemory(input: {
   userId: string
   sessionId: number
   locale: LabAiChatLocale
   memorySummary: string | null
   modelId: string
+  onStatus?: (message: string) => void
 }) {
   const candidate = await getLabAiChatCompactionCandidate(input.userId, input.sessionId)
   if (!candidate || candidate.messages.length === 0) {
+    input.onStatus?.(getLabAiChatStatusMessage(input.locale, "memory_skip"))
     return
   }
 
+  input.onStatus?.(getLabAiChatStatusMessage(input.locale, "memory_compacting"))
   const summaryStartedAt = Date.now()
 
   try {
@@ -389,9 +453,11 @@ async function compactLabAiChatMemory(input: {
       usage: summaryResult.usage,
       latencyMs: Date.now() - summaryStartedAt,
     })
+    input.onStatus?.(getLabAiChatStatusMessage(input.locale, "memory_compacted"))
   } catch (error) {
     console.error("Lab AI chat memory compaction failed:", error)
     const providerError = error instanceof NanoGptError ? error : null
+    input.onStatus?.(getLabAiChatStatusMessage(input.locale, "memory_failed"))
     await logLabAiChatRequestEvent({
       userId: input.userId,
       sessionId: input.sessionId,
@@ -406,6 +472,44 @@ async function compactLabAiChatMemory(input: {
       errorMessage: providerError?.message ?? "Summary compaction failed.",
     })
   }
+}
+
+async function prepareLabAiChatContext(input: {
+  userId: string
+  sessionId: number
+  locale: LabAiChatLocale
+  modelId: string
+  onStatus?: (message: string) => void
+}) {
+  input.onStatus?.(getLabAiChatStatusMessage(input.locale, "memory_check"))
+  const sessionMemory = await getLabAiChatSessionMemorySnapshot({
+    userId: input.userId,
+    sessionId: input.sessionId,
+  })
+
+  await compactLabAiChatMemory({
+    userId: input.userId,
+    sessionId: input.sessionId,
+    locale: input.locale,
+    memorySummary: sessionMemory?.summary ?? null,
+    modelId: input.modelId,
+    onStatus: input.onStatus,
+  })
+
+  input.onStatus?.(getLabAiChatStatusMessage(input.locale, "context_loading"))
+  const [latestSessionMemory, contextMessages] = await Promise.all([
+    getLabAiChatSessionMemorySnapshot({
+      userId: input.userId,
+      sessionId: input.sessionId,
+    }),
+    getRecentLabAiChatContextMessages(
+      input.userId,
+      input.sessionId,
+      LAB_AI_CHAT_CONTEXT_MESSAGE_LIMIT
+    ),
+  ])
+
+  return { latestSessionMemory, contextMessages }
 }
 
 async function handleGET(request: NextRequest) {
@@ -588,32 +692,6 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
-    const sessionMemory = await getLabAiChatSessionMemorySnapshot({
-      userId: authenticatedSession.user.id,
-      sessionId: resolvedSession.activeSessionId,
-    })
-
-    await compactLabAiChatMemory({
-      userId: authenticatedSession.user.id,
-      sessionId: resolvedSession.activeSessionId,
-      locale,
-      memorySummary: sessionMemory?.summary ?? null,
-      modelId: selectedModelId,
-    })
-
-    const [latestSessionMemory, contextMessages] = await Promise.all([
-      getLabAiChatSessionMemorySnapshot({
-        userId: authenticatedSession.user.id,
-        sessionId: resolvedSession.activeSessionId,
-      }),
-      getRecentLabAiChatContextMessages(
-        authenticatedSession.user.id,
-        resolvedSession.activeSessionId,
-        LAB_AI_CHAT_CONTEXT_MESSAGE_LIMIT
-      ),
-    ])
-    contextMessageCount = contextMessages.length
-
     const acceptSSE = request.headers.get("accept")?.includes("text/event-stream")
 
     if (acceptSSE) {
@@ -644,6 +722,17 @@ async function handlePOST(request: NextRequest) {
           const checkAlive = () => !clientDisconnected && !abortController.signal.aborted
 
           try {
+            const { latestSessionMemory, contextMessages } = await prepareLabAiChatContext({
+              userId: authenticatedSession.user.id,
+              sessionId: resolvedSession.activeSessionId,
+              locale,
+              modelId: selectedModelId!,
+              onStatus: (statusMessage) => {
+                sendEvent("status", { message: statusMessage })
+              },
+            })
+            contextMessageCount = contextMessages.length
+
             const webSearchResolution = await resolveLabAiChatWebSearchContext({
               userId: authenticatedSession.user.id,
               sessionId: resolvedSession.activeSessionId,
@@ -667,6 +756,7 @@ async function handlePOST(request: NextRequest) {
               message
             )
 
+            sendEvent("status", { message: getLabAiChatStatusMessage(locale, "response_generating") })
             const completionResult = await createNanoGptCompletionStream({
               model: selectedModelId!,
               requestKind: "chat",
@@ -702,6 +792,7 @@ async function handlePOST(request: NextRequest) {
               completionResult.finishReason
             )
 
+            sendEvent("status", { message: getLabAiChatStatusMessage(locale, "response_saving") })
             await persistLabAiChatExchange({
               userId: authenticatedSession.user.id,
               sessionId: resolvedSession.activeSessionId,
@@ -720,6 +811,7 @@ async function handlePOST(request: NextRequest) {
               return
             }
 
+            sendEvent("status", { message: getLabAiChatStatusMessage(locale, "state_syncing") })
             const state = await buildStateResponse({
               userId: authenticatedSession.user.id,
               locale,
@@ -773,6 +865,14 @@ async function handlePOST(request: NextRequest) {
         },
       })
     }
+
+    const { latestSessionMemory, contextMessages } = await prepareLabAiChatContext({
+      userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
+      locale,
+      modelId: selectedModelId!,
+    })
+    contextMessageCount = contextMessages.length
 
     const webSearchResolution = await resolveLabAiChatWebSearchContext({
       userId: authenticatedSession.user.id,
