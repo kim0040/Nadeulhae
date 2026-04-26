@@ -1321,12 +1321,7 @@ export function LabAiChatPanel() {
             </button>
           </div>
 
-          <div
-            className={cn(
-              "grid min-w-0 items-center gap-1.5 sm:flex sm:w-auto sm:gap-2",
-              activeModel?.thinkingId ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"
-            )}
-          >
+          <div className="flex min-w-0 items-center gap-1.5 sm:w-auto sm:gap-2">
             <div className="relative z-30 min-w-0" ref={modelMenuRef}>
               <button
                 type="button"
@@ -1395,7 +1390,7 @@ export function LabAiChatPanel() {
                 type="button"
                 onClick={handleThinkingToggle}
                 className={cn(
-                  "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition duration-200 active:scale-[0.98]",
+                  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition duration-200 active:scale-[0.98] sm:h-9 sm:w-auto sm:gap-1.5 sm:px-2.5",
                   isThinkingMode
                     ? "border-accent/35 bg-accent/10 text-accent dark:bg-accent/15"
                     : "border-border bg-card/75 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -1411,7 +1406,7 @@ export function LabAiChatPanel() {
               onClick={handleWebSearchToggle}
               disabled={!resolvedActiveSessionId || isPending}
               className={cn(
-                "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+                "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-auto sm:gap-1.5 sm:px-2.5",
                 isWebSearchEnabled
                   ? "border-accent/35 bg-accent/10 text-accent dark:bg-accent/15"
                   : "border-border bg-card/75 text-muted-foreground hover:bg-muted hover:text-foreground"
