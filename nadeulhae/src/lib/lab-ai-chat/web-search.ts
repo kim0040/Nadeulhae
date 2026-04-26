@@ -155,17 +155,54 @@ function safeDomainList(value: unknown, max: number) {
     .slice(0, max)
 }
 
-function buildFallbackPlan(question: string): SearchPlan {
+function isExplicitSearchRequest(question: string) {
+  return /(검색|찾아|찾아줘|알려줘|알려 줘|search|look ?up|find|현재|최신|속보|실시간|뉴스)/i.test(question)
+}
+
+function isGreeting(question: string) {
+  const normalized = question.trim()
+  if (normalized.length > 30) return false
+  return /^(안녕|안녕하세요|반가워|하이|ㅎㅇ|hi|hello|hey|thanks|감사|고마워|ㄱㅅ)[\s!.?~]*$/i.test(normalized)
+}
+
+function buildConversationHint(
+  recentMessages: Array<{ role: string; content: string }> | undefined
+) {
+  if (!recentMessages || recentMessages.length === 0) return null
+  return recentMessages
+    .slice(-6)
+    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.replace(/\s+/g, " ").trim().slice(0, 150)}`)
+    .join("\n")
+}
+
+function buildFallbackPlan(question: string, conversationHint?: string | null): SearchPlan {
   const asksLatest = /(latest|today|current|now|news|breaking|최신|오늘|현재|실시간|속보)/i.test(question)
   const asksFinance = /(stock|shares|market|price|forex|crypto|주가|증시|환율|코인|금리)/i.test(question)
   const asksHistory = /(history|historical|century|조선|고대|역사|과거)/i.test(question)
-  const needSearch = question.trim().length > 2
+  const needSearch = !isGreeting(question)
+
+  // For vague follow-ups, try to extract a better query from conversation context
+  let query = question.trim().slice(0, 200)
+  if (conversationHint && query.length < 15 && isExplicitSearchRequest(question)) {
+    // Extract last substantive user message as query basis
+    const contextLines = conversationHint.split("\n")
+    for (let i = contextLines.length - 1; i >= 0; i--) {
+      const line = contextLines[i]
+      if (line.startsWith("User: ") && line.length > 20) {
+        const extracted = line.slice(6).trim().slice(0, 200)
+        if (!isExplicitSearchRequest(extracted) || extracted.length > 20) {
+          query = extracted
+          break
+        }
+      }
+    }
+  }
 
   return {
     needSearch,
     useCacheFirst: true,
     cacheUsable: true,
-    query: question.trim().slice(0, 200),
+    query,
     fallbackQuery: null,
     topic: asksFinance ? "finance" : asksLatest ? "news" : "general",
     timeRange: asksHistory ? undefined : asksLatest ? "week" : undefined,
@@ -184,7 +221,26 @@ async function buildSearchPlan(input: {
   cacheQuery: string | null
   cacheUpdatedAt: string | null
   cachePreview: string | null
+  conversationHint: string | null
 }) {
+  // Fast-path: greetings never need search
+  if (isGreeting(input.question)) {
+    return {
+      needSearch: false,
+      useCacheFirst: true,
+      cacheUsable: true,
+      query: input.question.trim().slice(0, 200),
+      fallbackQuery: null,
+      topic: "general" as TavilyTopic,
+      timeRange: undefined as TavilySearchRequest["timeRange"],
+      startDate: null,
+      endDate: null,
+      country: null,
+      includeDomains: [] as string[],
+      excludeDomains: [] as string[],
+    } satisfies SearchPlan
+  }
+
   const localeName = input.locale === "ko" ? "Korean" : "English"
   const plannerPrompt = [
     "You are a web search planner for a chat assistant.",
@@ -211,10 +267,12 @@ async function buildSearchPlan(input: {
     "- Keep search_depth basic and max_results=5 in downstream caller.",
     "- Use news topic for current events. Use finance topic for markets/finance.",
     "- For timeless or historical questions, prefer no time filters.",
-    "- Use cache when the user likely asks a follow-up to cached topic.",
+    "- Use cache ONLY when the cache topic clearly matches the user's current question.",
     `- Language for search query should match user language (${localeName}) when useful.`,
     "- CRITICAL: Set need_search to true for ANY question asking for facts, specific entities, events, coding help, or general knowledge. Even if you think you know the answer, set it to true to get up-to-date sources.",
     "- Set need_search to false ONLY for casual greetings (e.g., hi, thanks) or purely creative/subjective writing that requires no facts.",
+    "- IMPORTANT: If the user asks you to 'search', 'find', 'look up', '검색', '찾아', '알려줘', etc., ALWAYS set need_search to true.",
+    "- IMPORTANT: If the user question is a vague follow-up (e.g., '다시 검색해줘', 'search again'), use the Conversation context and Cached query to determine the actual search topic and generate a proper query.",
   ].join("\n")
 
   const plannerInput = [
@@ -222,6 +280,9 @@ async function buildSearchPlan(input: {
     `Cached query: ${input.cacheQuery ?? "none"}`,
     `Cached at: ${input.cacheUpdatedAt ?? "none"}`,
     `Cached preview: ${input.cachePreview ?? "none"}`,
+    input.conversationHint
+      ? `Conversation context (recent messages):\n${input.conversationHint}`
+      : "Conversation context: none",
   ].join("\n")
 
   try {
@@ -237,12 +298,19 @@ async function buildSearchPlan(input: {
     const raw = completion.content.trim()
     const jsonText = extractJsonObject(raw)
     if (!jsonText) {
-      return buildFallbackPlan(input.question)
+      return buildFallbackPlan(input.question, input.conversationHint)
     }
     const parsed = JSON.parse(jsonText) as Record<string, unknown>
 
+    let needSearch = safeBool(parsed.need_search, false)
+
+    // Override: if planner says no but the user explicitly asked for search, force it
+    if (!needSearch && isExplicitSearchRequest(input.question)) {
+      needSearch = true
+    }
+
     return {
-      needSearch: safeBool(parsed.need_search, false),
+      needSearch,
       useCacheFirst: safeBool(parsed.use_cache_first, true),
       cacheUsable: safeBool(parsed.cache_usable, true),
       query: safeQuery(parsed.query, input.question.trim().slice(0, 200)),
@@ -256,7 +324,7 @@ async function buildSearchPlan(input: {
       excludeDomains: safeDomainList(parsed.exclude_domains, 20),
     } satisfies SearchPlan
   } catch {
-    return buildFallbackPlan(input.question)
+    return buildFallbackPlan(input.question, input.conversationHint)
   }
 }
 
@@ -348,11 +416,14 @@ export async function resolveLabAiChatWebSearchContext(input: {
   modelId: string
   question: string
   webSearchEnabled: boolean
+  recentMessages?: Array<{ role: string; content: string }>
   onStatus?: WebSearchStatusFn
 }): Promise<LabAiChatWebSearchResolution> {
   if (!input.webSearchEnabled) {
     return { context: null, source: "none" }
   }
+
+  const conversationHint = buildConversationHint(input.recentMessages)
 
   input.onStatus?.(toLocaleStatus(input.locale, "check_cache"))
   const cached = await getLabAiChatWebSearchCache({
@@ -368,6 +439,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
     cacheQuery: cached?.query ?? null,
     cacheUpdatedAt: cached?.updatedAt ?? null,
     cachePreview: cached?.result?.slice(0, 1200) ?? null,
+    conversationHint,
   })
 
   if (cached?.result && cached.query && plan.useCacheFirst && plan.cacheUsable) {
