@@ -80,7 +80,7 @@ function getTavilyBaseUrl() {
 
 function normalizeMaxResults(value?: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) return 5
-  return Math.min(20, Math.max(0, Math.floor(value)))
+  return Math.min(20, Math.max(1, Math.floor(value)))
 }
 
 function normalizeChunksPerSource(value?: number) {

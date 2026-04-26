@@ -554,15 +554,17 @@ export async function resolveLabAiChatWebSearchContext(input: {
 
     try {
       input.onStatus?.(toLocaleStatus(input.locale, "searching"))
+      // Tavily 권장사항: 상대 기간(time_range)과 절대 기간(start/end)은 동시 사용하지 않는다.
+      const hasAbsoluteRange = Boolean(plan.startDate || plan.endDate)
       const response = await createTavilySearch({
         query,
         topic: plan.topic,
         searchDepth: "basic",
         maxResults: 5,
         includeAnswer: "basic",
-        timeRange: plan.timeRange,
-        startDate: plan.startDate ?? undefined,
-        endDate: plan.endDate ?? undefined,
+        timeRange: hasAbsoluteRange ? undefined : plan.timeRange,
+        startDate: hasAbsoluteRange ? (plan.startDate ?? undefined) : undefined,
+        endDate: hasAbsoluteRange ? (plan.endDate ?? undefined) : undefined,
         includeDomains: plan.includeDomains.length > 0 ? plan.includeDomains : undefined,
         excludeDomains: plan.excludeDomains.length > 0 ? plan.excludeDomains : undefined,
         country: plan.country ?? undefined,

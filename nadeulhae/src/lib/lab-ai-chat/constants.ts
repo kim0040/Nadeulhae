@@ -51,7 +51,7 @@ export const LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT = parsePositiveIntEnv(
 
 export const LAB_AI_CHAT_WEB_SEARCH_RESULT_SCORE_THRESHOLD = parseFractionEnv(
   process.env.LAB_AI_CHAT_WEB_SEARCH_RESULT_SCORE_THRESHOLD,
-  0.3
+  0.5
 )
 
 export function estimateLabAiChatTokens(text: string) {
