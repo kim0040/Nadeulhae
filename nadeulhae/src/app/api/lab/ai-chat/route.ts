@@ -747,6 +747,7 @@ async function handlePOST(request: NextRequest) {
               modelId: selectedModelId!,
               question: message,
               webSearchEnabled,
+              recentMessages: contextMessages.map((m) => ({ role: m.role, content: m.content })),
               onStatus: (statusMessage) => {
                 sendEvent("status", { message: statusMessage })
               },
@@ -888,6 +889,7 @@ async function handlePOST(request: NextRequest) {
       modelId: selectedModelId!,
       question: message,
       webSearchEnabled,
+      recentMessages: contextMessages.map((m) => ({ role: m.role, content: m.content })),
     })
 
     const chatMessages = buildChatPayload(
