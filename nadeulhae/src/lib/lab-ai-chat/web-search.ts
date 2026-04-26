@@ -419,17 +419,22 @@ export async function resolveLabAiChatWebSearchContext(input: {
   recentMessages?: Array<{ role: string; content: string }>
   onStatus?: WebSearchStatusFn
 }): Promise<LabAiChatWebSearchResolution> {
+  console.log(`[web-search] START | webSearchEnabled=${input.webSearchEnabled} | question="${input.question.slice(0, 80)}" | sessionId=${input.sessionId}`)
+
   if (!input.webSearchEnabled) {
+    console.log("[web-search] SKIP: webSearchEnabled is false")
     return { context: null, source: "none" }
   }
 
   const conversationHint = buildConversationHint(input.recentMessages)
+  console.log(`[web-search] conversationHint length=${conversationHint?.length ?? 0} | recentMessages count=${input.recentMessages?.length ?? 0}`)
 
   input.onStatus?.(toLocaleStatus(input.locale, "check_cache"))
   const cached = await getLabAiChatWebSearchCache({
     userId: input.userId,
     sessionId: input.sessionId,
   })
+  console.log(`[web-search] cache check: query=${cached?.query?.slice(0, 40) ?? "null"} | result=${cached?.result ? "yes" : "null"}`)
 
   input.onStatus?.(toLocaleStatus(input.locale, "planning"))
   const plan = await buildSearchPlan({
@@ -441,8 +446,10 @@ export async function resolveLabAiChatWebSearchContext(input: {
     cachePreview: cached?.result?.slice(0, 1200) ?? null,
     conversationHint,
   })
+  console.log(`[web-search] plan result: needSearch=${plan.needSearch} | useCacheFirst=${plan.useCacheFirst} | cacheUsable=${plan.cacheUsable} | query="${plan.query?.slice(0, 60)}" | topic=${plan.topic}`)
 
   if (cached?.result && cached.query && plan.useCacheFirst && plan.cacheUsable) {
+    console.log("[web-search] USING CACHE (plan says cache is usable)")
     input.onStatus?.(toLocaleStatus(input.locale, "using_cache"))
     return {
       context: buildCachedContextText({
@@ -456,9 +463,13 @@ export async function resolveLabAiChatWebSearchContext(input: {
   }
 
   if (!plan.needSearch) {
+    console.log("[web-search] SKIP: planner says needSearch=false")
     input.onStatus?.(toLocaleStatus(input.locale, "search_skipped"))
     return { context: null, source: "none" }
   }
+
+  console.log(`[web-search] PROCEEDING to live search with query="${plan.query?.slice(0, 60)}"`)
+
 
   const runSearch = async (query: string) => {
     const reservation = await reserveLabAiChatWebSearchCall({
