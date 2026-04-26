@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 const MAX_RATE_LIMIT_ENTRIES = 10_000
+const IS_PRODUCTION = process.env.NODE_ENV === "production"
 
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
 const authRateLimitMap = new Map<string, { count: number; lastReset: number }>()
@@ -161,15 +162,23 @@ export function proxy(request: NextRequest) {
   }
 
   if (STATIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    for (const [key, value] of Object.entries(STATIC_CACHE_HEADERS)) {
-      response.headers.set(key, value)
+    if (IS_PRODUCTION) {
+      for (const [key, value] of Object.entries(STATIC_CACHE_HEADERS)) {
+        response.headers.set(key, value)
+      }
+    } else {
+      response.headers.set("Cache-Control", "no-store, max-age=0")
     }
     return response
   }
 
   if (IMMUTABLE_EXTENSIONS.some((ext) => pathname.endsWith(ext))) {
-    for (const [key, value] of Object.entries(IMMUTABLE_CACHE_HEADERS)) {
-      response.headers.set(key, value)
+    if (IS_PRODUCTION) {
+      for (const [key, value] of Object.entries(IMMUTABLE_CACHE_HEADERS)) {
+        response.headers.set(key, value)
+      }
+    } else {
+      response.headers.set("Cache-Control", "no-store, max-age=0")
     }
     return response
   }
