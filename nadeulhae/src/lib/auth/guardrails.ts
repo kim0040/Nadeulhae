@@ -2,8 +2,17 @@ import { createBlindIndex } from "@/lib/security/data-protection"
 
 export const AUTH_BODY_LIMIT_BYTES = 16 * 1024
 export const AUTH_FAILURE_DELAY_MS = 450
-export const MAX_ACTIVE_SESSIONS_PER_USER = Number(
-  process.env.AUTH_MAX_SESSIONS_PER_USER ?? "5"
+function parsePositiveIntEnv(raw: string | undefined, fallback: number) {
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed)) {
+    return fallback
+  }
+  return Math.max(1, Math.floor(parsed))
+}
+
+export const MAX_ACTIVE_SESSIONS_PER_USER = parsePositiveIntEnv(
+  process.env.AUTH_MAX_SESSIONS_PER_USER,
+  5
 )
 
 export const LOGIN_IP_LIMIT = {

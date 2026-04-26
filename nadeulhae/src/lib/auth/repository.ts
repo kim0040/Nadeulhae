@@ -324,6 +324,8 @@ export async function createUser(input: {
     ? input.weatherSensitivity.filter((item): item is string => typeof item === "string")
     : []
 
+  // NOTE: Some MySQL-compatible engines reject prepared placeholders in LIMIT
+  // inside nested subqueries, so we inject a pre-validated integer literal here.
   await executeStatement(
     `
       INSERT INTO users (
@@ -435,11 +437,11 @@ export async function createSessionRecord(input: {
             FROM user_sessions
             WHERE user_id = ?
             ORDER BY last_used_at DESC, created_at DESC
-            LIMIT ?
+            LIMIT ${sessionCap}
           ) AS kept_sessions
         )
     `,
-    [input.userId, input.userId, sessionCap]
+    [input.userId, input.userId]
   )
 }
 
