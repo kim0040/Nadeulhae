@@ -1,5 +1,7 @@
 const RAW_MERMAID_ERROR_BLOCK_RE = /<div[^>]*id=["']dmermaid-[^"']*["'][\s\S]*?<\/div>/gi
 const RAW_MERMAID_ERROR_SVG_RE = /<svg[^>]*id=["']mermaid-[^"']*["'][\s\S]*?<\/svg>/gi
+const RAW_MERMAID_ERROR_CODE_FENCE_RE = /```(?:html|xml|svg)?[\s\S]*?(?:dmermaid-|aria-roledescription=["']error["']|Syntax error in text|mermaid version)[\s\S]*?```/gi
+const ESCAPED_RAW_MERMAID_ERROR_RE = /&lt;(?:div|svg)[\s\S]*?(?:dmermaid-|aria-roledescription=&quot;error&quot;|Syntax error in text|mermaid version)[\s\S]*?&lt;\/(?:div|svg)&gt;/gi
 const RAW_MERMAID_ERROR_MARKER_RE = /id=["']d?mermaid-|aria-roledescription=["']error["']|class=["']error-icon["']|Syntax error in text|mermaid version/i
 
 export function sanitizeAssistantMarkdown(input: {
@@ -17,6 +19,10 @@ export function sanitizeAssistantMarkdown(input: {
   let sanitized = input.content
     .replace(RAW_MERMAID_ERROR_BLOCK_RE, fallback)
     .replace(RAW_MERMAID_ERROR_SVG_RE, fallback)
+    .replace(RAW_MERMAID_ERROR_CODE_FENCE_RE, fallback)
+    .replace(ESCAPED_RAW_MERMAID_ERROR_RE, fallback)
+    .replace(new RegExp(`${fallback}(\\s*${fallback})+`, "g"), fallback)
+    .replace(/\n{3,}/g, "\n\n")
     .trim()
 
   if (!sanitized || RAW_MERMAID_ERROR_MARKER_RE.test(sanitized)) {
