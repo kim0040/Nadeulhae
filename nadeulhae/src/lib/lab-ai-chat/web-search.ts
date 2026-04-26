@@ -159,7 +159,7 @@ function buildFallbackPlan(question: string): SearchPlan {
   const asksLatest = /(latest|today|current|now|news|breaking|최신|오늘|현재|실시간|속보)/i.test(question)
   const asksFinance = /(stock|shares|market|price|forex|crypto|주가|증시|환율|코인|금리)/i.test(question)
   const asksHistory = /(history|historical|century|조선|고대|역사|과거)/i.test(question)
-  const needSearch = asksLatest || asksFinance
+  const needSearch = question.trim().length > 2
 
   return {
     needSearch,
@@ -213,6 +213,8 @@ async function buildSearchPlan(input: {
     "- For timeless or historical questions, prefer no time filters.",
     "- Use cache when the user likely asks a follow-up to cached topic.",
     `- Language for search query should match user language (${localeName}) when useful.`,
+    "- CRITICAL: Set need_search to true for ANY question asking for facts, specific entities, events, coding help, or general knowledge. Even if you think you know the answer, set it to true to get up-to-date sources.",
+    "- Set need_search to false ONLY for casual greetings (e.g., hi, thanks) or purely creative/subjective writing that requires no facts.",
   ].join("\n")
 
   const plannerInput = [
