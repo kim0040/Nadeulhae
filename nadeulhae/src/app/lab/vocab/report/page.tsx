@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { AlertTriangle, ArrowLeft, BarChart3, BookOpenCheck, Flame, Gauge, RefreshCcw, Target, TrendingUp, Zap } from "lucide-react"
+import { AlertTriangle, ArrowLeft, BookOpenCheck, ChartColumn, Flame, Gauge, RefreshCcw, Target, TrendingUp, Zap } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { Meteors } from "@/components/magicui/meteors"
@@ -371,7 +371,7 @@ export default function LabVocabReportPage() {
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
             <div className="space-y-3">
               <span className="inline-flex items-center gap-2 rounded-full border border-active-blue/25 bg-active-blue/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-active-blue">
-                <BarChart3 className="size-3.5" />
+                <ChartColumn className="size-3.5" />
                 {copy.badge}
               </span>
               <h1 className="text-4xl font-black tracking-tight text-foreground sm:text-5xl">{copy.title}</h1>
