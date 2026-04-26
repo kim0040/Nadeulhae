@@ -51,6 +51,18 @@ export interface LabAiChatPolicySnapshot {
   resetTimeZone: string
 }
 
+export interface LabAiChatWebSearchSnapshot {
+  sessionLimit: number
+  sessionUsed: number
+  sessionRemaining: number
+  monthLimit: number
+  monthUsed: number
+  monthRemaining: number
+  cacheAvailable: boolean
+  cacheQuery: string | null
+  cacheUpdatedAt: string | null
+}
+
 export interface LabAiChatModelOption {
   id: string
   slug: string
@@ -66,6 +78,7 @@ export interface LabAiChatStateCore {
   memory: LabAiChatMemorySnapshot | null
   usage: LabAiChatUsageSnapshot
   policy: LabAiChatPolicySnapshot
+  webSearch: LabAiChatWebSearchSnapshot
   sessions: LabAiChatSessionSnapshot[]
   activeSessionId: string
 }

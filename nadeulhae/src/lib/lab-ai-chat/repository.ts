@@ -9,6 +9,9 @@ import {
   LAB_AI_CHAT_INPUT_MAX_CHARACTERS,
   LAB_AI_CHAT_MEMORY_SUMMARY_MAX_CHARACTERS,
   LAB_AI_CHAT_TIME_ZONE,
+  LAB_AI_CHAT_WEB_SEARCH_CACHE_MAX_CHARACTERS,
+  LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT,
+  LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT,
   LAB_AI_CHAT_VISIBLE_MESSAGE_LIMIT,
   estimateLabAiChatTokens,
 } from "@/lib/lab-ai-chat/constants"
@@ -23,6 +26,7 @@ import type {
   LabAiChatSessionSnapshot,
   LabAiChatStateCore,
   LabAiChatUsageSnapshot,
+  LabAiChatWebSearchSnapshot,
   NanoGptUsage,
 } from "@/lib/lab-ai-chat/types"
 import { getDbPool, queryRows } from "@/lib/db"
@@ -78,6 +82,27 @@ interface LabAiChatUsageRow extends RowDataPacket {
   summary_total_tokens: number
 }
 
+interface LabAiChatWebSearchStateRow extends RowDataPacket {
+  user_id: string
+  session_id: number
+  session_call_count: number
+  cache_query_text: string | null
+  cache_result_text: string | null
+  cache_topic: string | null
+  cache_time_range: string | null
+  cache_start_date: Date | string | null
+  cache_end_date: Date | string | null
+  cache_result_count: number
+  cache_updated_at: Date | string | null
+}
+
+interface LabAiChatWebSearchMonthlyUsageRow extends RowDataPacket {
+  metric_month: string
+  request_count: number
+  success_count: number
+  failure_count: number
+}
+
 const LAB_AI_CHAT_SESSION_TITLE_MAX_LENGTH = 60
 
 function toIsoString(value: Date | string) {
@@ -110,6 +135,14 @@ function getKstMetricDate() {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+  }).format(new Date())
+}
+
+function getKstMetricMonth() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: LAB_AI_CHAT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
   }).format(new Date())
 }
 
@@ -204,6 +237,57 @@ function toUsageSnapshot(row: LabAiChatUsageRow | null, metricDate: string) {
     summaryCompletionTokens: Math.max(0, row.summary_completion_tokens),
     summaryTotalTokens: Math.max(0, row.summary_total_tokens),
   } satisfies LabAiChatUsageSnapshot
+}
+
+function toWebSearchSnapshot(input: {
+  stateRow: LabAiChatWebSearchStateRow | null
+  monthRow: LabAiChatWebSearchMonthlyUsageRow | null
+}): LabAiChatWebSearchSnapshot {
+  const sessionUsed = Math.max(0, input.stateRow?.session_call_count ?? 0)
+  const monthUsed = Math.max(0, input.monthRow?.request_count ?? 0)
+  const cacheQuery = input.stateRow?.cache_query_text
+    ? decryptDatabaseValueSafely(input.stateRow.cache_query_text, "lab.ai.chat.web.cache.query")
+    : null
+  const cacheResult = input.stateRow?.cache_result_text
+    ? decryptDatabaseValueSafely(input.stateRow.cache_result_text, "lab.ai.chat.web.cache.result")
+    : null
+
+  return {
+    sessionLimit: LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT,
+    sessionUsed,
+    sessionRemaining: Math.max(0, LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT - sessionUsed),
+    monthLimit: LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT,
+    monthUsed,
+    monthRemaining: Math.max(0, LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT - monthUsed),
+    cacheAvailable: Boolean(cacheResult),
+    cacheQuery: cacheQuery || null,
+    cacheUpdatedAt: input.stateRow?.cache_updated_at ? toIsoString(input.stateRow.cache_updated_at) : null,
+  }
+}
+
+async function upsertLabAiChatWebSearchStateRow(connection: PoolConnection, userId: string, sessionId: number) {
+  await connection.execute(
+    `
+      INSERT INTO lab_ai_chat_web_search_state (
+        user_id,
+        session_id
+      ) VALUES (?, ?)
+      ON DUPLICATE KEY UPDATE user_id = user_id
+    `,
+    [userId, sessionId]
+  )
+}
+
+async function upsertLabAiChatWebSearchMonthlyRow(connection: PoolConnection, metricMonth: string) {
+  await connection.execute(
+    `
+      INSERT INTO lab_ai_chat_web_search_usage_monthly (
+        metric_month
+      ) VALUES (?)
+      ON DUPLICATE KEY UPDATE metric_month = metric_month
+    `,
+    [metricMonth]
+  )
 }
 
 async function listLabAiChatSessionRows(userId: string) {
@@ -483,6 +567,15 @@ export async function deleteLabAiChatSession(input: {
 
     await connection.execute(
       `
+        DELETE FROM lab_ai_chat_web_search_state
+        WHERE user_id = ?
+          AND session_id = ?
+      `,
+      [input.userId, parsedSessionId]
+    )
+
+    await connection.execute(
+      `
         DELETE FROM lab_ai_chat_messages
         WHERE user_id = ?
           AND session_id = ?
@@ -573,6 +666,310 @@ export async function getLabAiChatUsageSnapshot(userId: string) {
   )
 
   return toUsageSnapshot(rows[0] ?? null, metricDate)
+}
+
+export async function getLabAiChatWebSearchSnapshot(input: {
+  userId: string
+  sessionId: number
+}) {
+  await ensureLabAiChatSchema()
+
+  const connection = await getDbPool().getConnection()
+  try {
+    const metricMonth = getKstMetricMonth()
+    await upsertLabAiChatWebSearchStateRow(connection, input.userId, input.sessionId)
+    await upsertLabAiChatWebSearchMonthlyRow(connection, metricMonth)
+
+    const [stateRows] = await connection.query<LabAiChatWebSearchStateRow[]>(
+      `
+        SELECT
+          user_id,
+          session_id,
+          session_call_count,
+          cache_query_text,
+          cache_result_text,
+          cache_topic,
+          cache_time_range,
+          cache_start_date,
+          cache_end_date,
+          cache_result_count,
+          cache_updated_at
+        FROM lab_ai_chat_web_search_state
+        WHERE user_id = ?
+          AND session_id = ?
+        LIMIT 1
+      `,
+      [input.userId, input.sessionId]
+    )
+
+    const [monthRows] = await connection.query<LabAiChatWebSearchMonthlyUsageRow[]>(
+      `
+        SELECT
+          metric_month,
+          request_count,
+          success_count,
+          failure_count
+        FROM lab_ai_chat_web_search_usage_monthly
+        WHERE metric_month = ?
+        LIMIT 1
+      `,
+      [metricMonth]
+    )
+
+    return toWebSearchSnapshot({
+      stateRow: stateRows[0] ?? null,
+      monthRow: monthRows[0] ?? null,
+    })
+  } finally {
+    connection.release()
+  }
+}
+
+export async function getLabAiChatWebSearchCache(input: {
+  userId: string
+  sessionId: number
+}) {
+  await ensureLabAiChatSchema()
+
+  const rows = await queryRows<LabAiChatWebSearchStateRow[]>(
+    `
+      SELECT
+        user_id,
+        session_id,
+        session_call_count,
+        cache_query_text,
+        cache_result_text,
+        cache_topic,
+        cache_time_range,
+        cache_start_date,
+        cache_end_date,
+        cache_result_count,
+        cache_updated_at
+      FROM lab_ai_chat_web_search_state
+      WHERE user_id = ?
+        AND session_id = ?
+      LIMIT 1
+    `,
+    [input.userId, input.sessionId]
+  )
+
+  const row = rows[0]
+  if (!row) {
+    return null
+  }
+
+  const query = row.cache_query_text
+    ? decryptDatabaseValueSafely(row.cache_query_text, "lab.ai.chat.web.cache.query")
+    : null
+  const result = row.cache_result_text
+    ? decryptDatabaseValueSafely(row.cache_result_text, "lab.ai.chat.web.cache.result")
+    : null
+
+  return {
+    query: query || null,
+    result: result || null,
+    topic: row.cache_topic,
+    timeRange: row.cache_time_range,
+    startDate: row.cache_start_date ? toIsoString(row.cache_start_date).slice(0, 10) : null,
+    endDate: row.cache_end_date ? toIsoString(row.cache_end_date).slice(0, 10) : null,
+    resultCount: Math.max(0, row.cache_result_count ?? 0),
+    updatedAt: row.cache_updated_at ? toIsoString(row.cache_updated_at) : null,
+  }
+}
+
+export async function reserveLabAiChatWebSearchCall(input: {
+  userId: string
+  sessionId: number
+}) {
+  await ensureLabAiChatSchema()
+
+  const connection = await getDbPool().getConnection()
+  try {
+    await connection.beginTransaction()
+    const metricMonth = getKstMetricMonth()
+
+    await upsertLabAiChatWebSearchStateRow(connection, input.userId, input.sessionId)
+    await upsertLabAiChatWebSearchMonthlyRow(connection, metricMonth)
+
+    const [stateRows] = await connection.query<LabAiChatWebSearchStateRow[]>(
+      `
+        SELECT
+          user_id,
+          session_id,
+          session_call_count,
+          cache_query_text,
+          cache_result_text,
+          cache_topic,
+          cache_time_range,
+          cache_start_date,
+          cache_end_date,
+          cache_result_count,
+          cache_updated_at
+        FROM lab_ai_chat_web_search_state
+        WHERE user_id = ?
+          AND session_id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [input.userId, input.sessionId]
+    )
+
+    const [monthRows] = await connection.query<LabAiChatWebSearchMonthlyUsageRow[]>(
+      `
+        SELECT
+          metric_month,
+          request_count,
+          success_count,
+          failure_count
+        FROM lab_ai_chat_web_search_usage_monthly
+        WHERE metric_month = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [metricMonth]
+    )
+
+    const stateRow = stateRows[0] ?? null
+    const monthRow = monthRows[0] ?? null
+
+    const sessionUsed = Math.max(0, stateRow?.session_call_count ?? 0)
+    const monthUsed = Math.max(0, monthRow?.request_count ?? 0)
+
+    if (sessionUsed >= LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT) {
+      await connection.commit()
+      return {
+        allowed: false,
+        reason: "session_limit_reached" as const,
+        snapshot: toWebSearchSnapshot({ stateRow, monthRow }),
+        metricMonth,
+      }
+    }
+
+    if (monthUsed >= LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT) {
+      await connection.commit()
+      return {
+        allowed: false,
+        reason: "monthly_limit_reached" as const,
+        snapshot: toWebSearchSnapshot({ stateRow, monthRow }),
+        metricMonth,
+      }
+    }
+
+    await connection.execute(
+      `
+        UPDATE lab_ai_chat_web_search_state
+        SET session_call_count = session_call_count + 1,
+            updated_at = NOW()
+        WHERE user_id = ?
+          AND session_id = ?
+      `,
+      [input.userId, input.sessionId]
+    )
+
+    await connection.execute(
+      `
+        UPDATE lab_ai_chat_web_search_usage_monthly
+        SET request_count = request_count + 1,
+            last_used_at = NOW()
+        WHERE metric_month = ?
+      `,
+      [metricMonth]
+    )
+
+    const nextSnapshot = toWebSearchSnapshot({
+      stateRow: stateRow ? { ...stateRow, session_call_count: sessionUsed + 1 } : null,
+      monthRow: monthRow ? { ...monthRow, request_count: monthUsed + 1 } : null,
+    })
+
+    await connection.commit()
+    return {
+      allowed: true,
+      reason: null,
+      snapshot: nextSnapshot,
+      metricMonth,
+    }
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+}
+
+export async function recordLabAiChatWebSearchOutcome(input: {
+  metricMonth: string
+  success: boolean
+}) {
+  await ensureLabAiChatSchema()
+
+  const targetColumn = input.success ? "success_count" : "failure_count"
+  await getDbPool().execute(
+    `
+      UPDATE lab_ai_chat_web_search_usage_monthly
+      SET ${targetColumn} = ${targetColumn} + 1,
+          last_used_at = NOW()
+      WHERE metric_month = ?
+    `,
+    [input.metricMonth]
+  )
+}
+
+export async function persistLabAiChatWebSearchCache(input: {
+  userId: string
+  sessionId: number
+  query: string
+  resultText: string
+  resultCount: number
+  topic?: string | null
+  timeRange?: string | null
+  startDate?: string | null
+  endDate?: string | null
+}) {
+  await ensureLabAiChatSchema()
+
+  const startDate = input.startDate && /^\d{4}-\d{2}-\d{2}$/.test(input.startDate) ? input.startDate : null
+  const endDate = input.endDate && /^\d{4}-\d{2}-\d{2}$/.test(input.endDate) ? input.endDate : null
+
+  await getDbPool().execute(
+    `
+      INSERT INTO lab_ai_chat_web_search_state (
+        user_id,
+        session_id,
+        cache_query_text,
+        cache_result_text,
+        cache_topic,
+        cache_time_range,
+        cache_start_date,
+        cache_end_date,
+        cache_result_count,
+        cache_updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      ON DUPLICATE KEY UPDATE
+        cache_query_text = VALUES(cache_query_text),
+        cache_result_text = VALUES(cache_result_text),
+        cache_topic = VALUES(cache_topic),
+        cache_time_range = VALUES(cache_time_range),
+        cache_start_date = VALUES(cache_start_date),
+        cache_end_date = VALUES(cache_end_date),
+        cache_result_count = VALUES(cache_result_count),
+        cache_updated_at = NOW(),
+        updated_at = NOW()
+    `,
+    [
+      input.userId,
+      input.sessionId,
+      encryptDatabaseValue(input.query.slice(0, 500), "lab.ai.chat.web.cache.query"),
+      encryptDatabaseValue(
+        input.resultText.slice(0, LAB_AI_CHAT_WEB_SEARCH_CACHE_MAX_CHARACTERS),
+        "lab.ai.chat.web.cache.result"
+      ),
+      input.topic?.slice(0, 16) ?? null,
+      input.timeRange?.slice(0, 16) ?? null,
+      startDate,
+      endDate,
+      Math.max(0, Math.floor(input.resultCount)),
+    ]
+  )
 }
 
 export async function reserveDailyLabAiChatRequest(userId: string) {
@@ -722,9 +1119,13 @@ export async function getLabAiChatStateCore(input: {
     requestedSessionId: input.requestedSessionId,
   })
 
-  const [messages, usage] = await Promise.all([
+  const [messages, usage, webSearch] = await Promise.all([
     getRecentLabAiChatConversationMessages(input.userId, resolved.activeSessionId),
     getLabAiChatUsageSnapshot(input.userId),
+    getLabAiChatWebSearchSnapshot({
+      userId: input.userId,
+      sessionId: resolved.activeSessionId,
+    }),
   ])
 
   return {
@@ -732,6 +1133,7 @@ export async function getLabAiChatStateCore(input: {
     memory: toMemorySnapshot(resolved.activeSession),
     usage,
     policy: getLabAiChatPolicySnapshot(),
+    webSearch,
     sessions: resolved.sessions,
     activeSessionId: String(resolved.activeSessionId),
   }

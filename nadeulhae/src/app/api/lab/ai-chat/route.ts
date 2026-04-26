@@ -26,6 +26,7 @@ import {
   reserveDailyLabAiChatRequest,
 } from "@/lib/lab-ai-chat/repository"
 import type { LabAiChatLocale, LabAiChatStateResponse } from "@/lib/lab-ai-chat/types"
+import { resolveLabAiChatWebSearchContext } from "@/lib/lab-ai-chat/web-search"
 import {
   NanoGptError,
   createNanoGptCompletion,
@@ -143,6 +144,18 @@ function sanitizeModelId(value: unknown) {
 
   const normalized = value.trim()
   return normalized.length > 0 && normalized.length <= 191 ? normalized : null
+}
+
+function sanitizeBoolean(value: unknown) {
+  if (typeof value === "boolean") {
+    return value
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === "true") return true
+    if (normalized === "false") return false
+  }
+  return false
 }
 
 const ASSISTANT_NAME_KO = "나들 AI"
@@ -446,7 +459,7 @@ async function handlePOST(request: NextRequest) {
     return invalidRequestResponse
   }
 
-  let body: { message?: string; locale?: LabAiChatLocale; sessionId?: unknown; modelId?: unknown } = {}
+  let body: { message?: string; locale?: LabAiChatLocale; sessionId?: unknown; modelId?: unknown; webSearchEnabled?: unknown } = {}
   try {
     body = await request.json()
   } catch {
@@ -461,6 +474,7 @@ async function handlePOST(request: NextRequest) {
   const message = normalizeMessage(body.message)
   const requestedSessionId = sanitizeSessionId(body.sessionId)
   const requestedModelId = sanitizeModelId(body.modelId)
+  const webSearchEnabled = sanitizeBoolean(body.webSearchEnabled)
 
   if (!message) {
     return createAuthJsonResponse(
@@ -601,15 +615,6 @@ async function handlePOST(request: NextRequest) {
     contextMessageCount = contextMessages.length
 
     const acceptSSE = request.headers.get("accept")?.includes("text/event-stream")
-    const chatMessages = buildChatPayload(
-      contextMessages,
-      buildLabAiChatSystemPrompt({
-        locale,
-        user: authenticatedSession.user,
-        memorySummary: latestSessionMemory?.summary ?? null,
-      }),
-      message
-    )
 
     if (acceptSSE) {
       const encoder = new TextEncoder()
@@ -639,6 +644,29 @@ async function handlePOST(request: NextRequest) {
           const checkAlive = () => !clientDisconnected && !abortController.signal.aborted
 
           try {
+            const webSearchResolution = await resolveLabAiChatWebSearchContext({
+              userId: authenticatedSession.user.id,
+              sessionId: resolvedSession.activeSessionId,
+              locale,
+              modelId: selectedModelId!,
+              question: message,
+              webSearchEnabled,
+              onStatus: (statusMessage) => {
+                sendEvent("status", { message: statusMessage })
+              },
+            })
+
+            const chatMessages = buildChatPayload(
+              contextMessages,
+              buildLabAiChatSystemPrompt({
+                locale,
+                user: authenticatedSession.user,
+                memorySummary: latestSessionMemory?.summary ?? null,
+                webSearchContext: webSearchResolution.context,
+              }),
+              message
+            )
+
             const completionResult = await createNanoGptCompletionStream({
               model: selectedModelId!,
               requestKind: "chat",
@@ -745,6 +773,26 @@ async function handlePOST(request: NextRequest) {
         },
       })
     }
+
+    const webSearchResolution = await resolveLabAiChatWebSearchContext({
+      userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
+      locale,
+      modelId: selectedModelId!,
+      question: message,
+      webSearchEnabled,
+    })
+
+    const chatMessages = buildChatPayload(
+      contextMessages,
+      buildLabAiChatSystemPrompt({
+        locale,
+        user: authenticatedSession.user,
+        memorySummary: latestSessionMemory?.summary ?? null,
+        webSearchContext: webSearchResolution.context,
+      }),
+      message
+    )
 
     const completionResult = await createNanoGptCompletion({
       model: selectedModelId!,

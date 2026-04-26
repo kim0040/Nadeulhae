@@ -99,6 +99,39 @@ const createLabAiChatRequestEventsTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+const createLabAiChatWebSearchStateTableSql = `
+  CREATE TABLE IF NOT EXISTS lab_ai_chat_web_search_state (
+    user_id CHAR(36) NOT NULL,
+    session_id BIGINT NOT NULL,
+    session_call_count INT UNSIGNED NOT NULL DEFAULT 0,
+    cache_query_text LONGTEXT NULL,
+    cache_result_text LONGTEXT NULL,
+    cache_topic VARCHAR(16) NULL,
+    cache_time_range VARCHAR(16) NULL,
+    cache_start_date DATE NULL,
+    cache_end_date DATE NULL,
+    cache_result_count INT UNSIGNED NOT NULL DEFAULT 0,
+    cache_updated_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, session_id),
+    KEY idx_lab_ai_chat_web_state_updated (updated_at),
+    KEY idx_lab_ai_chat_web_state_cache (cache_updated_at)
+  ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`
+
+const createLabAiChatWebSearchUsageMonthlyTableSql = `
+  CREATE TABLE IF NOT EXISTS lab_ai_chat_web_search_usage_monthly (
+    metric_month CHAR(7) NOT NULL PRIMARY KEY,
+    request_count INT UNSIGNED NOT NULL DEFAULT 0,
+    success_count INT UNSIGNED NOT NULL DEFAULT 0,
+    failure_count INT UNSIGNED NOT NULL DEFAULT 0,
+    last_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_lab_ai_chat_web_monthly_last_used (last_used_at)
+  ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`
+
 export async function ensureLabAiChatSchema() {
   if (globalThis.__nadeulhaeLabAiChatSchemaPromise) {
     return globalThis.__nadeulhaeLabAiChatSchemaPromise
@@ -110,6 +143,8 @@ export async function ensureLabAiChatSchema() {
     await pool.query(createLabAiChatMessagesTableSql)
     await pool.query(createLabAiChatUsageDailyTableSql)
     await pool.query(createLabAiChatRequestEventsTableSql)
+    await pool.query(createLabAiChatWebSearchStateTableSql)
+    await pool.query(createLabAiChatWebSearchUsageMonthlyTableSql)
   })()
 
   globalThis.__nadeulhaeLabAiChatSchemaPromise = bootstrapPromise.catch((error) => {
