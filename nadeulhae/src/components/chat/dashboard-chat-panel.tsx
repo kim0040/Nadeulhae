@@ -1,7 +1,7 @@
 "use client"
 
 import { Children, isValidElement, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
-import { LoaderCircle, Plus, SendHorizonal, Sparkles, Trash2 } from "lucide-react"
+import { Check, Copy, LoaderCircle, Plus, SendHorizonal, Sparkles, Trash2 } from "lucide-react"
 
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -12,6 +12,7 @@ import { useLanguage } from "@/context/LanguageContext"
 import type { AuthUser } from "@/lib/auth/types"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { ChatConversationMessage, ChatStateResponse } from "@/lib/chat/types"
+import { sanitizeAssistantMarkdown } from "@/lib/markdown/sanitize-assistant-markdown"
 import {
   computeServerClockOffsetMs,
   formatServerClockTime,
@@ -118,6 +119,73 @@ function TypingIndicator() {
   )
 }
 
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const textarea = document.createElement("textarea")
+  textarea.value = text
+  textarea.setAttribute("readonly", "true")
+  textarea.style.position = "fixed"
+  textarea.style.left = "-9999px"
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand("copy")
+  document.body.removeChild(textarea)
+}
+
+function DashboardMarkdownCodeBlock({
+  code,
+  language,
+  copyLabel,
+  copiedLabel,
+}: {
+  code: string
+  language: string | null
+  copyLabel: string
+  copiedLabel: string
+}) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current != null) window.clearTimeout(timeoutRef.current)
+    }
+  }, [])
+
+  const handleCopy = useCallback(async () => {
+    await copyTextToClipboard(code)
+    setCopied(true)
+    if (timeoutRef.current != null) window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = window.setTimeout(() => setCopied(false), 1600)
+  }, [code])
+
+  const label = language ? language.toUpperCase() : "Text"
+
+  return (
+    <div className="not-prose my-3 overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-colors">
+      <div className="flex items-center justify-between border-b border-border bg-muted/55 px-3 py-2">
+        <span className="truncate text-xs font-semibold text-foreground/80">{label}</span>
+        <button
+          type="button"
+          onClick={() => void handleCopy()}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background/70 px-2.5 text-xs font-semibold text-foreground/85 transition hover:bg-muted active:scale-[0.98]"
+          aria-label={copied ? copiedLabel : copyLabel}
+        >
+          {copied ? <Check className="size-3.5 text-accent" /> : <Copy className="size-3.5" />}
+          {copied ? copiedLabel : copyLabel}
+        </button>
+      </div>
+      <pre className="m-0 max-h-[28rem] overflow-auto bg-card p-4 text-left custom-scrollbar">
+        <code className="block min-w-full whitespace-pre font-mono text-[13px] leading-6 text-foreground">{code}</code>
+      </pre>
+    </div>
+  )
+}
+
 type MessageGroup = {
   role: "user" | "assistant"
   messages: UiChatMessage[]
@@ -152,6 +220,9 @@ function ChatBubble({
   const showTimestamp = groupPosition === "last" || groupPosition === "only"
 
   const copy = CHAT_PANEL_COPY[language]
+  const messageContent = !isUser
+    ? sanitizeAssistantMarkdown({ content: message.content, language })
+    : message.content
 
   const markdownComponents = useMemo<Components>(() => ({
     pre({ children, node, ...props }) {
@@ -160,7 +231,7 @@ function ChatBubble({
       if (
         childArray.length === 1 &&
         isValidElement(childArray[0]) &&
-        childArray[0].type === MermaidDiagram
+        (childArray[0].type === MermaidDiagram || childArray[0].type === DashboardMarkdownCodeBlock)
       ) {
         return <>{childArray[0]}</>
       }
@@ -170,10 +241,28 @@ function ChatBubble({
       void node
       const codeText = Children.toArray(children).join("").replace(/\n$/, "")
       const lang = /language-([A-Za-z0-9_+#.-]+)/.exec(className ?? "")?.[1] ?? null
+      const isBlock = Boolean(lang) || codeText.includes("\n")
       if (lang?.toLowerCase() === "mermaid") {
         return <MermaidDiagram code={codeText} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} />
       }
-      return <code {...props} className={className}>{children}</code>
+      if (isBlock) {
+        return (
+          <DashboardMarkdownCodeBlock
+            code={codeText}
+            language={lang}
+            copyLabel={copy.copyCode}
+            copiedLabel={copy.copiedCode}
+          />
+        )
+      }
+      return (
+        <code
+          {...props}
+          className={cn("rounded bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground", className)}
+        >
+          {children}
+        </code>
+      )
     },
   }), [copy.copyCode, copy.copiedCode])
 
@@ -218,11 +307,11 @@ function ChatBubble({
           {message.pending ? (
             <TypingIndicator />
           ) : isUser ? (
-            <p className="whitespace-pre-wrap">{message.content}</p>
+            <p className="whitespace-pre-wrap">{messageContent}</p>
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1.5 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {message.content}
+                {messageContent}
               </ReactMarkdown>
             </div>
           )}

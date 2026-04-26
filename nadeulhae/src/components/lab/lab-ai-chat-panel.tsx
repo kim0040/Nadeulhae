@@ -30,6 +30,7 @@ import {
   formatServerRelativeTime,
   getServerNowMs,
 } from "@/lib/time/server-time"
+import { sanitizeAssistantMarkdown } from "@/lib/markdown/sanitize-assistant-markdown"
 import { cn } from "@/lib/utils"
 import { MermaidDiagram } from "@/components/lab/mermaid-diagram"
 
@@ -1511,6 +1512,9 @@ export function LabAiChatPanel() {
               <div className="flex flex-col gap-4 sm:gap-6">
                 {messages.map((message, messageIndex) => {
                   const isUser = message.role === "user"
+                  const assistantContent = !isUser
+                    ? sanitizeAssistantMarkdown({ content: message.content, language })
+                    : message.content
                   const previousUserMessage = !isUser && message.pending
                     ? getPreviousUserMessage(messages, messageIndex)
                     : ""
@@ -1564,12 +1568,12 @@ export function LabAiChatPanel() {
                                 <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base">
                                   <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                                      {message.content}
+                                      {assistantContent}
                                     </ReactMarkdown>
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-end">
-                                  <MessageCopyButton text={message.content} copyLabel={copy.copyMessage} copiedLabel={copy.copiedMessage} />
+                                  <MessageCopyButton text={assistantContent} copyLabel={copy.copyMessage} copiedLabel={copy.copiedMessage} />
                                 </div>
                               </div>
                             ) : (
@@ -1584,7 +1588,7 @@ export function LabAiChatPanel() {
                             <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base">
                               <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                                  {message.content}
+                                  {assistantContent}
                                 </ReactMarkdown>
                               </div>
                             </div>
@@ -1592,7 +1596,7 @@ export function LabAiChatPanel() {
                               <span className="text-[11px] leading-none text-muted-foreground/50">
                                 {formatServerRelativeTime(message.createdAt, serverNowMs, language)}
                               </span>
-                              <MessageCopyButton text={message.content} copyLabel={copy.copyMessage} copiedLabel={copy.copiedMessage} />
+                              <MessageCopyButton text={assistantContent} copyLabel={copy.copyMessage} copiedLabel={copy.copiedMessage} />
                             </div>
                           </div>
                         )}
