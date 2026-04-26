@@ -8,13 +8,12 @@ import {
 } from "node:crypto"
 
 const ENCRYPTED_PREFIX = "enc:v1:"
-const DEV_FALLBACK_SECRET = "nadeulhae-dev-only-data-protection-key"
 const KEY_BYTES = 32
 const IV_BYTES = 12
 const SALT_BYTES = 16
 const AUTH_TAG_BYTES = 16
 
-let warnedAboutFallback = false
+let devFallbackSecret: string | null = null
 
 function getProtectionSecret() {
   const configured =
@@ -29,12 +28,21 @@ function getProtectionSecret() {
     throw new Error("Missing DATA_PROTECTION_KEY for database field protection. Set DATA_PROTECTION_KEY in production.")
   }
 
-  if (!warnedAboutFallback) {
-    warnedAboutFallback = true
-    console.warn("[security] DATA_PROTECTION_KEY is not set. Falling back to AUTH_PEPPER. Set a dedicated DATA_PROTECTION_KEY for production.")
+  if (process.env.AUTH_PEPPER) {
+    return process.env.AUTH_PEPPER
   }
 
-  return process.env.AUTH_PEPPER || DEV_FALLBACK_SECRET
+  if (!devFallbackSecret) {
+    devFallbackSecret = randomBytes(32).toString("hex")
+    console.warn(
+      "[security] DATA_PROTECTION_KEY and AUTH_PEPPER are not set. " +
+      "A random key was generated for this session. " +
+      "Encrypted data will NOT be readable after a server restart. " +
+      "Set DATA_PROTECTION_KEY for consistent encryption."
+    )
+  }
+
+  return devFallbackSecret
 }
 
 function getMasterKey() {

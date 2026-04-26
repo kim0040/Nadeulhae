@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
         },
         {
           key: "X-Frame-Options",
-          value: "SAMEORIGIN",
+          value: "DENY",
         },
         {
           key: "X-Content-Type-Options",
@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
         },
         {
           key: "X-XSS-Protection",
-          value: "1; mode=block",
+          value: "0",
         },
         {
           key: "Referrer-Policy",
@@ -45,7 +45,11 @@ const nextConfig: NextConfig = {
         },
         {
           key: "Permissions-Policy",
-          value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+          value: "camera=(), microphone=(), geolocation=(self)",
+        },
+        {
+          key: "Content-Security-Policy",
+          value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr; font-src 'self'; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
         },
       ],
     },

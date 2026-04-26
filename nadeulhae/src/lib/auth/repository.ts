@@ -398,6 +398,9 @@ export async function createSessionRecord(input: {
 }) {
   await ensureAuthSchema()
   const sessionCap = Math.max(1, Math.floor(MAX_ACTIVE_SESSIONS_PER_USER))
+  if (!Number.isFinite(sessionCap) || sessionCap < 1) {
+    throw new Error("Invalid session cap value")
+  }
 
   await executeStatement("DELETE FROM user_sessions WHERE expires_at < NOW()", [])
 
@@ -432,11 +435,11 @@ export async function createSessionRecord(input: {
             FROM user_sessions
             WHERE user_id = ?
             ORDER BY last_used_at DESC, created_at DESC
-            LIMIT ${sessionCap}
+            LIMIT ?
           ) AS kept_sessions
         )
     `,
-    [input.userId, input.userId]
+    [input.userId, input.userId, sessionCap]
   )
 }
 
