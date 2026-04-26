@@ -3,6 +3,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Check, Copy, AlertTriangle } from "lucide-react"
 
+const MERMAID_ERROR_SVG_RE = /aria-roledescription="error"|class="error-icon"|Syntax error in text/i
+const HTML_BLOCK_RE = /<\s*(svg|div)\b/i
+
+function normalizeMermaidErrorMessage(raw: string) {
+  const compact = raw.replace(/\s+/g, " ").trim()
+  if (!compact) return "Failed to render Mermaid diagram. Check the syntax and try again."
+
+  if (/No diagram type detected/i.test(compact)) {
+    return "Unsupported Mermaid diagram type. Use supported types such as flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, or erDiagram."
+  }
+
+  if (MERMAID_ERROR_SVG_RE.test(compact) || HTML_BLOCK_RE.test(compact)) {
+    return "Mermaid syntax error. Please check the diagram type and syntax."
+  }
+
+  return compact.length > 320 ? `${compact.slice(0, 317)}...` : compact
+}
+
 async function copyTextToClipboard(text: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text)
@@ -71,7 +89,7 @@ export function MermaidDiagram({
     async function render() {
       if (isUnsupportedUseCaseDiagram) {
         setSvg(null)
-        setError("`useCaseDiagram` is not supported in the current Mermaid version. Please rewrite it as `flowchart` or `classDiagram`.")
+        setError("`useCaseDiagram` is not supported in Mermaid 11.14.0. Please rewrite it as `flowchart` or `classDiagram`.")
         return
       }
 
@@ -105,13 +123,18 @@ export function MermaidDiagram({
         const { svg: renderedSvg } = await mermaid.render(id, code)
 
         if (!cancelled) {
+          if (MERMAID_ERROR_SVG_RE.test(renderedSvg)) {
+            setSvg(null)
+            setError("Mermaid syntax error. Please check the diagram type and syntax.")
+            return
+          }
           setSvg(renderedSvg)
           setError(null)
         }
       } catch (err) {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : "Failed to render diagram"
-          setError(message)
+          const message = err instanceof Error ? err.message : "Failed to render Mermaid diagram."
+          setError(normalizeMermaidErrorMessage(message))
           setSvg(null)
         }
       }
