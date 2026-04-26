@@ -9,6 +9,7 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Globe,
   Lightbulb,
   LoaderCircle,
   MessageSquarePlus,
@@ -46,6 +47,7 @@ type LabAiChatStateApiResponse = LabAiChatStateResponse & {
 
 const MODEL_STORAGE_KEY = "nadeulhae:lab-ai-chat:model-id"
 const THINKING_PANEL_STORAGE_KEY = "nadeulhae:lab-ai-chat:thinking-panel-open"
+const WEB_SEARCH_STORAGE_KEY_PREFIX = "nadeulhae:lab-ai-chat:web-search:"
 const TEXT_ATTACHMENT_ACCEPT = ".txt,.md,.markdown,text/plain,text/markdown"
 const TEXT_ATTACHMENT_MAX_BYTES = 256 * 1024
 
@@ -96,6 +98,10 @@ const COPY = {
     copiedCode: "복사됨",
     copyMessage: "답변 복사",
     copiedMessage: "복사됨",
+    webSearch: "웹검색",
+    webSearchOn: "켜짐",
+    webSearchOff: "꺼짐",
+    webSearchHint: "필요할 때만 웹 검색을 사용하고, 세션당 최대 5회까지 호출합니다.",
     scrollBottom: "최신 메시지로 이동",
     shortcutHint: "Enter로 보내고 Shift+Enter로 줄을 바꿀 수 있어요.",
     footerHint: "나들 AI는 실수를 할 수 있으니 중요한 내용은 한 번 더 확인해 주세요.",
@@ -146,6 +152,10 @@ const COPY = {
     copiedCode: "Copied",
     copyMessage: "Copy response",
     copiedMessage: "Copied",
+    webSearch: "Web search",
+    webSearchOn: "On",
+    webSearchOff: "Off",
+    webSearchHint: "Use web search only when needed. Max 5 calls per session.",
     scrollBottom: "Jump to latest message",
     shortcutHint: "Enter to send, Shift+Enter for a new line.",
     footerHint: "Nadeul AI can make mistakes. Check important details before acting.",
@@ -581,12 +591,14 @@ export function LabAiChatPanel() {
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [usage, setUsage] = useState<LabAiChatStateResponse["usage"] | null>(null)
   const [policy, setPolicy] = useState<LabAiChatStateResponse["policy"] | null>(null)
+  const [webSearch, setWebSearch] = useState<LabAiChatStateResponse["webSearch"] | null>(null)
   const [chatInput, setChatInput] = useState("")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [isThinkingPanelOpen, setIsThinkingPanelOpen] = useState(true)
+  const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(true)
 
   const messageViewportRef = useRef<HTMLDivElement | null>(null)
@@ -634,6 +646,7 @@ export function LabAiChatPanel() {
     setMessages(payload.messages)
     setUsage(payload.usage)
     setPolicy(payload.policy)
+    setWebSearch(payload.webSearch)
     setSessions(payload.sessions)
     setModels(payload.models)
     setDefaultModelId(payload.defaultModelId)
@@ -728,6 +741,12 @@ export function LabAiChatPanel() {
     setIsNearBottom(true)
   }, [resolvedActiveSessionId])
 
+  useEffect(() => {
+    if (!resolvedActiveSessionId || typeof window === "undefined") return
+    const key = `${WEB_SEARCH_STORAGE_KEY_PREFIX}${resolvedActiveSessionId}`
+    setIsWebSearchEnabled(window.localStorage.getItem(key) === "on")
+  }, [resolvedActiveSessionId])
+
   const updateBottomState = useCallback(() => {
     const viewport = messageViewportRef.current
     if (!viewport) return
@@ -804,6 +823,18 @@ export function LabAiChatPanel() {
     const next = isThinkingMode ? activeModel.id : activeModel.thinkingId
     if (next && next !== resolvedModelId) handleModelSelect(next)
   }, [activeModel, handleModelSelect, isThinkingMode, resolvedModelId])
+
+  const handleWebSearchToggle = useCallback(() => {
+    if (!resolvedActiveSessionId) return
+    setIsWebSearchEnabled((current) => {
+      const next = !current
+      if (typeof window !== "undefined") {
+        const key = `${WEB_SEARCH_STORAGE_KEY_PREFIX}${resolvedActiveSessionId}`
+        window.localStorage.setItem(key, next ? "on" : "off")
+      }
+      return next
+    })
+  }, [resolvedActiveSessionId])
 
   const focusInput = useCallback(() => {
     const element = chatInputRef.current
@@ -1008,6 +1039,7 @@ export function LabAiChatPanel() {
             locale: language,
             sessionId: resolvedActiveSessionId,
             modelId: resolvedModelId,
+            webSearchEnabled: isWebSearchEnabled,
           }),
         })
 
@@ -1017,6 +1049,7 @@ export function LabAiChatPanel() {
           const decoder = new TextDecoder()
           let buffer = ""
           let streamAcc = ""
+          let statusMessages: string[] = []
 
           while (true) {
             const { done, value } = await reader.read()
@@ -1042,6 +1075,14 @@ export function LabAiChatPanel() {
                   setMessages((current) => current.map((message) => (
                     message.id === optimisticAssistant.id
                       ? { ...message, content: snapshot, pending: true }
+                      : message
+                  )))
+                } else if (eventType === "status" && typeof parsed.message === "string") {
+                  statusMessages = [...statusMessages, parsed.message].slice(-4)
+                  const statusText = statusMessages.map((line) => `• ${line}`).join("\n")
+                  setMessages((current) => current.map((message) => (
+                    message.id === optimisticAssistant.id
+                      ? { ...message, content: statusText, pending: true }
                       : message
                   )))
                 } else if (eventType === "done") {
@@ -1098,6 +1139,7 @@ export function LabAiChatPanel() {
     language,
     resolvedActiveSessionId,
     resolvedModelId,
+    isWebSearchEnabled,
     scrollToBottom,
     serverNowMs,
     syncServerClock,
@@ -1105,6 +1147,9 @@ export function LabAiChatPanel() {
 
   const hasMessages = messages.length > 0
   const sidebarToggleLabel = isSidebarOpen ? copy.closeSidebar : copy.openSidebar
+  const webSearchQuotaLabel = webSearch
+    ? `${webSearch.sessionRemaining}/${webSearch.sessionLimit} · ${webSearch.monthRemaining}/${webSearch.monthLimit}`
+    : null
   const markdownComponents = useMemo<Components>(() => ({
     pre({ children, node, ...props }) {
       void node
@@ -1359,6 +1404,25 @@ export function LabAiChatPanel() {
                 <span className="hidden sm:inline">{copy.thinking}</span>
               </button>
             ) : null}
+
+            <button
+              type="button"
+              onClick={handleWebSearchToggle}
+              disabled={!resolvedActiveSessionId || isPending}
+              className={cn(
+                "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+                isWebSearchEnabled
+                  ? "border-accent/35 bg-accent/10 text-accent dark:bg-accent/15"
+                  : "border-border bg-card/75 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              title={webSearchQuotaLabel ? `${copy.webSearchHint} (${webSearchQuotaLabel})` : copy.webSearchHint}
+            >
+              <Globe className="size-4" />
+              <span className="hidden sm:inline">{copy.webSearch}</span>
+              <span className="hidden md:inline text-[11px] opacity-80">
+                {isWebSearchEnabled ? copy.webSearchOn : copy.webSearchOff}
+              </span>
+            </button>
 
             <button
               type="button"

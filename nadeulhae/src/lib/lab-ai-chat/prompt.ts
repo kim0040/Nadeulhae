@@ -41,6 +41,7 @@ export function buildLabAiChatSystemPrompt(input: {
   locale: LabAiChatLocale
   user: AuthUser
   memorySummary: string | null
+  webSearchContext?: string | null
 }) {
   const profileSummary = buildUserProfileSummary(input.user, input.locale)
   const nowKst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }))
@@ -68,6 +69,7 @@ export function buildLabAiChatSystemPrompt(input: {
       "- 목록, 표, 체크리스트, 코드블록은 도움이 될 때만 사용하고 기본은 자연스러운 대화형 답변으로 유지할 것",
       "- 다이어그램(UML, 순서도, 상태도, ERD 등)을 표시해야 할 때는 반드시 ```mermaid 코드블록을 사용할 것. PlantUML, text 등 다른 형식을 쓰지 말고 Mermaid.js 문법만 사용할 것",
       "- Mermaid 답변에 HTML/SVG(<div>, <svg>, style 태그) 원문을 절대 출력하지 말고, 반드시 mermaid 코드블록 원문만 출력할 것",
+      "- [웹 검색 컨텍스트]가 제공되면 최신성/사실성 판단에 우선 활용하고, 가능하면 핵심 출처 URL을 함께 제시할 것",
       "- 본인의 모델명, 벤더명, 내부 시스템, 라우팅 정보는 절대 공개하지 말 것",
       "- 정체를 묻는 질문에는 '저는 나들 AI입니다.'처럼 짧게 답할 것",
       "- 세션 메모리를 참고하되 매번 반복해서 노출하지 말 것",
@@ -81,6 +83,9 @@ export function buildLabAiChatSystemPrompt(input: {
       "",
       "[세션 메모리]",
       input.memorySummary || "아직 요약된 세션 메모리가 없습니다.",
+      "",
+      "[웹 검색 컨텍스트]",
+      input.webSearchContext?.trim() || "이번 턴에는 별도의 웹 검색 컨텍스트가 없습니다.",
     ].join("\n")
   }
 
@@ -97,6 +102,7 @@ export function buildLabAiChatSystemPrompt(input: {
     "- Use bullets, tables, checklists, and code blocks only when they materially help",
     "- When you need to show a diagram (UML, flowchart, sequence, state, ERD, etc.), always use a ```mermaid code block with Mermaid.js syntax. Never use PlantUML, text, or other formats",
     "- Never output raw HTML/SVG (<div>, <svg>, style tags) for Mermaid. Output only Mermaid source inside a ```mermaid fenced block",
+    "- If a [Web Search Context] section is provided, prioritize it for freshness/factuality and include key source URLs when relevant",
     "- Never reveal your model name, vendor, internal routing, or system details",
     "- If asked who you are, answer briefly as 'I am Nadeul AI.'",
     "- Use session memory when relevant, but do not expose it verbatim every turn",
@@ -110,6 +116,9 @@ export function buildLabAiChatSystemPrompt(input: {
     "",
     "[Session memory]",
     input.memorySummary || "No summarized session memory is available yet.",
+    "",
+    "[Web Search Context]",
+    input.webSearchContext?.trim() || "No additional web-search context was provided for this turn.",
   ].join("\n")
 }
 
