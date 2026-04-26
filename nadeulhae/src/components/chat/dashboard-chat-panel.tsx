@@ -12,6 +12,7 @@ import { useLanguage } from "@/context/LanguageContext"
 import type { AuthUser } from "@/lib/auth/types"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { ChatConversationMessage, ChatStateResponse } from "@/lib/chat/types"
+import { highlightCode, normalizeCodeLanguage, type HighlightKind } from "@/lib/markdown/code-highlighting"
 import { sanitizeAssistantMarkdown } from "@/lib/markdown/sanitize-assistant-markdown"
 import {
   computeServerClockOffsetMs,
@@ -27,6 +28,19 @@ type UiChatMessage = ChatConversationMessage & {
 type ChatStateApiResponse = ChatStateResponse & {
   serverNow?: unknown
   error?: string
+}
+
+const TOKEN_CLASS_BY_KIND: Record<HighlightKind, string> = {
+  plain: "text-slate-800 dark:text-slate-200",
+  comment: "text-slate-500 italic dark:text-slate-400",
+  function: "text-teal-700 dark:text-teal-300",
+  keyword: "text-blue-700 dark:text-blue-300",
+  meta: "text-amber-700 dark:text-amber-300",
+  number: "text-amber-700 dark:text-amber-300",
+  operator: "text-slate-700/80 dark:text-slate-300/80",
+  property: "text-violet-700 dark:text-violet-300",
+  string: "text-emerald-700 dark:text-emerald-300",
+  type: "text-orange-700 dark:text-orange-300",
 }
 
 const CHAT_PANEL_COPY = {
@@ -149,6 +163,8 @@ function DashboardMarkdownCodeBlock({
 }) {
   const [copied, setCopied] = useState(false)
   const timeoutRef = useRef<number | null>(null)
+  const normalizedLanguage = useMemo(() => normalizeCodeLanguage(language), [language])
+  const tokens = useMemo(() => highlightCode(code, normalizedLanguage.id), [code, normalizedLanguage.id])
 
   useEffect(() => {
     return () => {
@@ -163,12 +179,10 @@ function DashboardMarkdownCodeBlock({
     timeoutRef.current = window.setTimeout(() => setCopied(false), 1600)
   }, [code])
 
-  const label = language ? language.toUpperCase() : "Text"
-
   return (
     <div className="not-prose my-3 overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-colors">
       <div className="flex items-center justify-between border-b border-border bg-muted/55 px-3 py-2">
-        <span className="truncate text-xs font-semibold text-foreground/80">{label}</span>
+        <span className="truncate text-xs font-semibold text-foreground/80">{normalizedLanguage.label}</span>
         <button
           type="button"
           onClick={() => void handleCopy()}
@@ -180,7 +194,13 @@ function DashboardMarkdownCodeBlock({
         </button>
       </div>
       <pre className="m-0 max-h-[28rem] overflow-auto bg-card p-4 text-left custom-scrollbar">
-        <code className="block min-w-full whitespace-pre font-mono text-[13px] leading-6 text-foreground">{code}</code>
+        <code className="block min-w-full whitespace-pre font-mono text-[13px] leading-6">
+          {tokens.map((token, index) => (
+            <span key={`${index}-${token.kind}`} className={TOKEN_CLASS_BY_KIND[token.kind]}>
+              {token.text}
+            </span>
+          ))}
+        </code>
       </pre>
     </div>
   )
