@@ -51,6 +51,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-XSS-Protection": "0",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr; font-src 'self'; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
 }
 
 const STATIC_CACHE_HEADERS: Record<string, string> = {

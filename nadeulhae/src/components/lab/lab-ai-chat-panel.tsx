@@ -27,9 +27,11 @@ import { useLanguage } from "@/context/LanguageContext"
 import type { LabAiChatConversationMessage, LabAiChatStateResponse } from "@/lib/lab-ai-chat/types"
 import {
   computeServerClockOffsetMs,
+  formatServerRelativeTime,
   getServerNowMs,
 } from "@/lib/time/server-time"
 import { cn } from "@/lib/utils"
+import { MermaidDiagram } from "@/components/lab/mermaid-diagram"
 
 type UiChatMessage = LabAiChatConversationMessage & {
   pending?: boolean
@@ -90,6 +92,8 @@ const COPY = {
     attachFileError: "파일을 읽지 못했어요.",
     copyCode: "복사",
     copiedCode: "복사됨",
+    copyMessage: "답변 복사",
+    copiedMessage: "복사됨",
     scrollBottom: "최신 메시지로 이동",
     shortcutHint: "Enter로 보내고 Shift+Enter로 줄을 바꿀 수 있어요.",
     footerHint: "나들 AI는 실수를 할 수 있으니 중요한 내용은 한 번 더 확인해 주세요.",
@@ -138,6 +142,8 @@ const COPY = {
     attachFileError: "Failed to read the file.",
     copyCode: "Copy",
     copiedCode: "Copied",
+    copyMessage: "Copy response",
+    copiedMessage: "Copied",
     scrollBottom: "Jump to latest message",
     shortcutHint: "Enter to send, Shift+Enter for a new line.",
     footerHint: "Nadeul AI can make mistakes. Check important details before acting.",
@@ -231,6 +237,7 @@ const LANGUAGE_ALIASES: Record<string, { id: string; label: string }> = {
   javascript: { id: "javascript", label: "JavaScript" },
   json: { id: "json", label: "JSON" },
   jsx: { id: "jsx", label: "JSX" },
+  mermaid: { id: "mermaid", label: "Mermaid" },
   md: { id: "markdown", label: "Markdown" },
   markdown: { id: "markdown", label: "Markdown" },
   py: { id: "python", label: "Python" },
@@ -358,6 +365,36 @@ async function copyTextToClipboard(text: string) {
   textarea.select()
   document.execCommand("copy")
   document.body.removeChild(textarea)
+}
+
+function MessageCopyButton({ text, copyLabel, copiedLabel }: { text: string; copyLabel: string; copiedLabel: string }) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current != null) window.clearTimeout(timeoutRef.current)
+    }
+  }, [])
+
+  const handleClick = useCallback(async () => {
+    await copyTextToClipboard(text)
+    setCopied(true)
+    if (timeoutRef.current != null) window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = window.setTimeout(() => setCopied(false), 1600)
+  }, [text])
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleClick()}
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground/60 transition hover:bg-muted hover:text-foreground active:scale-[0.97]"
+      aria-label={copied ? copiedLabel : copyLabel}
+    >
+      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+      <span className="hidden sm:inline">{copied ? copiedLabel : copyLabel}</span>
+    </button>
+  )
 }
 
 function MarkdownCodeBlock({
@@ -1194,7 +1231,11 @@ export function LabAiChatPanel() {
     pre({ children, node, ...props }) {
       void node
       const childArray = Children.toArray(children)
-      if (childArray.length === 1 && isValidElement(childArray[0]) && childArray[0].type === MarkdownCodeBlock) {
+      if (
+        childArray.length === 1 &&
+        isValidElement(childArray[0]) &&
+        (childArray[0].type === MarkdownCodeBlock || childArray[0].type === MermaidDiagram)
+      ) {
         return <>{childArray[0]}</>
       }
 
@@ -1205,6 +1246,16 @@ export function LabAiChatPanel() {
       const codeText = Children.toArray(children).join("").replace(/\n$/, "")
       const language = /language-([A-Za-z0-9_+#.-]+)/.exec(className ?? "")?.[1] ?? null
       const isBlock = Boolean(language) || codeText.includes("\n")
+
+      if (isBlock && language?.toLowerCase() === "mermaid") {
+        return (
+          <MermaidDiagram
+            code={codeText}
+            copyLabel={copy.copyCode}
+            copiedLabel={copy.copiedCode}
+          />
+        )
+      }
 
       if (isBlock) {
         return (
@@ -1475,20 +1526,25 @@ export function LabAiChatPanel() {
                     <div
                       key={message.id}
                       className={cn(
-                        "lab-chat-message flex w-full gap-2 sm:gap-3",
+                        "lab-chat-message flex w-full gap-1.5 sm:gap-3",
                         isUser ? "justify-end" : "justify-start"
                       )}
                     >
-                      {!isUser ? <NadeulAiMark className="hidden sm:flex" /> : null}
+                      {!isUser ? <NadeulAiMark className="mt-0.5 shrink-0" /> : null}
                       <div
                         className={cn(
                           "min-w-0",
-                          isUser ? "max-w-[min(94%,42rem)] sm:max-w-[min(82%,42rem)]" : "max-w-[min(100%,48rem)] flex-1"
+                          isUser ? "max-w-[min(82%,42rem)] sm:max-w-[min(78%,42rem)]" : "max-w-[min(92%,48rem)] flex-1 sm:max-w-[min(100%,48rem)]"
                         )}
                       >
                         {isUser ? (
-                          <div className="rounded-lg bg-accent px-3.5 py-2.5 text-[15px] leading-7 text-accent-foreground shadow-sm transition-colors duration-300 sm:px-4 sm:py-3 sm:text-base">
-                            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                          <div className="flex flex-col items-end gap-0.5">
+                            <div className="rounded-2xl rounded-tr-sm bg-accent px-3.5 py-2.5 text-[15px] leading-7 text-accent-foreground shadow-sm transition-colors duration-300 sm:px-4 sm:py-3 sm:text-base">
+                              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                            </div>
+                            <span className="px-1 text-[10px] tabular-nums text-muted-foreground/50">
+                              {formatServerRelativeTime(message.createdAt, serverNowMs, language)}
+                            </span>
                           </div>
                         ) : message.pending ? (
                           <div className="flex flex-col items-start gap-3">
@@ -1504,11 +1560,16 @@ export function LabAiChatPanel() {
                               thoughtPoints={thoughtSummary.points}
                             />
                             {message.content ? (
-                              <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base">
-                                <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
-                                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                                    {message.content}
-                                  </ReactMarkdown>
+                              <div className="flex flex-col gap-1">
+                                <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base">
+                                  <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                                      {message.content}
+                                    </ReactMarkdown>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-end">
+                                  <MessageCopyButton text={message.content} copyLabel={copy.copyMessage} copiedLabel={copy.copiedMessage} />
                                 </div>
                               </div>
                             ) : (
@@ -1519,11 +1580,19 @@ export function LabAiChatPanel() {
                             )}
                           </div>
                         ) : (
-                          <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base">
-                            <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                                {message.content}
-                              </ReactMarkdown>
+                          <div className="flex flex-col gap-1">
+                            <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base">
+                              <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                                  {message.content}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] leading-none text-muted-foreground/50">
+                                {formatServerRelativeTime(message.createdAt, serverNowMs, language)}
+                              </span>
+                              <MessageCopyButton text={message.content} copyLabel={copy.copyMessage} copiedLabel={copy.copiedMessage} />
                             </div>
                           </div>
                         )}
@@ -1559,11 +1628,10 @@ export function LabAiChatPanel() {
             <button
               type="button"
               onClick={() => scrollToBottom("smooth")}
-              className="absolute bottom-4 left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-lg border border-border bg-background/90 px-3 py-2 text-sm font-semibold text-foreground shadow-lg shadow-foreground/10 backdrop-blur transition duration-200 hover:bg-muted active:scale-[0.98]"
+              className="absolute bottom-20 right-3 z-20 inline-flex size-9 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-lg shadow-foreground/10 backdrop-blur transition duration-200 hover:bg-muted active:scale-[0.95]"
               aria-label={copy.scrollBottom}
             >
               <ArrowDown className="size-4" />
-              <span className="hidden sm:inline">{copy.scrollBottom}</span>
             </button>
           ) : null}
         </div>

@@ -1,12 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react"
+import { Children, isValidElement, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { LoaderCircle, Plus, SendHorizonal, Sparkles, Trash2 } from "lucide-react"
 
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
+import { MermaidDiagram } from "@/components/lab/mermaid-diagram"
 import { useLanguage } from "@/context/LanguageContext"
 import type { AuthUser } from "@/lib/auth/types"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
@@ -55,6 +56,8 @@ const CHAT_PANEL_COPY = {
     emptyTitle: "원하는 나들이를 바로 물어보세요",
     emptyDescription: "날씨, 시간, 동행자를 함께 알려주면 더 정확한 코스를 추천해요.",
     intro: "안녕하세요! 지금 조건에 맞는 전주 나들이 계획을 함께 짜볼게요.",
+    copyCode: "복사",
+    copiedCode: "복사됨",
   },
   en: {
     title: "Outing mate",
@@ -83,6 +86,8 @@ const CHAT_PANEL_COPY = {
     emptyTitle: "Ask for your outing plan",
     emptyDescription: "Share weather, timing, and who you are going with for better suggestions.",
     intro: "Hello! I can build a Jeonju outing plan around your current conditions.",
+    copyCode: "Copy",
+    copiedCode: "Copied",
   },
 } as const
 
@@ -146,6 +151,32 @@ function ChatBubble({
   const showAvatar = !isUser && (groupPosition === "first" || groupPosition === "only")
   const showTimestamp = groupPosition === "last" || groupPosition === "only"
 
+  const copy = CHAT_PANEL_COPY[language]
+
+  const markdownComponents = useMemo<Components>(() => ({
+    pre({ children, node, ...props }) {
+      void node
+      const childArray = Children.toArray(children)
+      if (
+        childArray.length === 1 &&
+        isValidElement(childArray[0]) &&
+        childArray[0].type === MermaidDiagram
+      ) {
+        return <>{childArray[0]}</>
+      }
+      return <pre {...props}>{children}</pre>
+    },
+    code({ children, className, node, ...props }) {
+      void node
+      const codeText = Children.toArray(children).join("").replace(/\n$/, "")
+      const lang = /language-([A-Za-z0-9_+#.-]+)/.exec(className ?? "")?.[1] ?? null
+      if (lang?.toLowerCase() === "mermaid") {
+        return <MermaidDiagram code={codeText} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} />
+      }
+      return <code {...props} className={className}>{children}</code>
+    },
+  }), [copy.copyCode, copy.copiedCode])
+
   const roundedClass = isUser
     ? groupPosition === "only"
       ? "rounded-2xl rounded-tr-sm"
@@ -190,7 +221,7 @@ function ChatBubble({
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1.5 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {message.content}
               </ReactMarkdown>
             </div>

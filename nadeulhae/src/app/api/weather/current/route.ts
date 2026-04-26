@@ -286,13 +286,20 @@ function getKstCompactTime() {
   return `${hour}${minute}`
 }
 
+const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
+  process.env.TRUST_PROXY_HEADERS ?? ""
+)
+
 function getClientIp(req: Request) {
+  if (!TRUST_PROXY_HEADERS) {
+    return "anonymous"
+  }
   const forwarded = req.headers.get("x-forwarded-for")
   if (forwarded) {
     return forwarded.split(",")[0].trim()
   }
   const realIp = req.headers.get("x-real-ip")
-  return realIp?.trim() || "127.0.0.1"
+  return realIp?.trim() || "anonymous"
 }
 
 function cleanupLastUpdateCache<T>(map: Map<string, CacheEntry<T>>, maxAgeMs: number, now: number) {
