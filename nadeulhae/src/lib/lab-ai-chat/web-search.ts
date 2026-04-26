@@ -105,6 +105,60 @@ function getTodayInKst() {
   }).format(new Date())
 }
 
+function getCurrentKstYear() {
+  const today = getTodayInKst()
+  const parsed = Number(today.slice(0, 4))
+  return Number.isFinite(parsed) ? parsed : new Date().getFullYear()
+}
+
+function extractYearFromText(text: string | null | undefined) {
+  if (!text) return null
+  const match = text.match(/(?:19|20)\d{2}/)
+  if (!match) return null
+  const year = Number(match[0])
+  if (!Number.isFinite(year) || year < 1900 || year > 2100) {
+    return null
+  }
+  return year
+}
+
+function hasCurrentYearCue(text: string) {
+  return /(이번|올해|금년|this year|current year|this season)/i.test(text)
+}
+
+function resolveRequestedYear(input: {
+  question: string
+  conversationHint: string | null
+  currentKstYear: number
+}) {
+  const fromQuestion = extractYearFromText(input.question)
+  if (fromQuestion) {
+    return fromQuestion
+  }
+  if (hasCurrentYearCue(input.question)) {
+    return input.currentKstYear
+  }
+
+  if (!input.conversationHint) {
+    return null
+  }
+
+  const lines = input.conversationHint.split("\n").reverse()
+  for (const line of lines) {
+    if (!line.startsWith("User: ")) continue
+    const userText = line.slice(6).trim()
+    const explicitYear = extractYearFromText(userText)
+    if (explicitYear) {
+      return explicitYear
+    }
+    if (hasCurrentYearCue(userText)) {
+      return input.currentKstYear
+    }
+  }
+
+  return null
+}
+
 function extractJsonObject(text: string) {
   const first = text.indexOf("{")
   const last = text.lastIndexOf("}")
@@ -196,8 +250,14 @@ function isFollowUpCue(question: string) {
   return /(다시|재검색|이어서|그거|그것|방금|방금거|위에|이전|same|again|that|those|it|previous)/i.test(question)
 }
 
-function isCacheLikelyRelevant(question: string, cachedQuery: string) {
+function isCacheLikelyRelevant(question: string, cachedQuery: string, requestedYear: number | null) {
   if (!question.trim() || !cachedQuery.trim()) return false
+  if (requestedYear !== null) {
+    const cachedYear = extractYearFromText(cachedQuery)
+    if (cachedYear !== null && cachedYear !== requestedYear) {
+      return false
+    }
+  }
   if (isFollowUpCue(question)) return true
 
   const questionTokens = normalizeSearchTokens(question)
@@ -220,6 +280,29 @@ function pickHighSignalResults<T extends { score: number }>(results: T[]) {
   return results.slice(0, Math.min(3, results.length))
 }
 
+function forceYearInQuery(query: string, year: number) {
+  const yearText = String(year)
+  if (/(?:19|20)\d{2}/.test(query)) {
+    return query.replace(/(?:19|20)\d{2}/g, yearText)
+  }
+  return `${query} ${yearText}`.trim()
+}
+
+function applyRequestedYearToPlan(plan: SearchPlan, requestedYear: number | null): SearchPlan {
+  if (requestedYear === null) {
+    return plan
+  }
+
+  return {
+    ...plan,
+    query: forceYearInQuery(plan.query, requestedYear),
+    fallbackQuery: plan.fallbackQuery ? forceYearInQuery(plan.fallbackQuery, requestedYear) : null,
+    timeRange: undefined,
+    startDate: `${requestedYear}-01-01`,
+    endDate: `${requestedYear}-12-31`,
+  }
+}
+
 function isExplicitSearchRequest(question: string) {
   return /(검색|찾아|찾아줘|알려줘|알려 줘|search|look ?up|find|현재|최신|속보|실시간|뉴스)/i.test(question)
 }
@@ -240,7 +323,7 @@ function buildConversationHint(
     .join("\n")
 }
 
-function buildFallbackPlan(question: string, conversationHint?: string | null): SearchPlan {
+function buildFallbackPlan(question: string, conversationHint?: string | null, requestedYear?: number | null): SearchPlan {
   const asksLatest = /(latest|today|current|now|news|breaking|최신|오늘|현재|실시간|속보)/i.test(question)
   const asksFinance = /(stock|shares|market|price|forex|crypto|주가|증시|환율|코인|금리)/i.test(question)
   const asksHistory = /(history|historical|century|조선|고대|역사|과거)/i.test(question)
@@ -263,7 +346,7 @@ function buildFallbackPlan(question: string, conversationHint?: string | null): 
     }
   }
 
-  return {
+  return applyRequestedYearToPlan({
     needSearch,
     useCacheFirst: true,
     cacheUsable: true,
@@ -276,7 +359,7 @@ function buildFallbackPlan(question: string, conversationHint?: string | null): 
     country: null,
     includeDomains: [],
     excludeDomains: [],
-  }
+  }, requestedYear ?? null)
 }
 
 async function buildSearchPlan(input: {
@@ -287,6 +370,7 @@ async function buildSearchPlan(input: {
   cacheUpdatedAt: string | null
   cachePreview: string | null
   conversationHint: string | null
+  requestedYear: number | null
 }) {
   // Fast-path: greetings never need search
   if (isGreeting(input.question)) {
@@ -338,6 +422,7 @@ async function buildSearchPlan(input: {
     "- Set need_search=false for pure writing/style edits, math/code reasoning that does not require external sources, or greetings/chit-chat.",
     "- IMPORTANT: If the user asks you to 'search', 'find', 'look up', '검색', '찾아', '알려줘', etc., ALWAYS set need_search to true.",
     "- IMPORTANT: If the user question is a vague follow-up (e.g., '다시 검색해줘', 'search again'), use the Conversation context and Cached query to determine the actual search topic and generate a proper query.",
+    "- IMPORTANT: If the user indicates '이번/올해/this year/current year', treat it as the current KST year and do not switch to prior years.",
   ].join("\n")
 
   const plannerInput = [
@@ -363,7 +448,7 @@ async function buildSearchPlan(input: {
     const raw = completion.content.trim()
     const jsonText = extractJsonObject(raw)
     if (!jsonText) {
-      return buildFallbackPlan(input.question, input.conversationHint)
+      return buildFallbackPlan(input.question, input.conversationHint, input.requestedYear)
     }
     const parsed = JSON.parse(jsonText) as Record<string, unknown>
 
@@ -374,7 +459,7 @@ async function buildSearchPlan(input: {
       needSearch = true
     }
 
-    return {
+    const parsedPlan = {
       needSearch,
       useCacheFirst: safeBool(parsed.use_cache_first, true),
       cacheUsable: safeBool(parsed.cache_usable, true),
@@ -388,8 +473,9 @@ async function buildSearchPlan(input: {
       includeDomains: safeDomainList(parsed.include_domains, 20),
       excludeDomains: safeDomainList(parsed.exclude_domains, 20),
     } satisfies SearchPlan
+    return applyRequestedYearToPlan(parsedPlan, input.requestedYear)
   } catch {
-    return buildFallbackPlan(input.question, input.conversationHint)
+    return buildFallbackPlan(input.question, input.conversationHint, input.requestedYear)
   }
 }
 
@@ -489,6 +575,12 @@ export async function resolveLabAiChatWebSearchContext(input: {
   }
 
   const conversationHint = buildConversationHint(input.recentMessages)
+  const currentKstYear = getCurrentKstYear()
+  const requestedYear = resolveRequestedYear({
+    question: input.question,
+    conversationHint,
+    currentKstYear,
+  })
 
   input.onStatus?.(toLocaleStatus(input.locale, "check_cache"))
   const cached = await getLabAiChatWebSearchCache({
@@ -501,7 +593,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
   const cacheRelevant = Boolean(
     cachedResult
     && cachedQuery
-    && isCacheLikelyRelevant(input.question, cachedQuery)
+    && isCacheLikelyRelevant(input.question, cachedQuery, requestedYear)
   )
 
   input.onStatus?.(toLocaleStatus(input.locale, "planning"))
@@ -513,6 +605,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
     cacheUpdatedAt: cachedUpdatedAt,
     cachePreview: cachedResult?.slice(0, 1200) ?? null,
     conversationHint,
+    requestedYear,
   })
 
   if (cacheRelevant && cachedQuery && cachedResult && plan.useCacheFirst && plan.cacheUsable) {
