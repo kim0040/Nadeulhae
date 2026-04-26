@@ -1419,9 +1419,6 @@ export function LabAiChatPanel() {
             >
               <Globe className="size-4" />
               <span className="hidden sm:inline">{copy.webSearch}</span>
-              <span className="hidden md:inline text-[11px] opacity-80">
-                {isWebSearchEnabled ? copy.webSearchOn : copy.webSearchOff}
-              </span>
             </button>
 
             <button
