@@ -626,6 +626,8 @@ export async function resolveLabAiChatWebSearchContext(input: {
     return { context: null, source: "none" }
   }
 
+  const forcedTopic: TavilyTopic = "general"
+
 
   const runSearch = async (query: string, isFallback = false) => {
     const reservation = await reserveLabAiChatWebSearchCall({
@@ -651,7 +653,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
       const hasAbsoluteRange = Boolean(plan.startDate || plan.endDate)
       const response = await createTavilySearch({
         query,
-        topic: plan.topic,
+        topic: forcedTopic,
         searchDepth: "basic",
         maxResults: 5,
         includeAnswer: "basic",
@@ -676,7 +678,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
       const context = buildSearchContextText({
         locale: input.locale,
         query: response.query,
-        topic: plan.topic,
+        topic: forcedTopic,
         timeRange: plan.timeRange,
         startDate: plan.startDate,
         endDate: plan.endDate,
@@ -691,7 +693,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
         query: response.query,
         resultText: context,
         resultCount: selectedResults.length,
-        topic: plan.topic,
+        topic: forcedTopic,
         timeRange: plan.timeRange ?? null,
         startDate: plan.startDate,
         endDate: plan.endDate,
