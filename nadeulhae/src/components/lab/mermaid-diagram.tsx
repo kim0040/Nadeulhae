@@ -5,6 +5,9 @@ import { Check, Copy, AlertTriangle } from "lucide-react"
 
 const MERMAID_ERROR_SVG_RE = /aria-roledescription="error"|class="error-icon"|Syntax error in text/i
 const HTML_BLOCK_RE = /<\s*(svg|div)\b/i
+const SCRIPT_TAG_RE = /<script\b[^>]*>[\s\S]*?<\/script>/gi
+const EVENT_HANDLER_ATTR_RE = /\son[a-z]+\s*=\s*(['"])[\s\S]*?\1/gi
+const JS_URL_ATTR_RE = /\s(?:href|xlink:href)\s*=\s*(['"])\s*javascript:[\s\S]*?\1/gi
 
 function normalizeMermaidErrorMessage(raw: string) {
   const compact = raw.replace(/\s+/g, " ").trim()
@@ -19,6 +22,13 @@ function normalizeMermaidErrorMessage(raw: string) {
   }
 
   return compact.length > 320 ? `${compact.slice(0, 317)}...` : compact
+}
+
+function sanitizeRenderedSvg(rawSvg: string) {
+  return rawSvg
+    .replace(SCRIPT_TAG_RE, "")
+    .replace(EVENT_HANDLER_ATTR_RE, "")
+    .replace(JS_URL_ATTR_RE, "")
 }
 
 async function copyTextToClipboard(text: string) {
@@ -121,14 +131,15 @@ export function MermaidDiagram({
 
         const id = `mermaid-${currentRenderId}-${Date.now()}`
         const { svg: renderedSvg } = await mermaid.render(id, code)
+        const safeSvg = sanitizeRenderedSvg(renderedSvg)
 
         if (!cancelled) {
-          if (MERMAID_ERROR_SVG_RE.test(renderedSvg)) {
+          if (MERMAID_ERROR_SVG_RE.test(safeSvg)) {
             setSvg(null)
             setError("Mermaid syntax error. Please check the diagram type and syntax.")
             return
           }
-          setSvg(renderedSvg)
+          setSvg(safeSvg)
           setError(null)
         }
       } catch (err) {

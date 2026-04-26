@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useSyncExternalStore, useTransition } from "react"
 import Link from "next/link"
-import { BarChart3, ShieldCheck } from "lucide-react"
+import { ChartColumn, ShieldCheck } from "lucide-react"
 
 import { BorderBeam } from "@/components/magicui/border-beam"
 import { MagicCard } from "@/components/magicui/magic-card"
@@ -186,7 +186,7 @@ export function AnalyticsConsentBanner() {
                 </div>
                 <div className="rounded-[1.35rem] border border-card-border/70 bg-background/70 p-4">
                   <div className="flex items-center gap-2 text-sm font-black text-foreground">
-                    <BarChart3 className="size-4 text-sky-blue" />
+                    <ChartColumn className="size-4 text-sky-blue" />
                     {copy.allowTitle}
                   </div>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
