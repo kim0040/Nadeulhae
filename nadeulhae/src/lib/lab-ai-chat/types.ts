@@ -55,6 +55,12 @@ export interface LabAiChatWebSearchSnapshot {
   sessionLimit: number
   sessionUsed: number
   sessionRemaining: number
+  primaryLimit: number
+  primaryUsed: number
+  primaryRemaining: number
+  fallbackLimit: number
+  fallbackUsed: number
+  fallbackRemaining: number
   monthLimit: number
   monthUsed: number
   monthRemaining: number

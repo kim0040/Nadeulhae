@@ -1,4 +1,5 @@
 import { getDbPool } from "@/lib/db"
+import type { RowDataPacket } from "mysql2/promise"
 
 declare global {
   var __nadeulhaeLabAiChatSchemaPromise: Promise<void> | undefined
@@ -104,6 +105,7 @@ const createLabAiChatWebSearchStateTableSql = `
     user_id CHAR(36) NOT NULL,
     session_id BIGINT NOT NULL,
     session_call_count INT UNSIGNED NOT NULL DEFAULT 0,
+    fallback_call_count INT UNSIGNED NOT NULL DEFAULT 0,
     cache_query_text LONGTEXT NULL,
     cache_result_text LONGTEXT NULL,
     cache_topic VARCHAR(16) NULL,
@@ -119,6 +121,18 @@ const createLabAiChatWebSearchStateTableSql = `
     KEY idx_lab_ai_chat_web_state_cache (cache_updated_at)
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
+
+async function ensureWebSearchStateColumns() {
+  const pool = getDbPool()
+  const [fallbackColumnRows] = await pool.query<RowDataPacket[]>(
+    "SHOW COLUMNS FROM lab_ai_chat_web_search_state LIKE 'fallback_call_count'"
+  )
+  if (fallbackColumnRows.length === 0) {
+    await pool.query(
+      "ALTER TABLE lab_ai_chat_web_search_state ADD COLUMN fallback_call_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER session_call_count"
+    )
+  }
+}
 
 const createLabAiChatWebSearchUsageMonthlyTableSql = `
   CREATE TABLE IF NOT EXISTS lab_ai_chat_web_search_usage_monthly (
@@ -145,6 +159,7 @@ export async function ensureLabAiChatSchema() {
     await pool.query(createLabAiChatRequestEventsTableSql)
     await pool.query(createLabAiChatWebSearchStateTableSql)
     await pool.query(createLabAiChatWebSearchUsageMonthlyTableSql)
+    await ensureWebSearchStateColumns()
   })()
 
   globalThis.__nadeulhaeLabAiChatSchemaPromise = bootstrapPromise.catch((error) => {

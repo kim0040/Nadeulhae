@@ -101,7 +101,7 @@ const COPY = {
     webSearch: "웹검색",
     webSearchOn: "켜짐",
     webSearchOff: "꺼짐",
-    webSearchHint: "필요할 때만 웹 검색을 사용하고, 세션당 최대 5회까지 호출합니다.",
+    webSearchHint: "필요할 때만 웹 검색을 사용합니다. 세션당 일반 7회 + 폴백 3회, 월 800회 제한입니다.",
     scrollBottom: "최신 메시지로 이동",
     shortcutHint: "Enter로 보내고 Shift+Enter로 줄을 바꿀 수 있어요.",
     footerHint: "나들 AI는 실수를 할 수 있으니 중요한 내용은 한 번 더 확인해 주세요.",
@@ -155,7 +155,7 @@ const COPY = {
     webSearch: "Web search",
     webSearchOn: "On",
     webSearchOff: "Off",
-    webSearchHint: "Use web search only when needed. Max 5 calls per session.",
+    webSearchHint: "Use web search only when needed. Session limit: 7 regular calls + 3 fallback retries, with a monthly cap of 800.",
     scrollBottom: "Jump to latest message",
     shortcutHint: "Enter to send, Shift+Enter for a new line.",
     footerHint: "Nadeul AI can make mistakes. Check important details before acting.",
@@ -1149,7 +1149,7 @@ export function LabAiChatPanel() {
   const hasMessages = messages.length > 0
   const sidebarToggleLabel = isSidebarOpen ? copy.closeSidebar : copy.openSidebar
   const webSearchQuotaLabel = webSearch
-    ? `${webSearch.sessionRemaining}/${webSearch.sessionLimit} · ${webSearch.monthRemaining}/${webSearch.monthLimit}`
+    ? `${webSearch.sessionRemaining}/${webSearch.sessionLimit} (R ${webSearch.primaryRemaining}/${webSearch.primaryLimit}, F ${webSearch.fallbackRemaining}/${webSearch.fallbackLimit}) · ${webSearch.monthRemaining}/${webSearch.monthLimit}`
     : null
   const markdownComponents = useMemo<Components>(() => ({
     pre({ children, node, ...props }) {

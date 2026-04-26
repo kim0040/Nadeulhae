@@ -33,8 +33,16 @@ function parseFractionEnv(raw: string | undefined, fallback: number) {
 
 export const LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT = parsePositiveIntEnv(
   process.env.LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT,
-  5
+  7
 )
+
+export const LAB_AI_CHAT_WEB_SEARCH_FALLBACK_CALL_LIMIT = parsePositiveIntEnv(
+  process.env.LAB_AI_CHAT_WEB_SEARCH_FALLBACK_CALL_LIMIT,
+  3
+)
+
+export const LAB_AI_CHAT_WEB_SEARCH_SESSION_TOTAL_CALL_LIMIT =
+  LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT + LAB_AI_CHAT_WEB_SEARCH_FALLBACK_CALL_LIMIT
 
 export const LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT = parsePositiveIntEnv(
   process.env.LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT,
