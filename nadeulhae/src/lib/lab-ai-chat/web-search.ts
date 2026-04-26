@@ -472,12 +472,14 @@ export async function resolveLabAiChatWebSearchContext(input: {
 
 
   const runSearch = async (query: string) => {
+    console.log(`[web-search] runSearch called with query="${query.slice(0, 60)}"`)
     const reservation = await reserveLabAiChatWebSearchCall({
       userId: input.userId,
       sessionId: input.sessionId,
     })
 
     if (!reservation.allowed) {
+      console.log(`[web-search] runSearch BLOCKED: ${reservation.reason}`)
       if (reservation.reason === "session_limit_reached") {
         input.onStatus?.(toLocaleStatus(input.locale, "search_limit"))
       } else {
@@ -486,6 +488,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
       return { blocked: true as const, context: null }
     }
 
+    console.log("[web-search] runSearch reservation allowed, calling Tavily...")
     try {
       input.onStatus?.(toLocaleStatus(input.locale, "searching"))
       const response = await createTavilySearch({
@@ -501,12 +504,15 @@ export async function resolveLabAiChatWebSearchContext(input: {
         country: plan.country ?? undefined,
       })
 
+      console.log(`[web-search] Tavily response: results=${response.results.length} | query="${response.query?.slice(0, 60)}"`)
+
       await recordLabAiChatWebSearchOutcome({
         metricMonth: reservation.metricMonth,
         success: true,
       })
 
       if (response.results.length === 0) {
+        console.log("[web-search] runSearch: 0 results, returning null context")
         return { blocked: false as const, context: null }
       }
 
@@ -522,6 +528,8 @@ export async function resolveLabAiChatWebSearchContext(input: {
         results: response.results,
       })
 
+      console.log(`[web-search] runSearch SUCCESS: context length=${context.length}`)
+
       await persistLabAiChatWebSearchCache({
         userId: input.userId,
         sessionId: input.sessionId,
@@ -536,6 +544,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
 
       return { blocked: false as const, context }
     } catch (error) {
+      console.error(`[web-search] runSearch ERROR:`, error instanceof Error ? `${error.name}: ${error.message}` : error)
       await recordLabAiChatWebSearchOutcome({
         metricMonth: reservation.metricMonth,
         success: false,
@@ -551,19 +560,24 @@ export async function resolveLabAiChatWebSearchContext(input: {
   }
 
   const first = await runSearch(plan.query)
+  console.log(`[web-search] first search result: context=${first.context ? `yes(${first.context.length})` : "null"} | blocked=${first.blocked}`)
   if (first.context) {
+    console.log("[web-search] DONE: returning live search context")
     return { context: first.context, source: "live" }
   }
 
   if (!first.blocked && plan.fallbackQuery && plan.fallbackQuery !== plan.query) {
+    console.log(`[web-search] Retrying with fallback query="${plan.fallbackQuery.slice(0, 60)}"`)
     input.onStatus?.(toLocaleStatus(input.locale, "retrying"))
     const second = await runSearch(plan.fallbackQuery)
     if (second.context) {
+      console.log("[web-search] DONE: returning fallback search context")
       return { context: second.context, source: "live" }
     }
   }
 
   if (cached?.result && cached.query) {
+    console.log("[web-search] DONE: falling back to cached context")
     input.onStatus?.(toLocaleStatus(input.locale, "using_cache"))
     return {
       context: buildCachedContextText({
@@ -576,5 +590,6 @@ export async function resolveLabAiChatWebSearchContext(input: {
     }
   }
 
+  console.log("[web-search] DONE: no context available, returning null")
   return { context: null, source: "none" }
 }
