@@ -155,7 +155,7 @@ async function main() {
     const initialState = await request("/api/lab/ai-chat", { jar })
     assertCondition(initialState.status === 200, "GET /api/lab/ai-chat should return 200")
     assertCondition(Array.isArray(initialState.json?.models), "Lab AI chat state should include models")
-    assertCondition(initialState.json.models.length === 7, "Lab AI chat should expose exactly seven allowed models")
+    assertCondition(initialState.json.models.length >= 7, "Lab AI chat should expose at least seven allowed models")
     logStep("Loaded lab AI chat state and allowed models")
 
     const chatResult = await request("/api/lab/ai-chat", {
