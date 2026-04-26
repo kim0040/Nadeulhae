@@ -10,8 +10,10 @@ import {
   LAB_AI_CHAT_MEMORY_SUMMARY_MAX_CHARACTERS,
   LAB_AI_CHAT_TIME_ZONE,
   LAB_AI_CHAT_WEB_SEARCH_CACHE_MAX_CHARACTERS,
+  LAB_AI_CHAT_WEB_SEARCH_FALLBACK_CALL_LIMIT,
   LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT,
   LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT,
+  LAB_AI_CHAT_WEB_SEARCH_SESSION_TOTAL_CALL_LIMIT,
   LAB_AI_CHAT_VISIBLE_MESSAGE_LIMIT,
   estimateLabAiChatTokens,
 } from "@/lib/lab-ai-chat/constants"
@@ -86,6 +88,7 @@ interface LabAiChatWebSearchStateRow extends RowDataPacket {
   user_id: string
   session_id: number
   session_call_count: number
+  fallback_call_count: number
   cache_query_text: string | null
   cache_result_text: string | null
   cache_topic: string | null
@@ -244,6 +247,11 @@ function toWebSearchSnapshot(input: {
   monthRow: LabAiChatWebSearchMonthlyUsageRow | null
 }): LabAiChatWebSearchSnapshot {
   const sessionUsed = Math.max(0, input.stateRow?.session_call_count ?? 0)
+  const fallbackUsed = Math.min(
+    sessionUsed,
+    Math.max(0, input.stateRow?.fallback_call_count ?? 0)
+  )
+  const primaryUsed = Math.max(0, sessionUsed - fallbackUsed)
   const monthUsed = Math.max(0, input.monthRow?.request_count ?? 0)
   const cacheQuery = input.stateRow?.cache_query_text
     ? decryptDatabaseValueSafely(input.stateRow.cache_query_text, "lab.ai.chat.web.cache.query")
@@ -253,9 +261,15 @@ function toWebSearchSnapshot(input: {
     : null
 
   return {
-    sessionLimit: LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT,
+    sessionLimit: LAB_AI_CHAT_WEB_SEARCH_SESSION_TOTAL_CALL_LIMIT,
     sessionUsed,
-    sessionRemaining: Math.max(0, LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT - sessionUsed),
+    sessionRemaining: Math.max(0, LAB_AI_CHAT_WEB_SEARCH_SESSION_TOTAL_CALL_LIMIT - sessionUsed),
+    primaryLimit: LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT,
+    primaryUsed,
+    primaryRemaining: Math.max(0, LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT - primaryUsed),
+    fallbackLimit: LAB_AI_CHAT_WEB_SEARCH_FALLBACK_CALL_LIMIT,
+    fallbackUsed,
+    fallbackRemaining: Math.max(0, LAB_AI_CHAT_WEB_SEARCH_FALLBACK_CALL_LIMIT - fallbackUsed),
     monthLimit: LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT,
     monthUsed,
     monthRemaining: Math.max(0, LAB_AI_CHAT_WEB_SEARCH_MONTHLY_CALL_LIMIT - monthUsed),
@@ -686,6 +700,7 @@ export async function getLabAiChatWebSearchSnapshot(input: {
           user_id,
           session_id,
           session_call_count,
+          fallback_call_count,
           cache_query_text,
           cache_result_text,
           cache_topic,
@@ -737,6 +752,7 @@ export async function getLabAiChatWebSearchCache(input: {
         user_id,
         session_id,
         session_call_count,
+        fallback_call_count,
         cache_query_text,
         cache_result_text,
         cache_topic,
@@ -780,6 +796,7 @@ export async function getLabAiChatWebSearchCache(input: {
 export async function reserveLabAiChatWebSearchCall(input: {
   userId: string
   sessionId: number
+  isFallback?: boolean
 }) {
   await ensureLabAiChatSchema()
 
@@ -797,6 +814,7 @@ export async function reserveLabAiChatWebSearchCall(input: {
           user_id,
           session_id,
           session_call_count,
+          fallback_call_count,
           cache_query_text,
           cache_result_text,
           cache_topic,
@@ -833,13 +851,26 @@ export async function reserveLabAiChatWebSearchCall(input: {
     const monthRow = monthRows[0] ?? null
 
     const sessionUsed = Math.max(0, stateRow?.session_call_count ?? 0)
+    const fallbackUsed = Math.min(sessionUsed, Math.max(0, stateRow?.fallback_call_count ?? 0))
+    const primaryUsed = Math.max(0, sessionUsed - fallbackUsed)
     const monthUsed = Math.max(0, monthRow?.request_count ?? 0)
+    const isFallback = Boolean(input.isFallback)
 
-    if (sessionUsed >= LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT) {
+    if (!isFallback && primaryUsed >= LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT) {
       await connection.commit()
       return {
         allowed: false,
         reason: "session_limit_reached" as const,
+        snapshot: toWebSearchSnapshot({ stateRow, monthRow }),
+        metricMonth,
+      }
+    }
+
+    if (isFallback && fallbackUsed >= LAB_AI_CHAT_WEB_SEARCH_FALLBACK_CALL_LIMIT) {
+      await connection.commit()
+      return {
+        allowed: false,
+        reason: "fallback_limit_reached" as const,
         snapshot: toWebSearchSnapshot({ stateRow, monthRow }),
         metricMonth,
       }
@@ -859,11 +890,12 @@ export async function reserveLabAiChatWebSearchCall(input: {
       `
         UPDATE lab_ai_chat_web_search_state
         SET session_call_count = session_call_count + 1,
+            fallback_call_count = fallback_call_count + ?,
             updated_at = NOW()
         WHERE user_id = ?
           AND session_id = ?
       `,
-      [input.userId, input.sessionId]
+      [isFallback ? 1 : 0, input.userId, input.sessionId]
     )
 
     await connection.execute(
@@ -877,7 +909,13 @@ export async function reserveLabAiChatWebSearchCall(input: {
     )
 
     const nextSnapshot = toWebSearchSnapshot({
-      stateRow: stateRow ? { ...stateRow, session_call_count: sessionUsed + 1 } : null,
+      stateRow: stateRow
+        ? {
+          ...stateRow,
+          session_call_count: sessionUsed + 1,
+          fallback_call_count: fallbackUsed + (isFallback ? 1 : 0),
+        }
+        : null,
       monthRow: monthRow ? { ...monthRow, request_count: monthUsed + 1 } : null,
     })
 

@@ -38,6 +38,7 @@ function toLocaleStatus(locale: LabAiChatLocale, kind:
   | "searching"
   | "retrying"
   | "search_limit"
+  | "fallback_limit"
   | "month_limit"
   | "search_failed"
   | "search_skipped"
@@ -55,7 +56,9 @@ function toLocaleStatus(locale: LabAiChatLocale, kind:
       case "retrying":
         return "검색 결과가 부족해서 다른 키워드로 재검색 중..."
       case "search_limit":
-        return "이 세션의 웹 검색 한도(5회)에 도달해 기존 맥락으로 답변합니다."
+        return "이 세션의 일반 웹 검색 한도(7회)에 도달해 기존 맥락으로 답변합니다."
+      case "fallback_limit":
+        return "이 세션의 폴백 재검색 한도(+3회)에 도달해 기존 맥락으로 답변합니다."
       case "month_limit":
         return "이번 달 웹 검색 한도(800회)에 도달해 기존 맥락으로 답변합니다."
       case "search_failed":
@@ -79,7 +82,9 @@ function toLocaleStatus(locale: LabAiChatLocale, kind:
     case "retrying":
       return "Results were weak, retrying with a refined query..."
     case "search_limit":
-      return "Session web search limit (5 calls) reached. Using existing context."
+      return "Session web-search limit (7 regular calls) reached. Using existing context."
+    case "fallback_limit":
+      return "Session fallback retry limit (+3 calls) reached. Using existing context."
     case "month_limit":
       return "Monthly web search limit (800 calls) reached. Using existing context."
     case "search_failed":
@@ -529,15 +534,18 @@ export async function resolveLabAiChatWebSearchContext(input: {
   }
 
 
-  const runSearch = async (query: string) => {
+  const runSearch = async (query: string, isFallback = false) => {
     const reservation = await reserveLabAiChatWebSearchCall({
       userId: input.userId,
       sessionId: input.sessionId,
+      isFallback,
     })
 
     if (!reservation.allowed) {
       if (reservation.reason === "session_limit_reached") {
         input.onStatus?.(toLocaleStatus(input.locale, "search_limit"))
+      } else if (reservation.reason === "fallback_limit_reached") {
+        input.onStatus?.(toLocaleStatus(input.locale, "fallback_limit"))
       } else {
         input.onStatus?.(toLocaleStatus(input.locale, "month_limit"))
       }
@@ -617,7 +625,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
 
   if (!first.blocked && plan.fallbackQuery && plan.fallbackQuery !== plan.query) {
     input.onStatus?.(toLocaleStatus(input.locale, "retrying"))
-    const second = await runSearch(plan.fallbackQuery)
+    const second = await runSearch(plan.fallbackQuery, true)
     if (second.context) {
       return { context: second.context, source: "live" }
     }
