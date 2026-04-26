@@ -30,6 +30,7 @@ import {
   formatServerRelativeTime,
   getServerNowMs,
 } from "@/lib/time/server-time"
+import { highlightCode, normalizeCodeLanguage, type HighlightKind } from "@/lib/markdown/code-highlighting"
 import { sanitizeAssistantMarkdown } from "@/lib/markdown/sanitize-assistant-markdown"
 import { cn } from "@/lib/utils"
 import { MermaidDiagram } from "@/components/lab/mermaid-diagram"
@@ -214,69 +215,6 @@ type ThoughtSummaryDetails = {
   points: string[]
 }
 
-type HighlightKind = "plain" | "comment" | "function" | "keyword" | "meta" | "number" | "operator" | "property" | "string" | "type"
-
-type HighlightToken = {
-  text: string
-  kind: HighlightKind
-}
-
-const LANGUAGE_ALIASES: Record<string, { id: string; label: string }> = {
-  bash: { id: "shell", label: "Shell" },
-  c: { id: "c", label: "C" },
-  cc: { id: "cpp", label: "C++" },
-  cpp: { id: "cpp", label: "C++" },
-  "c++": { id: "cpp", label: "C++" },
-  cs: { id: "csharp", label: "C#" },
-  csharp: { id: "csharp", label: "C#" },
-  css: { id: "css", label: "CSS" },
-  go: { id: "go", label: "Go" },
-  golang: { id: "go", label: "Go" },
-  html: { id: "html", label: "HTML" },
-  java: { id: "java", label: "Java" },
-  js: { id: "javascript", label: "JavaScript" },
-  javascript: { id: "javascript", label: "JavaScript" },
-  json: { id: "json", label: "JSON" },
-  jsx: { id: "jsx", label: "JSX" },
-  mermaid: { id: "mermaid", label: "Mermaid" },
-  md: { id: "markdown", label: "Markdown" },
-  markdown: { id: "markdown", label: "Markdown" },
-  py: { id: "python", label: "Python" },
-  python: { id: "python", label: "Python" },
-  rs: { id: "rust", label: "Rust" },
-  rust: { id: "rust", label: "Rust" },
-  sh: { id: "shell", label: "Shell" },
-  shell: { id: "shell", label: "Shell" },
-  sql: { id: "sql", label: "SQL" },
-  ts: { id: "typescript", label: "TypeScript" },
-  tsx: { id: "tsx", label: "TSX" },
-  typescript: { id: "typescript", label: "TypeScript" },
-  xml: { id: "html", label: "XML" },
-  yaml: { id: "yaml", label: "YAML" },
-  yml: { id: "yaml", label: "YAML" },
-  zsh: { id: "shell", label: "Shell" },
-}
-
-const KEYWORDS = new Set([
-  "abstract", "and", "as", "assert", "async", "await", "auto", "bool", "boolean", "break", "case", "catch", "char",
-  "class", "const", "constexpr", "continue", "crate", "def", "defer", "delete", "do", "double", "elif", "else", "enum",
-  "export", "extends", "extern", "false", "False", "finally", "float", "fn", "for", "from", "func", "function", "global",
-  "go", "if", "impl", "implements", "import", "in", "include", "inline", "instanceof", "int", "interface", "is", "lambda",
-  "let", "long", "match", "mod", "mut", "namespace", "new", "nil", "None", "nonlocal", "not", "null", "nullptr", "of",
-  "or", "package", "pass", "private", "protected", "pub", "public", "range", "return", "select", "self", "short", "static",
-  "struct", "super", "switch", "template", "this", "throw", "trait", "true", "True", "try", "type", "typedef", "typename",
-  "undefined", "union", "use", "using", "var", "void", "volatile", "where", "while", "with", "yield",
-  "SELECT", "FROM", "WHERE", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "GROUP", "ORDER", "BY", "HAVING", "INSERT",
-  "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "TABLE", "INDEX", "VALUES", "INTO", "LIMIT", "OFFSET", "PRIMARY",
-  "KEY", "FOREIGN", "REFERENCES", "NULL", "NOT", "DEFAULT", "DISTINCT", "COUNT", "SUM", "AVG", "MIN", "MAX",
-])
-
-const TYPE_WORDS = new Set([
-  "Array", "BigInt", "Boolean", "Date", "Dict", "Error", "List", "Map", "Number", "Object", "Promise", "Record", "Set",
-  "String", "Tuple", "any", "bigint", "bool", "boolean", "byte", "char", "dict", "double", "float", "int", "integer",
-  "long", "number", "short", "str", "string", "symbol", "unknown", "void",
-])
-
 const TOKEN_CLASS_BY_KIND: Record<HighlightKind, string> = {
   plain: "text-slate-800 dark:text-slate-200",
   comment: "text-slate-500 italic dark:text-slate-400",
@@ -288,67 +226,6 @@ const TOKEN_CLASS_BY_KIND: Record<HighlightKind, string> = {
   property: "text-violet-700 dark:text-violet-300",
   string: "text-emerald-700 dark:text-emerald-300",
   type: "text-orange-700 dark:text-orange-300",
-}
-
-function normalizeCodeLanguage(rawLanguage?: string | null) {
-  const key = String(rawLanguage ?? "").trim().toLowerCase()
-  return LANGUAGE_ALIASES[key] ?? {
-    id: key || "text",
-    label: key ? key.toUpperCase() : "Text",
-  }
-}
-
-function getCommentPattern(languageId: string) {
-  if (languageId === "html") return String.raw`<!--[\s\S]*?-->`
-  if (languageId === "python" || languageId === "shell" || languageId === "yaml") return String.raw`#[^\n]*`
-  if (languageId === "sql") return String.raw`--[^\n]*|\/\*[\s\S]*?\*\/`
-  return String.raw`\/\/[^\n]*|\/\*[\s\S]*?\*\/`
-}
-
-function classifyToken(text: string, languageId: string): HighlightKind {
-  if (!text) return "plain"
-  if (/^(\/\/|\/\*|#|--|<!--)/.test(text)) return "comment"
-  if (/^(['"`])/.test(text)) return "string"
-  if (/^(0x[\da-f]+|\d[\d_]*(\.\d[\d_]*)?)/i.test(text)) return "number"
-  if (languageId === "html" && /^<\/?[A-Za-z]/.test(text)) return "meta"
-  if (languageId === "css" && /^[A-Za-z-]+(?=\s*:)/.test(text)) return "property"
-  if (TYPE_WORDS.has(text)) return "type"
-  if (KEYWORDS.has(text)) return "keyword"
-  if (/^[A-Za-z_$][\w$]*(?=\s*\()/.test(text)) return "function"
-  if (/^[{}()[\].,;:+\-*/%=<>!&|^~?]+$/.test(text)) return "operator"
-  return "plain"
-}
-
-function highlightCode(code: string, languageId: string): HighlightToken[] {
-  if (!code) return []
-
-  const commentPattern = getCommentPattern(languageId)
-  const keywordPattern = String.raw`\b(?:${[...KEYWORDS].sort((a, b) => b.length - a.length).join("|")})\b`
-  const templateStringPattern = "`(?:\\\\.|[^`\\\\])*`"
-  const tokenPattern = languageId === "html"
-    ? String.raw`${commentPattern}|<\/?[A-Za-z][^>]*>|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|0x[\da-fA-F]+|\b\d[\d_]*(?:\.\d[\d_]*)?\b|\b[A-Za-z_$][\w$]*(?=\s*\()|[{}()[\].,;:+\-*/%=<>!&|^~?]+`
-    : String.raw`${commentPattern}|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|${templateStringPattern}|0x[\da-fA-F]+|\b\d[\d_]*(?:\.\d[\d_]*)?\b|${keywordPattern}|\b[A-Za-z_$][\w$]*(?=\s*\()|[{}()[\].,;:+\-*/%=<>!&|^~?]+`
-
-  const matcher = new RegExp(tokenPattern, "g")
-  const tokens: HighlightToken[] = []
-  let cursor = 0
-  let match: RegExpExecArray | null
-
-  while ((match = matcher.exec(code)) !== null) {
-    if (match.index > cursor) {
-      tokens.push({ text: code.slice(cursor, match.index), kind: "plain" })
-    }
-
-    const text = match[0]
-    tokens.push({ text, kind: classifyToken(text, languageId) })
-    cursor = match.index + text.length
-  }
-
-  if (cursor < code.length) {
-    tokens.push({ text: code.slice(cursor), kind: "plain" })
-  }
-
-  return tokens
 }
 
 async function copyTextToClipboard(text: string) {
