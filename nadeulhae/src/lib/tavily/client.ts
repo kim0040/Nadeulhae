@@ -31,8 +31,8 @@ export interface TavilySearchRequest {
 }
 
 interface TavilyErrorPayload {
-  error?: string
-  detail?: string
+  error?: string | Record<string, unknown>
+  detail?: string | Record<string, unknown>
   message?: string
 }
 
@@ -108,7 +108,8 @@ export async function createTavilySearch(input: TavilySearchRequest): Promise<Ta
         days: input.days,
         include_domains: input.includeDomains,
         exclude_domains: input.excludeDomains,
-        country: input.country,
+        // NOTE: country param is intentionally omitted — Tavily requires full country names
+        // (e.g. "South Korea") but the AI planner sends ISO codes ("KR"), which causes 400 errors.
       }),
       signal: controller.signal,
       cache: "no-store",
@@ -117,8 +118,18 @@ export async function createTavilySearch(input: TavilySearchRequest): Promise<Ta
     const json = await response.json().catch(() => ({}))
     if (!response.ok) {
       const payload = json as TavilyErrorPayload
+      const extractMsg = (v: unknown): string | undefined => {
+        if (typeof v === "string") return v
+        if (v && typeof v === "object" && "error" in v && typeof (v as Record<string, unknown>).error === "string") {
+          return (v as Record<string, string>).error
+        }
+        if (v && typeof v === "object" && "message" in v && typeof (v as Record<string, unknown>).message === "string") {
+          return (v as Record<string, string>).message
+        }
+        return undefined
+      }
       throw new TavilyError(
-        payload.detail || payload.error || payload.message || "Tavily search request failed.",
+        extractMsg(payload.detail) || extractMsg(payload.error) || payload.message || "Tavily search request failed.",
         response.status
       )
     }
