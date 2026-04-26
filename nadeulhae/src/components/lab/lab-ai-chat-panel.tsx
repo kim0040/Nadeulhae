@@ -1049,7 +1049,6 @@ export function LabAiChatPanel() {
           const decoder = new TextDecoder()
           let buffer = ""
           let streamAcc = ""
-          let statusMessages: string[] = []
 
           while (true) {
             const { done, value } = await reader.read()
@@ -1078,8 +1077,10 @@ export function LabAiChatPanel() {
                       : message
                   )))
                 } else if (eventType === "status" && typeof parsed.message === "string") {
-                  statusMessages = [...statusMessages, parsed.message].slice(-4)
-                  const statusText = statusMessages.map((line) => `• ${line}`).join("\n")
+                  if (streamAcc.trim().length > 0) {
+                    continue
+                  }
+                  const statusText = parsed.message.replace(/\s+/g, " ").trim()
                   setMessages((current) => current.map((message) => (
                     message.id === optimisticAssistant.id
                       ? { ...message, content: statusText, pending: true }

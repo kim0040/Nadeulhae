@@ -27,6 +27,7 @@ import {
 } from "@/lib/lab-ai-chat/repository"
 import type { LabAiChatLocale, LabAiChatStateResponse } from "@/lib/lab-ai-chat/types"
 import { resolveLabAiChatWebSearchContext } from "@/lib/lab-ai-chat/web-search"
+import { sanitizeAssistantMarkdown } from "@/lib/markdown/sanitize-assistant-markdown"
 import {
   NanoGptError,
   createNanoGptCompletion,
@@ -286,7 +287,10 @@ function addLengthLimitNotice(content: string, locale: LabAiChatLocale) {
 }
 
 function finalizeAssistantMessage(content: string, locale: LabAiChatLocale, finishReason?: string | null) {
-  const assistantMessage = enforceAssistantIdentity(content, locale)
+  const assistantMessage = sanitizeAssistantMarkdown({
+    content: enforceAssistantIdentity(content, locale),
+    language: locale,
+  })
   return finishReason === "length"
     ? addLengthLimitNotice(assistantMessage, locale)
     : assistantMessage
@@ -302,7 +306,10 @@ function sanitizeStateIdentity(state: LabAiChatStateResponse, locale: LabAiChatL
 
       return {
         ...message,
-        content: enforceAssistantIdentity(message.content, locale),
+        content: sanitizeAssistantMarkdown({
+          content: enforceAssistantIdentity(message.content, locale),
+          language: locale,
+        }),
       }
     }),
   }
