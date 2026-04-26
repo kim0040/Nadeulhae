@@ -1,6 +1,7 @@
 export type TavilyTopic = "general" | "news" | "finance"
-export type TavilySearchDepth = "basic" | "advanced"
+export type TavilySearchDepth = "basic" | "advanced" | "fast" | "ultra-fast"
 export type TavilyTimeRange = "day" | "week" | "month" | "year" | "d" | "w" | "m" | "y"
+export type TavilyAnswerMode = boolean | "basic" | "advanced"
 
 export interface TavilySearchResultItem {
   title: string
@@ -25,9 +26,16 @@ export interface TavilySearchRequest {
   startDate?: string
   endDate?: string
   days?: number
+  chunksPerSource?: number
+  includeAnswer?: TavilyAnswerMode
+  includeRawContent?: boolean | "markdown" | "text"
+  autoParameters?: boolean
+  exactMatch?: boolean
+  includeUsage?: boolean
+  includeFavicon?: boolean
   includeDomains?: string[]
   excludeDomains?: string[]
-  country?: string
+  country?: string // Tavily expects full country names such as "South Korea"
 }
 
 interface TavilyErrorPayload {
@@ -75,6 +83,11 @@ function normalizeMaxResults(value?: number) {
   return Math.min(20, Math.max(0, Math.floor(value)))
 }
 
+function normalizeChunksPerSource(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined
+  return Math.min(3, Math.max(1, Math.floor(value)))
+}
+
 function normalizeDate(value?: string) {
   if (!value) return undefined
   const normalized = value.trim()
@@ -98,18 +111,22 @@ export async function createTavilySearch(input: TavilySearchRequest): Promise<Ta
         query: input.query,
         topic: input.topic ?? "general",
         search_depth: input.searchDepth ?? "basic",
+        chunks_per_source: normalizeChunksPerSource(input.chunksPerSource),
         max_results: normalizeMaxResults(input.maxResults),
-        include_answer: false,
-        include_raw_content: false,
-        include_usage: false,
+        include_answer: input.includeAnswer ?? false,
+        include_raw_content: input.includeRawContent ?? false,
+        include_usage: input.includeUsage ?? false,
+        include_favicon: input.includeFavicon ?? false,
+        auto_parameters: input.autoParameters ?? false,
+        exact_match: input.exactMatch ?? false,
         time_range: input.timeRange,
         start_date: normalizeDate(input.startDate),
         end_date: normalizeDate(input.endDate),
         days: input.days,
         include_domains: input.includeDomains,
         exclude_domains: input.excludeDomains,
-        // NOTE: country param is intentionally omitted — Tavily requires full country names
-        // (e.g. "South Korea") but the AI planner sends ISO codes ("KR"), which causes 400 errors.
+        // NOTE: send country only when it looks like a full name, not ISO code.
+        country: input.country && input.country.length > 3 ? input.country : undefined,
       }),
       signal: controller.signal,
       cache: "no-store",

@@ -4,6 +4,7 @@ import {
   reserveLabAiChatWebSearchCall,
   persistLabAiChatWebSearchCache,
 } from "@/lib/lab-ai-chat/repository"
+import { LAB_AI_CHAT_WEB_SEARCH_RESULT_SCORE_THRESHOLD } from "@/lib/lab-ai-chat/constants"
 import type { LabAiChatLocale } from "@/lib/lab-ai-chat/types"
 import { createNanoGptCompletion } from "@/lib/nanogpt/client"
 import { createTavilySearch, TavilyError, type TavilySearchRequest, type TavilyTopic } from "@/lib/tavily/client"
@@ -155,6 +156,65 @@ function safeDomainList(value: unknown, max: number) {
     .slice(0, max)
 }
 
+function safeCountry(value: unknown) {
+  if (typeof value !== "string") return null
+  const normalized = value.trim()
+  if (!normalized) return null
+  if (/^[A-Za-z][A-Za-z\s-]{2,39}$/.test(normalized)) {
+    return normalized
+  }
+  return null
+}
+
+function normalizeSearchTokens(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[`~!@#$%^&*()_|+\-=?;:'",.<>{}\[\]\\\/]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length >= 2)
+}
+
+function calcTokenOverlap(a: string[], b: string[]) {
+  if (a.length === 0 || b.length === 0) return 0
+  const aSet = new Set(a)
+  const bSet = new Set(b)
+  let common = 0
+  for (const token of aSet) {
+    if (bSet.has(token)) {
+      common += 1
+    }
+  }
+  return common / Math.max(aSet.size, bSet.size)
+}
+
+function isFollowUpCue(question: string) {
+  return /(다시|재검색|이어서|그거|그것|방금|방금거|위에|이전|same|again|that|those|it|previous)/i.test(question)
+}
+
+function isCacheLikelyRelevant(question: string, cachedQuery: string) {
+  if (!question.trim() || !cachedQuery.trim()) return false
+  if (isFollowUpCue(question)) return true
+
+  const questionTokens = normalizeSearchTokens(question)
+  const cachedTokens = normalizeSearchTokens(cachedQuery)
+  const overlap = calcTokenOverlap(questionTokens, cachedTokens)
+
+  if (overlap >= 0.35) return true
+  const normalizedQuestion = question.trim().toLowerCase()
+  const normalizedCached = cachedQuery.trim().toLowerCase()
+  return normalizedQuestion.includes(normalizedCached) || normalizedCached.includes(normalizedQuestion)
+}
+
+function pickHighSignalResults<T extends { score: number }>(results: T[]) {
+  if (results.length <= 1) return results
+  const threshold = LAB_AI_CHAT_WEB_SEARCH_RESULT_SCORE_THRESHOLD
+  const filtered = results.filter((item) => item.score >= threshold)
+  if (filtered.length >= 2) {
+    return filtered
+  }
+  return results.slice(0, Math.min(3, results.length))
+}
+
 function isExplicitSearchRequest(question: string) {
   return /(검색|찾아|찾아줘|알려줘|알려 줘|search|look ?up|find|현재|최신|속보|실시간|뉴스)/i.test(question)
 }
@@ -179,7 +239,7 @@ function buildFallbackPlan(question: string, conversationHint?: string | null): 
   const asksLatest = /(latest|today|current|now|news|breaking|최신|오늘|현재|실시간|속보)/i.test(question)
   const asksFinance = /(stock|shares|market|price|forex|crypto|주가|증시|환율|코인|금리)/i.test(question)
   const asksHistory = /(history|historical|century|조선|고대|역사|과거)/i.test(question)
-  const needSearch = !isGreeting(question)
+  const needSearch = isExplicitSearchRequest(question) || asksLatest || asksFinance
 
   // For vague follow-ups, try to extract a better query from conversation context
   let query = question.trim().slice(0, 200)
@@ -269,8 +329,8 @@ async function buildSearchPlan(input: {
     "- For timeless or historical questions, prefer no time filters.",
     "- Use cache ONLY when the cache topic clearly matches the user's current question.",
     `- Language for search query should match user language (${localeName}) when useful.`,
-    "- CRITICAL: Set need_search to true for ANY question asking for facts, specific entities, events, coding help, or general knowledge. Even if you think you know the answer, set it to true to get up-to-date sources.",
-    "- Set need_search to false ONLY for casual greetings (e.g., hi, thanks) or purely creative/subjective writing that requires no facts.",
+    "- Set need_search=true when the user asks for latest/current info, external facts requiring verification, explicit web lookup, or specific references/news.",
+    "- Set need_search=false for pure writing/style edits, math/code reasoning that does not require external sources, or greetings/chit-chat.",
     "- IMPORTANT: If the user asks you to 'search', 'find', 'look up', '검색', '찾아', '알려줘', etc., ALWAYS set need_search to true.",
     "- IMPORTANT: If the user question is a vague follow-up (e.g., '다시 검색해줘', 'search again'), use the Conversation context and Cached query to determine the actual search topic and generate a proper query.",
   ].join("\n")
@@ -319,7 +379,7 @@ async function buildSearchPlan(input: {
       timeRange: safeTimeRange(parsed.time_range),
       startDate: safeDate(parsed.start_date),
       endDate: safeDate(parsed.end_date),
-      country: typeof parsed.country === "string" && parsed.country.trim() ? parsed.country.trim().slice(0, 8) : null,
+      country: safeCountry(parsed.country),
       includeDomains: safeDomainList(parsed.include_domains, 20),
       excludeDomains: safeDomainList(parsed.exclude_domains, 20),
     } satisfies SearchPlan
@@ -419,67 +479,63 @@ export async function resolveLabAiChatWebSearchContext(input: {
   recentMessages?: Array<{ role: string; content: string }>
   onStatus?: WebSearchStatusFn
 }): Promise<LabAiChatWebSearchResolution> {
-  console.log(`[web-search] START | webSearchEnabled=${input.webSearchEnabled} | question="${input.question.slice(0, 80)}" | sessionId=${input.sessionId}`)
-
   if (!input.webSearchEnabled) {
-    console.log("[web-search] SKIP: webSearchEnabled is false")
     return { context: null, source: "none" }
   }
 
   const conversationHint = buildConversationHint(input.recentMessages)
-  console.log(`[web-search] conversationHint length=${conversationHint?.length ?? 0} | recentMessages count=${input.recentMessages?.length ?? 0}`)
 
   input.onStatus?.(toLocaleStatus(input.locale, "check_cache"))
   const cached = await getLabAiChatWebSearchCache({
     userId: input.userId,
     sessionId: input.sessionId,
   })
-  console.log(`[web-search] cache check: query=${cached?.query?.slice(0, 40) ?? "null"} | result=${cached?.result ? "yes" : "null"}`)
+  const cachedQuery = cached?.query ?? null
+  const cachedResult = cached?.result ?? null
+  const cachedUpdatedAt = cached?.updatedAt ?? null
+  const cacheRelevant = Boolean(
+    cachedResult
+    && cachedQuery
+    && isCacheLikelyRelevant(input.question, cachedQuery)
+  )
 
   input.onStatus?.(toLocaleStatus(input.locale, "planning"))
   const plan = await buildSearchPlan({
     locale: input.locale,
     modelId: input.modelId,
     question: input.question,
-    cacheQuery: cached?.query ?? null,
-    cacheUpdatedAt: cached?.updatedAt ?? null,
-    cachePreview: cached?.result?.slice(0, 1200) ?? null,
+    cacheQuery: cachedQuery,
+    cacheUpdatedAt: cachedUpdatedAt,
+    cachePreview: cachedResult?.slice(0, 1200) ?? null,
     conversationHint,
   })
-  console.log(`[web-search] plan result: needSearch=${plan.needSearch} | useCacheFirst=${plan.useCacheFirst} | cacheUsable=${plan.cacheUsable} | query="${plan.query?.slice(0, 60)}" | topic=${plan.topic}`)
 
-  if (cached?.result && cached.query && plan.useCacheFirst && plan.cacheUsable) {
-    console.log("[web-search] USING CACHE (plan says cache is usable)")
+  if (cacheRelevant && cachedQuery && cachedResult && plan.useCacheFirst && plan.cacheUsable) {
     input.onStatus?.(toLocaleStatus(input.locale, "using_cache"))
     return {
       context: buildCachedContextText({
         locale: input.locale,
-        cachedQuery: cached.query,
-        cachedResult: cached.result,
-        cachedAt: cached.updatedAt ?? null,
+        cachedQuery,
+        cachedResult,
+        cachedAt: cachedUpdatedAt,
       }),
       source: "cache",
     }
   }
 
   if (!plan.needSearch) {
-    console.log("[web-search] SKIP: planner says needSearch=false")
     input.onStatus?.(toLocaleStatus(input.locale, "search_skipped"))
     return { context: null, source: "none" }
   }
 
-  console.log(`[web-search] PROCEEDING to live search with query="${plan.query?.slice(0, 60)}"`)
-
 
   const runSearch = async (query: string) => {
-    console.log(`[web-search] runSearch called with query="${query.slice(0, 60)}"`)
     const reservation = await reserveLabAiChatWebSearchCall({
       userId: input.userId,
       sessionId: input.sessionId,
     })
 
     if (!reservation.allowed) {
-      console.log(`[web-search] runSearch BLOCKED: ${reservation.reason}`)
       if (reservation.reason === "session_limit_reached") {
         input.onStatus?.(toLocaleStatus(input.locale, "search_limit"))
       } else {
@@ -488,7 +544,6 @@ export async function resolveLabAiChatWebSearchContext(input: {
       return { blocked: true as const, context: null }
     }
 
-    console.log("[web-search] runSearch reservation allowed, calling Tavily...")
     try {
       input.onStatus?.(toLocaleStatus(input.locale, "searching"))
       const response = await createTavilySearch({
@@ -496,6 +551,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
         topic: plan.topic,
         searchDepth: "basic",
         maxResults: 5,
+        includeAnswer: "basic",
         timeRange: plan.timeRange,
         startDate: plan.startDate ?? undefined,
         endDate: plan.endDate ?? undefined,
@@ -503,16 +559,14 @@ export async function resolveLabAiChatWebSearchContext(input: {
         excludeDomains: plan.excludeDomains.length > 0 ? plan.excludeDomains : undefined,
         country: plan.country ?? undefined,
       })
-
-      console.log(`[web-search] Tavily response: results=${response.results.length} | query="${response.query?.slice(0, 60)}"`)
+      const selectedResults = pickHighSignalResults(response.results).slice(0, 5)
 
       await recordLabAiChatWebSearchOutcome({
         metricMonth: reservation.metricMonth,
         success: true,
       })
 
-      if (response.results.length === 0) {
-        console.log("[web-search] runSearch: 0 results, returning null context")
+      if (selectedResults.length === 0) {
         return { blocked: false as const, context: null }
       }
 
@@ -523,19 +577,17 @@ export async function resolveLabAiChatWebSearchContext(input: {
         timeRange: plan.timeRange,
         startDate: plan.startDate,
         endDate: plan.endDate,
-        resultCount: response.results.length,
+        resultCount: selectedResults.length,
         answer: response.answer,
-        results: response.results,
+        results: selectedResults,
       })
-
-      console.log(`[web-search] runSearch SUCCESS: context length=${context.length}`)
 
       await persistLabAiChatWebSearchCache({
         userId: input.userId,
         sessionId: input.sessionId,
         query: response.query,
         resultText: context,
-        resultCount: response.results.length,
+        resultCount: selectedResults.length,
         topic: plan.topic,
         timeRange: plan.timeRange ?? null,
         startDate: plan.startDate,
@@ -544,7 +596,6 @@ export async function resolveLabAiChatWebSearchContext(input: {
 
       return { blocked: false as const, context }
     } catch (error) {
-      console.error(`[web-search] runSearch ERROR:`, error instanceof Error ? `${error.name}: ${error.message}` : error)
       await recordLabAiChatWebSearchOutcome({
         metricMonth: reservation.metricMonth,
         success: false,
@@ -560,36 +611,30 @@ export async function resolveLabAiChatWebSearchContext(input: {
   }
 
   const first = await runSearch(plan.query)
-  console.log(`[web-search] first search result: context=${first.context ? `yes(${first.context.length})` : "null"} | blocked=${first.blocked}`)
   if (first.context) {
-    console.log("[web-search] DONE: returning live search context")
     return { context: first.context, source: "live" }
   }
 
   if (!first.blocked && plan.fallbackQuery && plan.fallbackQuery !== plan.query) {
-    console.log(`[web-search] Retrying with fallback query="${plan.fallbackQuery.slice(0, 60)}"`)
     input.onStatus?.(toLocaleStatus(input.locale, "retrying"))
     const second = await runSearch(plan.fallbackQuery)
     if (second.context) {
-      console.log("[web-search] DONE: returning fallback search context")
       return { context: second.context, source: "live" }
     }
   }
 
-  if (cached?.result && cached.query) {
-    console.log("[web-search] DONE: falling back to cached context")
+  if (cacheRelevant && cachedQuery && cachedResult) {
     input.onStatus?.(toLocaleStatus(input.locale, "using_cache"))
     return {
       context: buildCachedContextText({
         locale: input.locale,
-        cachedQuery: cached.query,
-        cachedResult: cached.result,
-        cachedAt: cached.updatedAt ?? null,
+        cachedQuery,
+        cachedResult,
+        cachedAt: cachedUpdatedAt,
       }),
       source: "cache",
     }
   }
 
-  console.log("[web-search] DONE: no context available, returning null")
   return { context: null, source: "none" }
 }
