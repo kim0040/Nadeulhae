@@ -269,6 +269,63 @@ function enforceAssistantIdentity(content: string, locale: LabAiChatLocale) {
   return sanitized
 }
 
+function stripLeakedWebSearchScaffold(content: string) {
+  const lines = content.split(/\r?\n/)
+  const kept: string[] = []
+
+  let inContextBlock = false
+  let inSourceList = false
+
+  const contextHeaderPattern = /^\[(?:웹 검색 컨텍스트|Web Search Context|캐시된 웹 검색 컨텍스트|Cached Web Search Context|내부 웹 검색 컨텍스트.*|Internal Web Search Context.*)\]$/i
+  const sourceHeaderPattern = /^\[(?:출처 후보|Candidate Sources)\]$/i
+  const metadataPattern = /^(?:질의|토픽|기간|결과 수|시작일|종료일|요약 답변|이전 질의|캐시 시각|Query|Topic|Range|Result count|Start|End|Summary answer|Previous query|Cached at)\s*:/i
+  const sourceItemPattern = /^(?:\d+\.\s|URL\s*:|발행일\s*:|Published\s*:|요약\s*:|Snippet\s*:)/i
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+
+    if (contextHeaderPattern.test(line)) {
+      inContextBlock = true
+      inSourceList = false
+      continue
+    }
+
+    if (inContextBlock && sourceHeaderPattern.test(line)) {
+      inSourceList = true
+      continue
+    }
+
+    if (inContextBlock) {
+      if (!line) {
+        continue
+      }
+
+      if (metadataPattern.test(line)) {
+        continue
+      }
+
+      if (inSourceList) {
+        if (sourceItemPattern.test(line)) {
+          continue
+        }
+      }
+
+      // Exit leaked scaffold mode once we hit normal prose.
+      inContextBlock = false
+      inSourceList = false
+      kept.push(rawLine)
+      continue
+    }
+
+    kept.push(rawLine)
+  }
+
+  return kept
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
 function addLengthLimitNotice(content: string, locale: LabAiChatLocale) {
   const trimmed = content.trim()
   if (!trimmed) {
@@ -287,10 +344,15 @@ function addLengthLimitNotice(content: string, locale: LabAiChatLocale) {
 }
 
 function finalizeAssistantMessage(content: string, locale: LabAiChatLocale, finishReason?: string | null) {
-  const assistantMessage = sanitizeAssistantMarkdown({
-    content: enforceAssistantIdentity(content, locale),
+  const sanitizedMessage = sanitizeAssistantMarkdown({
+    content: stripLeakedWebSearchScaffold(enforceAssistantIdentity(content, locale)),
     language: locale,
   })
+  const assistantMessage = sanitizedMessage.trim().length > 0
+    ? sanitizedMessage
+    : (locale === "ko"
+      ? "검색 내용을 바탕으로 핵심만 정리해 다시 답변할게요."
+      : "I will summarize the search findings and answer concisely.")
   return finishReason === "length"
     ? addLengthLimitNotice(assistantMessage, locale)
     : assistantMessage
@@ -307,7 +369,7 @@ function sanitizeStateIdentity(state: LabAiChatStateResponse, locale: LabAiChatL
       return {
         ...message,
         content: sanitizeAssistantMarkdown({
-          content: enforceAssistantIdentity(message.content, locale),
+          content: stripLeakedWebSearchScaffold(enforceAssistantIdentity(message.content, locale)),
           language: locale,
         }),
       }
