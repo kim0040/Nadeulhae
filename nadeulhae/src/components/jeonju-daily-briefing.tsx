@@ -53,6 +53,58 @@ type IssueCategory = "safety" | "governance" | "culture" | "economy" | "lifestyl
 
 const RETRY_MAX = 3
 const RETRY_DELAY_MS = 1000
+const LOCAL_BRIEFING_CACHE_PREFIX = "nadeul:jeonju:briefing"
+
+type LocalBriefingCacheEntry = {
+  data: BriefingData
+  expiresAtMs: number
+}
+
+function getKstDateKey() {
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  return kstNow.toISOString().slice(0, 10)
+}
+
+function getLocalBriefingCacheKey(language: "ko" | "en") {
+  return `${LOCAL_BRIEFING_CACHE_PREFIX}:${language}:${getKstDateKey()}`
+}
+
+function readLocalBriefingCache(language: "ko" | "en"): BriefingData | null {
+  if (typeof window === "undefined") return null
+  const key = getLocalBriefingCacheKey(language)
+  const raw = window.localStorage.getItem(key)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as LocalBriefingCacheEntry
+    if (!parsed || typeof parsed !== "object" || !parsed.data || typeof parsed.expiresAtMs !== "number") {
+      window.localStorage.removeItem(key)
+      return null
+    }
+    if (parsed.expiresAtMs <= Date.now()) {
+      window.localStorage.removeItem(key)
+      return null
+    }
+    return parsed.data
+  } catch {
+    window.localStorage.removeItem(key)
+    return null
+  }
+}
+
+function writeLocalBriefingCache(language: "ko" | "en", data: BriefingData) {
+  if (typeof window === "undefined") return
+  const key = getLocalBriefingCacheKey(language)
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  const nextKstMidnight = new Date(kstNow)
+  nextKstMidnight.setHours(24, 0, 0, 0)
+  const expiresAtMs = Math.max(Date.now() + 5 * 60 * 1000, nextKstMidnight.getTime())
+  const payload: LocalBriefingCacheEntry = {
+    data,
+    expiresAtMs,
+  }
+  window.localStorage.setItem(key, JSON.stringify(payload))
+}
 
 function splitChecklist(text: string | null): string[] {
   if (!text) return []
@@ -203,6 +255,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           fromCache: json.fromCache ?? false,
         }
 
+        writeLocalBriefingCache(language, data)
         setBriefing(data)
         setErrorMessage(null)
 
@@ -244,6 +297,17 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
   )
 
   useEffect(() => {
+    const cached = readLocalBriefingCache(language)
+    if (cached) {
+      setBriefing(cached)
+      const isEmptyFallback =
+        cached.newsItems.length === 0 &&
+        !cached.aiInsight &&
+        !cached.weatherNote &&
+        !cached.festivalNote
+      setStatus(isEmptyFallback ? "empty" : "success")
+      return
+    }
     fetchBriefing()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language])

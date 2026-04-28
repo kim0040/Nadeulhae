@@ -24,13 +24,21 @@ type AttemptState = {
   blockedUntilMs: number
 }
 
+type BriefingMemoryCacheEntry = {
+  data: JeonjuBriefingData
+  expiresAtMs: number
+  lastAccessMs: number
+}
+
 declare global {
   var __nadeulhaeJeonjuBriefingInflight: Map<string, Promise<BriefingGenerationResult>> | undefined
   var __nadeulhaeJeonjuBriefingAttempts: Map<string, AttemptState> | undefined
+  var __nadeulhaeJeonjuBriefingMemoryCache: Map<string, BriefingMemoryCacheEntry> | undefined
 }
 
 const JEONJU_BRIEFING_MAX_AUTO_ATTEMPTS = 3
 const JEONJU_BRIEFING_RETRY_COOLDOWN_MS = 15 * 60 * 1000
+const JEONJU_BRIEFING_MEMORY_CACHE_MAX_ENTRIES = 24
 
 // ------------------------------------------------------------------
 // KST Helpers
@@ -84,6 +92,13 @@ function getAttemptMap() {
   return globalThis.__nadeulhaeJeonjuBriefingAttempts
 }
 
+function getBriefingMemoryCacheMap() {
+  if (!globalThis.__nadeulhaeJeonjuBriefingMemoryCache) {
+    globalThis.__nadeulhaeJeonjuBriefingMemoryCache = new Map()
+  }
+  return globalThis.__nadeulhaeJeonjuBriefingMemoryCache
+}
+
 function isAutoGenerationBlocked(cacheKey: string) {
   const attemptMap = getAttemptMap()
   const state = attemptMap.get(cacheKey)
@@ -104,6 +119,62 @@ function markAutoGenerationFailure(cacheKey: string) {
 
 function clearAutoGenerationFailures(cacheKey: string) {
   getAttemptMap().delete(cacheKey)
+}
+
+function getKstNow() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000)
+}
+
+function getNextKstMidnightMs() {
+  const kstNow = getKstNow()
+  const next = new Date(kstNow)
+  next.setHours(24, 0, 0, 0)
+  return next.getTime()
+}
+
+function cleanupBriefingMemoryCache(nowMs: number) {
+  const cache = getBriefingMemoryCacheMap()
+  for (const [key, value] of cache.entries()) {
+    if (value.expiresAtMs <= nowMs) {
+      cache.delete(key)
+    }
+  }
+
+  if (cache.size <= JEONJU_BRIEFING_MEMORY_CACHE_MAX_ENTRIES) return
+
+  const sorted = [...cache.entries()].sort((a, b) => a[1].lastAccessMs - b[1].lastAccessMs)
+  const overflow = cache.size - JEONJU_BRIEFING_MEMORY_CACHE_MAX_ENTRIES
+  for (let i = 0; i < overflow; i += 1) {
+    const key = sorted[i]?.[0]
+    if (key) cache.delete(key)
+  }
+}
+
+function getCachedBriefingFromMemory(cacheKey: string): JeonjuBriefingData | null {
+  const nowMs = Date.now()
+  cleanupBriefingMemoryCache(nowMs)
+  const cache = getBriefingMemoryCacheMap()
+  const entry = cache.get(cacheKey)
+  if (!entry) return null
+  if (entry.expiresAtMs <= nowMs) {
+    cache.delete(cacheKey)
+    return null
+  }
+  entry.lastAccessMs = nowMs
+  cache.set(cacheKey, entry)
+  return entry.data
+}
+
+function setCachedBriefingToMemory(cacheKey: string, data: JeonjuBriefingData) {
+  const nowMs = Date.now()
+  const expiresAtMs = Math.max(nowMs + 5 * 60 * 1000, getNextKstMidnightMs())
+  const cache = getBriefingMemoryCacheMap()
+  cache.set(cacheKey, {
+    data,
+    expiresAtMs,
+    lastAccessMs: nowMs,
+  })
+  cleanupBriefingMemoryCache(nowMs)
 }
 
 // ------------------------------------------------------------------
@@ -600,11 +671,20 @@ export async function generateJeonjuBriefing(
   const yesterdayDate = getYesterdayInKst()
   const cacheKey = getBriefingCacheKey(yesterdayDate, locale)
 
-  // 1. Check DB cache first
+  // 1. Check in-memory cache first (per process, fast-path).
+  if (!forceRefresh) {
+    const memoryCached = getCachedBriefingFromMemory(cacheKey)
+    if (memoryCached) {
+      return { fromCache: true, data: memoryCached }
+    }
+  }
+
+  // 2. Check DB cache.
   if (!forceRefresh) {
     try {
       const cached = await getJeonjuBriefingByDateAndLocale(yesterdayDate, locale)
       if (cached && cached.newsItems.length > 0) {
+        setCachedBriefingToMemory(cacheKey, cached)
         console.log(`[jeonju-briefing] Serving cached briefing for ${yesterdayDate} (${locale})`)
         return { fromCache: true, data: cached }
       }
@@ -613,23 +693,27 @@ export async function generateJeonjuBriefing(
     }
   }
 
-  // 2. Auto-generation safety: avoid repeated re-calls when upstream fails.
+  // 3. Auto-generation safety: avoid repeated re-calls when upstream fails.
   if (!forceRefresh && isAutoGenerationBlocked(cacheKey)) {
     const blocked = createFallbackBriefing(yesterdayDate, locale)
+    setCachedBriefingToMemory(cacheKey, blocked)
     return { fromCache: false, data: blocked }
   }
 
-  // 3. De-duplicate concurrent requests for the same date/locale.
+  // 4. De-duplicate concurrent requests for the same date/locale.
   const inflightMap = getInflightMap()
   const existing = inflightMap.get(cacheKey)
   if (existing) return existing
 
   const generationPromise = (async (): Promise<BriefingGenerationResult> => {
-    // 4. Generate fresh briefing
+    // 5. Generate fresh briefing
     try {
       const result = await fetchAndSummarize(yesterdayDate, locale)
 
-      // 5. Save to DB (best-effort)
+      // Save to memory cache first so repeated reads do not hit DB.
+      setCachedBriefingToMemory(cacheKey, result)
+
+      // 6. Save to DB (best-effort)
       try {
         const plannedQueries = getPlannedQuerySummary(yesterdayDate, locale)
         await saveJeonjuBriefing({
@@ -662,13 +746,17 @@ export async function generateJeonjuBriefing(
       // Stale cache fallback (same date+locale)
       try {
         const stale = await getJeonjuBriefingByDateAndLocale(yesterdayDate, locale)
-        if (stale) return { fromCache: true, data: stale }
+        if (stale) {
+          setCachedBriefingToMemory(cacheKey, stale)
+          return { fromCache: true, data: stale }
+        }
       } catch {
         // ignore
       }
 
       // Save fallback once to prevent repeated auto-calls on this date.
       const fallback = createFallbackBriefing(yesterdayDate, locale)
+      setCachedBriefingToMemory(cacheKey, fallback)
       try {
         await saveJeonjuBriefing({
           briefingDate: yesterdayDate,
