@@ -38,7 +38,6 @@ declare global {
 }
 
 const JEONJU_BRIEFING_MAX_AUTO_ATTEMPTS = 3
-const JEONJU_BRIEFING_RETRY_COOLDOWN_MS = 15 * 60 * 1000
 const JEONJU_BRIEFING_MEMORY_CACHE_MAX_ENTRIES = 24
 
 // ------------------------------------------------------------------
@@ -114,7 +113,7 @@ function markAutoGenerationFailure(cacheKey: string) {
   const shouldBlock = nextAttempts >= JEONJU_BRIEFING_MAX_AUTO_ATTEMPTS
   attemptMap.set(cacheKey, {
     attempts: nextAttempts,
-    blockedUntilMs: shouldBlock ? Date.now() + JEONJU_BRIEFING_RETRY_COOLDOWN_MS : 0,
+    blockedUntilMs: shouldBlock ? getNextKstMidnightMs() : 0,
   })
 }
 
@@ -385,17 +384,18 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
     return [
       {
         key: "local-news",
-        query: `전주 생활 공지 교통 행사 업데이트 ${dateStr}`,
+        query: `전주 어제 주요 뉴스 소식 교통 행사 ${dateStr}`,
         topic: "news",
-        searchDepth: "fast",
+        searchDepth: "basic",
         timeRange: "week",
         includeDomains: LOCAL_UTILITY_DOMAINS,
         excludeDomains: NOISE_DOMAINS,
-        includeAnswer: "basic",
+        includeAnswer: "advanced",
+        country: "south korea",
       },
       {
         key: "city-hall",
-        query: `전주시청 보도자료 시정뉴스룸 ${dateStr}`,
+        query: `전주시청 보도자료 공지 행사 안내 ${dateStr}`,
         topic: "general",
         searchDepth: "basic",
         timeRange: "week",
@@ -405,28 +405,10 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
       },
       {
         key: "events",
-        query: `전주 축제 행사 공연 전시 일정 ${dateStr}`,
-        topic: "news",
-        searchDepth: "basic",
-        timeRange: "month",
-        includeDomains: LOCAL_UTILITY_DOMAINS,
-        excludeDomains: NOISE_DOMAINS,
-      },
-      {
-        key: "safety",
-        query: `전주 교통 통제 안전 주의 사건사고 ${dateStr}`,
+        query: `전주 축제 행사 공연 교통통제 사건사고 ${dateStr}`,
         topic: "news",
         searchDepth: "basic",
         timeRange: "week",
-        includeDomains: LOCAL_UTILITY_DOMAINS,
-        excludeDomains: NOISE_DOMAINS,
-      },
-      {
-        key: "governance",
-        query: `전주 시의회 시정 정책 예산 브리핑 ${dateStr}`,
-        topic: "news",
-        searchDepth: "basic",
-        timeRange: "month",
         includeDomains: LOCAL_UTILITY_DOMAINS,
         excludeDomains: NOISE_DOMAINS,
       },
@@ -436,17 +418,18 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
   return [
     {
       key: "local-news",
-      query: `Jeonju local civic notices traffic events update ${dateStr}`,
+      query: `Jeonju yesterday news updates traffic events ${dateStr}`,
       topic: "news",
-      searchDepth: "fast",
+      searchDepth: "basic",
       timeRange: "week",
       includeDomains: LOCAL_UTILITY_DOMAINS,
       excludeDomains: NOISE_DOMAINS,
-      includeAnswer: "basic",
+      includeAnswer: "advanced",
+      country: "south korea",
     },
     {
       key: "city-hall",
-      query: `Jeonju city hall press release ${dateStr}`,
+      query: `Jeonju city hall official notice press release ${dateStr}`,
       topic: "general",
       searchDepth: "basic",
       timeRange: "week",
@@ -456,28 +439,10 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
     },
     {
       key: "events",
-      query: `Jeonju events festival exhibition update ${dateStr}`,
-      topic: "news",
-      searchDepth: "basic",
-      timeRange: "month",
-      includeDomains: LOCAL_UTILITY_DOMAINS,
-      excludeDomains: NOISE_DOMAINS,
-    },
-    {
-      key: "safety",
-      query: `Jeonju traffic control safety incident update ${dateStr}`,
+      query: `Jeonju festival event traffic safety update ${dateStr}`,
       topic: "news",
       searchDepth: "basic",
       timeRange: "week",
-      includeDomains: LOCAL_UTILITY_DOMAINS,
-      excludeDomains: NOISE_DOMAINS,
-    },
-    {
-      key: "governance",
-      query: `Jeonju city council policy budget governance briefing ${dateStr}`,
-      topic: "news",
-      searchDepth: "basic",
-      timeRange: "month",
       includeDomains: LOCAL_UTILITY_DOMAINS,
       excludeDomains: NOISE_DOMAINS,
     },
@@ -871,68 +836,25 @@ function buildSearchContext(
   dateLabel: string
 ): string {
   const lines: string[] = []
-  const trackName: Record<string, { ko: string; en: string }> = {
-    "local-news": { ko: "지역 주요뉴스", en: "Local headlines" },
-    "city-hall": { ko: "전주시 공식 보도", en: "City official release" },
-    "events": { ko: "행사/축제", en: "Events/Festival" },
-    "safety": { ko: "교통/안전", en: "Traffic/Safety" },
-    "governance": { ko: "시정/의회", en: "Governance/Council" },
-    "fallback-news": { ko: "보강 뉴스", en: "Fallback news" },
-    "fallback-general": { ko: "보강 일반", en: "Fallback general" },
-  }
-
-  lines.push(locale === "ko"
-    ? "[브리핑 목표] 어제 전주 소식 핵심 + 오늘 바로 필요한 체크포인트를 제공한다."
-    : "[Goal] Provide yesterday's Jeonju highlights plus practical check points for today."
-  )
-  lines.push(locale === "ko"
-    ? "[편집 원칙] 오래된 정보·관광 홍보성 일반 문구보다 생활 영향이 큰 공지/교통/행사 업데이트를 우선한다."
-    : "[Editorial policy] Prioritize impactful updates (notices/traffic/events) over generic promotional text."
-  )
-  lines.push("")
 
   if (searchAnswer) {
-    lines.push(locale === "ko"
-      ? `[Tavily 검색 요약 답변]\n${searchAnswer}`
-      : `[Tavily Search Summary]\n${searchAnswer}`
-    )
-    lines.push("")
+    lines.push(`[Search Summary]\n${searchAnswer}\n`)
   }
 
   if (results.length > 0) {
-    lines.push(locale === "ko"
-      ? `[검색 결과 (${results.length}개)]`
-      : `[Search Results (${results.length} items)]`
-    )
-
+    lines.push(`[Results: ${results.length}]`)
     results.slice(0, 10).forEach((r, i) => {
-      const dateLine = r.publishedDate
-        ? (locale === "ko" ? `발행일: ${r.publishedDate}` : `Published: ${r.publishedDate}`)
-        : ""
-      const trackLabel = trackName[r.trackKey]?.[locale] ?? r.trackKey
       lines.push(
-        `[${i + 1}] ${r.title}` +
-        `\nURL: ${r.url}` +
-        `\n출처: ${r.source}` +
-        `\n분류: ${trackLabel}` +
-        `\n정렬점수: ${r.weightedScore.toFixed(2)} (원점수 ${r.score.toFixed(2)})` +
-        (dateLine ? `\n${dateLine}` : "") +
-        `\n내용: ${r.content.slice(0, 420)}`
+        `${i + 1}. ${r.title}` +
+        `\n   ${r.source} | ${r.publishedDate || "date unknown"}` +
+        `\n   ${r.content.slice(0, 400)}`
       )
     })
   } else {
-    lines.push(locale === "ko"
-      ? "[검색 결과가 거의 없습니다. 사실 확인 가능한 정보만 최소한으로 작성하고, 확인 필요하다고 명시하세요.]"
-      : "[Search results are sparse. Keep only verifiable facts and explicitly note verification gaps.]"
-    )
+    lines.push("[No search results found]")
   }
 
-  lines.push("")
-  lines.push(locale === "ko"
-    ? `참고: 기준일은 ${dateLabel}입니다.`
-    : `Note: The reference date is ${dateLabel}.`
-  )
-
+  lines.push(`\nReference date: ${dateLabel}`)
   return lines.join("\n")
 }
 
@@ -946,79 +868,56 @@ function buildSystemPrompt(
   locale: JeonjuBriefingLocale
 ): string {
   if (locale === "ko") {
-    return `당신은 전주시 생활 브리핑 에디터 '나들AI'입니다.
+    return `당신은 '나들AI'입니다. 전주 시민과 방문객을 위해 어제(${dateLabel}, ${relativeLabel})의 전주 소식을 친근하게 브리핑합니다.
 
-## 역할
-- ${dateLabel} (${relativeLabel}) 기준으로 '어제 확인된 사실'을 우선 정리합니다.
-- 오늘(지금) 바로 도움이 되는 생활 영향 포인트를 짧게 덧붙입니다.
+순수 JSON만 반환하세요. 마크다운/코드블록/설명 텍스트 없이 JSON 오브젝트만 출력합니다.
 
-## 출력 규칙
-- 반드시 **순수 JSON만** 반환하세요. 마크다운 블록(\`\`\`)이나 설명 텍스트 없이 순수 JSON만 반환해야 합니다.
-- 모든 문자열은 큰따옴표를 사용하세요.
-
-## JSON 스키마
 {
-  "headline": "어제 핵심을 담은 한 줄 (30자 이내, 전주 관련)",
-  "summary": "인사 1문장 + 핵심상황 2문장 + 오늘영향 1문장",
-  "newsItems": [
-    {"title": "소식 제목", "url": "https://...", "source": "출처명", "snippet": "핵심 내용 한줄(60자 이내)", "publishedDate": "YYYY-MM-DD"}
-  ],
-  "aiInsight": "오늘 체크포인트 2~4개 (각 항목은 '•'로 시작, 실행 가능한 조언)",
-  "weatherNote": "날씨 관련 정보 (검색 결과에 있으면, 없으면 null)",
-  "festivalNote": "축제/행사 정보 (검색 결과에 있으면, 없으면 null)",
-  "keywordTags": ["#태그1", "#태그2"]
+  "headline": "어제 전주 핵심을 담은 친근한 한 줄 제목 (25자 이내)",
+  "summary": "8~12문장의 아주 상세하고 자연스러운 아침 브리핑. 각 소식의 구체적인 내용(원인, 결과, 장소 등)을 충분히 풀어서 친한 친구에게 이야기하듯 길게 써주세요.",
+  "newsItems": [{"title":"제목","url":"https://...","source":"출처","snippet":"핵심 요약(80자이내)","publishedDate":"YYYY-MM-DD"}],
+  "aiInsight": "오늘 쓸모있는 팁 1~3개 (각 항목 '•'로 시작, 소식과 관련된 실용적 조언)",
+  "weatherNote": "날씨 정보 또는 null",
+  "festivalNote": "행사/축제 정보 또는 null",
+  "keywordTags": ["#전주", "#태그"]
 }
 
-## 상세 규칙
-1. **headline**: 30자 이내, 구체적인 전주 관련 내용 (추상 표현 금지)
-2. **summary**: 첫 문장은 반드시 "안녕하세요! 나들AI 입니다. 어제의 전주 소식을 알려드릴게요."로 시작
-3. 그 다음은 "핵심상황:"으로 시작하는 문장 2개 + "오늘영향:" 문장 1개. 과장/추측 금지
-4. **newsItems**: 최대 6개. 실제 전주 관련 내용만 포함. 없으면 빈 배열 []
-5. **snippet**: 60자 이내, 핵심만 간결하게
-6. **aiInsight**: 오늘 바로 쓸 수 있는 체크포인트 2~4개를 "•" 목록 형태로 작성
-7. **weatherNote / festivalNote**: 검색 결과 기반으로, 없으면 null
-8. **keywordTags**: 3-5개 전주 관련 해시태그
-9. 없는 정보는 반드시 **null** (빈 문자열 금지)
-10. 시정/의회/정책/선거 관련 이슈도 공공적 영향이 있으면 포함 가능 (단, 특정 진영 편들기 금지)
-11. 검색 근거가 약하거나 오래된 정보면 지어내지 말고, summary에 "어제 확인 가능한 신규 보도가 제한적"이라고 명시
-12. **JSON 외의 어떤 텍스트도 출력하지 마세요**`
+규칙:
+- summary 첫 문장: "안녕하세요! 나들AI예요 ☀️ 어제 전주에서 있었던 일들을 알려드릴게요~" 로 시작
+- 이후 7~10문장으로 어제의 핵심 소식을 아주 구체적이고 길게 브리핑. 기사의 단편적인 제목만 나열하지 말고, 본문의 상세 내용을 포함하여 스토리를 엮어주세요.
+- 마지막 문장은 오늘 하루를 응원하는 따뜻한 마무리.
+- '핵심상황:', '오늘영향:', '체크포인트' 같은 딱딱한 라벨 절대 금지.
+- newsItems: 최대 6개, 실제 URL만. snippet은 기사 핵심을 구체적으로 80자 이내로.
+- aiInsight: 어제 소식과 관련된 실용적 팁 1~3개. "•" 로 시작. 예: "• 예수병원 근처 방문 예정이라면 새 주차장을 활용해보세요"
+- 검색 결과가 부족하면 솔직하게 "어제는 특별한 새 소식이 많지 않았어요" 라고 자연스럽게.
+- 지어내기 금지. null은 null로 (빈 문자열 금지).
+- JSON 외 텍스트 출력 금지.`
   }
 
-  return `You are 'NadeulAI', a Jeonju daily briefing editor.
+  return `You are 'NadeulAI'. You brief Jeonju visitors and residents on yesterday's (${dateLabel}, ${relativeLabel}) local news in a warm, friendly tone.
 
-## Role
-- Prioritize verified facts from ${dateLabel} (${relativeLabel}).
-- Add practical "what to watch today" guidance in a compact form.
+Return ONLY pure JSON. No markdown, no code blocks, no extra text.
 
-## Output Rule
-- Return **ONLY pure JSON**. No markdown blocks (\`\`\`), no explanatory text.
-
-## JSON Schema
 {
-  "headline": "One-line core update (under 40 chars, Jeonju-related)",
-  "summary": "1 greeting line + 2 core factual lines + 1 practical impact line",
-  "newsItems": [
-    {"title": "News title", "url": "https://...", "source": "Source", "snippet": "Key point (under 80 chars)", "publishedDate": "YYYY-MM-DD"}
-  ],
-  "aiInsight": "2-4 bullet checklist items, each prefixed with '•'",
-  "weatherNote": "Weather info if available, otherwise null",
-  "festivalNote": "Festival/event info if available, otherwise null",
-  "keywordTags": ["#tag1", "#tag2"]
+  "headline": "Friendly one-line title about yesterday's Jeonju news (under 35 chars)",
+  "summary": "7-10 sentence highly detailed and warm morning briefing, covering each story with specific facts (causes, results, places) like telling a friend a full story.",
+  "newsItems": [{"title":"Title","url":"https://...","source":"Source","snippet":"Specific summary of the article (under 80 chars)","publishedDate":"YYYY-MM-DD"}],
+  "aiInsight": "1-3 practical tips related to yesterday's news, each starting with '•'",
+  "weatherNote": "Weather info or null",
+  "festivalNote": "Event/festival info or null",
+  "keywordTags": ["#Jeonju", "#tag"]
 }
 
-## Rules
-1. **headline**: Under 40 chars, specific and concrete
-2. **summary**: first sentence must start with "Hello! I'm NadeulAI. Here's yesterday's Jeonju briefing."
-3. Then add "Core:" for 2 facts, and one "Today impact:" sentence
-4. **newsItems**: Max 6. Include only real Jeonju content from searches. Empty array if none.
-5. **snippet**: Under 80 chars
-6. **aiInsight**: 2-4 actionable checklist bullets, each starting with "•"
-7. **weatherNote / festivalNote**: Based on search results, null if unavailable
-8. **keywordTags**: 3-5 Jeonju-related hashtags
-9. Use **null** for missing info (not empty strings)
-10. Governance/council/election topics may be included if publicly relevant, but keep neutral and non-partisan wording
-11. If evidence is limited, explicitly state that yesterday's verified updates were limited
-12. **Do NOT output any text besides valid JSON**`
+Rules:
+- summary must start with: "Hi there! It's NadeulAI ☀️ Let me catch you up on what happened in Jeonju yesterday~"
+- Follow with 6-9 sentences covering each key story in deep detail. Do not just list titles; weave the article contents into a rich narrative.
+- End with a warm, encouraging closing line for today.
+- NO rigid labels like "Core:", "Impact:", "Checklist:".
+- newsItems: max 6, real URLs only. Snippets should be specific and informative (up to 80 chars).
+- aiInsight: 1-3 practical tips tied to the news. E.g. "• If visiting Yesu Hospital area, try the new parking garage"
+- If search results are thin, honestly say "there weren't many notable updates yesterday".
+- Never fabricate. Use null for missing fields (not empty strings).
+- Output NOTHING besides valid JSON.`
 }
 
 // ------------------------------------------------------------------
@@ -1038,10 +937,14 @@ interface ParsedBriefing {
 function ensureFriendlyIntro(summary: string, locale: JeonjuBriefingLocale) {
   const trimmed = summary.trim()
   if (!trimmed) return trimmed
-  const koIntro = "안녕하세요! 나들AI 입니다. 어제의 전주 소식을 알려드릴게요."
-  const enIntro = "Hello! I'm NadeulAI. Here's yesterday's Jeonju briefing."
+  const koIntro = "안녕하세요! 나들AI예요 ☀️ 어제 전주에서 있었던 일들을 알려드릴게요~"
+  const enIntro = "Hi there! It's NadeulAI ☀️ Let me catch you up on what happened in Jeonju yesterday~"
   const intro = locale === "ko" ? koIntro : enIntro
   if (trimmed.startsWith(koIntro) || trimmed.startsWith(enIntro)) {
+    return trimmed
+  }
+  // Also check for old intros
+  if (trimmed.startsWith("안녕하세요!") || trimmed.startsWith("Hi there!") || trimmed.startsWith("Hello!")) {
     return trimmed
   }
   return `${intro} ${trimmed}`
@@ -1199,30 +1102,26 @@ function buildNarrativeSummary(
   if (locale === "ko") {
     if (!top) {
       return ensureFriendlyIntro(
-        `핵심상황: ${dateLabel} 기준 공공성 있는 신규 소식이 제한적이었습니다. 핵심상황: 공식 공지·교통·행사 페이지 위주로 확인이 필요합니다. 오늘영향: 이동 전 교통·행사 공지를 우선 점검해 주세요.`,
+        `어제는 전주에서 특별히 새로운 소식이 많지 않았어요. 전주시청 공지나 교통 정보를 가볍게 확인해보시는 걸 추천드려요. 오늘도 좋은 하루 되세요! 😊`,
         locale
       )
     }
-    const core1 = `핵심상황: ${top.title} 관련 내용이 확인됐고, ${top.source} 기준으로 핵심 포인트를 반영했습니다.`
-    const core2 = second
-      ? `핵심상황: ${second.title} 등 총 ${items.length}건(출처 ${sourceCount}곳)에서 어제 기준 변화를 교차 확인했습니다.`
-      : `핵심상황: 어제 기준 총 ${items.length}건(출처 ${sourceCount}곳)의 전주 관련 업데이트를 확인했습니다.`
-    const impact = `오늘영향: 일정 전에는 기사/공지의 최신 시각과 현장 운영 여부를 한 번 더 확인하면 혼선을 줄일 수 있습니다.`
-    return ensureFriendlyIntro(`${core1} ${core2} ${impact}`, locale)
+    const body = second
+      ? `어제는 "${top.title}" 소식이 있었고, "${second.title}" 관련 내용도 확인됐어요. 총 ${items.length}건의 소식을 모아봤는데요, 오늘 외출하시기 전에 한번 훑어보시면 도움이 될 거예요!`
+      : `어제는 "${top.title}" 관련 소식이 주목할 만했어요. 오늘 일정 시작 전에 가볍게 확인해보세요!`
+    return ensureFriendlyIntro(body, locale)
   }
 
   if (!top) {
     return ensureFriendlyIntro(
-      `Core: publicly useful fresh updates for ${dateLabel} were limited. Core: prioritize official city notices, traffic, and event pages. Today impact: check traffic and event updates before moving today.`,
+      `It was a pretty quiet day in Jeonju yesterday! I'd recommend checking official city notices and traffic updates. Have a wonderful day! 😊`,
       locale
     )
   }
-  const core1 = `Core: ${top.title} was a key verified update from ${top.source}.`
-  const core2 = second
-    ? `Core: together with ${second.title}, we cross-checked ${items.length} items across ${sourceCount} sources.`
-    : `Core: we validated ${items.length} Jeonju-related updates across ${sourceCount} sources.`
-  const impact = `Today impact: before finalizing plans, verify latest notice timestamps and on-site operation status.`
-  return ensureFriendlyIntro(`${core1} ${core2} ${impact}`, locale)
+  const body = second
+    ? `Yesterday, "${top.title}" was notable, along with "${second.title}". I've gathered ${items.length} updates total — take a quick look before heading out today!`
+    : `Yesterday's highlight was "${top.title}". Give it a quick read before you start your day!`
+  return ensureFriendlyIntro(body, locale)
 }
 
 function buildInsightFromItems(
@@ -1309,8 +1208,8 @@ function buildFinalBriefing(
   let summary = parsed.summary
   if (!summary) {
     summary = isKo
-      ? `핵심상황: ${dateLabel} 기준으로 확인 가능한 전주 관련 업데이트를 정리했습니다. 핵심상황: 생활 동선에 영향을 줄 수 있는 공지·행사·교통 정보를 우선 반영했습니다. 오늘영향: 오늘 일정 전에는 링크된 원문 기준으로 행사·교통 공지를 한 번 더 확인해 주세요.`
-      : `Core: this summarizes verifiable Jeonju updates as of ${dateLabel}. Core: priority is given to notices, event updates, and traffic-impacting changes. Today impact: before today's plans, double-check event and traffic notices from linked sources.`
+      ? `어제 하루 동안 확인된 전주 관련 업데이트를 모아봤어요. 생활 동선에 영향을 줄 수 있는 공지나 행사, 교통 정보를 위주로 정리했으니, 오늘 일정 시작 전에 가볍게 확인해 보세요!`
+      : `I've summarized the verified Jeonju updates for you. I prioritized helpful notices, events, and traffic changes to help your day go smoothly!`
   }
   summary = ensureFriendlyIntro(summary, locale)
 
@@ -1402,8 +1301,8 @@ function buildPartialBriefing(
     locale,
     headline: isKo ? `${dateLabel} 전주 소식` : `Jeonju News ${dateLabel}`,
     summary: isKo
-      ? ensureFriendlyIntro(`핵심상황: ${dateLabel} 기준 수집된 전주 관련 원문을 정리했습니다. 핵심상황: 근거가 확인되는 항목만 선별했습니다. 오늘영향: 오늘 일정 전에는 링크된 공지/기사의 최신 갱신 시간을 확인해 주세요.`, locale)
-      : ensureFriendlyIntro(`Core: this compiles Jeonju-related sources for ${dateLabel}. Core: only verifiable items are included. Today impact: check each linked notice/article for latest updates before making plans today.`, locale),
+      ? ensureFriendlyIntro(`오늘은 어제 기준 수집된 전주 관련 원문을 간단히 정리했어요. 확실한 정보만 쏙쏙 뽑아 담았으니, 외출하시기 전에 유용하게 활용해 보세요!`, locale)
+      : ensureFriendlyIntro(`I've compiled some helpful Jeonju-related updates for you. Have a quick look to stay informed before starting your day!`, locale),
     newsItems: searchResults.length > 0
       ? searchResults.slice(0, 6).map((r) => ({
           title: r.title,
@@ -1434,10 +1333,10 @@ function createFallbackBriefing(dateStr: string, locale: JeonjuBriefingLocale): 
   return {
     briefingDate: dateStr,
     locale,
-    headline: isKo ? "어제 전주 소식 요약 준비중" : "Yesterday's Jeonju digest is being prepared",
+    headline: isKo ? "새로운 전주 소식을 찾아보고 있어요" : "Gathering new Jeonju updates",
     summary: isKo
-      ? ensureFriendlyIntro(`핵심상황: ${dateLabel} 기준으로 자동 수집을 시도했지만 확인 가능한 신규 소식이 제한적이었습니다. 핵심상황: 현재는 공식 공지와 지역 기사의 추가 업데이트 대기 상태입니다. 오늘영향: 전주시청 공지와 지역 언론의 당일 업데이트를 우선 확인해 주세요.`, locale)
-      : ensureFriendlyIntro(`Core: automatic collection for ${dateLabel} found limited verifiable updates. Core: additional official updates are still pending. Today impact: check Jeonju city notices and local media updates first today.`, locale),
+      ? ensureFriendlyIntro(`어제 하루 동안 전해진 새로운 소식이 많지 않네요. 중요한 공식 공지나 일정은 전주시청 및 지역 언론 채널을 먼저 참고해 주시면 좋겠습니다. 오늘도 좋은 하루 보내세요!`, locale)
+      : ensureFriendlyIntro(`There weren't many new updates yesterday. Please check Jeonju city's official notices and local media for the latest announcements. Have a wonderful day!`, locale),
     newsItems: [
       {
         title: isKo ? "전주 한옥마을 - 조선의 정취를 품은 골목" : "Jeonju Hanok Village - Alleys of Joseon Charm",

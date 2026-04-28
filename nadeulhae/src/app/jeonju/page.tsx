@@ -163,6 +163,16 @@ export default function JeonjuPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+        <div className="mb-8 max-w-3xl">
+          <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">
+            {language === "ko" ? "어제의 전주" : "Yesterday's Jeonju"}
+          </h2>
+          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
+            {language === "ko"
+              ? "나들AI가 어제의 전주 소식을 매일 아침 따뜻하게 브리핑해 드립니다."
+              : "NadeulAI delivers a warm morning briefing of yesterday's Jeonju news, every day."}
+          </p>
+        </div>
         <JeonjuDailyBriefing language={language} />
       </section>
 
