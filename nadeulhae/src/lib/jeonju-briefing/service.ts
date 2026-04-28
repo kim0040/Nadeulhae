@@ -5,7 +5,7 @@ import {
   type TavilyTopic,
 } from "@/lib/tavily/client"
 import { createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
-import { saveJeonjuBriefing, getJeonjuBriefingByDate, type JeonjuBriefingData } from "./repository"
+import { saveJeonjuBriefing, getJeonjuBriefingByDateAndLocale, type JeonjuBriefingData } from "./repository"
 
 export type JeonjuBriefingLocale = "ko" | "en"
 
@@ -18,6 +18,19 @@ interface BriefingGenerationResult {
   fromCache: boolean
   data: JeonjuBriefingData
 }
+
+type AttemptState = {
+  attempts: number
+  blockedUntilMs: number
+}
+
+declare global {
+  var __nadeulhaeJeonjuBriefingInflight: Map<string, Promise<BriefingGenerationResult>> | undefined
+  var __nadeulhaeJeonjuBriefingAttempts: Map<string, AttemptState> | undefined
+}
+
+const JEONJU_BRIEFING_MAX_AUTO_ATTEMPTS = 3
+const JEONJU_BRIEFING_RETRY_COOLDOWN_MS = 15 * 60 * 1000
 
 // ------------------------------------------------------------------
 // KST Helpers
@@ -51,6 +64,46 @@ function getRelativeDayLabel(dateStr: string, locale: JeonjuBriefingLocale): str
   if (dateStr === today) return locale === "ko" ? "오늘" : "today"
   if (dateStr === getYesterdayInKst()) return locale === "ko" ? "어제" : "yesterday"
   return getFormattedDateLabel(dateStr, locale)
+}
+
+function getBriefingCacheKey(dateStr: string, locale: JeonjuBriefingLocale) {
+  return `${dateStr}:${locale}`
+}
+
+function getInflightMap() {
+  if (!globalThis.__nadeulhaeJeonjuBriefingInflight) {
+    globalThis.__nadeulhaeJeonjuBriefingInflight = new Map()
+  }
+  return globalThis.__nadeulhaeJeonjuBriefingInflight
+}
+
+function getAttemptMap() {
+  if (!globalThis.__nadeulhaeJeonjuBriefingAttempts) {
+    globalThis.__nadeulhaeJeonjuBriefingAttempts = new Map()
+  }
+  return globalThis.__nadeulhaeJeonjuBriefingAttempts
+}
+
+function isAutoGenerationBlocked(cacheKey: string) {
+  const attemptMap = getAttemptMap()
+  const state = attemptMap.get(cacheKey)
+  if (!state) return false
+  return state.blockedUntilMs > Date.now()
+}
+
+function markAutoGenerationFailure(cacheKey: string) {
+  const attemptMap = getAttemptMap()
+  const current = attemptMap.get(cacheKey)
+  const nextAttempts = (current?.attempts ?? 0) + 1
+  const shouldBlock = nextAttempts >= JEONJU_BRIEFING_MAX_AUTO_ATTEMPTS
+  attemptMap.set(cacheKey, {
+    attempts: nextAttempts,
+    blockedUntilMs: shouldBlock ? Date.now() + JEONJU_BRIEFING_RETRY_COOLDOWN_MS : 0,
+  })
+}
+
+function clearAutoGenerationFailures(cacheKey: string) {
+  getAttemptMap().delete(cacheKey)
 }
 
 // ------------------------------------------------------------------
@@ -523,13 +576,14 @@ export async function generateJeonjuBriefing(
 ): Promise<BriefingGenerationResult> {
   const { locale = "ko", forceRefresh = false } = options
   const yesterdayDate = getYesterdayInKst()
+  const cacheKey = getBriefingCacheKey(yesterdayDate, locale)
 
   // 1. Check DB cache first
   if (!forceRefresh) {
     try {
-      const cached = await getJeonjuBriefingByDate(yesterdayDate)
+      const cached = await getJeonjuBriefingByDateAndLocale(yesterdayDate, locale)
       if (cached && cached.newsItems.length > 0) {
-        console.log(`[jeonju-briefing] Serving cached briefing for ${yesterdayDate}`)
+        console.log(`[jeonju-briefing] Serving cached briefing for ${yesterdayDate} (${locale})`)
         return { fromCache: true, data: cached }
       }
     } catch {
@@ -537,48 +591,96 @@ export async function generateJeonjuBriefing(
     }
   }
 
-  // 2. Generate fresh briefing
-  try {
-    const result = await fetchAndSummarize(yesterdayDate, locale)
-
-    // 3. Save to DB (best-effort)
-    try {
-      const plannedQueries = getPlannedQuerySummary(yesterdayDate, locale)
-      await saveJeonjuBriefing({
-        briefingDate: yesterdayDate,
-        locale: result.locale,
-        headline: result.headline,
-        summary: result.summary,
-        newsItems: result.newsItems,
-        aiInsight: result.aiInsight,
-        weatherNote: result.weatherNote,
-        festivalNote: result.festivalNote,
-        keywordTags: result.keywordTags,
-        searchQuery: plannedQueries,
-        modelUsed: result.modelUsed,
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      })
-      console.log(`[jeonju-briefing] Saved briefing for ${yesterdayDate}`)
-    } catch (saveError) {
-      console.warn("[jeonju-briefing] Save to DB failed:", saveError)
-    }
-
-    return { fromCache: false, data: result }
-  } catch (error) {
-    console.error("[jeonju-briefing] Generation failed:", error)
-
-    // Stale cache fallback
-    try {
-      const stale = await getJeonjuBriefingByDate(yesterdayDate)
-      if (stale) return { fromCache: true, data: stale }
-    } catch {
-      // ignore
-    }
-
-    return { fromCache: false, data: createFallbackBriefing(yesterdayDate, locale) }
+  // 2. Auto-generation safety: avoid repeated re-calls when upstream fails.
+  if (!forceRefresh && isAutoGenerationBlocked(cacheKey)) {
+    const blocked = createFallbackBriefing(yesterdayDate, locale)
+    return { fromCache: false, data: blocked }
   }
+
+  // 3. De-duplicate concurrent requests for the same date/locale.
+  const inflightMap = getInflightMap()
+  if (!forceRefresh) {
+    const existing = inflightMap.get(cacheKey)
+    if (existing) return existing
+  }
+
+  const generationPromise = (async (): Promise<BriefingGenerationResult> => {
+    // 4. Generate fresh briefing
+    try {
+      const result = await fetchAndSummarize(yesterdayDate, locale)
+
+      // 5. Save to DB (best-effort)
+      try {
+        const plannedQueries = getPlannedQuerySummary(yesterdayDate, locale)
+        await saveJeonjuBriefing({
+          briefingDate: yesterdayDate,
+          locale: result.locale,
+          headline: result.headline,
+          summary: result.summary,
+          newsItems: result.newsItems,
+          aiInsight: result.aiInsight,
+          weatherNote: result.weatherNote,
+          festivalNote: result.festivalNote,
+          keywordTags: result.keywordTags,
+          searchQuery: plannedQueries,
+          modelUsed: result.modelUsed,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        })
+        console.log(`[jeonju-briefing] Saved briefing for ${yesterdayDate} (${locale})`)
+      } catch (saveError) {
+        console.warn("[jeonju-briefing] Save to DB failed:", saveError)
+      }
+
+      clearAutoGenerationFailures(cacheKey)
+      return { fromCache: false, data: result }
+    } catch (error) {
+      console.error("[jeonju-briefing] Generation failed:", error)
+      markAutoGenerationFailure(cacheKey)
+
+      // Stale cache fallback (same date+locale)
+      try {
+        const stale = await getJeonjuBriefingByDateAndLocale(yesterdayDate, locale)
+        if (stale) return { fromCache: true, data: stale }
+      } catch {
+        // ignore
+      }
+
+      // Save fallback once to prevent repeated auto-calls on this date.
+      const fallback = createFallbackBriefing(yesterdayDate, locale)
+      try {
+        await saveJeonjuBriefing({
+          briefingDate: yesterdayDate,
+          locale,
+          headline: fallback.headline,
+          summary: fallback.summary,
+          newsItems: fallback.newsItems,
+          aiInsight: fallback.aiInsight,
+          weatherNote: fallback.weatherNote,
+          festivalNote: fallback.festivalNote,
+          keywordTags: fallback.keywordTags,
+          searchQuery: "fallback",
+          modelUsed: null,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        })
+      } catch {
+        // ignore save fallback failure
+      }
+
+      return { fromCache: false, data: fallback }
+    } finally {
+      inflightMap.delete(cacheKey)
+    }
+  })()
+
+  if (!forceRefresh) {
+    inflightMap.set(cacheKey, generationPromise)
+  }
+
+  return generationPromise
 }
 
 // ------------------------------------------------------------------
@@ -745,7 +847,7 @@ function buildSystemPrompt(
 ## JSON 스키마
 {
   "headline": "어제 핵심을 담은 한 줄 (30자 이내, 전주 관련)",
-  "summary": "핵심상황 2문장 + 오늘영향 1문장",
+  "summary": "인사 1문장 + 핵심상황 2문장 + 오늘영향 1문장",
   "newsItems": [
     {"title": "소식 제목", "url": "https://...", "source": "출처명", "snippet": "핵심 내용 한줄(60자 이내)", "publishedDate": "YYYY-MM-DD"}
   ],
@@ -757,15 +859,16 @@ function buildSystemPrompt(
 
 ## 상세 규칙
 1. **headline**: 30자 이내, 구체적인 전주 관련 내용 (추상 표현 금지)
-2. **summary**: "핵심상황:"으로 시작하는 문장 2개 + "오늘영향:" 문장 1개. 과장/추측 금지
-3. **newsItems**: 최대 5개. 실제 전주 관련 내용만 포함. 없으면 빈 배열 []
-4. **snippet**: 60자 이내, 핵심만 간결하게
-5. **aiInsight**: 오늘 바로 쓸 수 있는 체크포인트 2~4개를 "•" 목록 형태로 작성
-6. **weatherNote / festivalNote**: 검색 결과 기반으로, 없으면 null
-7. **keywordTags**: 3-5개 전주 관련 해시태그
-8. 없는 정보는 반드시 **null** (빈 문자열 금지)
-9. 검색 근거가 약하거나 오래된 정보면 지어내지 말고, summary에 "어제 확인 가능한 신규 보도가 제한적"이라고 명시
-10. **JSON 외의 어떤 텍스트도 출력하지 마세요**`
+2. **summary**: 첫 문장은 반드시 "안녕하세요! 나들AI입니다. 어제의 전주 소식을 알려드릴게요."로 시작
+3. 그 다음은 "핵심상황:"으로 시작하는 문장 2개 + "오늘영향:" 문장 1개. 과장/추측 금지
+4. **newsItems**: 최대 5개. 실제 전주 관련 내용만 포함. 없으면 빈 배열 []
+5. **snippet**: 60자 이내, 핵심만 간결하게
+6. **aiInsight**: 오늘 바로 쓸 수 있는 체크포인트 2~4개를 "•" 목록 형태로 작성
+7. **weatherNote / festivalNote**: 검색 결과 기반으로, 없으면 null
+8. **keywordTags**: 3-5개 전주 관련 해시태그
+9. 없는 정보는 반드시 **null** (빈 문자열 금지)
+10. 검색 근거가 약하거나 오래된 정보면 지어내지 말고, summary에 "어제 확인 가능한 신규 보도가 제한적"이라고 명시
+11. **JSON 외의 어떤 텍스트도 출력하지 마세요**`
   }
 
   return `You are 'NadeulAI', a Jeonju daily briefing editor.
@@ -780,7 +883,7 @@ function buildSystemPrompt(
 ## JSON Schema
 {
   "headline": "One-line core update (under 40 chars, Jeonju-related)",
-  "summary": "2 core factual lines + 1 practical impact line",
+  "summary": "1 greeting line + 2 core factual lines + 1 practical impact line",
   "newsItems": [
     {"title": "News title", "url": "https://...", "source": "Source", "snippet": "Key point (under 80 chars)", "publishedDate": "YYYY-MM-DD"}
   ],
@@ -792,15 +895,16 @@ function buildSystemPrompt(
 
 ## Rules
 1. **headline**: Under 40 chars, specific and concrete
-2. **summary**: start with "Core:" for 2 facts, and add one "Today impact:" sentence
-3. **newsItems**: Max 5. Include only real Jeonju content from searches. Empty array if none.
-4. **snippet**: Under 80 chars
-5. **aiInsight**: 2-4 actionable checklist bullets, each starting with "•"
-6. **weatherNote / festivalNote**: Based on search results, null if unavailable
-7. **keywordTags**: 3-5 Jeonju-related hashtags
-8. Use **null** for missing info (not empty strings)
-9. If evidence is limited, explicitly state that yesterday's verified updates were limited
-10. **Do NOT output any text besides valid JSON**`
+2. **summary**: first sentence must start with "Hello! I'm NadeulAI. Here's yesterday's Jeonju briefing."
+3. Then add "Core:" for 2 facts, and one "Today impact:" sentence
+4. **newsItems**: Max 5. Include only real Jeonju content from searches. Empty array if none.
+5. **snippet**: Under 80 chars
+6. **aiInsight**: 2-4 actionable checklist bullets, each starting with "•"
+7. **weatherNote / festivalNote**: Based on search results, null if unavailable
+8. **keywordTags**: 3-5 Jeonju-related hashtags
+9. Use **null** for missing info (not empty strings)
+10. If evidence is limited, explicitly state that yesterday's verified updates were limited
+11. **Do NOT output any text besides valid JSON**`
 }
 
 // ------------------------------------------------------------------
@@ -815,6 +919,18 @@ interface ParsedBriefing {
   weatherNote: string | null
   festivalNote: string | null
   keywordTags: string[]
+}
+
+function ensureFriendlyIntro(summary: string, locale: JeonjuBriefingLocale) {
+  const trimmed = summary.trim()
+  if (!trimmed) return trimmed
+  const koIntro = "안녕하세요! 나들AI입니다. 어제의 전주 소식을 알려드릴게요."
+  const enIntro = "Hello! I'm NadeulAI. Here's yesterday's Jeonju briefing."
+  const intro = locale === "ko" ? koIntro : enIntro
+  if (trimmed.startsWith(koIntro) || trimmed.startsWith(enIntro)) {
+    return trimmed
+  }
+  return `${intro} ${trimmed}`
 }
 
 function parseBriefingJson(jsonText: string): ParsedBriefing {
@@ -887,9 +1003,10 @@ function buildFinalBriefing(
   let summary = parsed.summary
   if (!summary) {
     summary = isKo
-      ? `${dateLabel} 기준으로 확인 가능한 전주 관련 업데이트를 정리했습니다. 오늘 일정 전에는 링크된 원문 기준으로 행사·교통 공지를 한 번 더 확인해 주세요.`
-      : `This summarizes verifiable Jeonju updates as of ${dateLabel}. Before today's plans, double-check event and traffic notices from the linked sources.`
+      ? `핵심상황: ${dateLabel} 기준으로 확인 가능한 전주 관련 업데이트를 정리했습니다. 핵심상황: 생활 동선에 영향을 줄 수 있는 공지·행사·교통 정보를 우선 반영했습니다. 오늘영향: 오늘 일정 전에는 링크된 원문 기준으로 행사·교통 공지를 한 번 더 확인해 주세요.`
+      : `Core: this summarizes verifiable Jeonju updates as of ${dateLabel}. Core: priority is given to notices, event updates, and traffic-impacting changes. Today impact: before today's plans, double-check event and traffic notices from linked sources.`
   }
+  summary = ensureFriendlyIntro(summary, locale)
 
   // News items: prefer LLM's, fallback to raw search results
   let newsItems: JeonjuBriefingData["newsItems"]
@@ -976,8 +1093,8 @@ function buildPartialBriefing(
     locale,
     headline: isKo ? `${dateLabel} 전주 소식` : `Jeonju News ${dateLabel}`,
     summary: isKo
-      ? `${dateLabel} 기준 수집된 전주 관련 원문을 정리했습니다. 오늘 일정 전에는 링크된 공지/기사의 최신 갱신 시간을 확인해 주세요.`
-      : `This compiles Jeonju-related sources for ${dateLabel}. Check each linked notice/article for latest updates before making plans today.`,
+      ? ensureFriendlyIntro(`핵심상황: ${dateLabel} 기준 수집된 전주 관련 원문을 정리했습니다. 핵심상황: 근거가 확인되는 항목만 선별했습니다. 오늘영향: 오늘 일정 전에는 링크된 공지/기사의 최신 갱신 시간을 확인해 주세요.`, locale)
+      : ensureFriendlyIntro(`Core: this compiles Jeonju-related sources for ${dateLabel}. Core: only verifiable items are included. Today impact: check each linked notice/article for latest updates before making plans today.`, locale),
     newsItems: searchResults.length > 0
       ? searchResults.slice(0, 5).map((r) => ({
           title: r.title,
@@ -1010,8 +1127,8 @@ function createFallbackBriefing(dateStr: string, locale: JeonjuBriefingLocale): 
     locale,
     headline: isKo ? "어제 전주 소식 요약 준비중" : "Yesterday's Jeonju digest is being prepared",
     summary: isKo
-      ? `${dateLabel} 기준으로 자동 수집을 시도했지만 확인 가능한 신규 소식이 제한적이었습니다. 전주시청 공지와 지역 언론의 당일 업데이트를 우선 확인해 주세요.`
-      : `Automatic collection for ${dateLabel} found limited verifiable updates. Please check Jeonju city notices and local media updates first today.`,
+      ? ensureFriendlyIntro(`핵심상황: ${dateLabel} 기준으로 자동 수집을 시도했지만 확인 가능한 신규 소식이 제한적이었습니다. 핵심상황: 현재는 공식 공지와 지역 기사의 추가 업데이트 대기 상태입니다. 오늘영향: 전주시청 공지와 지역 언론의 당일 업데이트를 우선 확인해 주세요.`, locale)
+      : ensureFriendlyIntro(`Core: automatic collection for ${dateLabel} found limited verifiable updates. Core: additional official updates are still pending. Today impact: check Jeonju city notices and local media updates first today.`, locale),
     newsItems: [
       {
         title: isKo ? "전주 한옥마을 - 조선의 정취를 품은 골목" : "Jeonju Hanok Village - Alleys of Joseon Charm",

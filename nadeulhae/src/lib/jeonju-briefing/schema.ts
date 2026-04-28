@@ -7,7 +7,7 @@ declare global {
 
 const createJeonjuDailyBriefingTableSql = `
   CREATE TABLE IF NOT EXISTS jeonju_daily_briefings (
-    briefing_date DATE NOT NULL PRIMARY KEY,
+    briefing_date DATE NOT NULL,
     locale VARCHAR(8) NOT NULL DEFAULT 'ko',
     headline VARCHAR(255) NOT NULL DEFAULT '',
     summary LONGTEXT NOT NULL,
@@ -23,9 +23,22 @@ const createJeonjuDailyBriefingTableSql = `
     total_tokens INT UNSIGNED NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (briefing_date, locale),
     KEY idx_jeonju_briefing_date (briefing_date),
+    KEY idx_jeonju_briefing_locale (locale),
     KEY idx_jeonju_briefing_updated (updated_at)
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`
+
+const migrateCompositePrimaryKeySql = `
+  ALTER TABLE jeonju_daily_briefings
+  DROP PRIMARY KEY,
+  ADD PRIMARY KEY (briefing_date, locale)
+`
+
+const addLocaleIndexSql = `
+  ALTER TABLE jeonju_daily_briefings
+  ADD KEY idx_jeonju_briefing_locale (locale)
 `
 
 export async function ensureJeonjuBriefingSchema() {
@@ -36,6 +49,19 @@ export async function ensureJeonjuBriefingSchema() {
   const bootstrapPromise = (async () => {
     const pool = getDbPool()
     await pool.query(createJeonjuDailyBriefingTableSql)
+
+    // Backward-compatible migration: old schema used PRIMARY KEY(briefing_date) only.
+    try {
+      await pool.query(migrateCompositePrimaryKeySql)
+    } catch {
+      // ignore when already migrated or table state disallows migration in this run
+    }
+
+    try {
+      await pool.query(addLocaleIndexSql)
+    } catch {
+      // ignore duplicate index error
+    }
   })()
 
   globalThis.__nadeulhaeJeonjuBriefingSchemaPromise = bootstrapPromise.catch((error) => {
