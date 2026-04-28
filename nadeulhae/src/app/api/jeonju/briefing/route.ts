@@ -20,8 +20,22 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
     localeParam === "en" ? "en" : "ko"
 
   const force = searchParams.get("force") === "true"
+  const warmAll = searchParams.get("warm_all") === "true"
 
   try {
+    if (warmAll) {
+      const ko = await generateJeonjuBriefing({ locale: "ko", forceRefresh: force })
+      const en = await generateJeonjuBriefing({ locale: "en", forceRefresh: force })
+      return NextResponse.json({
+        success: true,
+        warmed: true,
+        data: {
+          ko: ko.data,
+          en: en.data,
+        },
+      })
+    }
+
     const result = await generateJeonjuBriefing({
       locale,
       forceRefresh: force,

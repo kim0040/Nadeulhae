@@ -22,15 +22,19 @@ export interface JeonjuBriefingData {
   updatedAt: string
 }
 
-export async function getJeonjuBriefingByDate(briefingDate: string): Promise<JeonjuBriefingData | null> {
+export async function getJeonjuBriefingByDateAndLocale(
+  briefingDate: string,
+  locale: string
+): Promise<JeonjuBriefingData | null> {
   const rows = await queryRows<JeonjuDailyBriefingRow[]>(
     `
       SELECT *
       FROM jeonju_daily_briefings
       WHERE briefing_date = ?
+        AND locale = ?
       LIMIT 1
     `,
-    [briefingDate]
+    [briefingDate, locale]
   )
 
   if (rows.length === 0) {
@@ -65,7 +69,6 @@ export async function saveJeonjuBriefing(data: {
         search_query, model_used, prompt_tokens, completion_tokens, total_tokens
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
-        locale = VALUES(locale),
         headline = VALUES(headline),
         summary = VALUES(summary),
         news_items = VALUES(news_items),
