@@ -44,7 +44,7 @@ type FetchStatus = "idle" | "loading" | "success" | "error"
 // Cache helpers (localStorage, 1 day TTL)
 // ------------------------------------------------------------------
 
-const CACHE_PREFIX = "nadeul:briefing:v4"
+const CACHE_PREFIX = "nadeul:briefing:v5"
 
 function getKstDateKey() {
   const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
