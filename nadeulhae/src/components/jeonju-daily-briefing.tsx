@@ -207,7 +207,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
   // --- Fetch logic ---
   const fetchBriefing = useCallback(
-    async (force = false, attempt = 0) => {
+    async (force = false, attempt = 0, refresh = false) => {
       if (!force || !briefing) {
         setStatus("loading")
       }
@@ -221,8 +221,11 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         )
         let res: Response
         try {
+          const queryParams = new URLSearchParams({ locale: language })
+          if (force) queryParams.set("force", "true")
+          if (refresh && !force) queryParams.set("refresh", "true")
           res = await fetch(
-            `/api/jeonju/briefing?locale=${language}${force ? "&force=true" : ""}`,
+            `/api/jeonju/briefing?${queryParams.toString()}`,
             { signal: controller.signal }
           )
         } finally {
@@ -287,7 +290,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           : (err instanceof Error ? err.message : t.errorSub)
 
         if (!isRateLimited && attempt < RETRY_MAX) {
-          setTimeout(() => fetchBriefing(force, attempt + 1), RETRY_DELAY_MS * (attempt + 1))
+          setTimeout(() => fetchBriefing(force, attempt + 1, refresh), RETRY_DELAY_MS * (attempt + 1))
           return
         }
 
@@ -319,12 +322,12 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
       setStatus(isEmptyFallback ? "empty" : "success")
       return
     }
-    fetchBriefing()
+    fetchBriefing(false, 0, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language])
 
   const handleRefresh = useCallback(() => {
-    fetchBriefing(true, 0)
+    fetchBriefing(false, 0, true)
   }, [fetchBriefing])
 
   // --- Renders ---

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { withApiAnalytics } from "@/lib/analytics/route"
 import { ensureJeonjuBriefingSchema } from "@/lib/jeonju-briefing/schema"
 import { generateJeonjuBriefing } from "@/lib/jeonju-briefing/service"
+import { getJeonjuBriefingByDateAndLocale } from "@/lib/jeonju-briefing/repository"
 import type { JeonjuBriefingLocale } from "@/lib/jeonju-briefing/service"
 
 export const runtime = "nodejs"
@@ -34,6 +35,7 @@ const WARM_ALL_DAILY_LIMIT = 4
 const FORCE_REFRESH_COOLDOWN_MS = 90 * 1000
 const WARM_ALL_REFRESH_COOLDOWN_MS = 3 * 60 * 1000
 const RATE_LIMIT_MAX_ENTRIES = 8000
+const FORCE_REFRESH_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000
 
 function getRateWindowMap() {
   if (!globalThis.__nadeulhaeJeonjuBriefingForceWindowMap) {
@@ -141,6 +143,19 @@ function createRateLimitResponse(locale: JeonjuBriefingLocale, retryAfterSeconds
   return response
 }
 
+function getYesterdayInKst(): string {
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  const yesterday = new Date(kstNow)
+  yesterday.setDate(yesterday.getDate() - 1)
+  return yesterday.toISOString().slice(0, 10)
+}
+
+function isRecentlyUpdated(updatedAt: string, nowMs: number, minIntervalMs: number) {
+  const updatedMs = Date.parse(updatedAt)
+  if (!Number.isFinite(updatedMs)) return false
+  return nowMs - updatedMs < minIntervalMs
+}
+
 export const GET = withApiAnalytics(async (request: NextRequest) => {
   try {
     await ensureJeonjuBriefingSchema()
@@ -154,11 +169,57 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
   const locale: JeonjuBriefingLocale =
     localeParam === "en" ? "en" : "ko"
 
-  const force = searchParams.get("force") === "true"
+  const forceRequested = searchParams.get("force") === "true"
   const warmAll = searchParams.get("warm_all") === "true"
+  const nowMs = Date.now()
+  const briefingDate = getYesterdayInKst()
+
+  if (forceRequested) {
+    try {
+      if (warmAll) {
+        const [koCached, enCached] = await Promise.all([
+          getJeonjuBriefingByDateAndLocale(briefingDate, "ko"),
+          getJeonjuBriefingByDateAndLocale(briefingDate, "en"),
+        ])
+        if (
+          koCached
+          && enCached
+          && isRecentlyUpdated(koCached.updatedAt, nowMs, FORCE_REFRESH_MIN_INTERVAL_MS)
+          && isRecentlyUpdated(enCached.updatedAt, nowMs, FORCE_REFRESH_MIN_INTERVAL_MS)
+        ) {
+          const response = NextResponse.json({
+            success: true,
+            warmed: true,
+            throttledForceRefresh: true,
+            data: {
+              ko: koCached,
+              en: enCached,
+            },
+          })
+          response.headers.set("Cache-Control", BRIEFING_PUBLIC_CACHE_CONTROL)
+          return response
+        }
+      } else {
+        const cached = await getJeonjuBriefingByDateAndLocale(briefingDate, locale)
+        if (cached && isRecentlyUpdated(cached.updatedAt, nowMs, FORCE_REFRESH_MIN_INTERVAL_MS)) {
+          const response = NextResponse.json({
+            success: true,
+            fromCache: true,
+            throttledForceRefresh: true,
+            data: cached,
+          })
+          response.headers.set("Cache-Control", BRIEFING_PUBLIC_CACHE_CONTROL)
+          return response
+        }
+      }
+    } catch (error) {
+      console.warn("[api/jeonju/briefing] Force refresh pre-check failed:", error)
+    }
+  }
+
+  const force = forceRequested
 
   if (force || warmAll) {
-    const nowMs = Date.now()
     const clientKey = getClientKey(request)
     const actionKey = warmAll ? "warm-all" : "force"
     const perClientActionKey = `${clientKey}:${actionKey}`
