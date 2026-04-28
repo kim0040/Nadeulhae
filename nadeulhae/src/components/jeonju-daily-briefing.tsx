@@ -17,8 +17,6 @@ import {
   ShieldCheck,
 } from "lucide-react"
 
-import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text"
-
 // ------------------------------------------------------------------
 // Types
 // ------------------------------------------------------------------
@@ -132,6 +130,17 @@ function formatPublishedDate(date: string | null, language: "ko" | "en") {
   })
 }
 
+function formatBriefingDateLabel(date: string, language: "ko" | "en") {
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return date
+  return parsed.toLocaleDateString(language === "ko" ? "ko-KR" : "en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  })
+}
+
 function parseSummarySections(summary: string, language: "ko" | "en") {
   const normalized = summary.replace(/\s+/g, " ").trim()
   const lines = normalized
@@ -169,7 +178,7 @@ function parseSummarySections(summary: string, language: "ko" | "en") {
 
   if (!intro) {
     intro = language === "ko"
-      ? "안녕하세요! 나들AI입니다. 어제의 전주 소식을 알려드릴게요."
+      ? "안녕하세요! 나들AI 입니다. 어제의 전주 소식을 알려드릴게요."
       : "Hello! I'm NadeulAI. Here's yesterday's Jeonju briefing."
   }
 
@@ -227,6 +236,37 @@ function summarizeCategory(
     return "Prioritize notices directly tied to your plan today."
   })()
   return `${base} ${sourceLine}${secondLine ? ` ${secondLine}` : ""} ${action}`
+}
+
+function getCategoryAccent(category: IssueCategory) {
+  if (category === "safety") {
+    return {
+      badge: "bg-rose-500/10 text-rose-700 border-rose-300/40 dark:text-rose-300",
+      bar: "bg-rose-400",
+    }
+  }
+  if (category === "governance") {
+    return {
+      badge: "bg-indigo-500/10 text-indigo-700 border-indigo-300/40 dark:text-indigo-300",
+      bar: "bg-indigo-400",
+    }
+  }
+  if (category === "culture") {
+    return {
+      badge: "bg-fuchsia-500/10 text-fuchsia-700 border-fuchsia-300/40 dark:text-fuchsia-300",
+      bar: "bg-fuchsia-400",
+    }
+  }
+  if (category === "economy") {
+    return {
+      badge: "bg-amber-500/10 text-amber-700 border-amber-300/40 dark:text-amber-300",
+      bar: "bg-amber-400",
+    }
+  }
+  return {
+    badge: "bg-emerald-500/10 text-emerald-700 border-emerald-300/40 dark:text-emerald-300",
+    bar: "bg-emerald-400",
+  }
 }
 
 // ------------------------------------------------------------------
@@ -438,55 +478,61 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
     acc[item.category] += 1
     return acc
   }, { safety: 0, governance: 0, culture: 0, economy: 0, lifestyle: 0 })
+  const anchorDateLabel = formatBriefingDateLabel(briefing.briefingDate, language)
+  const topLineItems = [...summarySections.core, ...summarySections.impact].slice(0, 4)
 
   return (
     <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
       {/* Header */}
-      <div className="mb-8 max-w-4xl">
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="inline-flex rounded-full border border-nature-green/20 bg-nature-green/10 px-5 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-nature-green">
-            <Sparkles size={12} className="mr-1.5" />
+      <div className="mb-8 overflow-hidden rounded-[1.7rem] border border-slate-300/40 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-5 py-6 text-slate-50 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.95)] sm:px-7 sm:py-7">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-100">
+            <Sparkles size={12} className="text-cyan-300" />
             {t.aiLabel}
-          </div>
-          {briefing.fromCache && (
-            <div className="inline-flex rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-              {t.fromCache}
-            </div>
-          )}
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-            <CalendarDays className="h-3 w-3" />
-            {briefing.briefingDate}
-          </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-            <ShieldCheck className="h-3 w-3" />
-            {language === "ko" ? `출처 ${sourceCount}개` : `${sourceCount} sources`}
-          </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-            <Newspaper className="h-3 w-3" />
-            {language === "ko" ? `기사 ${briefing.newsItems.length}건` : `${briefing.newsItems.length} stories`}
           </div>
           <button
             onClick={handleRefresh}
-            className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-slate-100 hover:bg-white/20 transition-colors"
             aria-label={t.retry}
           >
             <RefreshCw className="h-3 w-3" />
             {t.refresh}
           </button>
         </div>
-        <AnimatedGradientText
-          className="text-3xl sm:text-5xl font-black tracking-tight"
-          colorFrom="#0b7d71"
-          colorTo="#2f6fe4"
-          speed={1.2}
-        >
-          {t.sectionTitle}
-        </AnimatedGradientText>
-        <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
-          {t.sectionDesc}
-        </p>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr] lg:items-end">
+          <div>
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-cyan-200/90">
+              {t.morningDeskLabel}
+            </p>
+            <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
+              {t.sectionTitle}
+            </h2>
+            <p className="mt-3 text-sm sm:text-base font-semibold leading-relaxed text-slate-200">
+              {t.sectionDesc}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-200">{t.anchorTimeLabel}</p>
+            <p className="mt-1 text-lg font-black text-white">{anchorDateLabel}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-slate-100">
+                <ShieldCheck className="h-3 w-3" />
+                {language === "ko" ? `출처 ${sourceCount}개` : `${sourceCount} sources`}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-slate-100">
+                <Newspaper className="h-3 w-3" />
+                {language === "ko" ? `기사 ${briefing.newsItems.length}건` : `${briefing.newsItems.length} stories`}
+              </span>
+              {briefing.fromCache && (
+                <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-slate-100">
+                  {t.fromCache}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
         {errorMessage && (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-orange-400/35 bg-orange-400/10 px-3 py-1.5 text-xs font-black text-orange-600 dark:text-orange-300">
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-orange-300/50 bg-orange-500/15 px-3 py-1.5 text-xs font-black text-orange-100">
             <Info className="h-3 w-3" />
             {errorMessage}
           </div>
@@ -496,17 +542,16 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
       {/* Main Briefing Card */}
       <div className="overflow-hidden rounded-[2rem] border border-[var(--interactive-border)] bg-[var(--interactive)] shadow-[0_20px_65px_-36px_rgba(17,24,39,0.5)]">
         {/* Headline Banner */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-nature-green/10 to-sky-blue/10 px-6 py-8 sm:px-10 sm:py-10">
-          <div className="absolute top-0 right-0 opacity-[0.04] dark:opacity-[0.06] pointer-events-none select-none">
-            <span className="text-[8rem] font-black tracking-tighter leading-none">
-              {language === "ko" ? "전" : "J"}
-            </span>
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 px-6 py-7 text-white sm:px-10 sm:py-8">
+          <div className="absolute top-0 right-0 opacity-[0.08] pointer-events-none select-none">
+            <span className="text-[6.5rem] font-black tracking-tighter leading-none">09</span>
           </div>
           <div className="relative z-10">
-            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground mb-3">
-              {briefing.briefingDate}
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
+              <CalendarDays className="h-3 w-3" />
+              {t.anchorBulletinLabel}
             </div>
-            <h3 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground break-keep">
+            <h3 className="text-2xl sm:text-4xl font-black tracking-tight text-white break-keep">
               {briefing.headline}
             </h3>
           </div>
@@ -540,7 +585,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                 </ul>
               </div>
             )}
-            {summarySections.impact.length > 0 && (
+              {summarySections.impact.length > 0 && (
               <div className="mt-4 rounded-xl border border-sky-blue/25 bg-sky-blue/5 px-3 py-3">
                 <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-blue">{t.todayImpactLabel}</p>
                 <ul className="space-y-2">
@@ -553,6 +598,24 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
               </div>
             )}
           </div>
+
+          {/* Top Lines */}
+          {topLineItems.length > 0 && (
+            <div className="mb-8 rounded-[1.2rem] border border-card-border/60 bg-card/60 p-4 sm:p-5">
+              <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+                <Sparkles size={12} className="text-cyan-600 dark:text-cyan-300" />
+                {t.topLineLabel}
+              </div>
+              <ul className="space-y-2">
+                {topLineItems.map((line, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm sm:text-base font-bold text-foreground break-keep">
+                    <span className="mt-[2px] h-2 w-2 shrink-0 rounded-full bg-cyan-500" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Issue Spectrum */}
           {briefing.newsItems.length > 0 && (
@@ -652,10 +715,11 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                 {categoryBriefings.map((entry) => (
                   <div
                     key={entry.category}
-                    className="rounded-[1.2rem] border border-card-border bg-card px-5 py-4"
+                    className="relative overflow-hidden rounded-[1.2rem] border border-card-border bg-card px-5 py-4"
                   >
+                    <span className={`absolute left-0 top-0 h-full w-1 ${getCategoryAccent(entry.category).bar}`} />
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-wide text-foreground px-2 py-0.5 rounded-full bg-sky-blue/10 border border-sky-blue/25">
+                      <span className={`text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border ${getCategoryAccent(entry.category).badge}`}>
                         {t.issueLabels[entry.category]}
                       </span>
                       <span className="text-[10px] font-bold text-muted-foreground">
@@ -739,10 +803,14 @@ function useI18n(language: "ko" | "en") {
   if (language === "ko") {
     return {
       sectionTitle: "어제의 전주 소식",
-      sectionDesc: "나들AI가 어제 기준 전주 핵심 이슈를 직접 브리핑하고, 오늘 바로 쓸 수 있는 체크포인트까지 안내합니다.",
+      sectionDesc: "나들AI가 전주 핵심 이슈를 9시 뉴스 톤으로 정리해, 오늘 일정에 필요한 정보만 빠르게 전해드립니다.",
       aiLabel: "나들AI 브리핑",
+      morningDeskLabel: "nadeulai morning desk",
+      anchorTimeLabel: "오전 9시 기준 편집",
+      anchorBulletinLabel: "오늘의 아침 뉴스",
       aiVoiceLabel: "나들AI 브리핑 멘트",
-      summaryLabel: "요약",
+      summaryLabel: "앵커 오프닝",
+      topLineLabel: "톱라인",
       corePointsLabel: "핵심 포인트",
       todayImpactLabel: "오늘 영향",
       issueSpectrumLabel: "이슈 분포",
@@ -774,10 +842,14 @@ function useI18n(language: "ko" | "en") {
 
   return {
     sectionTitle: "Yesterday's Jeonju News",
-    sectionDesc: "NadeulAI briefs yesterday's key Jeonju updates and highlights practical points you can use today.",
+    sectionDesc: "NadeulAI delivers a 9AM-style city briefing so you can scan only what matters for today.",
     aiLabel: "NadeulAI Briefing",
+    morningDeskLabel: "nadeulai morning desk",
+    anchorTimeLabel: "Edited for 09:00",
+    anchorBulletinLabel: "Morning News Bulletin",
     aiVoiceLabel: "NadeulAI Voice Brief",
-    summaryLabel: "Summary",
+    summaryLabel: "Anchor Opening",
+    topLineLabel: "Top Lines",
     corePointsLabel: "Core Points",
     todayImpactLabel: "Today's Impact",
     issueSpectrumLabel: "Issue Spectrum",
