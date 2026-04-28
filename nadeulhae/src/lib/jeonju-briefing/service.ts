@@ -1100,6 +1100,198 @@ function parseBriefingJson(jsonText: string): ParsedBriefing {
 // Final Assembly
 // ------------------------------------------------------------------
 
+function extractYmd(value: string | null | undefined): string | null {
+  if (!value) return null
+  const match = value.match(/(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+}
+
+function resolveNewsItemDate(item: JeonjuBriefingData["newsItems"][number]): string | null {
+  return (
+    extractYmd(item.publishedDate)
+    || extractYmd(item.snippet)
+    || extractYmd(item.url)
+    || null
+  )
+}
+
+function isStaleComparedToTarget(targetDate: string, candidateDate: string | null) {
+  if (!candidateDate) return false
+  const days = calcDateDiffDays(targetDate, candidateDate)
+  return days > 120
+}
+
+function isLowUtilityNewsItem(
+  item: JeonjuBriefingData["newsItems"][number],
+  targetDate: string
+) {
+  const merged = `${item.title} ${item.snippet}`
+  const sourceDomain = extractDomain(item.url)
+  const hasOfficialSource = OFFICIAL_JEONJU_DOMAINS.some((domain) => sourceDomain.endsWith(domain))
+  if (!hasOfficialSource && !hasJeonjuSignal(merged)) return true
+  if (isLowValueResult(item.url, item.title, item.snippet)) return true
+  if (LOW_UTILITY_PATTERN.test(merged)) return true
+  const resolvedDate = resolveNewsItemDate(item)
+  if (isStaleComparedToTarget(targetDate, resolvedDate)) return true
+  return false
+}
+
+function normalizeNewsItemsForBriefing(
+  items: JeonjuBriefingData["newsItems"],
+  targetDate: string
+) {
+  const dedup = new Set<string>()
+  const normalized: JeonjuBriefingData["newsItems"] = []
+
+  for (const raw of items) {
+    const key = normalizeUrlForDedup(raw.url)
+    if (dedup.has(key)) continue
+    dedup.add(key)
+
+    const nextItem = {
+      ...raw,
+      publishedDate: resolveNewsItemDate(raw),
+      snippet: raw.snippet.replace(/\s+/g, " ").trim().slice(0, 110),
+    }
+
+    if (isLowUtilityNewsItem(nextItem, targetDate)) continue
+    normalized.push(nextItem)
+    if (normalized.length >= 6) break
+  }
+
+  return normalized
+}
+
+function isGenericSummaryText(summary: string, locale: JeonjuBriefingLocale) {
+  const normalized = summary.replace(/\s+/g, " ").trim()
+  if (!normalized) return true
+  const genericKo = [
+    "확인 가능한 전주 관련 업데이트",
+    "생활 동선에 영향을 줄 수 있는 공지",
+    "링크된 원문 기준으로",
+    "신규 보도가 제한적",
+  ]
+  const genericEn = [
+    "verifiable Jeonju updates",
+    "priority is given to notices",
+    "double-check",
+    "verified updates were limited",
+  ]
+  const matched = (locale === "ko" ? genericKo : genericEn).some((token) => normalized.includes(token))
+  return matched
+}
+
+function buildNarrativeSummary(
+  locale: JeonjuBriefingLocale,
+  dateLabel: string,
+  items: JeonjuBriefingData["newsItems"]
+) {
+  const top = items[0]
+  const second = items[1]
+  const sourceCount = new Set(items.map((item) => item.source).filter(Boolean)).size
+
+  if (locale === "ko") {
+    if (!top) {
+      return ensureFriendlyIntro(
+        `핵심상황: ${dateLabel} 기준 공공성 있는 신규 소식이 제한적이었습니다. 핵심상황: 공식 공지·교통·행사 페이지 위주로 확인이 필요합니다. 오늘영향: 이동 전 교통·행사 공지를 우선 점검해 주세요.`,
+        locale
+      )
+    }
+    const core1 = `핵심상황: ${top.title} 관련 내용이 확인됐고, ${top.source} 기준으로 핵심 포인트를 반영했습니다.`
+    const core2 = second
+      ? `핵심상황: ${second.title} 등 총 ${items.length}건(출처 ${sourceCount}곳)에서 어제 기준 변화를 교차 확인했습니다.`
+      : `핵심상황: 어제 기준 총 ${items.length}건(출처 ${sourceCount}곳)의 전주 관련 업데이트를 확인했습니다.`
+    const impact = `오늘영향: 일정 전에는 기사/공지의 최신 시각과 현장 운영 여부를 한 번 더 확인하면 혼선을 줄일 수 있습니다.`
+    return ensureFriendlyIntro(`${core1} ${core2} ${impact}`, locale)
+  }
+
+  if (!top) {
+    return ensureFriendlyIntro(
+      `Core: publicly useful fresh updates for ${dateLabel} were limited. Core: prioritize official city notices, traffic, and event pages. Today impact: check traffic and event updates before moving today.`,
+      locale
+    )
+  }
+  const core1 = `Core: ${top.title} was a key verified update from ${top.source}.`
+  const core2 = second
+    ? `Core: together with ${second.title}, we cross-checked ${items.length} items across ${sourceCount} sources.`
+    : `Core: we validated ${items.length} Jeonju-related updates across ${sourceCount} sources.`
+  const impact = `Today impact: before finalizing plans, verify latest notice timestamps and on-site operation status.`
+  return ensureFriendlyIntro(`${core1} ${core2} ${impact}`, locale)
+}
+
+function buildInsightFromItems(
+  locale: JeonjuBriefingLocale,
+  items: JeonjuBriefingData["newsItems"]
+) {
+  if (items.length === 0) {
+    return locale === "ko"
+      ? "• 전주시청 공지와 교통 안내를 먼저 확인하세요.\n• 방문 예정 장소의 운영 시간 변동 여부를 확인하세요."
+      : "• Check Jeonju city notices and traffic updates first.\n• Verify operating hours for planned destinations."
+  }
+
+  const bullets: string[] = []
+  const top = items[0]
+  const second = items[1]
+  const mergedTop = `${top.title} ${top.snippet}`
+  const mergedSecond = second ? `${second.title} ${second.snippet}` : ""
+
+  if (locale === "ko") {
+    bullets.push(`• ${top.source} 원문에서 "${top.title}" 관련 최신 갱신 시각을 먼저 확인하세요.`)
+    if (/(교통|통제|도로|우회|혼잡|안전|사고)/i.test(`${mergedTop} ${mergedSecond}`)) {
+      bullets.push("• 이동 전 우회 동선·주차 가능 구역을 함께 확인하면 대기 시간을 줄일 수 있습니다.")
+    }
+    if (/(행사|축제|공연|전시|박물관|문화)/i.test(`${mergedTop} ${mergedSecond}`)) {
+      bullets.push("• 행사/전시 참여 전 운영 시간·입장 조건(사전신청/현장접수)을 확인하세요.")
+    }
+    if (bullets.length < 3) {
+      bullets.push("• 오늘 일정과 직접 관련된 링크 2~3개만 먼저 확인하고 출발하세요.")
+    }
+    return bullets.slice(0, 4).join("\n")
+  }
+
+  bullets.push(`• Check the latest update time in ${top.source} for "${top.title}".`)
+  if (/(traffic|road|closure|safety|accident|transport|parking)/i.test(`${mergedTop} ${mergedSecond}`)) {
+    bullets.push("• Confirm detour and parking options before departure to reduce delays.")
+  }
+  if (/(event|festival|concert|exhibition|museum|culture)/i.test(`${mergedTop} ${mergedSecond}`)) {
+    bullets.push("• Verify event hours and entry requirements before joining.")
+  }
+  if (bullets.length < 3) {
+    bullets.push("• Prioritize checking 2-3 links directly tied to your plan today.")
+  }
+  return bullets.slice(0, 4).join("\n")
+}
+
+function deriveKeywordTags(
+  locale: JeonjuBriefingLocale,
+  items: JeonjuBriefingData["newsItems"]
+) {
+  const joined = items.map((item) => `${item.title} ${item.snippet}`).join(" ")
+  const tagsKo: string[] = ["#전주"]
+  if (/(교통|통제|도로|우회|안전)/i.test(joined)) tagsKo.push("#전주교통")
+  if (/(행사|축제|공연|전시|문화|박물관)/i.test(joined)) tagsKo.push("#전주행사")
+  if (/(시정|공고|보도자료|의회|정책)/i.test(joined)) tagsKo.push("#전주시정")
+  if (/(관광|한옥마을|여행)/i.test(joined)) tagsKo.push("#전주여행")
+  if (tagsKo.length < 3) tagsKo.push("#전주생활", "#어제브리핑")
+  const uniqueKo = [...new Set(tagsKo)].slice(0, 5)
+
+  if (locale === "ko") return uniqueKo
+
+  const tagsEn: string[] = ["#Jeonju"]
+  if (uniqueKo.includes("#전주교통")) tagsEn.push("#JeonjuTraffic")
+  if (uniqueKo.includes("#전주행사")) tagsEn.push("#JeonjuEvents")
+  if (uniqueKo.includes("#전주시정")) tagsEn.push("#JeonjuCivic")
+  if (uniqueKo.includes("#전주여행")) tagsEn.push("#JeonjuTravel")
+  if (tagsEn.length < 3) tagsEn.push("#JeonjuDaily", "#NadeulAI")
+  return [...new Set(tagsEn)].slice(0, 5)
+}
+
 function buildFinalBriefing(
   dateStr: string,
   locale: JeonjuBriefingLocale,
@@ -1125,9 +1317,9 @@ function buildFinalBriefing(
   // News items: prefer LLM's, fallback to raw search results
   let newsItems: JeonjuBriefingData["newsItems"]
   if (parsed.newsItems.length > 0) {
-    newsItems = parsed.newsItems.slice(0, 6)
+    newsItems = parsed.newsItems.slice(0, 10)
   } else if (searchResults.length > 0) {
-    newsItems = searchResults.slice(0, 6).map((r) => ({
+    newsItems = searchResults.slice(0, 10).map((r) => ({
       title: r.title,
       url: r.url,
       source: r.source || extractDomain(r.url) || "링크",
@@ -1147,7 +1339,7 @@ function buildFinalBriefing(
       (r) => r.title.includes("전주") || r.title.includes("Jeonju") || r.content.includes("전주") || r.content.includes("Jeonju")
     )
     if (filtered.length >= 2) {
-      newsItems = filtered.slice(0, 6).map((r) => ({
+      newsItems = filtered.slice(0, 10).map((r) => ({
         title: r.title,
         url: r.url,
         source: r.source || extractDomain(r.url) || "링크",
@@ -1157,6 +1349,13 @@ function buildFinalBriefing(
     }
   }
 
+  newsItems = normalizeNewsItemsForBriefing(newsItems, dateStr)
+
+  const shouldOverrideSummary = !parsed.summary || isGenericSummaryText(parsed.summary, locale)
+  if (shouldOverrideSummary) {
+    summary = buildNarrativeSummary(locale, dateLabel, newsItems)
+  }
+
   const cleanNullable = (value: string | null): string | null => {
     if (value === null || value === undefined) return null
     const trimmed = value.trim()
@@ -1164,14 +1363,10 @@ function buildFinalBriefing(
   }
 
   // Default AI insight if LLM didn't provide one
-  const defaultInsight = isKo
-    ? "오늘 체크포인트: 이동 전 교통 공지·행사 시간·혼잡 예상 구간을 먼저 확인하면 일정 차질을 줄일 수 있어요."
-    : "Today's checklist: verify traffic notices, event times, and likely crowd zones before moving."
+  const defaultInsight = buildInsightFromItems(locale, newsItems)
 
   // Tags
-  const defaultTags = isKo
-    ? ["#전주", "#나들해", "#전주여행", "#전주한옥마을", "#전주국제영화제"]
-    : ["#Jeonju", "#Nadeulhae", "#JeonjuTravel", "#HanokVillage", "#JIFF"]
+  const defaultTags = deriveKeywordTags(locale, newsItems)
 
   return {
     briefingDate: dateStr,
