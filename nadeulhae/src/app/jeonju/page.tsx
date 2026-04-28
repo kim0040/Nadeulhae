@@ -14,6 +14,7 @@ import { PicnicBriefing } from "@/components/picnic-briefing"
 import { PicnicCalendar } from "@/components/picnic-calendar"
 import { JeonjuSafetyPanel } from "@/components/jeonju-safety-panel"
 import { JeonjuChatPanel } from "@/components/jeonju-chat-panel"
+import { JeonjuDailyBriefing } from "@/components/jeonju-daily-briefing"
 import { getParticleCount } from "@/lib/performance"
 
 
@@ -53,8 +54,8 @@ export default function JeonjuPage() {
     heroTag: language === "ko" ? "전주 특화 서비스" : "Jeonju Special Service",
     heroTitle: language === "ko" ? "전주를 위한 데이터 기반 나들이 실험실" : "A Jeonju-first outdoor planning lab",
     heroDesc: language === "ko"
-      ? "나들해의 고향, 전주를 위한 데이터 기반 나들이 실험실입니다. 현재 동작하는 실시간 환경 분석 기능을 시작으로, 향후 백엔드 및 공간 DB 통합을 통해 전주만의 정밀한 로컬 경험을 완성해 나갈 예정입니다."
-      : "A data-driven outdoor lab dedicated to Nadeulhae's hometown, Jeonju. Starting with our active real-time environmental analysis, we are building toward a precision local experience powered by upcoming backend and spatial database integrations.",
+      ? "나들해의 고향, 전주를 위한 데이터 기반 나들이 실험실입니다. 실시간 환경 분석, 날씨 브리핑, 안전 패널, 그리고 매일 아침 나들AI가 정리하는 전주 소식까지, 전주만의 정밀한 로컬 경험을 제공합니다."
+      : "A data-driven outdoor lab dedicated to Nadeulhae's hometown, Jeonju. Featuring real-time environment analysis, weather briefings, safety panels, and daily Jeonju news curated by NadeulAI — a precision local experience crafted just for Jeonju.",
 
     fixedTitle: language === "ko" ? "전주 고정 브리핑 & 피크닉 캘린더" : "Jeonju-fixed briefing & picnic calendar",
     fixedDesc: language === "ko"
@@ -159,6 +160,10 @@ export default function JeonjuPage() {
             </div>
           ))}
         </Marquee>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+        <JeonjuDailyBriefing language={language} />
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
