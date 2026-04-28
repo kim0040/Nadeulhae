@@ -277,7 +277,15 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
         setStatus(isEmptyFallback ? "empty" : "success")
       } catch (err) {
-        const isAbortError = (err as { name?: string } | null)?.name === "AbortError"
+        const abortReason = "jeonju_briefing_request_timeout"
+        const errName = (err as { name?: string } | null)?.name
+        const errMessage = typeof err === "string"
+          ? err
+          : (err instanceof Error ? err.message : "")
+        const isAbortError =
+          errName === "AbortError"
+          || err === abortReason
+          || errMessage === abortReason
         if (!isAbortError) {
           console.error("[JeonjuDailyBriefing] Fetch failed:", err)
         }
