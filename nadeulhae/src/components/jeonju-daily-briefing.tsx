@@ -45,6 +45,7 @@ interface BriefingData {
 }
 
 type FetchStatus = "idle" | "loading" | "success" | "error" | "empty"
+type IssueCategory = "safety" | "governance" | "culture" | "economy" | "lifestyle"
 
 // ------------------------------------------------------------------
 // Constants
@@ -77,6 +78,63 @@ function formatPublishedDate(date: string | null, language: "ko" | "en") {
     month: "short",
     day: "numeric",
   })
+}
+
+function parseSummarySections(summary: string, language: "ko" | "en") {
+  const normalized = summary.replace(/\s+/g, " ").trim()
+  const lines = normalized
+    .replace(/핵심상황:/g, "\n[CORE] ")
+    .replace(/오늘영향:/g, "\n[IMPACT] ")
+    .replace(/Core:/g, "\n[CORE] ")
+    .replace(/Today impact:/g, "\n[IMPACT] ")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  let intro = ""
+  const core: string[] = []
+  const impact: string[] = []
+
+  for (const line of lines) {
+    if (line.startsWith("[CORE]")) {
+      core.push(line.replace("[CORE]", "").trim())
+      continue
+    }
+    if (line.startsWith("[IMPACT]")) {
+      impact.push(line.replace("[IMPACT]", "").trim())
+      continue
+    }
+    if (!intro) {
+      intro = line
+      continue
+    }
+    if (core.length < 2) {
+      core.push(line)
+    } else {
+      impact.push(line)
+    }
+  }
+
+  if (!intro) {
+    intro = language === "ko"
+      ? "안녕하세요! 나들AI입니다. 어제의 전주 소식을 알려드릴게요."
+      : "Hello! I'm NadeulAI. Here's yesterday's Jeonju briefing."
+  }
+
+  return {
+    intro,
+    core: core.slice(0, 3),
+    impact: impact.slice(0, 2),
+  }
+}
+
+function classifyIssueCategory(item: NewsItem): IssueCategory {
+  const text = `${item.title} ${item.snippet}`.toLowerCase()
+  if (/(교통|통제|안전|사고|재난|도로|우회|단속)/i.test(text)) return "safety"
+  if (/(의회|시정|정책|예산|선거|후보|브리핑|공고|행정)/i.test(text)) return "governance"
+  if (/(축제|행사|공연|전시|문화|관광|박물관)/i.test(text)) return "culture"
+  if (/(경제|일자리|상권|기업|투자|산업|재정)/i.test(text)) return "economy"
+  return "lifestyle"
 }
 
 // ------------------------------------------------------------------
@@ -201,6 +259,15 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
   if (!briefing) return null
   const checklistItems = splitChecklist(briefing.aiInsight)
   const sourceCount = new Set(briefing.newsItems.map((item) => item.source).filter(Boolean)).size
+  const summarySections = parseSummarySections(briefing.summary, language)
+  const categorizedNews = briefing.newsItems.map((item) => ({
+    ...item,
+    category: classifyIssueCategory(item),
+  }))
+  const issueCounts = categorizedNews.reduce<Record<IssueCategory, number>>((acc, item) => {
+    acc[item.category] += 1
+    return acc
+  }, { safety: 0, governance: 0, culture: 0, economy: 0, lifestyle: 0 })
 
   return (
     <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
@@ -223,6 +290,10 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           <div className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
             <ShieldCheck className="h-3 w-3" />
             {language === "ko" ? `출처 ${sourceCount}개` : `${sourceCount} sources`}
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+            <Newspaper className="h-3 w-3" />
+            {language === "ko" ? `기사 ${briefing.newsItems.length}건` : `${briefing.newsItems.length} stories`}
           </div>
           <button
             onClick={handleRefresh}
@@ -273,10 +344,57 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
               <Newspaper size={14} className="text-sky-blue" />
               {t.summaryLabel}
             </div>
-            <p className="text-base sm:text-lg font-bold leading-relaxed text-foreground break-keep">
-              {briefing.summary}
+            <p className="rounded-xl bg-background/70 px-3 py-3 text-sm sm:text-base font-black leading-relaxed text-foreground break-keep">
+              {summarySections.intro}
             </p>
+            {summarySections.core.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{t.corePointsLabel}</p>
+                <ul className="space-y-2">
+                  {summarySections.core.map((line, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm sm:text-base font-bold text-foreground break-keep">
+                      <span className="mt-[2px] h-2 w-2 shrink-0 rounded-full bg-sky-blue" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {summarySections.impact.length > 0 && (
+              <div className="mt-4 rounded-xl border border-sky-blue/25 bg-sky-blue/5 px-3 py-3">
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-blue">{t.todayImpactLabel}</p>
+                <ul className="space-y-2">
+                  {summarySections.impact.map((line, idx) => (
+                    <li key={idx} className="text-sm sm:text-base font-bold leading-relaxed text-foreground break-keep">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
+
+          {/* Issue Spectrum */}
+          {briefing.newsItems.length > 0 && (
+            <div className="mb-8 rounded-[1.2rem] border border-card-border/60 bg-card/60 p-4 sm:p-5">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+                {t.issueSpectrumLabel}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(t.issueLabels) as IssueCategory[])
+                  .filter((key) => issueCounts[key] > 0)
+                  .map((key) => (
+                    <span
+                      key={key}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-card-border bg-background px-3 py-1.5 text-xs font-black text-foreground"
+                    >
+                      <span>{t.issueLabels[key]}</span>
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{issueCounts[key]}</span>
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
 
           {/* Quick Notes Row */}
           {(briefing.weatherNote || briefing.festivalNote) && (
@@ -351,7 +469,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                 {t.newsLabel}
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {briefing.newsItems.map((item, index) => (
+                {categorizedNews.map((item, index) => (
                   <a
                     key={`${item.url}-${index}`}
                     href={item.url}
@@ -364,6 +482,9 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="text-[10px] font-black uppercase tracking-wide text-foreground px-2 py-0.5 rounded-full bg-sky-blue/10 border border-sky-blue/25">
+                          {t.issueLabels[item.category]}
+                        </span>
                         <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground px-2 py-0.5 rounded-full bg-background border border-card-border">
                           {item.source || t.link}
                         </span>
@@ -423,6 +544,16 @@ function useI18n(language: "ko" | "en") {
       sectionDesc: "매일 1회 자동 수집 후, 전주 시민/방문자에게 실제 도움이 되는 공지·교통·행사 중심으로 요약해 안내합니다.",
       aiLabel: "나들AI 브리핑",
       summaryLabel: "요약",
+      corePointsLabel: "핵심 포인트",
+      todayImpactLabel: "오늘 영향",
+      issueSpectrumLabel: "이슈 분포",
+      issueLabels: {
+        safety: "교통/안전",
+        governance: "시정/정책",
+        culture: "문화/행사",
+        economy: "경제/일자리",
+        lifestyle: "생활 일반",
+      } as Record<IssueCategory, string>,
       newsLabel: "관련 소식",
       insightLabel: "오늘 체크리스트",
       weatherLabel: "날씨",
@@ -444,6 +575,16 @@ function useI18n(language: "ko" | "en") {
     sectionDesc: "Collected once per day, then distilled into practical city updates focused on notices, traffic, and events.",
     aiLabel: "NadeulAI Briefing",
     summaryLabel: "Summary",
+    corePointsLabel: "Core Points",
+    todayImpactLabel: "Today's Impact",
+    issueSpectrumLabel: "Issue Spectrum",
+    issueLabels: {
+      safety: "Safety/Traffic",
+      governance: "Governance/Policy",
+      culture: "Culture/Events",
+      economy: "Economy/Jobs",
+      lifestyle: "General",
+    } as Record<IssueCategory, string>,
     newsLabel: "Related News",
     insightLabel: "Today's Checklist",
     weatherLabel: "Weather",
