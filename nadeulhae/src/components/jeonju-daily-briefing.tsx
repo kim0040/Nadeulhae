@@ -189,6 +189,46 @@ function classifyIssueCategory(item: NewsItem): IssueCategory {
   return "lifestyle"
 }
 
+function summarizeCategory(
+  category: IssueCategory,
+  items: Array<NewsItem & { category: IssueCategory }>,
+  language: "ko" | "en"
+) {
+  const top = items[0]
+  const second = items[1]
+  const sources = new Set(items.map((item) => item.source).filter(Boolean))
+
+  if (language === "ko") {
+    const base = top
+      ? `${top.title} 이슈를 중심으로 ${items.length}건을 확인했습니다.`
+      : `${items.length}건의 관련 이슈를 확인했습니다.`
+    const sourceLine = `출처 ${sources.size}곳 기준으로 어제 업데이트를 통합했습니다.`
+    const secondLine = second ? `추가로 ${second.title} 관련 내용까지 함께 반영했습니다.` : ""
+    const action = (() => {
+      if (category === "safety") return "이동 전 통제·혼잡 여부를 먼저 확인하세요."
+      if (category === "culture") return "행사 참여 전 운영시간·입장 조건을 확인하세요."
+      if (category === "governance") return "공식 공고/보도자료의 최신 갱신 시각을 확인하세요."
+      if (category === "economy") return "생활·상권 관련 변동 사항은 원문 공지 기준으로 확인하세요."
+      return "오늘 일정과 직접 관련된 공지를 우선 확인하세요."
+    })()
+    return `${base} ${sourceLine}${secondLine ? ` ${secondLine}` : ""} ${action}`
+  }
+
+  const base = top
+    ? `Key update: ${top.title}.`
+    : `We verified ${items.length} related updates.`
+  const sourceLine = `Combined from ${sources.size} sources for yesterday's context.`
+  const secondLine = second ? `Also includes ${second.title}.` : ""
+  const action = (() => {
+    if (category === "safety") return "Check traffic controls and congestion before moving."
+    if (category === "culture") return "Verify event hours and entry conditions first."
+    if (category === "governance") return "Check the latest timestamp on official notices."
+    if (category === "economy") return "Validate local business/economy updates via source links."
+    return "Prioritize notices directly tied to your plan today."
+  })()
+  return `${base} ${sourceLine}${secondLine ? ` ${secondLine}` : ""} ${action}`
+}
+
 // ------------------------------------------------------------------
 // Component
 // ------------------------------------------------------------------
@@ -383,6 +423,17 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
     ...item,
     category: classifyIssueCategory(item),
   }))
+  const categoryBriefings = (Object.keys(t.issueLabels) as IssueCategory[])
+    .map((category) => {
+      const items = categorizedNews.filter((item) => item.category === category)
+      if (items.length === 0) return null
+      return {
+        category,
+        summary: summarizeCategory(category, items, language),
+        items: items.slice(0, 3),
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
   const issueCounts = categorizedNews.reduce<Record<IssueCategory, number>>((acc, item) => {
     acc[item.category] += 1
     return acc
@@ -590,52 +641,70 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
             </div>
           )}
 
-          {/* News Items */}
-          {briefing.newsItems.length > 0 && (
+          {/* Sector Briefings */}
+          {categoryBriefings.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground mb-4">
                 <Newspaper size={14} className="text-active-blue" />
-                {t.newsLabel}
+                {t.categoryBriefingLabel}
               </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {categoryBriefings.map((entry) => (
+                  <div
+                    key={entry.category}
+                    className="rounded-[1.2rem] border border-card-border bg-card px-5 py-4"
+                  >
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wide text-foreground px-2 py-0.5 rounded-full bg-sky-blue/10 border border-sky-blue/25">
+                        {t.issueLabels[entry.category]}
+                      </span>
+                      <span className="text-[10px] font-bold text-muted-foreground">
+                        {language === "ko" ? `${entry.items.length}건 요약` : `${entry.items.length} highlights`}
+                      </span>
+                    </div>
+                    <p className="text-sm sm:text-base font-bold leading-relaxed text-foreground break-keep">
+                      {entry.summary}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* References */}
+          {briefing.newsItems.length > 0 && (
+            <div className="mb-8 rounded-[1.2rem] border border-card-border/60 bg-card/60 p-4 sm:p-5">
+              <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+                <ArrowUpRight size={14} className="text-active-blue" />
+                {t.referencesLabel}
+              </div>
+              <p className="mb-3 text-xs sm:text-sm font-bold text-muted-foreground break-keep">
+                {t.referencesDesc}
+              </p>
+              <div className="space-y-2">
                 {categorizedNews.map((item, index) => (
                   <a
                     key={`${item.url}-${index}`}
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex h-full items-start gap-4 rounded-[1.2rem] border border-card-border bg-card px-5 py-4 hover:-translate-y-[1px] hover:border-sky-blue/30 hover:bg-sky-blue/5 transition-all duration-300"
+                    className="group flex items-start gap-3 rounded-xl border border-card-border bg-background/70 px-3 py-2 hover:border-sky-blue/25 hover:bg-sky-blue/5 transition-colors"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-card-border bg-background text-xs font-black text-muted-foreground group-hover:border-sky-blue/30 group-hover:text-sky-blue transition-colors">
+                    <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-card-border text-[10px] font-black text-muted-foreground">
                       {index + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-[10px] font-black uppercase tracking-wide text-foreground px-2 py-0.5 rounded-full bg-sky-blue/10 border border-sky-blue/25">
-                          {t.issueLabels[item.category]}
-                        </span>
-                        <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground px-2 py-0.5 rounded-full bg-background border border-card-border">
-                          {item.source || t.link}
-                        </span>
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-black text-foreground break-keep group-hover:text-sky-blue transition-colors">
+                        {item.title}
+                      </p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted-foreground">
+                        <span>{t.issueLabels[item.category]}</span>
+                        <span>{item.source || t.link}</span>
                         {item.publishedDate && (
-                          <span className="text-[10px] font-bold text-muted-foreground">
-                            {formatPublishedDate(item.publishedDate, language)}
-                          </span>
+                          <span>{formatPublishedDate(item.publishedDate, language)}</span>
                         )}
                       </div>
-                      <h4 className="text-sm sm:text-base font-black text-foreground group-hover:text-sky-blue transition-colors break-keep leading-snug">
-                        {item.title}
-                      </h4>
-                      {item.snippet && (
-                        <p className="mt-1 text-xs sm:text-sm font-bold text-muted-foreground break-keep">
-                          {item.snippet}
-                        </p>
-                      )}
                     </div>
-                    <ArrowUpRight
-                      size={16}
-                      className="shrink-0 mt-1 text-muted-foreground group-hover:text-sky-blue transition-colors opacity-0 group-hover:opacity-100"
-                    />
                   </a>
                 ))}
               </div>
@@ -684,7 +753,9 @@ function useI18n(language: "ko" | "en") {
         economy: "경제/일자리",
         lifestyle: "생활 일반",
       } as Record<IssueCategory, string>,
-      newsLabel: "관련 소식",
+      categoryBriefingLabel: "분야별 통합 브리핑",
+      referencesLabel: "참고 링크",
+      referencesDesc: "아래 링크는 분야별 브리핑의 근거 원문입니다.",
       insightLabel: "오늘 체크리스트",
       weatherLabel: "날씨",
       festivalLabel: "행사",
@@ -717,7 +788,9 @@ function useI18n(language: "ko" | "en") {
       economy: "Economy/Jobs",
       lifestyle: "General",
     } as Record<IssueCategory, string>,
-    newsLabel: "Related News",
+    categoryBriefingLabel: "Integrated Briefing by Sector",
+    referencesLabel: "Reference Links",
+    referencesDesc: "These links are the source evidence behind each sector summary.",
     insightLabel: "Today's Checklist",
     weatherLabel: "Weather",
     festivalLabel: "Events",
