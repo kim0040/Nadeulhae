@@ -1,4 +1,9 @@
-import { createTavilySearch } from "@/lib/tavily/client"
+import {
+  createTavilySearch,
+  type TavilySearchDepth,
+  type TavilyTimeRange,
+  type TavilyTopic,
+} from "@/lib/tavily/client"
 import { createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
 import { saveJeonjuBriefing, getJeonjuBriefingByDate, type JeonjuBriefingData } from "./repository"
 
@@ -57,18 +62,35 @@ interface SearchResultItem {
   url: string
   content: string
   score: number
+  weightedScore: number
   publishedDate: string | null
   source: string
+  trackKey: string
 }
 
-const TRUSTED_JEONJU_DOMAINS = [
+type SearchTrack = {
+  key: string
+  query: string
+  topic: TavilyTopic
+  searchDepth: TavilySearchDepth
+  timeRange?: TavilyTimeRange
+  includeDomains?: string[]
+  excludeDomains?: string[]
+  includeAnswer?: boolean | "basic" | "advanced"
+  country?: string
+}
+
+const OFFICIAL_JEONJU_DOMAINS = [
   "jeonju.go.kr",
+  "tour.jeonju.go.kr",
+]
+
+const LOCAL_UTILITY_DOMAINS = [
+  ...OFFICIAL_JEONJU_DOMAINS,
   "jjan.kr",
   "domin.co.kr",
   "jjn.co.kr",
   "nocutnews.co.kr",
-  "yonhapnews.co.kr",
-  "yna.co.kr",
 ]
 
 const NOISE_DOMAINS = [
@@ -77,7 +99,37 @@ const NOISE_DOMAINS = [
   "blog.naver.com",
   "tistory.com",
   "brunch.co.kr",
+  "youtube.com",
+  "m.youtube.com",
+  "instagram.com",
+  "facebook.com",
 ]
+
+const LOW_VALUE_TITLE_PATTERNS = [
+  /보도자료\(목록\)/i,
+  /고시\/공고\(목록\)/i,
+  /자유게시판/i,
+  /Buy 전주/i,
+  /알뜰정보마당/i,
+  /목록\)/i,
+  /보도자료\s*$/i,
+  /목록\s*$/i,
+  /list$/i,
+]
+
+const LOW_VALUE_URL_PATTERNS = [
+  /\/board\/list/i,
+  /\/planweb\/board\/list/i,
+  /\/pdf\/php\/check\.php/i,
+  /\/index\.jeonju/i,
+]
+
+const UTILITY_SIGNAL_PATTERN = /(교통|통제|우회|안전|주의|행사|축제|공연|전시|개최|운영|마감|신청|접수|점검|단속|공지|보도자료|시정|호우|폭염|미세먼지|개방|휴관|개장|버스|주차|도로)/i
+const LOW_UTILITY_PATTERN = /(후보|경선|선거|정당|의장|군수|도지사|국회의원|찬양|연예가|가십|트럼프)/i
+
+function hasJeonjuSignal(text: string) {
+  return /(전주|jeonju|완산|덕진|한옥마을|전주천|전주시청|전주국제영화제)/i.test(text)
+}
 
 function normalizePublishedDate(raw: string | null): string | null {
   if (!raw) return null
@@ -85,127 +137,347 @@ function normalizePublishedDate(raw: string | null): string | null {
   return match ? match[1] : null
 }
 
-/**
- * Execute multiple targeted Tavily searches and aggregate results.
- * Uses Promise.allSettled for resilience.
- * - topic: "news" for fresh news, "general" for broader info
- * - timeRange: "week" for balance of recency and breadth
- * - includeAnswer for AI-summarized answer
- * - Dedup by URL, sort by relevance
- */
+function normalizeUrlForDedup(raw: string): string {
+  try {
+    const url = new URL(raw)
+    const keepKeys = new Set(["dataUid", "contentUid", "idxno", "uid"])
+    const kept = new URLSearchParams()
+    for (const [key, value] of url.searchParams.entries()) {
+      if (keepKeys.has(key) && value.length <= 80) {
+        kept.set(key, value)
+      }
+    }
+    const query = kept.toString()
+    return `${url.origin}${url.pathname}${query ? `?${query}` : ""}`
+  } catch {
+    return raw
+  }
+}
+
+function isLowValueResult(url: string, title: string, content: string) {
+  if (LOW_VALUE_TITLE_PATTERNS.some((pattern) => pattern.test(title))) return true
+  if (LOW_VALUE_URL_PATTERNS.some((pattern) => pattern.test(url))) return true
+  if (title.trim().length < 4) return true
+  if (content.trim().length < 10) return true
+  return false
+}
+
+function isLikelyArticleUrl(url: string) {
+  return /\/(view|article|news)\b|idxno=|dataUid=|contentUid=/i.test(url)
+}
+
+function calcDateDiffDays(baseDateYmd: string, targetDateYmd: string) {
+  const baseDate = new Date(`${baseDateYmd}T00:00:00+09:00`)
+  const targetDate = new Date(`${targetDateYmd}T00:00:00+09:00`)
+  const diffMs = Math.abs(baseDate.getTime() - targetDate.getTime())
+  return Math.floor(diffMs / 86_400_000)
+}
+
+function calcWeightedScore(item: {
+  score: number
+  url: string
+  title: string
+  content: string
+  publishedDate: string | null
+}, targetDate: string) {
+  let weighted = item.score
+  const source = extractDomain(item.url)
+
+  if (OFFICIAL_JEONJU_DOMAINS.some((domain) => source.endsWith(domain))) {
+    weighted += 0.16
+  } else if (LOCAL_UTILITY_DOMAINS.some((domain) => source.endsWith(domain))) {
+    weighted += 0.18
+  }
+
+  if (item.publishedDate) {
+    const days = calcDateDiffDays(targetDate, item.publishedDate)
+    if (days <= 1) weighted += 0.28
+    else if (days <= 7) weighted += 0.18
+    else if (days <= 30) weighted += 0.08
+    else if (days > 365) weighted -= 0.35
+  } else {
+    weighted -= 0.04
+  }
+
+  if (/(행사|축제|공연|전시|교통|통제|주의|안전|공지|보도자료|브리핑)/i.test(`${item.title} ${item.content}`)) {
+    weighted += 0.08
+  }
+
+  if (UTILITY_SIGNAL_PATTERN.test(`${item.title} ${item.content}`)) {
+    weighted += 0.22
+  } else if (!OFFICIAL_JEONJU_DOMAINS.some((domain) => source.endsWith(domain))) {
+    weighted -= 0.1
+  }
+
+  if (LOW_UTILITY_PATTERN.test(`${item.title} ${item.content}`)) {
+    weighted -= 0.18
+  }
+
+  if (isLowValueResult(item.url, item.title, item.content)) {
+    weighted -= 0.4
+  }
+
+  return weighted
+}
+
+function pickDiverseTopResults(items: SearchResultItem[], limit: number) {
+  const prioritizedTracks = ["city-hall", "events", "safety", "local-news", "fallback-news", "fallback-general"]
+  const picked: SearchResultItem[] = []
+  const consumed = new Set<number>()
+  const trackCounts = new Map<string, number>()
+  const increment = (trackKey: string) => {
+    trackCounts.set(trackKey, (trackCounts.get(trackKey) ?? 0) + 1)
+  }
+  const canPick = (trackKey: string) => (trackCounts.get(trackKey) ?? 0) < 3
+
+  for (const track of prioritizedTracks) {
+    const index = items.findIndex((item, idx) => !consumed.has(idx) && item.trackKey === track && canPick(item.trackKey))
+    if (index >= 0) {
+      consumed.add(index)
+      picked.push(items[index])
+      increment(items[index].trackKey)
+    }
+    if (picked.length >= limit) break
+  }
+
+  for (let i = 0; i < items.length && picked.length < limit; i += 1) {
+    if (consumed.has(i)) continue
+    if (!canPick(items[i].trackKey)) continue
+    consumed.add(i)
+    picked.push(items[i])
+    increment(items[i].trackKey)
+  }
+
+  return picked
+}
+
+function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale): SearchTrack[] {
+  if (locale === "ko") {
+    return [
+      {
+        key: "local-news",
+        query: `전주 생활 공지 교통 행사 업데이트 ${dateStr}`,
+        topic: "news",
+        searchDepth: "fast",
+        timeRange: "week",
+        includeDomains: LOCAL_UTILITY_DOMAINS,
+        excludeDomains: NOISE_DOMAINS,
+        includeAnswer: "basic",
+      },
+      {
+        key: "city-hall",
+        query: `전주시청 보도자료 시정뉴스룸 ${dateStr}`,
+        topic: "general",
+        searchDepth: "basic",
+        timeRange: "week",
+        includeDomains: OFFICIAL_JEONJU_DOMAINS,
+        excludeDomains: NOISE_DOMAINS,
+        country: "south korea",
+      },
+      {
+        key: "events",
+        query: `전주 축제 행사 공연 전시 일정 ${dateStr}`,
+        topic: "news",
+        searchDepth: "basic",
+        timeRange: "month",
+        includeDomains: LOCAL_UTILITY_DOMAINS,
+        excludeDomains: NOISE_DOMAINS,
+      },
+      {
+        key: "safety",
+        query: `전주 교통 통제 안전 주의 사건사고 ${dateStr}`,
+        topic: "news",
+        searchDepth: "basic",
+        timeRange: "week",
+        includeDomains: LOCAL_UTILITY_DOMAINS,
+        excludeDomains: NOISE_DOMAINS,
+      },
+    ]
+  }
+
+  return [
+    {
+      key: "local-news",
+      query: `Jeonju local civic notices traffic events update ${dateStr}`,
+      topic: "news",
+      searchDepth: "fast",
+      timeRange: "week",
+      includeDomains: LOCAL_UTILITY_DOMAINS,
+      excludeDomains: NOISE_DOMAINS,
+      includeAnswer: "basic",
+    },
+    {
+      key: "city-hall",
+      query: `Jeonju city hall press release ${dateStr}`,
+      topic: "general",
+      searchDepth: "basic",
+      timeRange: "week",
+      includeDomains: OFFICIAL_JEONJU_DOMAINS,
+      excludeDomains: NOISE_DOMAINS,
+      country: "south korea",
+    },
+    {
+      key: "events",
+      query: `Jeonju events festival exhibition update ${dateStr}`,
+      topic: "news",
+      searchDepth: "basic",
+      timeRange: "month",
+      includeDomains: LOCAL_UTILITY_DOMAINS,
+      excludeDomains: NOISE_DOMAINS,
+    },
+    {
+      key: "safety",
+      query: `Jeonju traffic control safety incident update ${dateStr}`,
+      topic: "news",
+      searchDepth: "basic",
+      timeRange: "week",
+      includeDomains: LOCAL_UTILITY_DOMAINS,
+      excludeDomains: NOISE_DOMAINS,
+    },
+  ]
+}
+
+function buildFallbackSearchTracks(dateStr: string, locale: JeonjuBriefingLocale): SearchTrack[] {
+  if (locale === "ko") {
+    return [
+      {
+        key: "fallback-news",
+        query: `전주 최근 소식 요약 ${dateStr}`,
+        topic: "news",
+        searchDepth: "basic",
+        timeRange: "week",
+        excludeDomains: NOISE_DOMAINS,
+      },
+      {
+        key: "fallback-general",
+        query: `전주 생활 정보 교통 행사 공지 ${dateStr}`,
+        topic: "general",
+        searchDepth: "basic",
+        timeRange: "month",
+        excludeDomains: NOISE_DOMAINS,
+        country: "south korea",
+      },
+    ]
+  }
+
+  return [
+    {
+      key: "fallback-news",
+      query: `recent Jeonju local updates ${dateStr}`,
+      topic: "news",
+      searchDepth: "basic",
+      timeRange: "week",
+      excludeDomains: NOISE_DOMAINS,
+    },
+    {
+      key: "fallback-general",
+      query: `Jeonju local advisory events traffic notice ${dateStr}`,
+      topic: "general",
+      searchDepth: "basic",
+      timeRange: "month",
+      excludeDomains: NOISE_DOMAINS,
+      country: "south korea",
+    },
+  ]
+}
+
+function getPlannedQuerySummary(dateStr: string, locale: JeonjuBriefingLocale) {
+  return buildPrimarySearchTracks(dateStr, locale).map((track) => track.query).join(" | ")
+}
+
 async function executeMultiSearch(dateStr: string, locale: JeonjuBriefingLocale): Promise<{
   results: SearchResultItem[]
   answer: string | null
   totalSearches: number
   mergedQuerySummary: string
 }> {
-  const allResults: SearchResultItem[] = []
-  const seenUrls = new Set<string>()
+  const selectedByUrl = new Map<string, SearchResultItem>()
+  const allTrackQueries: string[] = []
   let combinedAnswer: string | null = null
 
-  const queries = buildJeonjuSearchQueries(dateStr, locale)
+  const collectTracks = async (tracks: SearchTrack[]) => {
+    const settled = await Promise.allSettled(tracks.map(async (track) => {
+      try {
+        const response = await createTavilySearch({
+          query: track.query,
+          topic: track.topic,
+          searchDepth: track.searchDepth,
+          maxResults: 10,
+          includeAnswer: track.includeAnswer ?? false,
+          timeRange: track.timeRange,
+          includeDomains: track.includeDomains,
+          excludeDomains: track.excludeDomains,
+          country: track.country,
+        })
 
-  const searchPromises = queries.map(async (query, idx) => {
-    try {
-      const isOfficialTrack = idx === 1
+        return { track, response }
+      } catch (error) {
+        console.warn(`[jeonju-briefing] Tavily search failed for "${track.query}":`, error)
+        return null
+      }
+    }))
 
-      const response = await createTavilySearch({
-        query,
-        topic: "general",
-        searchDepth: "basic",
-        maxResults: 5,
-        includeAnswer: idx === 0 ? "basic" : false,
-        startDate: dateStr,
-        endDate: dateStr,
-        includeDomains: isOfficialTrack
-          ? ["jeonju.go.kr"]
-          : TRUSTED_JEONJU_DOMAINS,
-        excludeDomains: NOISE_DOMAINS,
-      })
-
-      const items = response.results
-        .filter((item) => item.score >= 0.35 && item.url.length > 0)
-        .map((item) => ({
-          title: item.title,
-          url: item.url,
-          content: item.content,
-          score: item.score,
-          publishedDate: normalizePublishedDate(item.publishedDate),
-          source: extractDomain(item.url),
-        }))
-        .filter((item) => (
-          item.title.includes("전주")
-          || item.content.includes("전주")
-          || item.title.toLowerCase().includes("jeonju")
-          || item.content.toLowerCase().includes("jeonju")
-        ))
-
-      return { items, answer: response.answer }
-    } catch (error) {
-      console.warn(`[jeonju-briefing] Tavily search failed for "${query}":`, error)
-      return { items: [], answer: null }
-    }
-  })
-
-  const settled = await Promise.allSettled(searchPromises)
-
-  for (const result of settled) {
-    if (result.status === "fulfilled") {
-      // Collect answer from first successful query
-      if (result.value.answer && !combinedAnswer) {
-        combinedAnswer = result.value.answer
+    for (const candidate of settled) {
+      if (candidate.status !== "fulfilled" || !candidate.value) continue
+      const { track, response } = candidate.value
+      allTrackQueries.push(track.query)
+      if (response.answer && !combinedAnswer) {
+        combinedAnswer = response.answer
       }
 
-      for (const item of result.value.items) {
-        if (!seenUrls.has(item.url)) {
-          seenUrls.add(item.url)
-          allResults.push(item)
+      for (const item of response.results) {
+        if (!item.url || item.score < 0.2) continue
+        const normalizedDate = normalizePublishedDate(item.publishedDate)
+        const composedText = `${item.title} ${item.content}`
+        const domain = extractDomain(item.url)
+        const hasUtilitySignal = UTILITY_SIGNAL_PATTERN.test(composedText)
+        if (!hasJeonjuSignal(composedText) && !domain.includes("jeonju")) continue
+        if (LOW_UTILITY_PATTERN.test(composedText) && !hasUtilitySignal) continue
+        if (!normalizedDate && !isLikelyArticleUrl(item.url) && !hasUtilitySignal) continue
+        if (isLowValueResult(item.url, item.title, item.content)) continue
+
+        const weightedScore = calcWeightedScore({
+          score: item.score,
+          url: item.url,
+          title: item.title,
+          content: item.content,
+          publishedDate: normalizedDate,
+        }, dateStr)
+        if (weightedScore < 0.2) continue
+
+        const normalizedUrl = normalizeUrlForDedup(item.url)
+        const mapped: SearchResultItem = {
+          title: item.title.trim(),
+          url: item.url.trim(),
+          content: item.content.trim(),
+          score: item.score,
+          weightedScore,
+          publishedDate: normalizedDate,
+          source: domain,
+          trackKey: track.key,
+        }
+
+        const existing = selectedByUrl.get(normalizedUrl)
+        if (!existing || mapped.weightedScore > existing.weightedScore) {
+          selectedByUrl.set(normalizedUrl, mapped)
         }
       }
     }
   }
 
-  allResults.sort((a, b) => {
-    const aDateBonus = a.publishedDate === dateStr ? 0.25 : 0
-    const bDateBonus = b.publishedDate === dateStr ? 0.25 : 0
-    const aDomainBonus = isKoreanDomain(a.url) ? 0.12 : 0
-    const bDomainBonus = isKoreanDomain(b.url) ? 0.12 : 0
-    return (b.score + bDateBonus + bDomainBonus) - (a.score + aDateBonus + aDomainBonus)
-  })
+  await collectTracks(buildPrimarySearchTracks(dateStr, locale))
+  if (selectedByUrl.size < 5) {
+    await collectTracks(buildFallbackSearchTracks(dateStr, locale))
+  }
+
+  const ranked = [...selectedByUrl.values()].sort((a, b) => b.weightedScore - a.weightedScore)
+  const allResults = pickDiverseTopResults(ranked, 10)
 
   return {
-    results: allResults.slice(0, 8),
+    results: allResults,
     answer: combinedAnswer,
-    totalSearches: queries.length,
-    mergedQuerySummary: queries.join(" | "),
-  }
-}
-
-function buildJeonjuSearchQueries(dateStr: string, locale: JeonjuBriefingLocale) {
-  if (locale === "ko") {
-    return [
-      `전주 어제 주요 뉴스 ${dateStr}`,
-      `전주시청 보도자료 ${dateStr} 전주`,
-      `전주 행사 축제 공연 전시 어제 ${dateStr}`,
-      `전주 교통 안전 사건사고 어제 ${dateStr}`,
-    ]
-  }
-
-  return [
-    `Jeonju major local news yesterday ${dateStr}`,
-    `Jeonju city press release ${dateStr}`,
-    `Jeonju events festival exhibition yesterday ${dateStr}`,
-    `Jeonju traffic safety incident yesterday ${dateStr}`,
-  ]
-}
-
-/** Prefer .kr / .or.kr / .go.kr domains for Korean content */
-function isKoreanDomain(url: string): boolean {
-  try {
-    const hostname = new URL(url).hostname
-    return /\.(kr|or\.kr|go\.kr|ac\.kr)$/i.test(hostname)
-  } catch {
-    return false
+    totalSearches: allTrackQueries.length,
+    mergedQuerySummary: allTrackQueries.join(" | "),
   }
 }
 
@@ -271,7 +543,7 @@ export async function generateJeonjuBriefing(
 
     // 3. Save to DB (best-effort)
     try {
-      const plannedQueries = buildJeonjuSearchQueries(yesterdayDate, locale).join(" | ")
+      const plannedQueries = getPlannedQuerySummary(yesterdayDate, locale)
       await saveJeonjuBriefing({
         briefingDate: yesterdayDate,
         locale: result.locale,
@@ -386,6 +658,24 @@ function buildSearchContext(
   dateLabel: string
 ): string {
   const lines: string[] = []
+  const trackName: Record<string, { ko: string; en: string }> = {
+    "local-news": { ko: "지역 주요뉴스", en: "Local headlines" },
+    "city-hall": { ko: "전주시 공식 보도", en: "City official release" },
+    "events": { ko: "행사/축제", en: "Events/Festival" },
+    "safety": { ko: "교통/안전", en: "Traffic/Safety" },
+    "fallback-news": { ko: "보강 뉴스", en: "Fallback news" },
+    "fallback-general": { ko: "보강 일반", en: "Fallback general" },
+  }
+
+  lines.push(locale === "ko"
+    ? "[브리핑 목표] 어제 전주 소식 핵심 + 오늘 바로 필요한 체크포인트를 제공한다."
+    : "[Goal] Provide yesterday's Jeonju highlights plus practical check points for today."
+  )
+  lines.push(locale === "ko"
+    ? "[편집 원칙] 오래된 정보·관광 홍보성 일반 문구보다 생활 영향이 큰 공지/교통/행사 업데이트를 우선한다."
+    : "[Editorial policy] Prioritize impactful updates (notices/traffic/events) over generic promotional text."
+  )
+  lines.push("")
 
   if (searchAnswer) {
     lines.push(locale === "ko"
@@ -401,22 +691,25 @@ function buildSearchContext(
       : `[Search Results (${results.length} items)]`
     )
 
-    results.slice(0, 8).forEach((r, i) => {
+    results.slice(0, 10).forEach((r, i) => {
       const dateLine = r.publishedDate
         ? (locale === "ko" ? `발행일: ${r.publishedDate}` : `Published: ${r.publishedDate}`)
         : ""
+      const trackLabel = trackName[r.trackKey]?.[locale] ?? r.trackKey
       lines.push(
         `[${i + 1}] ${r.title}` +
         `\nURL: ${r.url}` +
         `\n출처: ${r.source}` +
+        `\n분류: ${trackLabel}` +
+        `\n정렬점수: ${r.weightedScore.toFixed(2)} (원점수 ${r.score.toFixed(2)})` +
         (dateLine ? `\n${dateLine}` : "") +
-        `\n내용: ${r.content.slice(0, 400)}`
+        `\n내용: ${r.content.slice(0, 420)}`
       )
     })
   } else {
     lines.push(locale === "ko"
-      ? "[검색 결과가 없습니다. 전주의 전반적인 관광 정보, 문화, 음식 등에 대해 알려주세요.]"
-      : "[No search results available. Please provide general information about Jeonju's tourism, culture, and food.]"
+      ? "[검색 결과가 거의 없습니다. 사실 확인 가능한 정보만 최소한으로 작성하고, 확인 필요하다고 명시하세요.]"
+      : "[Search results are sparse. Keep only verifiable facts and explicitly note verification gaps.]"
     )
   }
 
@@ -452,11 +745,11 @@ function buildSystemPrompt(
 ## JSON 스키마
 {
   "headline": "어제 핵심을 담은 한 줄 (30자 이내, 전주 관련)",
-  "summary": "어제 기준 확인된 핵심 2-3문장 + 오늘 체감 영향 1문장",
+  "summary": "핵심상황 2문장 + 오늘영향 1문장",
   "newsItems": [
     {"title": "소식 제목", "url": "https://...", "source": "출처명", "snippet": "핵심 내용 한줄(60자 이내)", "publishedDate": "YYYY-MM-DD"}
   ],
-  "aiInsight": "오늘 체크포인트 1-2문장 (실행 가능한 조언)",
+  "aiInsight": "오늘 체크포인트 2~4개 (각 항목은 '•'로 시작, 실행 가능한 조언)",
   "weatherNote": "날씨 관련 정보 (검색 결과에 있으면, 없으면 null)",
   "festivalNote": "축제/행사 정보 (검색 결과에 있으면, 없으면 null)",
   "keywordTags": ["#태그1", "#태그2"]
@@ -464,14 +757,14 @@ function buildSystemPrompt(
 
 ## 상세 규칙
 1. **headline**: 30자 이내, 구체적인 전주 관련 내용 (추상 표현 금지)
-2. **summary**: 사실 중심 2-3문장 + 오늘 영향 1문장. 과장/추측 금지
-3. **newsItems**: 최대 4개. 실제 전주 관련 내용만 포함. 없으면 빈 배열 []
+2. **summary**: "핵심상황:"으로 시작하는 문장 2개 + "오늘영향:" 문장 1개. 과장/추측 금지
+3. **newsItems**: 최대 5개. 실제 전주 관련 내용만 포함. 없으면 빈 배열 []
 4. **snippet**: 60자 이내, 핵심만 간결하게
-5. **aiInsight**: 오늘 바로 쓸 수 있는 체크포인트(교통/행사/혼잡/준비물 등)
+5. **aiInsight**: 오늘 바로 쓸 수 있는 체크포인트 2~4개를 "•" 목록 형태로 작성
 6. **weatherNote / festivalNote**: 검색 결과 기반으로, 없으면 null
 7. **keywordTags**: 3-5개 전주 관련 해시태그
 8. 없는 정보는 반드시 **null** (빈 문자열 금지)
-9. 검색 근거가 없으면 지어내지 말고, summary에 "어제 확인 가능한 신규 보도가 제한적"이라고 명시
+9. 검색 근거가 약하거나 오래된 정보면 지어내지 말고, summary에 "어제 확인 가능한 신규 보도가 제한적"이라고 명시
 10. **JSON 외의 어떤 텍스트도 출력하지 마세요**`
   }
 
@@ -487,11 +780,11 @@ function buildSystemPrompt(
 ## JSON Schema
 {
   "headline": "One-line core update (under 40 chars, Jeonju-related)",
-  "summary": "2-3 factual sentences from yesterday + 1 sentence on practical impact today",
+  "summary": "2 core factual lines + 1 practical impact line",
   "newsItems": [
     {"title": "News title", "url": "https://...", "source": "Source", "snippet": "Key point (under 80 chars)", "publishedDate": "YYYY-MM-DD"}
   ],
-  "aiInsight": "1-2 sentence actionable checklist for today",
+  "aiInsight": "2-4 bullet checklist items, each prefixed with '•'",
   "weatherNote": "Weather info if available, otherwise null",
   "festivalNote": "Festival/event info if available, otherwise null",
   "keywordTags": ["#tag1", "#tag2"]
@@ -499,10 +792,10 @@ function buildSystemPrompt(
 
 ## Rules
 1. **headline**: Under 40 chars, specific and concrete
-2. **summary**: factual 2-3 sentences + practical today-impact sentence
-3. **newsItems**: Max 4. Include only real Jeonju content from searches. Empty array if none.
+2. **summary**: start with "Core:" for 2 facts, and add one "Today impact:" sentence
+3. **newsItems**: Max 5. Include only real Jeonju content from searches. Empty array if none.
 4. **snippet**: Under 80 chars
-5. **aiInsight**: Actionable, practical guidance (traffic/events/crowd/prep)
+5. **aiInsight**: 2-4 actionable checklist bullets, each starting with "•"
 6. **weatherNote / festivalNote**: Based on search results, null if unavailable
 7. **keywordTags**: 3-5 Jeonju-related hashtags
 8. Use **null** for missing info (not empty strings)
@@ -601,13 +894,13 @@ function buildFinalBriefing(
   // News items: prefer LLM's, fallback to raw search results
   let newsItems: JeonjuBriefingData["newsItems"]
   if (parsed.newsItems.length > 0) {
-    newsItems = parsed.newsItems.slice(0, 4)
+    newsItems = parsed.newsItems.slice(0, 5)
   } else if (searchResults.length > 0) {
-    newsItems = searchResults.slice(0, 4).map((r) => ({
+    newsItems = searchResults.slice(0, 5).map((r) => ({
       title: r.title,
       url: r.url,
       source: r.source || extractDomain(r.url) || "링크",
-      snippet: r.content.replace(/\s+/g, " ").trim().slice(0, 60),
+      snippet: r.content.replace(/\s+/g, " ").trim().slice(0, 90),
       publishedDate: r.publishedDate,
     }))
   } else {
@@ -623,11 +916,11 @@ function buildFinalBriefing(
       (r) => r.title.includes("전주") || r.title.includes("Jeonju") || r.content.includes("전주") || r.content.includes("Jeonju")
     )
     if (filtered.length >= 2) {
-      newsItems = filtered.slice(0, 4).map((r) => ({
+      newsItems = filtered.slice(0, 5).map((r) => ({
         title: r.title,
         url: r.url,
         source: r.source || extractDomain(r.url) || "링크",
-        snippet: r.content.replace(/\s+/g, " ").trim().slice(0, 60),
+        snippet: r.content.replace(/\s+/g, " ").trim().slice(0, 90),
         publishedDate: r.publishedDate,
       }))
     }
@@ -686,11 +979,11 @@ function buildPartialBriefing(
       ? `${dateLabel} 기준 수집된 전주 관련 원문을 정리했습니다. 오늘 일정 전에는 링크된 공지/기사의 최신 갱신 시간을 확인해 주세요.`
       : `This compiles Jeonju-related sources for ${dateLabel}. Check each linked notice/article for latest updates before making plans today.`,
     newsItems: searchResults.length > 0
-      ? searchResults.slice(0, 4).map((r) => ({
+      ? searchResults.slice(0, 5).map((r) => ({
           title: r.title,
           url: r.url,
           source: r.source || extractDomain(r.url) || "링크",
-          snippet: r.content.replace(/\s+/g, " ").trim().slice(0, 60),
+          snippet: r.content.replace(/\s+/g, " ").trim().slice(0, 90),
           publishedDate: r.publishedDate,
         }))
       : [],
