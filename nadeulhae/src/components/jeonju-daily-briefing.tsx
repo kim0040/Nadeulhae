@@ -12,6 +12,9 @@ import {
   RefreshCw,
   AlertTriangle,
   Info,
+  CalendarDays,
+  ListChecks,
+  ShieldCheck,
 } from "lucide-react"
 
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text"
@@ -49,6 +52,32 @@ type FetchStatus = "idle" | "loading" | "success" | "error" | "empty"
 
 const RETRY_MAX = 3
 const RETRY_DELAY_MS = 1000
+
+function splitChecklist(text: string | null): string[] {
+  if (!text) return []
+  const normalized = text
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?=•)/g))
+    .map((line) => line.replace(/^•\s*/, "").trim())
+    .filter((line) => line.length > 0)
+
+  if (normalized.length >= 2) return normalized.slice(0, 4)
+  return text
+    .split(/[.!?]\s+/)
+    .map((line) => line.replace(/^•\s*/, "").trim())
+    .filter((line) => line.length > 0)
+    .slice(0, 4)
+}
+
+function formatPublishedDate(date: string | null, language: "ko" | "en") {
+  if (!date) return null
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return date
+  return parsed.toLocaleDateString(language === "ko" ? "ko-KR" : "en-US", {
+    month: "short",
+    day: "numeric",
+  })
+}
 
 // ------------------------------------------------------------------
 // Component
@@ -170,6 +199,8 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
   // Safety: should not happen, but guard anyway
   if (!briefing) return null
+  const checklistItems = splitChecklist(briefing.aiInsight)
+  const sourceCount = new Set(briefing.newsItems.map((item) => item.source).filter(Boolean)).size
 
   return (
     <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
@@ -185,6 +216,14 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
               {t.fromCache}
             </div>
           )}
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+            <CalendarDays className="h-3 w-3" />
+            {briefing.briefingDate}
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+            <ShieldCheck className="h-3 w-3" />
+            {language === "ko" ? `출처 ${sourceCount}개` : `${sourceCount} sources`}
+          </div>
           <button
             onClick={handleRefresh}
             className="inline-flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
@@ -208,7 +247,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
       </div>
 
       {/* Main Briefing Card */}
-      <div className="rounded-[2rem] border border-[var(--interactive-border)] bg-[var(--interactive)] overflow-hidden">
+      <div className="overflow-hidden rounded-[2rem] border border-[var(--interactive-border)] bg-[var(--interactive)] shadow-[0_20px_65px_-36px_rgba(17,24,39,0.5)]">
         {/* Headline Banner */}
         <div className="relative overflow-hidden bg-gradient-to-br from-nature-green/10 to-sky-blue/10 px-6 py-8 sm:px-10 sm:py-10">
           <div className="absolute top-0 right-0 opacity-[0.04] dark:opacity-[0.06] pointer-events-none select-none">
@@ -229,7 +268,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         {/* Content */}
         <div className="p-6 sm:p-10">
           {/* Summary */}
-          <div className="mb-8">
+          <div className="mb-8 rounded-[1.2rem] border border-card-border/60 bg-card/60 p-4 sm:p-5">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground mb-3">
               <Newspaper size={14} className="text-sky-blue" />
               {t.summaryLabel}
@@ -269,14 +308,25 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
           {/* AI Insight */}
           {briefing.aiInsight && (
-            <div className="mb-8 rounded-[1.4rem] border border-nature-green/20 bg-nature-green/5 px-5 py-4">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wide text-nature-green mb-2">
-                <Sparkles size={12} />
+            <div className="mb-8 rounded-[1.4rem] border border-nature-green/20 bg-gradient-to-br from-nature-green/10 via-nature-green/5 to-sky-blue/5 px-5 py-4">
+              <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-wide text-nature-green">
+                <ListChecks size={12} />
                 {t.insightLabel}
               </div>
-              <p className="text-sm sm:text-base font-bold text-foreground italic break-keep">
-                &ldquo;{briefing.aiInsight}&rdquo;
-              </p>
+              {checklistItems.length > 1 ? (
+                <ul className="space-y-2">
+                  {checklistItems.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm sm:text-base font-bold text-foreground break-keep">
+                      <span className="mt-[2px] h-2 w-2 shrink-0 rounded-full bg-nature-green" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm sm:text-base font-bold text-foreground italic break-keep">
+                  &ldquo;{briefing.aiInsight}&rdquo;
+                </p>
+              )}
             </div>
           )}
 
@@ -300,14 +350,14 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                 <Newspaper size={14} className="text-active-blue" />
                 {t.newsLabel}
               </div>
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {briefing.newsItems.map((item, index) => (
                   <a
                     key={`${item.url}-${index}`}
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex items-start gap-4 rounded-[1.2rem] border border-card-border bg-card px-5 py-4 hover:border-sky-blue/30 hover:bg-sky-blue/5 transition-all duration-300"
+                    className="group flex h-full items-start gap-4 rounded-[1.2rem] border border-card-border bg-card px-5 py-4 hover:-translate-y-[1px] hover:border-sky-blue/30 hover:bg-sky-blue/5 transition-all duration-300"
                   >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-card-border bg-background text-xs font-black text-muted-foreground group-hover:border-sky-blue/30 group-hover:text-sky-blue transition-colors">
                       {index + 1}
@@ -319,7 +369,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                         </span>
                         {item.publishedDate && (
                           <span className="text-[10px] font-bold text-muted-foreground">
-                            {item.publishedDate}
+                            {formatPublishedDate(item.publishedDate, language)}
                           </span>
                         )}
                       </div>
@@ -370,11 +420,11 @@ function useI18n(language: "ko" | "en") {
   if (language === "ko") {
     return {
       sectionTitle: "어제의 전주 소식",
-      sectionDesc: "매일 1회 수집한 어제 소식을 요약하고, 오늘 바로 필요한 체크포인트까지 함께 안내해요.",
+      sectionDesc: "매일 1회 자동 수집 후, 전주 시민/방문자에게 실제 도움이 되는 공지·교통·행사 중심으로 요약해 안내합니다.",
       aiLabel: "나들AI 브리핑",
       summaryLabel: "요약",
       newsLabel: "관련 소식",
-      insightLabel: "나들AI의 한마디",
+      insightLabel: "오늘 체크리스트",
       weatherLabel: "날씨",
       festivalLabel: "행사",
       loading: "브리핑 준비 중...",
@@ -385,17 +435,17 @@ function useI18n(language: "ko" | "en") {
       fromCache: "캐시된 데이터",
       link: "링크",
       noNewsInfo: "새로운 소식을 모으는 중이에요",
-      noNewsDesc: "전주의 아름다운 소식이 곧 전해질 예정이에요. 그동안 한옥마을 산책 어떠세요?",
+      noNewsDesc: "어제 기준 확인 가능한 신규 보도가 제한적입니다. 전주시청 공지와 교통 안내를 먼저 확인해 주세요.",
     }
   }
 
   return {
     sectionTitle: "Yesterday's Jeonju News",
-    sectionDesc: "Collected once per day: yesterday's verified updates plus practical check points for today.",
+    sectionDesc: "Collected once per day, then distilled into practical city updates focused on notices, traffic, and events.",
     aiLabel: "NadeulAI Briefing",
     summaryLabel: "Summary",
     newsLabel: "Related News",
-    insightLabel: "NadeulAI's Tip",
+    insightLabel: "Today's Checklist",
     weatherLabel: "Weather",
     festivalLabel: "Events",
     loading: "Preparing briefing...",
@@ -406,6 +456,6 @@ function useI18n(language: "ko" | "en") {
     fromCache: "Cached data",
     link: "Link",
     noNewsInfo: "Gathering fresh news",
-    noNewsDesc: "Beautiful news about Jeonju will be delivered soon. In the meantime, how about a walk in Hanok Village?",
+    noNewsDesc: "Verified fresh updates were limited for yesterday. Please check Jeonju city notices and traffic updates first.",
   }
 }
