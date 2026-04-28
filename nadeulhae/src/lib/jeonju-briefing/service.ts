@@ -144,6 +144,10 @@ const LOCAL_UTILITY_DOMAINS = [
   "domin.co.kr",
   "jjn.co.kr",
   "nocutnews.co.kr",
+  "yna.co.kr",
+  "yonhapnews.co.kr",
+  "newsis.com",
+  "news1.kr",
 ]
 
 const NOISE_DOMAINS = [
@@ -178,7 +182,7 @@ const LOW_VALUE_URL_PATTERNS = [
 ]
 
 const UTILITY_SIGNAL_PATTERN = /(교통|통제|우회|안전|주의|행사|축제|공연|전시|개최|운영|마감|신청|접수|점검|단속|공지|보도자료|시정|호우|폭염|미세먼지|개방|휴관|개장|버스|주차|도로)/i
-const LOW_UTILITY_PATTERN = /(후보|경선|선거|정당|의장|군수|도지사|국회의원|찬양|연예가|가십|트럼프)/i
+const LOW_UTILITY_PATTERN = /(연예가|가십|트럼프|해외연예)/i
 
 function hasJeonjuSignal(text: string) {
   return /(전주|jeonju|완산|덕진|한옥마을|전주천|전주시청|전주국제영화제)/i.test(text)
@@ -274,7 +278,7 @@ function calcWeightedScore(item: {
 }
 
 function pickDiverseTopResults(items: SearchResultItem[], limit: number) {
-  const prioritizedTracks = ["city-hall", "events", "safety", "local-news", "fallback-news", "fallback-general"]
+  const prioritizedTracks = ["city-hall", "events", "safety", "governance", "local-news", "fallback-news", "fallback-general"]
   const picked: SearchResultItem[] = []
   const consumed = new Set<number>()
   const trackCounts = new Map<string, number>()
@@ -345,6 +349,15 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
         includeDomains: LOCAL_UTILITY_DOMAINS,
         excludeDomains: NOISE_DOMAINS,
       },
+      {
+        key: "governance",
+        query: `전주 시의회 시정 정책 예산 브리핑 ${dateStr}`,
+        topic: "news",
+        searchDepth: "basic",
+        timeRange: "month",
+        includeDomains: LOCAL_UTILITY_DOMAINS,
+        excludeDomains: NOISE_DOMAINS,
+      },
     ]
   }
 
@@ -384,6 +397,15 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
       topic: "news",
       searchDepth: "basic",
       timeRange: "week",
+      includeDomains: LOCAL_UTILITY_DOMAINS,
+      excludeDomains: NOISE_DOMAINS,
+    },
+    {
+      key: "governance",
+      query: `Jeonju city council policy budget governance briefing ${dateStr}`,
+      topic: "news",
+      searchDepth: "basic",
+      timeRange: "month",
       includeDomains: LOCAL_UTILITY_DOMAINS,
       excludeDomains: NOISE_DOMAINS,
     },
@@ -765,6 +787,7 @@ function buildSearchContext(
     "city-hall": { ko: "전주시 공식 보도", en: "City official release" },
     "events": { ko: "행사/축제", en: "Events/Festival" },
     "safety": { ko: "교통/안전", en: "Traffic/Safety" },
+    "governance": { ko: "시정/의회", en: "Governance/Council" },
     "fallback-news": { ko: "보강 뉴스", en: "Fallback news" },
     "fallback-general": { ko: "보강 일반", en: "Fallback general" },
   }
@@ -861,14 +884,15 @@ function buildSystemPrompt(
 1. **headline**: 30자 이내, 구체적인 전주 관련 내용 (추상 표현 금지)
 2. **summary**: 첫 문장은 반드시 "안녕하세요! 나들AI입니다. 어제의 전주 소식을 알려드릴게요."로 시작
 3. 그 다음은 "핵심상황:"으로 시작하는 문장 2개 + "오늘영향:" 문장 1개. 과장/추측 금지
-4. **newsItems**: 최대 5개. 실제 전주 관련 내용만 포함. 없으면 빈 배열 []
+4. **newsItems**: 최대 6개. 실제 전주 관련 내용만 포함. 없으면 빈 배열 []
 5. **snippet**: 60자 이내, 핵심만 간결하게
 6. **aiInsight**: 오늘 바로 쓸 수 있는 체크포인트 2~4개를 "•" 목록 형태로 작성
 7. **weatherNote / festivalNote**: 검색 결과 기반으로, 없으면 null
 8. **keywordTags**: 3-5개 전주 관련 해시태그
 9. 없는 정보는 반드시 **null** (빈 문자열 금지)
-10. 검색 근거가 약하거나 오래된 정보면 지어내지 말고, summary에 "어제 확인 가능한 신규 보도가 제한적"이라고 명시
-11. **JSON 외의 어떤 텍스트도 출력하지 마세요**`
+10. 시정/의회/정책/선거 관련 이슈도 공공적 영향이 있으면 포함 가능 (단, 특정 진영 편들기 금지)
+11. 검색 근거가 약하거나 오래된 정보면 지어내지 말고, summary에 "어제 확인 가능한 신규 보도가 제한적"이라고 명시
+12. **JSON 외의 어떤 텍스트도 출력하지 마세요**`
   }
 
   return `You are 'NadeulAI', a Jeonju daily briefing editor.
@@ -897,14 +921,15 @@ function buildSystemPrompt(
 1. **headline**: Under 40 chars, specific and concrete
 2. **summary**: first sentence must start with "Hello! I'm NadeulAI. Here's yesterday's Jeonju briefing."
 3. Then add "Core:" for 2 facts, and one "Today impact:" sentence
-4. **newsItems**: Max 5. Include only real Jeonju content from searches. Empty array if none.
+4. **newsItems**: Max 6. Include only real Jeonju content from searches. Empty array if none.
 5. **snippet**: Under 80 chars
 6. **aiInsight**: 2-4 actionable checklist bullets, each starting with "•"
 7. **weatherNote / festivalNote**: Based on search results, null if unavailable
 8. **keywordTags**: 3-5 Jeonju-related hashtags
 9. Use **null** for missing info (not empty strings)
-10. If evidence is limited, explicitly state that yesterday's verified updates were limited
-11. **Do NOT output any text besides valid JSON**`
+10. Governance/council/election topics may be included if publicly relevant, but keep neutral and non-partisan wording
+11. If evidence is limited, explicitly state that yesterday's verified updates were limited
+12. **Do NOT output any text besides valid JSON**`
 }
 
 // ------------------------------------------------------------------
@@ -1011,9 +1036,9 @@ function buildFinalBriefing(
   // News items: prefer LLM's, fallback to raw search results
   let newsItems: JeonjuBriefingData["newsItems"]
   if (parsed.newsItems.length > 0) {
-    newsItems = parsed.newsItems.slice(0, 5)
+    newsItems = parsed.newsItems.slice(0, 6)
   } else if (searchResults.length > 0) {
-    newsItems = searchResults.slice(0, 5).map((r) => ({
+    newsItems = searchResults.slice(0, 6).map((r) => ({
       title: r.title,
       url: r.url,
       source: r.source || extractDomain(r.url) || "링크",
@@ -1033,7 +1058,7 @@ function buildFinalBriefing(
       (r) => r.title.includes("전주") || r.title.includes("Jeonju") || r.content.includes("전주") || r.content.includes("Jeonju")
     )
     if (filtered.length >= 2) {
-      newsItems = filtered.slice(0, 5).map((r) => ({
+      newsItems = filtered.slice(0, 6).map((r) => ({
         title: r.title,
         url: r.url,
         source: r.source || extractDomain(r.url) || "링크",
@@ -1096,7 +1121,7 @@ function buildPartialBriefing(
       ? ensureFriendlyIntro(`핵심상황: ${dateLabel} 기준 수집된 전주 관련 원문을 정리했습니다. 핵심상황: 근거가 확인되는 항목만 선별했습니다. 오늘영향: 오늘 일정 전에는 링크된 공지/기사의 최신 갱신 시간을 확인해 주세요.`, locale)
       : ensureFriendlyIntro(`Core: this compiles Jeonju-related sources for ${dateLabel}. Core: only verifiable items are included. Today impact: check each linked notice/article for latest updates before making plans today.`, locale),
     newsItems: searchResults.length > 0
-      ? searchResults.slice(0, 5).map((r) => ({
+      ? searchResults.slice(0, 6).map((r) => ({
           title: r.title,
           url: r.url,
           source: r.source || extractDomain(r.url) || "링크",
