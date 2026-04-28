@@ -171,6 +171,7 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
 
   const forceRequested = searchParams.get("force") === "true"
   const warmAll = searchParams.get("warm_all") === "true"
+  const refresh = searchParams.get("refresh") === "true"
   const nowMs = Date.now()
   const briefingDate = getYesterdayInKst()
 
@@ -267,8 +268,16 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
 
   try {
     if (warmAll) {
-      const ko = await generateJeonjuBriefing({ locale: "ko", forceRefresh: force })
-      const en = await generateJeonjuBriefing({ locale: "en", forceRefresh: force })
+      const ko = await generateJeonjuBriefing({
+        locale: "ko",
+        forceRefresh: force,
+        skipMemoryCache: refresh,
+      })
+      const en = await generateJeonjuBriefing({
+        locale: "en",
+        forceRefresh: force,
+        skipMemoryCache: refresh,
+      })
       const response = NextResponse.json({
         success: true,
         warmed: true,
@@ -284,6 +293,7 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
     const result = await generateJeonjuBriefing({
       locale,
       forceRefresh: force,
+      skipMemoryCache: refresh,
     })
 
     const response = NextResponse.json({
