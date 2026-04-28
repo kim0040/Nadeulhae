@@ -621,10 +621,8 @@ export async function generateJeonjuBriefing(
 
   // 3. De-duplicate concurrent requests for the same date/locale.
   const inflightMap = getInflightMap()
-  if (!forceRefresh) {
-    const existing = inflightMap.get(cacheKey)
-    if (existing) return existing
-  }
+  const existing = inflightMap.get(cacheKey)
+  if (existing) return existing
 
   const generationPromise = (async (): Promise<BriefingGenerationResult> => {
     // 4. Generate fresh briefing
@@ -698,9 +696,7 @@ export async function generateJeonjuBriefing(
     }
   })()
 
-  if (!forceRefresh) {
-    inflightMap.set(cacheKey, generationPromise)
-  }
+  inflightMap.set(cacheKey, generationPromise)
 
   return generationPromise
 }

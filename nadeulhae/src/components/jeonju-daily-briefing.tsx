@@ -148,15 +148,18 @@ interface JeonjuDailyBriefingProps {
 export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
   const [briefing, setBriefing] = useState<BriefingData | null>(null)
   const [status, setStatus] = useState<FetchStatus>("idle")
-  const [retryCount, setRetryCount] = useState(0)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // --- i18n ---
   const t = useI18n(language)
 
   // --- Fetch logic ---
   const fetchBriefing = useCallback(
-    async (force = false) => {
-      setStatus("loading")
+    async (force = false, attempt = 0) => {
+      if (!force || !briefing) {
+        setStatus("loading")
+      }
+      setErrorMessage(null)
 
       try {
         const controller = new AbortController()
@@ -169,7 +172,24 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         clearTimeout(timeout)
 
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`)
+          let serverError = `HTTP ${res.status}`
+          let retryAfterSeconds: number | null = null
+          try {
+            const payload = await res.json() as { error?: string; retryAfterSeconds?: number }
+            if (typeof payload.error === "string" && payload.error.trim()) {
+              serverError = payload.error
+            }
+            if (typeof payload.retryAfterSeconds === "number" && Number.isFinite(payload.retryAfterSeconds)) {
+              retryAfterSeconds = payload.retryAfterSeconds
+            }
+          } catch {
+            // ignore json parsing errors
+          }
+
+          const error = new Error(serverError) as Error & { status?: number; retryAfterSeconds?: number | null }
+          error.status = res.status
+          error.retryAfterSeconds = retryAfterSeconds
+          throw error
         }
 
         const json = await res.json()
@@ -184,7 +204,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         }
 
         setBriefing(data)
-        setRetryCount(0)
+        setErrorMessage(null)
 
         // If data looks like a fallback (empty news items + no AI insight), mark as "empty"
         const isEmptyFallback =
@@ -197,16 +217,30 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
       } catch (err) {
         console.error("[JeonjuDailyBriefing] Fetch failed:", err)
 
-        if (retryCount < RETRY_MAX) {
-          setRetryCount((c) => c + 1)
-          setTimeout(() => fetchBriefing(force), RETRY_DELAY_MS * (retryCount + 1))
+        const statusCode = (err as { status?: number })?.status
+        const retryAfterSeconds = (err as { retryAfterSeconds?: number | null })?.retryAfterSeconds ?? null
+        const isRateLimited = statusCode === 429
+        const message = err instanceof Error ? err.message : t.errorSub
+
+        if (!isRateLimited && attempt < RETRY_MAX) {
+          setTimeout(() => fetchBriefing(force, attempt + 1), RETRY_DELAY_MS * (attempt + 1))
           return
+        }
+
+        if (isRateLimited) {
+          setErrorMessage(
+            retryAfterSeconds && retryAfterSeconds > 0
+              ? `${message} (${retryAfterSeconds}s)`
+              : message
+          )
+        } else {
+          setErrorMessage(message)
         }
 
         setStatus("error")
       }
     },
-    [language, retryCount]
+    [briefing, language, t.errorSub]
   )
 
   useEffect(() => {
@@ -215,8 +249,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
   }, [language])
 
   const handleRefresh = useCallback(() => {
-    setRetryCount(0)
-    fetchBriefing(true)
+    fetchBriefing(true, 0)
   }, [fetchBriefing])
 
   // --- Renders ---
@@ -241,7 +274,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           <div className="text-center py-12">
             <AlertTriangle className="mx-auto h-12 w-12 text-orange-400 mb-4" />
             <p className="text-lg font-black text-muted-foreground">{t.error}</p>
-            <p className="mt-2 text-sm font-bold text-muted-foreground/70">{t.errorSub}</p>
+            <p className="mt-2 text-sm font-bold text-muted-foreground/70">{errorMessage || t.errorSub}</p>
             <button
               onClick={handleRefresh}
               className="mt-6 inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-5 py-2.5 text-sm font-black text-sky-blue hover:bg-sky-blue/20 transition-colors"
@@ -315,6 +348,12 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
           {t.sectionDesc}
         </p>
+        {errorMessage && (
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-orange-400/35 bg-orange-400/10 px-3 py-1.5 text-xs font-black text-orange-600 dark:text-orange-300">
+            <Info className="h-3 w-3" />
+            {errorMessage}
+          </div>
+        )}
       </div>
 
       {/* Main Briefing Card */}
