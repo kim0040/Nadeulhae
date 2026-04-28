@@ -5,6 +5,7 @@ import { generateJeonjuBriefing } from "@/lib/jeonju-briefing/service"
 import type { JeonjuBriefingLocale } from "@/lib/jeonju-briefing/service"
 
 export const runtime = "nodejs"
+const BRIEFING_PUBLIC_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=1800"
 
 type RateLimitEntry = {
   count: number
@@ -207,7 +208,7 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
     if (warmAll) {
       const ko = await generateJeonjuBriefing({ locale: "ko", forceRefresh: force })
       const en = await generateJeonjuBriefing({ locale: "en", forceRefresh: force })
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         warmed: true,
         data: {
@@ -215,6 +216,8 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
           en: en.data,
         },
       })
+      response.headers.set("Cache-Control", force ? "no-store" : BRIEFING_PUBLIC_CACHE_CONTROL)
+      return response
     }
 
     const result = await generateJeonjuBriefing({
@@ -222,11 +225,13 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
       forceRefresh: force,
     })
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       fromCache: result.fromCache,
       data: result.data,
     })
+    response.headers.set("Cache-Control", force ? "no-store" : BRIEFING_PUBLIC_CACHE_CONTROL)
+    return response
   } catch (error) {
     console.error("[api/jeonju/briefing] Unhandled error:", error)
     return NextResponse.json(
