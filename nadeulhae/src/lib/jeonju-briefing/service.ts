@@ -971,7 +971,7 @@ function buildSystemPrompt(
 
 ## 상세 규칙
 1. **headline**: 30자 이내, 구체적인 전주 관련 내용 (추상 표현 금지)
-2. **summary**: 첫 문장은 반드시 "안녕하세요! 나들AI입니다. 어제의 전주 소식을 알려드릴게요."로 시작
+2. **summary**: 첫 문장은 반드시 "안녕하세요! 나들AI 입니다. 어제의 전주 소식을 알려드릴게요."로 시작
 3. 그 다음은 "핵심상황:"으로 시작하는 문장 2개 + "오늘영향:" 문장 1개. 과장/추측 금지
 4. **newsItems**: 최대 6개. 실제 전주 관련 내용만 포함. 없으면 빈 배열 []
 5. **snippet**: 60자 이내, 핵심만 간결하게
@@ -1038,7 +1038,7 @@ interface ParsedBriefing {
 function ensureFriendlyIntro(summary: string, locale: JeonjuBriefingLocale) {
   const trimmed = summary.trim()
   if (!trimmed) return trimmed
-  const koIntro = "안녕하세요! 나들AI입니다. 어제의 전주 소식을 알려드릴게요."
+  const koIntro = "안녕하세요! 나들AI 입니다. 어제의 전주 소식을 알려드릴게요."
   const enIntro = "Hello! I'm NadeulAI. Here's yesterday's Jeonju briefing."
   const intro = locale === "ko" ? koIntro : enIntro
   if (trimmed.startsWith(koIntro) || trimmed.startsWith(enIntro)) {
