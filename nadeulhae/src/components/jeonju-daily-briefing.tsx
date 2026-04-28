@@ -215,13 +215,19 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
       try {
         const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 25000)
-
-        const res = await fetch(
-          `/api/jeonju/briefing?locale=${language}${force ? "&force=true" : ""}`,
-          { signal: controller.signal }
+        const timeout = window.setTimeout(
+          () => controller.abort("jeonju_briefing_request_timeout"),
+          25000
         )
-        clearTimeout(timeout)
+        let res: Response
+        try {
+          res = await fetch(
+            `/api/jeonju/briefing?locale=${language}${force ? "&force=true" : ""}`,
+            { signal: controller.signal }
+          )
+        } finally {
+          window.clearTimeout(timeout)
+        }
 
         if (!res.ok) {
           let serverError = `HTTP ${res.status}`
@@ -268,12 +274,17 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
         setStatus(isEmptyFallback ? "empty" : "success")
       } catch (err) {
-        console.error("[JeonjuDailyBriefing] Fetch failed:", err)
+        const isAbortError = (err as { name?: string } | null)?.name === "AbortError"
+        if (!isAbortError) {
+          console.error("[JeonjuDailyBriefing] Fetch failed:", err)
+        }
 
         const statusCode = (err as { status?: number })?.status
         const retryAfterSeconds = (err as { retryAfterSeconds?: number | null })?.retryAfterSeconds ?? null
         const isRateLimited = statusCode === 429
-        const message = err instanceof Error ? err.message : t.errorSub
+        const message = isAbortError
+          ? t.timeoutSub
+          : (err instanceof Error ? err.message : t.errorSub)
 
         if (!isRateLimited && attempt < RETRY_MAX) {
           setTimeout(() => fetchBriefing(force, attempt + 1), RETRY_DELAY_MS * (attempt + 1))
@@ -293,7 +304,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         setStatus("error")
       }
     },
-    [briefing, language, t.errorSub]
+    [briefing, language, t.errorSub, t.timeoutSub]
   )
 
   useEffect(() => {
@@ -446,6 +457,10 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground mb-3">
               <Newspaper size={14} className="text-sky-blue" />
               {t.summaryLabel}
+            </div>
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-sky-blue/25 bg-sky-blue/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-blue">
+              <Sparkles className="h-3 w-3" />
+              {t.aiVoiceLabel}
             </div>
             <p className="rounded-xl bg-background/70 px-3 py-3 text-sm sm:text-base font-black leading-relaxed text-foreground break-keep">
               {summarySections.intro}
@@ -644,8 +659,9 @@ function useI18n(language: "ko" | "en") {
   if (language === "ko") {
     return {
       sectionTitle: "어제의 전주 소식",
-      sectionDesc: "매일 1회 자동 수집 후, 전주 시민/방문자에게 실제 도움이 되는 공지·교통·행사 중심으로 요약해 안내합니다.",
+      sectionDesc: "나들AI가 어제 기준 전주 핵심 이슈를 직접 브리핑하고, 오늘 바로 쓸 수 있는 체크포인트까지 안내합니다.",
       aiLabel: "나들AI 브리핑",
+      aiVoiceLabel: "나들AI 브리핑 멘트",
       summaryLabel: "요약",
       corePointsLabel: "핵심 포인트",
       todayImpactLabel: "오늘 영향",
@@ -664,6 +680,7 @@ function useI18n(language: "ko" | "en") {
       loading: "브리핑 준비 중...",
       error: "일시적으로 불러올 수 없어요",
       errorSub: "잠시 후 다시 시도해 주세요.",
+      timeoutSub: "응답 시간이 길어져 요청을 새로 시도하고 있어요.",
       retry: "다시 시도",
       refresh: "갱신",
       fromCache: "캐시된 데이터",
@@ -675,8 +692,9 @@ function useI18n(language: "ko" | "en") {
 
   return {
     sectionTitle: "Yesterday's Jeonju News",
-    sectionDesc: "Collected once per day, then distilled into practical city updates focused on notices, traffic, and events.",
+    sectionDesc: "NadeulAI briefs yesterday's key Jeonju updates and highlights practical points you can use today.",
     aiLabel: "NadeulAI Briefing",
+    aiVoiceLabel: "NadeulAI Voice Brief",
     summaryLabel: "Summary",
     corePointsLabel: "Core Points",
     todayImpactLabel: "Today's Impact",
@@ -695,6 +713,7 @@ function useI18n(language: "ko" | "en") {
     loading: "Preparing briefing...",
     error: "Temporarily unavailable",
     errorSub: "Please try again in a moment.",
+    timeoutSub: "The response took too long, retrying the request.",
     retry: "Retry",
     refresh: "Refresh",
     fromCache: "Cached data",
