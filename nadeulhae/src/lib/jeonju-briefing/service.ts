@@ -763,7 +763,7 @@ export async function generateJeonjuBriefing(
 // Core: Fetch + Summarize
 // ------------------------------------------------------------------
 
-async function fetchAndSummarize(
+export async function fetchAndSummarize(
   dateStr: string,
   locale: JeonjuBriefingLocale
 ): Promise<JeonjuBriefingData> {
@@ -874,9 +874,9 @@ function buildSystemPrompt(
 
 {
   "headline": "어제 전주 핵심을 담은 친근한 한 줄 제목 (25자 이내)",
-  "summary": "8~12문장의 아주 상세하고 자연스러운 아침 브리핑. 각 소식의 구체적인 내용(원인, 결과, 장소 등)을 충분히 풀어서 친한 친구에게 이야기하듯 길게 써주세요.",
+  "summary": "5~7문장의 상세하고 자연스러운 아침 브리핑. 기사 내용을 구체적으로 풀어서 친한 친구에게 이야기하듯 써주세요.",
   "newsItems": [{"title":"제목","url":"https://...","source":"출처","snippet":"핵심 요약(80자이내)","publishedDate":"YYYY-MM-DD"}],
-  "aiInsight": "오늘 쓸모있는 팁 1~3개 (각 항목 '•'로 시작, 소식과 관련된 실용적 조언)",
+  "aiInsight": "오늘 일정에 참고할 실용적인 팁 1~2개 (각 항목 '•'로 시작)",
   "weatherNote": "날씨 정보 또는 null",
   "festivalNote": "행사/축제 정보 또는 null",
   "keywordTags": ["#전주", "#태그"]
@@ -884,11 +884,11 @@ function buildSystemPrompt(
 
 규칙:
 - summary 첫 문장: "안녕하세요! 나들AI예요 ☀️ 어제 전주에서 있었던 일들을 알려드릴게요~" 로 시작
-- 이후 7~10문장으로 어제의 핵심 소식을 아주 구체적이고 길게 브리핑. 기사의 단편적인 제목만 나열하지 말고, 본문의 상세 내용을 포함하여 스토리를 엮어주세요.
+- 이후 4~6문장으로 어제의 핵심 소식을 구체적으로 브리핑. 기사의 단순 나열을 피하고 자연스러운 흐름으로 설명.
 - 마지막 문장은 오늘 하루를 응원하는 따뜻한 마무리.
 - '핵심상황:', '오늘영향:', '체크포인트' 같은 딱딱한 라벨 절대 금지.
-- newsItems: 최대 6개, 실제 URL만. snippet은 기사 핵심을 구체적으로 80자 이내로.
-- aiInsight: 어제 소식과 관련된 실용적 팁 1~3개. "•" 로 시작. 예: "• 예수병원 근처 방문 예정이라면 새 주차장을 활용해보세요"
+- newsItems: 최대 6개, 실제 URL만. snippet은 구체적으로 80자 이내.
+- aiInsight: 어제 소식과 관련된 실용적 팁 1~2개. "•" 로 시작. 예: "• 방문 전 운영시간을 꼭 확인하세요."
 - 검색 결과가 부족하면 솔직하게 "어제는 특별한 새 소식이 많지 않았어요" 라고 자연스럽게.
 - 지어내기 금지. null은 null로 (빈 문자열 금지).
 - JSON 외 텍스트 출력 금지.`
@@ -900,9 +900,9 @@ Return ONLY pure JSON. No markdown, no code blocks, no extra text.
 
 {
   "headline": "Friendly one-line title about yesterday's Jeonju news (under 35 chars)",
-  "summary": "7-10 sentence highly detailed and warm morning briefing, covering each story with specific facts (causes, results, places) like telling a friend a full story.",
+  "summary": "5-7 sentence detailed and warm morning briefing, covering each story naturally like telling a friend.",
   "newsItems": [{"title":"Title","url":"https://...","source":"Source","snippet":"Specific summary of the article (under 80 chars)","publishedDate":"YYYY-MM-DD"}],
-  "aiInsight": "1-3 practical tips related to yesterday's news, each starting with '•'",
+  "aiInsight": "1-2 practical tips related to yesterday's news, each starting with '•'",
   "weatherNote": "Weather info or null",
   "festivalNote": "Event/festival info or null",
   "keywordTags": ["#Jeonju", "#tag"]
@@ -910,11 +910,11 @@ Return ONLY pure JSON. No markdown, no code blocks, no extra text.
 
 Rules:
 - summary must start with: "Hi there! It's NadeulAI ☀️ Let me catch you up on what happened in Jeonju yesterday~"
-- Follow with 6-9 sentences covering each key story in deep detail. Do not just list titles; weave the article contents into a rich narrative.
+- Follow with 4-6 sentences detailing the key stories with smooth transitions.
 - End with a warm, encouraging closing line for today.
 - NO rigid labels like "Core:", "Impact:", "Checklist:".
-- newsItems: max 6, real URLs only. Snippets should be specific and informative (up to 80 chars).
-- aiInsight: 1-3 practical tips tied to the news. E.g. "• If visiting Yesu Hospital area, try the new parking garage"
+- newsItems: max 6, real URLs only. Snippets up to 80 chars.
+- aiInsight: 1-2 practical tips tied to the news. E.g. "• Verify operating hours before visiting."
 - If search results are thin, honestly say "there weren't many notable updates yesterday".
 - Never fabricate. Use null for missing fields (not empty strings).
 - Output NOTHING besides valid JSON.`
@@ -1071,24 +1071,7 @@ function normalizeNewsItemsForBriefing(
   return normalized
 }
 
-function isGenericSummaryText(summary: string, locale: JeonjuBriefingLocale) {
-  const normalized = summary.replace(/\s+/g, " ").trim()
-  if (!normalized) return true
-  const genericKo = [
-    "확인 가능한 전주 관련 업데이트",
-    "생활 동선에 영향을 줄 수 있는 공지",
-    "링크된 원문 기준으로",
-    "신규 보도가 제한적",
-  ]
-  const genericEn = [
-    "verifiable Jeonju updates",
-    "priority is given to notices",
-    "double-check",
-    "verified updates were limited",
-  ]
-  const matched = (locale === "ko" ? genericKo : genericEn).some((token) => normalized.includes(token))
-  return matched
-}
+
 
 function buildNarrativeSummary(
   locale: JeonjuBriefingLocale,
@@ -1250,8 +1233,7 @@ function buildFinalBriefing(
 
   newsItems = normalizeNewsItemsForBriefing(newsItems, dateStr)
 
-  const shouldOverrideSummary = !parsed.summary || isGenericSummaryText(parsed.summary, locale)
-  if (shouldOverrideSummary) {
+  if (!summary) {
     summary = buildNarrativeSummary(locale, dateLabel, newsItems)
   }
 
