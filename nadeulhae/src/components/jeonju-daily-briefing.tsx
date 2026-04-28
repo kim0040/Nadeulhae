@@ -53,7 +53,7 @@ type IssueCategory = "safety" | "governance" | "culture" | "economy" | "lifestyl
 
 const RETRY_MAX = 3
 const RETRY_DELAY_MS = 1000
-const LOCAL_BRIEFING_CACHE_PREFIX = "nadeul:jeonju:briefing"
+const LOCAL_BRIEFING_CACHE_PREFIX = "nadeul:jeonju:briefing:v2"
 
 type LocalBriefingCacheEntry = {
   data: BriefingData

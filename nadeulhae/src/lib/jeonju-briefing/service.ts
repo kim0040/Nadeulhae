@@ -12,6 +12,7 @@ export type JeonjuBriefingLocale = "ko" | "en"
 interface GenerateBriefingOptions {
   locale?: JeonjuBriefingLocale
   forceRefresh?: boolean
+  skipMemoryCache?: boolean
 }
 
 interface BriefingGenerationResult {
@@ -667,12 +668,16 @@ function extractJsonFromResponse(content: string): string | null {
 export async function generateJeonjuBriefing(
   options: GenerateBriefingOptions = {}
 ): Promise<BriefingGenerationResult> {
-  const { locale = "ko", forceRefresh = false } = options
+  const {
+    locale = "ko",
+    forceRefresh = false,
+    skipMemoryCache = false,
+  } = options
   const yesterdayDate = getYesterdayInKst()
   const cacheKey = getBriefingCacheKey(yesterdayDate, locale)
 
   // 1. Check in-memory cache first (per process, fast-path).
-  if (!forceRefresh) {
+  if (!forceRefresh && !skipMemoryCache) {
     const memoryCached = getCachedBriefingFromMemory(cacheKey)
     if (memoryCached) {
       return { fromCache: true, data: memoryCached }
