@@ -10,7 +10,7 @@ import {
   clearAuthCookie,
   getAuthenticatedSessionFromRequest,
 } from "@/lib/auth/session"
-import { FactChatError, createFactChatCompletion } from "@/lib/chat/factchat"
+import { NanoGptChatError, createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
 import { reserveUserActionDailyRequest } from "@/lib/llm/quota"
 import { buildLabCardAutofillPrompts } from "@/lib/lab/prompt"
 import type { LabLocale } from "@/lib/lab/types"
@@ -261,7 +261,7 @@ async function handlePOST(request: NextRequest) {
         exampleLanguage,
       })
 
-      const completion = await createFactChatCompletion({
+      const completion = await createNanoGptChatCompletion({
         requestKind: "chat",
         messages: [
           { role: "system", content: prompts.systemPrompt },
@@ -295,7 +295,7 @@ async function handlePOST(request: NextRequest) {
         authenticatedSession
       )
     } catch (error) {
-      if (error instanceof FactChatError) {
+      if (error instanceof NanoGptChatError) {
         if (error.statusCode === 429 && error.code === "global_daily_limit_reached") {
           return attachRefreshedAuthCookie(
             createAuthJsonResponse(
