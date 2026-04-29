@@ -235,7 +235,7 @@ export function Navbar() {
 
             <button
               type="button"
-              onClick={() => setLanguage(language === "ko" ? "en" : "ko")}
+              onClick={() => { const cycle = ["ko","en","zh","ja"] as const; const idx = cycle.indexOf(language as any); setLanguage((cycle[(idx+1)%4] ?? "ko") as any) }}
               className="flex items-center gap-1 p-1.5 text-[11px] font-black text-neutral-500 transition-all hover:text-sky-blue sm:p-2 sm:text-xs md:text-[13px]"
             >
               <Languages size={16} className="sm:size-[17px]" />
