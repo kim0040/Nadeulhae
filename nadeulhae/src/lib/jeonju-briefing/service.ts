@@ -401,7 +401,7 @@ function pickDiverseTopResults(items: SearchResultItem[], limit: number) {
   const increment = (trackKey: string) => {
     trackCounts.set(trackKey, (trackCounts.get(trackKey) ?? 0) + 1)
   }
-  const canPick = (trackKey: string) => (trackCounts.get(trackKey) ?? 0) < 3
+  const canPick = (trackKey: string) => (trackCounts.get(trackKey) ?? 0) < 4
 
   for (const track of prioritizedTracks) {
     const index = items.findIndex((item, idx) => !consumed.has(idx) && item.trackKey === track && canPick(item.trackKey))
@@ -628,7 +628,7 @@ async function executeMultiSearch(dateStr: string, locale: JeonjuBriefingLocale)
   }
 
   const ranked = [...selectedByUrl.values()].sort((a, b) => b.weightedScore - a.weightedScore)
-  const allResults = pickDiverseTopResults(ranked, 10)
+  const allResults = pickDiverseTopResults(ranked, 15)
 
   return {
     results: allResults,
@@ -1052,7 +1052,7 @@ function buildSearchContext(
 
   if (results.length > 0) {
     lines.push(`[Results: ${results.length}]`)
-    results.slice(0, 10).forEach((r, i) => {
+    results.slice(0, 15).forEach((r, i) => {
       lines.push(
         `${i + 1}. ${r.title}` +
         `\n   ${r.source} | ${r.publishedDate || "date unknown"}` +
@@ -1096,7 +1096,7 @@ function buildSystemPrompt(
 - 이후 4~6문장으로 어제의 핵심 소식을 구체적으로 브리핑. 기사의 단순 나열을 피하고 자연스러운 흐름으로 설명.
 - 마지막 문장은 오늘 하루를 응원하는 따뜻한 마무리.
 - '핵심상황:', '오늘영향:', '체크포인트' 같은 딱딱한 라벨 절대 금지.
-- newsItems: 최대 6개, 실제 URL만. snippet은 구체적으로 80자 이내.
+- newsItems: 최대 10개, 실제 URL만. snippet은 구체적으로 80자 이내.
 - aiInsight: 어제 소식과 관련된 실용적 팁 1~2개. "•" 로 시작. 예: "• 방문 전 운영시간을 꼭 확인하세요."
 - 검색 결과가 부족하면 솔직하게 "어제는 특별한 새 소식이 많지 않았어요" 라고 자연스럽게.
 - 지어내기 금지. null은 null로 (빈 문자열 금지).
@@ -1122,7 +1122,7 @@ Rules:
 - Follow with 4-6 sentences detailing the key stories with smooth transitions.
 - End with a warm, encouraging closing line for today.
 - NO rigid labels like "Core:", "Impact:", "Checklist:".
-- newsItems: max 6, real URLs only. Snippets up to 80 chars.
+- newsItems: max 10, real URLs only. Snippets up to 80 chars.
 - aiInsight: 1-2 practical tips tied to the news. E.g. "• Verify operating hours before visiting."
 - If search results are thin, honestly say "there weren't many notable updates yesterday".
 - Never fabricate. Use null for missing fields (not empty strings).
@@ -1274,7 +1274,7 @@ function normalizeNewsItemsForBriefing(
 
     if (isLowUtilityNewsItem(nextItem, targetDate)) continue
     normalized.push(nextItem)
-    if (normalized.length >= 6) break
+    if (normalized.length >= 10) break
   }
 
   return normalized
@@ -1417,7 +1417,7 @@ function buildFinalBriefing(
       resultMap.set(key, r)
     }
     // Match each LLM news item to a real search result for valid URLs
-    newsItems = parsed.newsItems.slice(0, 10).map((item) => {
+    newsItems = parsed.newsItems.slice(0, 15).map((item) => {
       let matchedUrl = item.url
       let matchedSource = item.source
       // Try exact title match first
@@ -1448,7 +1448,7 @@ function buildFinalBriefing(
       }
     })
   } else if (searchResults.length > 0) {
-    newsItems = searchResults.slice(0, 10).map((r) => ({
+    newsItems = searchResults.slice(0, 15).map((r) => ({
       title: r.title,
       url: r.url,
       source: r.source || extractDomain(r.url) || "링크",
@@ -1468,7 +1468,7 @@ function buildFinalBriefing(
       (r) => r.title.includes("전주") || r.title.includes("Jeonju") || r.content.includes("전주") || r.content.includes("Jeonju")
     )
     if (filtered.length >= 2) {
-      newsItems = filtered.slice(0, 10).map((r) => ({
+      newsItems = filtered.slice(0, 15).map((r) => ({
         title: r.title,
         url: r.url,
         source: r.source || extractDomain(r.url) || "링크",
@@ -1505,7 +1505,7 @@ function buildFinalBriefing(
     aiInsight: cleanNullable(parsed.aiInsight) ?? defaultInsight,
     weatherNote: cleanNullable(parsed.weatherNote),
     festivalNote: cleanNullable(parsed.festivalNote),
-    keywordTags: parsed.keywordTags.length > 0 ? parsed.keywordTags.slice(0, 6) : defaultTags,
+    keywordTags: parsed.keywordTags.length > 0 ? parsed.keywordTags.slice(0, 8) : defaultTags,
     modelUsed,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
