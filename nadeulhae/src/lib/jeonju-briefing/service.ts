@@ -211,9 +211,14 @@ const OFFICIAL_JEONJU_DOMAINS = [
 
 const LOCAL_UTILITY_DOMAINS = [
   ...OFFICIAL_JEONJU_DOMAINS,
+  "jeonbuk.go.kr",
   "jjan.kr",
   "domin.co.kr",
   "jjn.co.kr",
+  "sjbnews.com",
+  "jbnews.com",
+  "jeonbukilbo.co.kr",
+  "jeollailbo.com",
   "nocutnews.co.kr",
   "yna.co.kr",
   "yonhapnews.co.kr",
@@ -698,9 +703,9 @@ export async function generateJeonjuBriefing(
           keywordTags: result.keywordTags,
           searchQuery: plannedQueries,
           modelUsed: result.modelUsed,
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0,
+          promptTokens: result.tokenUsage?.promptTokens ?? 0,
+          completionTokens: result.tokenUsage?.completionTokens ?? 0,
+          totalTokens: result.tokenUsage?.totalTokens ?? 0,
         })
         console.log(`[jeonju-briefing] Saved briefing for ${yesterdayDate} (${locale})`)
       } catch (saveError) {
@@ -766,7 +771,7 @@ export async function generateJeonjuBriefing(
 export async function fetchAndSummarize(
   dateStr: string,
   locale: JeonjuBriefingLocale
-): Promise<JeonjuBriefingData> {
+): Promise<JeonjuBriefingData & { tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
   const dateLabel = getFormattedDateLabel(dateStr, locale)
   const relativeLabel = getRelativeDayLabel(dateStr, locale)
 
@@ -784,6 +789,11 @@ export async function fetchAndSummarize(
   // 4. Call NanoGPT LLM
   let completionContent: string
   let modelUsed: string | null = null
+  let tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } = {
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+  }
   try {
     const completion = await createNanoGptChatCompletion({
       messages: [
@@ -796,7 +806,12 @@ export async function fetchAndSummarize(
     })
     completionContent = completion.content
     modelUsed = completion.resolvedModel
-    console.log(`[jeonju-briefing] LLM response: ${completionContent.slice(0, 100)}...`)
+    tokenUsage = {
+      promptTokens: completion.usage.promptTokens ?? 0,
+      completionTokens: completion.usage.completionTokens ?? 0,
+      totalTokens: completion.usage.totalTokens ?? 0,
+    }
+    console.log(`[jeonju-briefing] LLM response: ${completionContent.slice(0, 100)}... (tokens: ${tokenUsage.totalTokens})`)
   } catch (llmError) {
     console.error("[jeonju-briefing] LLM failed, using partial fallback:", llmError)
     return buildPartialBriefing(dateStr, locale, allResults, null)
@@ -827,7 +842,7 @@ export async function fetchAndSummarize(
   }
 
   // 6. Normalize & build final result
-  return buildFinalBriefing(dateStr, locale, allResults, parsed, modelUsed)
+  return buildFinalBriefing(dateStr, locale, allResults, parsed, modelUsed, tokenUsage)
 }
 
 // ------------------------------------------------------------------
@@ -1184,8 +1199,9 @@ function buildFinalBriefing(
   locale: JeonjuBriefingLocale,
   searchResults: SearchResultItem[],
   parsed: ParsedBriefing,
-  modelUsed: string | null
-): JeonjuBriefingData {
+  modelUsed: string | null,
+  tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number }
+): JeonjuBriefingData & { tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } } {
   const dateLabel = getFormattedDateLabel(dateStr, locale)
   const isKo = locale === "ko"
 
@@ -1267,6 +1283,7 @@ function buildFinalBriefing(
     modelUsed,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    tokenUsage,
   }
 }
 
