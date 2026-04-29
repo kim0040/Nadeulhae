@@ -623,6 +623,17 @@ function getWhoThermalLevel(feelsLike: number): ThermalLevel {
   return "danger"
 }
 
+let _lastFetchErrorKey = ""
+
+function logFetchError(label: string, err: unknown) {
+  const msg = err instanceof Error ? err.message.slice(0, 100) : String(err).slice(0, 100)
+  const key = `${label}:${msg}`
+  if (key !== _lastFetchErrorKey) {
+    _lastFetchErrorKey = key
+    console.error(label, msg)
+  }
+}
+
 async function fetchJsonSafely(url: string) {
   try {
     const response = await fetch(url, { cache: "no-store" })
@@ -635,7 +646,7 @@ async function fetchJsonSafely(url: string) {
       return null
     }
   } catch (error) {
-    console.error("External fetch failed:", error)
+    logFetchError("External JSON fetch failed:", error)
     return null
   }
 }
@@ -646,7 +657,7 @@ async function fetchTextSafely(url: string) {
     if (!response.ok) return ""
     return await response.text()
   } catch (error) {
-    console.error("External text fetch failed:", error)
+    logFetchError("External text fetch failed:", error)
     return ""
   }
 }

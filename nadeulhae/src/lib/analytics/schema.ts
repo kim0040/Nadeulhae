@@ -129,8 +129,7 @@ export async function ensureAnalyticsSchema() {
   })()
 
   globalThis.__nadeulhaeAnalyticsSchemaPromise = bootstrapPromise.catch((error) => {
-    globalThis.__nadeulhaeAnalyticsSchemaPromise = undefined
-    throw error
+    console.error("[analytics-schema] Bootstrap failed:", error.message ?? error)
   })
 
   return globalThis.__nadeulhaeAnalyticsSchemaPromise

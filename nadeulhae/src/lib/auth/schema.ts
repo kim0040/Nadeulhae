@@ -612,8 +612,7 @@ export async function ensureAuthSchema() {
   })()
 
   globalThis.__nadeulhaeAuthSchemaPromise = bootstrapPromise.catch((error) => {
-    globalThis.__nadeulhaeAuthSchemaPromise = undefined
-    throw error
+    console.error("[auth-schema] Bootstrap failed:", error.message ?? error)
   })
 
   return globalThis.__nadeulhaeAuthSchemaPromise
