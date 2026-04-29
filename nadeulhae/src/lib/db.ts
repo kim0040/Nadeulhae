@@ -80,6 +80,7 @@ export function getDbPool() {
     connectionLimit: isProduction ? connectionLimit : Math.max(2, connectionLimit),
     queueLimit: isProduction ? 0 : 100,
     enableKeepAlive: true,
+    connectTimeout: 10000,
   }
 
   globalThis.__nadeulhaeDbPool = mysql.createPool(config)

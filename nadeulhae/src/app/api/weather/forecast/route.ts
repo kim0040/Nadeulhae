@@ -162,9 +162,14 @@ async function fetchJsonSafely(url: string) {
     if (!response.ok) return null
     const text = await response.text()
     if (!text || text.trim().startsWith("<")) return null
-    return JSON.parse(text)
+    try {
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
   } catch (error) {
-    console.error("Forecast fetch failed:", error)
+    const msg = error instanceof Error ? error.message.slice(0, 80) : String(error).slice(0, 80)
+    console.error("Forecast fetch failed:", msg)
     return null
   }
 }

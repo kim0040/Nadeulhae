@@ -176,8 +176,7 @@ export async function ensureForecastLocationRepositoryReady() {
   })()
 
   globalThis.__nadeulhaeForecastLocationBootstrapPromise = bootstrapPromise.catch((error) => {
-    globalThis.__nadeulhaeForecastLocationBootstrapPromise = undefined
-    throw error
+    console.error("[forecast-location] Bootstrap failed:", error.message ?? error)
   })
 
   return globalThis.__nadeulhaeForecastLocationBootstrapPromise
