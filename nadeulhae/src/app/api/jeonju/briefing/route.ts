@@ -145,9 +145,10 @@ function createRateLimitResponse(locale: JeonjuBriefingLocale, retryAfterSeconds
 
 function getYesterdayInKst(): string {
   const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
-  const yesterday = new Date(kstNow)
-  yesterday.setDate(yesterday.getDate() - 1)
-  return yesterday.toISOString().slice(0, 10)
+  // Day boundary is 07:00 KST, not midnight
+  const offset = kstNow.getHours() < 7 ? 2 : 1
+  kstNow.setDate(kstNow.getDate() - offset)
+  return kstNow.toISOString().slice(0, 10)
 }
 
 function isRecentlyUpdated(updatedAt: string, nowMs: number, minIntervalMs: number) {
