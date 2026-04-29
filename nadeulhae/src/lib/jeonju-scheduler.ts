@@ -49,18 +49,38 @@ async function generateForToday(): Promise<void> {
   try {
     console.log(`[jeonju-scheduler] Starting auto-generation for ${dateStr}...`)
 
-    // Generate Korean first, then translate to English for consistency
+    // 1. Generate Korean first (Tavily search + LLM)
     const ko = await generateJeonjuBriefing({ locale: "ko", forceRefresh: true, skipMemoryCache: true })
-    const en = await generateJeonjuBriefing({
-      locale: "en",
-      forceRefresh: true,
-      skipMemoryCache: true,
-      koreanBriefing: ko.data,
-    })
+
+    // 2. Translate to other languages sequentially with delays
+    const translations: Array<{ locale: "en" | "zh" | "ja"; delayMs: number }> = [
+      { locale: "en", delayMs: 3000 },
+      { locale: "zh", delayMs: 8000 },
+      { locale: "ja", delayMs: 8000 },
+    ]
+
+    let enItems = 0, zhItems = 0, jaItems = 0
+    for (const { locale, delayMs } of translations) {
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+      try {
+        const result = await generateJeonjuBriefing({
+          locale,
+          forceRefresh: true,
+          skipMemoryCache: true,
+          koreanBriefing: ko.data,
+        })
+        if (locale === "en") enItems = result.data.newsItems.length
+        if (locale === "zh") zhItems = result.data.newsItems.length
+        if (locale === "ja") jaItems = result.data.newsItems.length
+        console.log(`[jeonju-scheduler] ${locale} translation done: ${result.data.newsItems.length} items`)
+      } catch (err) {
+        console.warn(`[jeonju-scheduler] ${locale} translation failed:`, err instanceof Error ? err.message : err)
+      }
+    }
 
     console.log(
       `[jeonju-scheduler] Auto-generation complete for ${dateStr}. ` +
-      `ko: ${ko.data.newsItems.length} items, en: ${en.data.newsItems.length} items`
+      `ko:${ko.data.newsItems.length} en:${enItems} zh:${zhItems} ja:${jaItems}`
     )
 
     _lastGeneratedDate = todayDate

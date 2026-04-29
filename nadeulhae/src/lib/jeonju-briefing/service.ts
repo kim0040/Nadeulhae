@@ -7,7 +7,7 @@ import {
 import { createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
 import { saveJeonjuBriefing, getJeonjuBriefingByDateAndLocale, type JeonjuBriefingData } from "./repository"
 
-export type JeonjuBriefingLocale = "ko" | "en"
+export type JeonjuBriefingLocale = "ko" | "en" | "zh" | "ja"
 
 interface GenerateBriefingOptions {
   locale?: JeonjuBriefingLocale
@@ -829,9 +829,20 @@ export async function fetchAndSummarize(
   const dateLabel = getFormattedDateLabel(dateStr, locale)
   const relativeLabel = getRelativeDayLabel(dateStr, locale)
 
-  // English mode: translate Korean briefing instead of generating independently
-  if (locale === "en" && koreanBriefing) {
-    return translateBriefingToEnglish(dateStr, koreanBriefing)
+  // Non-Korean mode: translate Korean briefing via LLM
+  if (locale !== "ko") {
+    // Use provided Korean briefing or try to fetch from DB cache
+    const koSource = koreanBriefing ?? await getJeonjuBriefingByDateAndLocale(dateStr, "ko").catch(() => null)
+    if (koSource && koSource.newsItems.length > 0) {
+      return translateBriefing(dateStr, locale, koSource)
+    }
+    // No Korean source available — generate Korean first, then translate
+    if (!koreanBriefing) {
+      const ko = await generateJeonjuBriefing({ locale: "ko", forceRefresh: false })
+      if (ko.data.newsItems.length > 0) {
+        return translateBriefing(dateStr, locale, ko.data)
+      }
+    }
   }
 
   // 1. Run Tavily searches
@@ -922,10 +933,13 @@ export async function fetchAndSummarize(
  * This ensures consistent content between ko/en versions
  * instead of independently generating both from search results.
  */
-async function translateBriefingToEnglish(
+async function translateBriefing(
   dateStr: string,
+  locale: JeonjuBriefingLocale,
   koreanBriefing: JeonjuBriefingData
 ): Promise<JeonjuBriefingData & { tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+  const langNames: Record<string, string> = { en: "English", zh: "Chinese", ja: "Japanese" }
+  const targetLang = langNames[locale] || "English"
   const koContent = JSON.stringify({
     headline: koreanBriefing.headline,
     summary: koreanBriefing.summary,
@@ -938,22 +952,22 @@ async function translateBriefingToEnglish(
     keywordTags: koreanBriefing.keywordTags,
   })
 
-  const systemPrompt = `You are a professional Korean-to-English translator for a Jeonju local news briefing.
-Translate the given Korean JSON content into natural, fluent English.
+  const systemPrompt = `You are a professional Korean-to-${targetLang} translator for a Jeonju local news briefing.
+Translate the given Korean JSON content into natural, fluent ${targetLang}.
 Keep the same JSON structure and field names.
 Maintain a warm, friendly tone similar to the Korean original.
 Do NOT add or remove any information. Translate faithfully.
 
 Return ONLY valid JSON with these fields:
 {
-  "headline": "English headline (concise, under 80 chars)",
-  "summary": "English summary preserving the friendly intro greeting style",
+  "headline": "${targetLang} headline (concise, under 80 chars)",
+  "summary": "${targetLang} summary preserving the friendly intro greeting style",
   "newsItems": [{"title": "...", "snippet": "...", "source": "..."}],
   "aiInsight": "Translated insight or null",
   "keywordTags": ["translated tags"]
 }`
 
-  const userPrompt = `Translate this Korean Jeonju briefing to English:\n\n${koContent}`
+  const userPrompt = `Translate this Korean Jeonju briefing to ${targetLang}:\n\n${koContent}`
 
   let modelUsed: string | null = null
   let tokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
@@ -983,7 +997,7 @@ Return ONLY valid JSON with these fields:
     if (parsed?.summary) {
       return {
         briefingDate: dateStr,
-        locale: "en",
+        locale,
         headline: parsed.headline || koreanBriefing.headline,
         summary: ensureFriendlyIntro(parsed.summary.replace(/[\x00-\x1f]/g, " "), "en"),
         newsItems: parsed.newsItems?.length > 0
@@ -1005,7 +1019,7 @@ Return ONLY valid JSON with these fields:
     // Fallback: use raw translation text as summary
     return {
       briefingDate: dateStr,
-      locale: "en",
+      locale,
       headline: koreanBriefing.headline,
       summary: ensureFriendlyIntro(
         (completion.content || "").replace(/[\x00-\x1f]/g, " ").slice(0, 1200),
@@ -1027,7 +1041,7 @@ Return ONLY valid JSON with these fields:
     // Fallback: serve Korean data as-is with English wrapper
     return {
       briefingDate: dateStr,
-      locale: "en",
+      locale,
       headline: koreanBriefing.headline,
       summary: ensureFriendlyIntro(
         "I've compiled the latest Jeonju updates for you. The original Korean briefing is provided below.",
