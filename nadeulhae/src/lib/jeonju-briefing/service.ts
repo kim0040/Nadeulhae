@@ -221,11 +221,10 @@ type SearchTrack = {
 const OFFICIAL_JEONJU_DOMAINS = [
   "jeonju.go.kr",
   "tour.jeonju.go.kr",
+  "jeonbuk.go.kr",
 ]
 
-const LOCAL_UTILITY_DOMAINS = [
-  ...OFFICIAL_JEONJU_DOMAINS,
-  "jeonbuk.go.kr",
+const LOCAL_NEWS_DOMAINS = [
   "jjan.kr",
   "domin.co.kr",
   "jjn.co.kr",
@@ -233,6 +232,32 @@ const LOCAL_UTILITY_DOMAINS = [
   "jbnews.com",
   "jeonbukilbo.co.kr",
   "jeollailbo.com",
+  "jeonmin.co.kr",
+  "jeonbuktoday.com",
+  "jbsori.com",
+]
+
+const LOCAL_BROADCAST_DOMAINS = [
+  "jmbc.co.kr",
+  "jtv.co.kr",
+]
+
+const LOCAL_CULTURE_DOMAINS = [
+  "jfac.or.kr",
+  "jjcf.or.kr",
+]
+
+const LOCAL_EDUCATION_DOMAINS = [
+  "jbnu.ac.kr",
+  "jj.ac.kr",
+]
+
+const LOCAL_UTILITY_DOMAINS = [
+  ...OFFICIAL_JEONJU_DOMAINS,
+  ...LOCAL_NEWS_DOMAINS,
+  ...LOCAL_BROADCAST_DOMAINS,
+  ...LOCAL_CULTURE_DOMAINS,
+  ...LOCAL_EDUCATION_DOMAINS,
   "nocutnews.co.kr",
   "yna.co.kr",
   "yonhapnews.co.kr",
