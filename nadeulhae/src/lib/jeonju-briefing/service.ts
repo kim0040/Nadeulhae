@@ -177,6 +177,20 @@ function setCachedBriefingToMemory(cacheKey: string, data: JeonjuBriefingData) {
   cleanupBriefingMemoryCache(nowMs)
 }
 
+function clearCachedBriefingFromMemory(cacheKey: string) {
+  getBriefingMemoryCacheMap().delete(cacheKey)
+}
+
+function clearAutoGenerationBlock(cacheKey: string) {
+  getAttemptMap().delete(cacheKey)
+}
+
+export function purgeJeonjuBriefingCache(dateStr: string, locale: JeonjuBriefingLocale) {
+  const cacheKey = getBriefingCacheKey(dateStr, locale)
+  clearCachedBriefingFromMemory(cacheKey)
+  clearAutoGenerationBlock(cacheKey)
+}
+
 // ------------------------------------------------------------------
 // Tavily Search Types
 // ------------------------------------------------------------------
@@ -400,11 +414,11 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
       },
       {
         key: "city-hall",
-        query: `전주시청 보도자료 공지 행사 안내 ${dateStr}`,
+        query: `전주시청 전라북도 보도자료 공지 행사 안내 ${dateStr}`,
         topic: "general",
         searchDepth: "basic",
         timeRange: "week",
-        includeDomains: OFFICIAL_JEONJU_DOMAINS,
+        includeDomains: [...OFFICIAL_JEONJU_DOMAINS, "jeonbuk.go.kr"],
         excludeDomains: NOISE_DOMAINS,
         country: "south korea",
       },
@@ -421,10 +435,10 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
   }
 
   return [
-    {
-      key: "local-news",
-      query: `Jeonju yesterday news updates traffic events ${dateStr}`,
-      topic: "news",
+      {
+        key: "local-news",
+        query: `Jeonju latest news local events traffic updates yesterday ${dateStr}`,
+        topic: "news",
       searchDepth: "basic",
       timeRange: "week",
       includeDomains: LOCAL_UTILITY_DOMAINS,
@@ -432,16 +446,16 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
       includeAnswer: "advanced",
       country: "south korea",
     },
-    {
-      key: "city-hall",
-      query: `Jeonju city hall official notice press release ${dateStr}`,
-      topic: "general",
-      searchDepth: "basic",
-      timeRange: "week",
-      includeDomains: OFFICIAL_JEONJU_DOMAINS,
-      excludeDomains: NOISE_DOMAINS,
-      country: "south korea",
-    },
+      {
+        key: "city-hall",
+        query: `Jeonju city hall press release official notice announcement ${dateStr}`,
+        topic: "general",
+        searchDepth: "basic",
+        timeRange: "week",
+        includeDomains: [...OFFICIAL_JEONJU_DOMAINS, "jeonbuk.go.kr"],
+        excludeDomains: NOISE_DOMAINS,
+        country: "south korea",
+      },
     {
       key: "events",
       query: `Jeonju festival event traffic safety update ${dateStr}`,

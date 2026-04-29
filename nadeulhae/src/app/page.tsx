@@ -21,6 +21,7 @@ import { Particles } from "@/components/magicui/particles"
 import { Meteors } from "@/components/magicui/meteors"
 import { WordPullUp } from "@/components/magicui/word-pull-up"
 import { ShineBorder } from "@/components/magicui/shine-border"
+import { MagicCard } from "@/components/ui/magic-card"
 import type { HourlyForecastItem } from "@/components/today-hourly-forecast"
 import type { WeatherImageData } from "@/components/weather-image-panel"
 
@@ -273,6 +274,7 @@ export default function Home() {
             className="text-4xl sm:text-5xl md:text-7xl text-sky-blue px-4 font-black tracking-tight"
           />
 
+          <MagicCard className="rounded-full" gradientFrom={scoreColors.primary} gradientTo={scoreColors.secondary}>
           <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card shadow-2xl transition-all hover:scale-105 duration-500" style={!enableAnimations ? { boxShadow: `0 0 24px 2px ${scoreColors.primary}40, 0 0 0 3px ${scoreColors.primary}` } : undefined}>
             {enableAnimations && <ShineBorder shineColor={[scoreColors.primary, scoreColors.secondary, "#ffffff"]} duration={10} borderWidth={2} className="rounded-full" />}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
@@ -294,6 +296,7 @@ export default function Home() {
               )}
             </div>
           </div>
+          </MagicCard>
 
           <div className="flex flex-wrap items-start justify-center gap-y-12 sm:gap-10 mt-12 text-foreground w-full max-w-4xl mx-auto px-4">
             {quickMetrics.map((item) => (

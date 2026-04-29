@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { withApiAnalytics } from "@/lib/analytics/route"
 import { ensureJeonjuBriefingSchema } from "@/lib/jeonju-briefing/schema"
-import { generateJeonjuBriefing } from "@/lib/jeonju-briefing/service"
-import { getJeonjuBriefingByDateAndLocale } from "@/lib/jeonju-briefing/repository"
+import { generateJeonjuBriefing, purgeJeonjuBriefingCache } from "@/lib/jeonju-briefing/service"
+import { getJeonjuBriefingByDateAndLocale, deleteJeonjuBriefingsForDate } from "@/lib/jeonju-briefing/repository"
 import type { JeonjuBriefingLocale } from "@/lib/jeonju-briefing/service"
 
 export const runtime = "nodejs"
@@ -172,8 +172,26 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
   const forceRequested = searchParams.get("force") === "true"
   const warmAll = searchParams.get("warm_all") === "true"
   const refresh = searchParams.get("refresh") === "true"
+  const purgeRequested = searchParams.get("purge") === "true"
   const nowMs = Date.now()
   const briefingDate = getYesterdayInKst()
+
+  // Purge: clear all cached data (DB + memory + failure blocks) for fresh regeneration
+  if (purgeRequested) {
+    try {
+      const targetLocale = warmAll ? undefined : locale
+      await deleteJeonjuBriefingsForDate(briefingDate, targetLocale)
+      if (warmAll) {
+        purgeJeonjuBriefingCache(briefingDate, "ko")
+        purgeJeonjuBriefingCache(briefingDate, "en")
+      } else {
+        purgeJeonjuBriefingCache(briefingDate, locale)
+      }
+      // Fall through to generate fresh briefing with force=true
+    } catch (purgeError) {
+      console.warn("[api/jeonju/briefing] Cache purge failed:", purgeError)
+    }
+  }
 
   if (forceRequested) {
     try {
@@ -218,7 +236,7 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
     }
   }
 
-  const force = forceRequested
+  const force = forceRequested || purgeRequested
 
   if (force || warmAll) {
     const clientKey = getClientKey(request)
