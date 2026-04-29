@@ -1,13 +1,42 @@
+/**
+ * Animated Circular Progress Bar — an SVG-based circular gauge component.
+ *
+ * Renders a ring with two overlapping arcs:
+ *   1. A background (secondary color) arc showing the "remaining" portion
+ *   2. A foreground (primary color) arc showing the current progress
+ *
+ * The animation is driven by CSS custom properties and transitions,
+ * using stroke-dasharray manipulation on SVG circles. The gauge
+ * smoothly interpolates between values via CSS transition.
+ *
+ * @example
+ * <AnimatedCircularProgressBar
+ *   value={75}
+ *   max={100}
+ *   gaugePrimaryColor="#22c55e"
+ *   gaugeSecondaryColor="#e5e7eb"
+ * />
+ */
+
 import { cn } from "@/lib/utils"
 
 interface AnimatedCircularProgressBarProps {
   max?: number
   min?: number
+  /** Current progress value (between min and max) */
   value: number
+  /** Color of the progress arc */
   gaugePrimaryColor: string
+  /** Color of the background arc */
   gaugeSecondaryColor: string
   className?: string
 }
+
+/**
+ * SVG circle circumference (radius = 45).
+ * Used as the total dasharray length for the gauge ring.
+ */
+const circumference = 2 * Math.PI * 45
 
 export function AnimatedCircularProgressBar({
   max = 100,

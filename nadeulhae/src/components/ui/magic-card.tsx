@@ -1,5 +1,22 @@
 "use client"
 
+/**
+ * Magic Card — a spotlight-glow hover effect component.
+ *
+ * Uses framer-motion to track the pointer position and render a
+ * radial gradient that follows the mouse cursor. When the pointer
+ * leaves the card, the gradient resets to an off-screen position.
+ *
+ * The component has two visual layers stacked via z-index:
+ *   1. A background radial gradient (visible immediately)
+ *   2. A foreground glow overlay (fades in on hover, z-30)
+ *
+ * @example
+ * <MagicCard gradientFrom="#ff6b6b" gradientTo="#ffd93d">
+ *   <p>Hover over me for a glow effect</p>
+ * </MagicCard>
+ */
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   motion,
@@ -11,18 +28,29 @@ import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
 
+/** Props for the MagicCard component. */
 interface MagicCardBaseProps {
   children?: React.ReactNode
   className?: string
+  /** Diameter of the radial gradient spotlight in pixels */
   gradientSize?: number
+  /** Foreground glow color (hex/rgb) */
   gradientColor?: string
+  /** Opacity of the foreground glow overlay (0–1) */
   gradientOpacity?: number
+  /** Start color for the background gradient */
   gradientFrom?: string
+  /** End color for the background gradient */
   gradientTo?: string
 }
 
 type MagicCardProps = MagicCardBaseProps
 
+/**
+ * A card with a mouse-following gradient glow effect.
+ * The gradient position is driven by `useMotionValue` which tracks
+ * the pointer position relative to the card's bounding rectangle.
+ */
 export function MagicCard({
   children,
   className,
