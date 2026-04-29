@@ -32,12 +32,6 @@ interface AnimatedCircularProgressBarProps {
   className?: string
 }
 
-/**
- * SVG circle circumference (radius = 45).
- * Used as the total dasharray length for the gauge ring.
- */
-const circumference = 2 * Math.PI * 45
-
 export function AnimatedCircularProgressBar({
   max = 100,
   min = 0,

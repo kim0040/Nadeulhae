@@ -15,7 +15,7 @@ import { withApiAnalytics } from "@/lib/analytics/route"
 import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/repository"
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
-import { canCallKmaApi, recordKmaApiCall } from "@/lib/kma-quota"
+import { recordKmaApiCall } from "@/lib/kma-quota"
 
 type CacheEntry<T> = {
   data: T
