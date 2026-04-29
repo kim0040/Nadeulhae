@@ -117,7 +117,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
       try {
         const controller = new AbortController()
-        const timer = window.setTimeout(() => controller.abort(), 30000)
+        const timer = window.setTimeout(() => controller.abort(), 90000)
 
         const params = new URLSearchParams({ locale: language })
         if (force) params.set("force", "true")
@@ -144,6 +144,18 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         setBriefing(data)
         setStatus("success")
       } catch (err) {
+        // Aborted requests are expected when the component unmounts or timeout fires
+        if (err instanceof DOMException && err.name === "AbortError") {
+          if (attempt < 2) {
+            fetchingRef.current = false
+            setTimeout(() => fetchBriefing(force, attempt + 1), 2000)
+            return
+          }
+          setErrorMsg(t.errorSub)
+          setStatus("error")
+          fetchingRef.current = false
+          return
+        }
         console.error("[JeonjuBriefing] fetch failed:", err)
         if (attempt < 2) {
           fetchingRef.current = false
