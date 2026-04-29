@@ -28,14 +28,12 @@ function getProtectionSecret() {
     throw new Error("Missing DATA_PROTECTION_KEY for database field protection. Set DATA_PROTECTION_KEY in production.")
   }
 
-  if (process.env.AUTH_PEPPER) {
-    return process.env.AUTH_PEPPER
-  }
-
+  // Development only: generate a random key for this session.
+  // Encrypted data will NOT survive a server restart.
   if (!devFallbackSecret) {
     devFallbackSecret = randomBytes(32).toString("hex")
     console.warn(
-      "[security] DATA_PROTECTION_KEY and AUTH_PEPPER are not set. " +
+      "[security] DATA_PROTECTION_KEY is not set. " +
       "A random key was generated for this session. " +
       "Encrypted data will NOT be readable after a server restart. " +
       "Set DATA_PROTECTION_KEY for consistent encryption."
