@@ -141,3 +141,20 @@ function rowToBriefingData(row: JeonjuDailyBriefingRow): JeonjuBriefingData {
     updatedAt: row.updated_at,
   }
 }
+
+export async function deleteJeonjuBriefingsForDate(
+  briefingDate: string,
+  locale?: string
+): Promise<number> {
+  const whereClause = locale
+    ? "WHERE briefing_date = ? AND locale = ?"
+    : "WHERE briefing_date = ?"
+  const params = locale ? [briefingDate, locale] : [briefingDate]
+
+  const result = await executeStatement(
+    `DELETE FROM jeonju_daily_briefings ${whereClause}`,
+    params
+  )
+  // mysql2 ResultSetHeader has affectedRows
+  return (result as any).affectedRows ?? 0
+}
