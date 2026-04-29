@@ -41,7 +41,9 @@ function getKstHour(): number {
 async function generateForToday(): Promise<void> {
   const todayDate = getKstDate()
   const yesterdayDate = new Date(Date.now() + KST_OFFSET_MS)
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+  // Day boundary is 07:00 KST, not midnight
+  const offset = yesterdayDate.getHours() < 7 ? 2 : 1
+  yesterdayDate.setDate(yesterdayDate.getDate() - offset)
   const dateStr = yesterdayDate.toISOString().slice(0, 10)
 
   try {
