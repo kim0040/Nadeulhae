@@ -394,7 +394,7 @@ function calcWeightedScore(item: {
 }
 
 function pickDiverseTopResults(items: SearchResultItem[], limit: number) {
-  const prioritizedTracks = ["city-hall", "events", "safety", "governance", "local-news", "fallback-news", "fallback-general"]
+  const prioritizedTracks = ["city-hall", "local-news", "events", "culture", "safety", "governance", "fallback-news", "fallback-general"]
   const picked: SearchResultItem[] = []
   const consumed = new Set<number>()
   const trackCounts = new Map<string, number>()
@@ -431,7 +431,7 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
         key: "local-news",
         query: `전주 어제 주요 뉴스 소식 교통 행사 ${dateStr}`,
         topic: "news",
-        searchDepth: "basic",
+        searchDepth: "advanced",
         timeRange: "week",
         includeDomains: LOCAL_UTILITY_DOMAINS,
         excludeDomains: NOISE_DOMAINS,
@@ -446,11 +446,21 @@ function buildPrimarySearchTracks(dateStr: string, locale: JeonjuBriefingLocale)
         timeRange: "week",
         includeDomains: [...OFFICIAL_JEONJU_DOMAINS, "jeonbuk.go.kr"],
         excludeDomains: NOISE_DOMAINS,
+        includeAnswer: "advanced",
         country: "south korea",
       },
       {
         key: "events",
         query: `전주 축제 행사 공연 교통통제 사건사고 ${dateStr}`,
+        topic: "news",
+        searchDepth: "basic",
+        timeRange: "week",
+        includeDomains: LOCAL_UTILITY_DOMAINS,
+        excludeDomains: NOISE_DOMAINS,
+      },
+      {
+        key: "culture",
+        query: `전주 한옥마을 문화 전시 공연 관광 맛집 ${dateStr}`,
         topic: "news",
         searchDepth: "basic",
         timeRange: "week",
@@ -559,7 +569,7 @@ async function executeMultiSearch(dateStr: string, locale: JeonjuBriefingLocale)
           query: track.query,
           topic: track.topic,
           searchDepth: track.searchDepth,
-          maxResults: 10,
+          maxResults: 15,
           includeAnswer: track.includeAnswer ?? false,
           timeRange: track.timeRange,
           includeDomains: track.includeDomains,
