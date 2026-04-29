@@ -1205,9 +1205,6 @@ export default function LabPage() {
     setState((prev) => {
       if (!prev) return prev
       const newDue = prev.dueCards.filter((c) => c.id !== cardIdToReview)
-      if (grade === 1) {
-        newDue.push(activeCard)
-      }
       return { ...prev, dueCards: newDue }
     })
     

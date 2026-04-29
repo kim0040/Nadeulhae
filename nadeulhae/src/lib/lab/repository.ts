@@ -444,9 +444,7 @@ function mapCardRow(row: LabCardRow, referenceDate: Date = new Date()): LabCardS
     example: decryptLabText(row.example_text, "lab.card.example"),
     exampleTranslation: decryptLabText(row.example_translation_text, "lab.card.example_translation"),
     learningState,
-    stage: row.learning_state === "learning"
-      ? deriveStageFromStabilityDays(stabilityDays)
-      : clampStage(Number(row.stage ?? 0)),
+    stage: clampStage(Number(row.stage ?? 0)),
     stabilityDays,
     difficulty,
     retrievability: learningState === "review"
@@ -1183,6 +1181,7 @@ export async function applyLabCardReview(input: {
         FROM lab_cards
         WHERE id = ?
           AND user_id = ?
+          AND next_review_at <= NOW()
         LIMIT 1
         FOR UPDATE
       `,
@@ -1381,6 +1380,7 @@ export async function applyLabCardReviewBatch(input: {
         FROM lab_cards
         WHERE user_id = ?
           AND id IN (${placeholders})
+          AND next_review_at <= NOW()
         FOR UPDATE
       `,
       [input.userId, ...cardIds]
