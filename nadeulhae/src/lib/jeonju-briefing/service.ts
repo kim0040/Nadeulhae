@@ -852,7 +852,14 @@ export async function fetchAndSummarize(
     }
     console.log(`[jeonju-briefing] LLM response: ${completionContent.slice(0, 100)}... (tokens: ${tokenUsage.totalTokens})`)
   } catch (llmError) {
-    console.error("[jeonju-briefing] LLM failed, using partial fallback:", llmError)
+    const msg = llmError instanceof Error ? llmError.message : String(llmError)
+    const cause = (llmError as any)?.cause?.code ?? (llmError as any)?.cause?.message ?? ""
+    const prefix = msg.includes("AbortError") || cause.includes("ETIMEDOUT") || cause.includes("ECONNREFUSED")
+      ? `LLM connection failed${cause ? ` (${cause})` : ""}`
+      : msg.includes("global_daily_limit")
+        ? "LLM daily limit reached"
+        : `LLM error: ${msg.slice(0, 80)}`
+    console.error(`[jeonju-briefing] ${prefix} — falling back to search-only briefing. Check NANOGPT_API_KEY and NANOGPT_BASE_URL in .env.local.`)
     return buildPartialBriefing(dateStr, locale, allResults, null)
   }
 
