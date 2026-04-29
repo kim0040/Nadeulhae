@@ -842,6 +842,7 @@ export async function fetchAndSummarize(
       requestKind: "chat",
       maxTokens: 2200,
       temperature: 0.2,
+      timeoutMs: 90000,
     })
     completionContent = completion.content
     modelUsed = completion.resolvedModel
