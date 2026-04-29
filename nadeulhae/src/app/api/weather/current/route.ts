@@ -406,13 +406,22 @@ function resetAirQuotaIfNeeded() {
   }
 }
 
+let airQuotaPending = 0
+
 function consumeAirQuotaSlot() {
   resetAirQuotaIfNeeded()
-  if (airQuotaState.count >= AIR_DAILY_LIMIT) {
+  if (airQuotaState.count + airQuotaPending >= AIR_DAILY_LIMIT) {
     return false
   }
-  airQuotaState.count += 1
+  airQuotaPending += 1
   return true
+}
+
+function releaseAirQuotaSlot(succeeded: boolean) {
+  airQuotaPending = Math.max(0, airQuotaPending - 1)
+  if (succeeded) {
+    airQuotaState.count += 1
+  }
 }
 
 function parseNumber(value: unknown, fallback = 0) {
@@ -620,7 +629,11 @@ async function fetchJsonSafely(url: string) {
     if (!response.ok) return null
     const text = await response.text()
     if (!text || text.trim().startsWith("<")) return null
-    return JSON.parse(text)
+    try {
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
   } catch (error) {
     console.error("External fetch failed:", error)
     return null
@@ -747,6 +760,8 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
   }
 
   if (consumeAirQuotaSlot()) {
+    let quotaReleased = false
+    try {
     if (normalizedStationName) {
       const stationUrl = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${serviceKey}&returnType=json&numOfRows=48&pageNo=1&stationName=${encodeURIComponent(normalizedStationName)}&dataTerm=DAILY&ver=1.0`
       const stationData = await fetchJsonSafely(stationUrl)
@@ -757,6 +772,8 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
       const station = exactStation ?? stationItems[0] ?? null
 
       if (station) {
+        releaseAirQuotaSlot(true)
+        quotaReleased = true
         const resolvedCacheKey = station.stationName
           ? `station:${station.stationName.trim()}`
           : cacheKey
@@ -777,6 +794,8 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
           || pickStationByKeywords(items, explicitProfile.stationKeywords)
         : pickStationByKeywords(items, explicitProfile.stationKeywords)
       if (station) {
+        releaseAirQuotaSlot(true)
+        quotaReleased = true
         const resolvedCacheKey = station.stationName
           ? `station:${station.stationName.trim()}`
           : cacheKey
@@ -785,6 +804,11 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
         setCacheWithLimit(airQualityCache, resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
         setCacheWithLimit(airQualityCache, profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
         return { data: snapshot, isFallback: false }
+      }
+    }
+    } finally {
+      if (!quotaReleased) {
+        releaseAirQuotaSlot(false)
       }
     }
   }
@@ -1097,12 +1121,14 @@ async function handleGET(req: Request) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 
-  // 1. Dynamic Nearest Station Lookup
+  // 1. Dynamic Nearest Station Lookup (runs in parallel with other fetches)
   let dynamicStationName = ""
   let stationLookupSource: "profile" | "cache" | "live_api" = "profile"
   let nearbyStationCandidates: NearbyStationCandidate[] = []
   let tmCoords: { x: number | null; y: number | null } = { x: null, y: null }
-  if (hasDeviceCoordinates && userLat != null && userLon != null) {
+
+  const stationPromise = (async () => {
+    if (!hasDeviceCoordinates || userLat == null || userLon == null) return
     const [tmX, tmY] = wgs84ToTm(userLat, userLon)
     tmCoords = { x: tmX, y: tmY }
     const coordsKey = `${Math.round(userLat * 1000)}_${Math.round(userLon * 1000)}`
@@ -1112,39 +1138,38 @@ async function handleGET(req: Request) {
       nearbyStationCandidates = cached.candidates
       stationLookupSource = "cache"
       tmCoords = { x: cached.tmX, y: cached.tmY }
-    } else {
-      const nearbyStationUrl = `https://apis.data.go.kr/B552584/MsrstnInfoInqireSvc/getNearbyMsrstnList?serviceKey=${publicServiceKey}&returnType=json&tmX=${tmX}&tmY=${tmY}&ver=1.0`
-      const nearbyData = await fetchJsonSafely(nearbyStationUrl)
-      const nearbyItems = toArray(nearbyData?.response?.body?.items?.item)
-      nearbyStationCandidates = nearbyItems
-        .map((item: any) => ({
-          name: String(item?.stationName || "").trim(),
-          distanceKm: parseNumber(item?.tm, Number.NaN),
-        }))
-        .filter((item) => item.name.length > 0)
-        .slice(0, 3)
-        .map((item) => ({
-          name: item.name,
-          distanceKm: Number.isFinite(item.distanceKm) ? Number(item.distanceKm.toFixed(1)) : undefined,
-        }))
-      const nearestStation = nearbyStationCandidates[0]?.name
-      if (nearestStation) {
-        dynamicStationName = nearestStation
-        stationLookupSource = "live_api"
-        setExpiringCacheWithLimit(stationCache, coordsKey, {
-          name: nearestStation,
-          tmX,
-          tmY,
-          candidates: nearbyStationCandidates,
-          expiry: Date.now() + STATION_CACHE_TTL,
-        }, MAX_STATION_CACHE_KEYS)
-      }
+      return
     }
-  }
+    const nearbyStationUrl = `https://apis.data.go.kr/B552584/MsrstnInfoInqireSvc/getNearbyMsrstnList?serviceKey=${publicServiceKey}&returnType=json&tmX=${tmX}&tmY=${tmY}&ver=1.0`
+    const nearbyData = await fetchJsonSafely(nearbyStationUrl)
+    const nearbyItems = toArray(nearbyData?.response?.body?.items?.item)
+    nearbyStationCandidates = nearbyItems
+      .map((item: any) => ({
+        name: String(item?.stationName || "").trim(),
+        distanceKm: parseNumber(item?.tm, Number.NaN),
+      }))
+      .filter((item) => item.name.length > 0)
+      .slice(0, 3)
+      .map((item) => ({
+        name: item.name,
+        distanceKm: Number.isFinite(item.distanceKm) ? Number(item.distanceKm.toFixed(1)) : undefined,
+      }))
+    const nearestStation = nearbyStationCandidates[0]?.name
+    if (nearestStation) {
+      dynamicStationName = nearestStation
+      stationLookupSource = "live_api"
+      setExpiringCacheWithLimit(stationCache, coordsKey, {
+        name: nearestStation,
+        tmX,
+        tmY,
+        candidates: nearbyStationCandidates,
+        expiry: Date.now() + STATION_CACHE_TTL,
+      }, MAX_STATION_CACHE_KEYS)
+    }
+  })()
 
-  const [weatherData, airResponse, uvIndex, bulletin, warning, earthquake, tsunami, volcano] = await Promise.all([
+  const [weatherData, uvIndex, bulletin, warning, earthquake, tsunami, volcano] = await Promise.all([
     fetchCurrentWeather(grid.nx, grid.ny, kmaKey),
-    fetchAirQuality(profile, publicServiceKey, dynamicStationName),
     fetchUvIndex(profile, publicServiceKey),
     fetchRegionalBulletin(profile, publicServiceKey),
     fetchRegionalWarning(profile, publicServiceKey),
@@ -1152,6 +1177,10 @@ async function handleGET(req: Request) {
     fetchTsunamiInfo(kmaKey),
     fetchVolcanoInfo(kmaKey),
   ])
+
+  // Wait for station lookup to complete before fetching air quality
+  await stationPromise
+  const airResponse = await fetchAirQuality(profile, publicServiceKey, dynamicStationName)
 
   if (!weatherData) {
     return NextResponse.json({ error: "Failed to fetch weather data from KMA" }, { status: 503 })
@@ -1335,8 +1364,8 @@ async function handleGET(req: Request) {
       },
       locationContext: {
         coordinates: {
-          lat: userLat,
-          lon: userLon,
+          lat: userLat != null && userLon != null ? Math.round(userLat * 100) / 100 : null,
+          lon: userLat != null && userLon != null ? Math.round(userLon * 100) / 100 : null,
           source: userLat != null && userLon != null ? "device" : "default",
         },
         grid: {

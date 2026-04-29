@@ -698,44 +698,55 @@ export async function createLabDeckWithCards(input: {
     const deckId = Number(deckInsert.insertId)
     const snapshots: LabCardSnapshot[] = []
 
-    for (const card of normalizedCards) {
-      const [cardInsert] = await connection.execute<ResultSetHeader>(
-        `
-          INSERT INTO lab_cards (
-            deck_id,
-            user_id,
-            term_text,
-            meaning_text,
-            pos_text,
-            example_text,
-            example_translation_text,
-            learning_state,
-            consecutive_correct,
-            stage,
-            stability_days,
-            difficulty,
-            total_reviews,
-            lapses,
-            last_review_outcome,
-            next_review_at,
-            last_reviewed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', 0, 0, ?, ?, 0, 0, NULL, NOW(), NULL)
-        `,
-        [
-          deckId,
-          input.userId,
-          encryptDatabaseValue(card.term, "lab.card.term"),
-          encryptDatabaseValue(card.meaning, "lab.card.meaning"),
-          encryptDatabaseValueSafely(card.partOfSpeech, "lab.card.pos"),
-          encryptDatabaseValueSafely(card.example, "lab.card.example"),
-          encryptDatabaseValueSafely(card.exampleTranslation, "lab.card.example_translation"),
-          LAB_DEFAULT_STABILITY_DAYS,
-          LAB_DEFAULT_DIFFICULTY,
-        ]
-      )
+    const batchPlaceholders = normalizedCards.map(() =>
+      `(?, ?, ?, ?, ?, ?, ?, 'new', 0, 0, ?, ?, 0, 0, NULL, NOW(), NULL)`
+    ).join(', ')
 
+    const batchParams: (string | number | null)[] = []
+    for (const card of normalizedCards) {
+      batchParams.push(
+        deckId,
+        input.userId,
+        encryptDatabaseValue(card.term, "lab.card.term"),
+        encryptDatabaseValue(card.meaning, "lab.card.meaning"),
+        encryptDatabaseValueSafely(card.partOfSpeech, "lab.card.pos"),
+        encryptDatabaseValueSafely(card.example, "lab.card.example"),
+        encryptDatabaseValueSafely(card.exampleTranslation, "lab.card.example_translation"),
+        LAB_DEFAULT_STABILITY_DAYS,
+        LAB_DEFAULT_DIFFICULTY,
+      )
+    }
+
+    const [cardInsert] = await connection.execute<ResultSetHeader>(
+      `
+        INSERT INTO lab_cards (
+          deck_id,
+          user_id,
+          term_text,
+          meaning_text,
+          pos_text,
+          example_text,
+          example_translation_text,
+          learning_state,
+          consecutive_correct,
+          stage,
+          stability_days,
+          difficulty,
+          total_reviews,
+          lapses,
+          last_review_outcome,
+          next_review_at,
+          last_reviewed_at
+        ) VALUES ${batchPlaceholders}
+      `,
+      batchParams
+    )
+
+    const firstInsertId = Number(cardInsert.insertId)
+    for (let i = 0; i < normalizedCards.length; i++) {
+      const card = normalizedCards[i]
       snapshots.push({
-        id: String(cardInsert.insertId),
+        id: String(firstInsertId + i),
         deckId: String(deckId),
         term: card.term,
         meaning: card.meaning,
@@ -885,34 +896,29 @@ export async function getLabReportSnapshot(input: {
     queryRows<LabReportTotalsRow[]>(
       `
         SELECT
-          (SELECT COUNT(*) FROM lab_decks WHERE user_id = ?) AS deck_count,
-          (SELECT COUNT(*) FROM lab_cards WHERE user_id = ?) AS card_count,
-          (SELECT COUNT(*) FROM lab_cards WHERE user_id = ? AND next_review_at <= NOW()) AS due_count,
-          (SELECT COUNT(*) FROM lab_cards WHERE user_id = ? AND learning_state = 'review' AND stage >= 4) AS mastered_count,
-          (SELECT AVG(difficulty) FROM lab_cards WHERE user_id = ?) AS avg_difficulty,
-          (SELECT AVG(stability_days) FROM lab_cards WHERE user_id = ?) AS avg_stability_days,
-          (SELECT COALESCE(SUM(total_reviews), 0) FROM lab_cards WHERE user_id = ?) AS total_reviews,
-          (SELECT COALESCE(SUM(lapses), 0) FROM lab_cards WHERE user_id = ?) AS total_lapses,
-          (
-            SELECT AVG(
-              CASE
-                WHEN c.learning_state = 'review' AND c.stability_days > 0
-                  THEN POW(0.9, GREATEST(TIMESTAMPDIFF(SECOND, COALESCE(c.last_reviewed_at, c.created_at), NOW()), 0) / (c.stability_days * 86400))
-                ELSE NULL
-              END
-            )
-            FROM lab_cards c
-            WHERE c.user_id = ?
-          ) AS avg_retrievability
+          d.deck_count,
+          c.card_count,
+          c.due_count,
+          c.mastered_count,
+          c.avg_difficulty,
+          c.avg_stability_days,
+          c.total_reviews,
+          c.total_lapses,
+          c.avg_retrievability
+        FROM
+          (SELECT COUNT(*) AS deck_count FROM lab_decks WHERE user_id = ?) d,
+          (SELECT
+            COUNT(*) AS card_count,
+            COUNT(CASE WHEN next_review_at <= NOW() THEN 1 END) AS due_count,
+            COUNT(CASE WHEN learning_state = 'review' AND stage >= 4 THEN 1 END) AS mastered_count,
+            AVG(difficulty) AS avg_difficulty,
+            AVG(stability_days) AS avg_stability_days,
+            COALESCE(SUM(total_reviews), 0) AS total_reviews,
+            COALESCE(SUM(lapses), 0) AS total_lapses,
+            AVG(CASE WHEN learning_state = 'review' AND stability_days > 0 THEN POW(0.9, GREATEST(TIMESTAMPDIFF(SECOND, COALESCE(last_reviewed_at, created_at), NOW()), 0) / (stability_days * 86400)) END) AS avg_retrievability
+          FROM lab_cards WHERE user_id = ?) c
       `,
       [
-        input.userId,
-        input.userId,
-        input.userId,
-        input.userId,
-        input.userId,
-        input.userId,
-        input.userId,
         input.userId,
         input.userId,
       ]
