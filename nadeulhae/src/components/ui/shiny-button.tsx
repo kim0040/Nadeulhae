@@ -1,5 +1,20 @@
 "use client"
 
+/**
+ * Shiny Button — an animated button with a shimmering highlight effect.
+ *
+ * Uses framer-motion to animate a CSS custom property `--x` from 100% to -100%,
+ * creating a diagonal light sweep across the button surface. The effect is
+ * achieved through a CSS mask-image gradient that reveals a highlight layer
+ * positioned by `--x`.
+ *
+ * The animation runs on a continuous spring loop with a 1-second delay
+ * between sweeps. Works in both light and dark modes via Tailwind dark: prefix.
+ *
+ * @example
+ * <ShinyButton onClick={handleClick}>Get Started</ShinyButton>
+ */
+
 import React from "react"
 import { motion, type Transition } from "framer-motion"
 

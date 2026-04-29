@@ -1,5 +1,35 @@
+/**
+ * Device capability detection and animation optimization helpers.
+ *
+ * Detects hardware tier (low / mid / high), reduced-motion preference, and
+ * mobile viewport so that expensive visual effects can be scaled or disabled
+ * per device. Every animation helper respects `prefers-reduced-motion` and
+ * returns a minimum-viable output (often `0` or `1`) when the user has opted
+ * into reduced motion.
+ *
+ * The tier-based scaling strategy uses progressively smaller multipliers for
+ * lower tiers so that animations remain visually coherent rather than being
+ * disabled outright — the site still "feels" animated, but the GPU / CPU
+ * cost stays within a safe budget for the device.
+ *
+ * | Tier | CPU cores | Memory    | Strategy                            |
+ * |------|-----------|-----------|-------------------------------------|
+ * | low  | ≤2        | ≤2 GiB    | Heavily reduce or disable effects   |
+ * | mid  | ≤4        | ≤4 GiB    | Moderate reduction; 50-70 % of high |
+ * | high | >4        | >4 GiB    | Full effects at the given count     |
+ */
 export type DeviceTier = "low" | "mid" | "high"
 
+/**
+ * Detects the user's device hardware tier from `navigator.hardwareConcurrency`
+ * and `navigator.deviceMemory`.
+ *
+ * The returned tier drives the scaling multipliers used by every animation
+ * helper in this module. On the server (no `window`) it defaults to `"mid"`
+ * so SSR output is a reasonable middle-ground.
+ *
+ * @returns `"low"` when ≤2 cores or ≤2 GiB memory; `"mid"` when ≤4 cores or ≤4 GiB memory; `"high"` otherwise.
+ */
 export function detectDeviceTier(): DeviceTier {
   if (typeof window === "undefined") return "mid"
 
@@ -22,6 +52,19 @@ export function isMobileViewport(): boolean {
   return window.innerWidth < 768
 }
 
+/**
+ * Returns a scaled particle count for canvas / DOM particle effects.
+ *
+ * Scaling strategy by tier and viewport:
+ * - Low device: capped at 8, 15 % of `highCount` (bare minimum)
+ * - Mobile + mid: capped at 16, 30 % (lightweight mobile)
+ * - Mobile (high): 50 % (fast phone, still smaller screen)
+ * - Desktop mid: 70 % (sufficient CPU but not top-tier)
+ * - Desktop high: 100 % of `highCount`
+ *
+ * @param highCount - The particle count intended for a high-tier desktop device.
+ * @returns `0` when the user prefers reduced motion; otherwise a scaled count.
+ */
 export function getParticleCount(highCount: number): number {
   if (prefersReducedMotion()) return 0
   const tier = detectDeviceTier()
@@ -34,6 +77,18 @@ export function getParticleCount(highCount: number): number {
   return highCount
 }
 
+/**
+ * Returns a scaled meteor count for meteor / shooting-star effects.
+ *
+ * Scaling strategy by tier and viewport:
+ * - Low device: capped at 2, 30 % of `highCount` (almost off)
+ * - Mobile + mid: at least 1, 50 % (lightweight mobile)
+ * - Mobile (high): at least 1, 70 % (fast phone)
+ * - All other tiers: 100 % of `highCount`
+ *
+ * @param highCount - The meteor count intended for a high-tier desktop device.
+ * @returns `0` when the user prefers reduced motion; otherwise a scaled count.
+ */
 export function getMeteorCount(highCount: number): number {
   if (prefersReducedMotion()) return 0
   const tier = detectDeviceTier()
@@ -45,6 +100,19 @@ export function getMeteorCount(highCount: number): number {
   return highCount
 }
 
+/**
+ * Returns the number of times a marquee element should be repeated to fill the
+ * viewport without creating unnecessarily long DOM strings on low-end devices.
+ *
+ * Scaling strategy by tier and viewport:
+ * - Low device or reduced motion: 1 (no repetition)
+ * - Mobile: clamped to [1, 2] including `defaultRepeat`
+ * - Mid: clamped to [1, 3] including `defaultRepeat`
+ * - High: at least 1, using `defaultRepeat` as-is
+ *
+ * @param defaultRepeat - The repeat count intended for a high-tier desktop.
+ * @returns `1` when the user prefers reduced motion; otherwise a scaled repeat count.
+ */
 export function getMarqueeRepeat(defaultRepeat: number): number {
   if (prefersReducedMotion()) return 1
   const tier = detectDeviceTier()
@@ -61,6 +129,19 @@ export function shouldRunAnimation(): boolean {
   return !prefersReducedMotion()
 }
 
+/**
+ * Returns whether expensive ("rich") animations should be allowed to run.
+ *
+ * Rich animations include effects like shaders, heavy CSS transforms, or
+ * large canvas compositions. The tier-based logic prevents them on:
+ * - Low-tier devices (regardless of viewport)
+ * - Mid-tier devices on mobile viewports
+ *
+ * Also returns `false` when the user prefers reduced motion.
+ *
+ * @returns `true` only on high-tier devices and desktop mid-tier devices
+ *          where the user has not opted into reduced motion.
+ */
 export function shouldRunRichAnimation(): boolean {
   if (!shouldRunAnimation()) return false
 
