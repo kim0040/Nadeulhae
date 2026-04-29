@@ -1219,7 +1219,7 @@ function buildFinalBriefing(
   const isKo = locale === "ko"
 
   // Headline: use LLM's or generate
-  const headline = parsed.headline || `${dateLabel} ${isKo ? "전주 브리핑" : "Jeonju Briefing"}`
+  const headline = (parsed.headline || `${dateLabel} ${isKo ? "전주 브리핑" : "Jeonju Briefing"}`).replace(/[\x00-\x1f]/g, " ").trim()
 
   // Summary: use LLM's or fallback
   let summary = parsed.summary
@@ -1229,6 +1229,8 @@ function buildFinalBriefing(
       : `I've summarized the verified Jeonju updates for you. I prioritized helpful notices, events, and traffic changes to help your day go smoothly!`
   }
   summary = ensureFriendlyIntro(summary, locale)
+  // Strip control characters that break JSON (raw newlines, tabs, etc.)
+  summary = summary.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, " ")
 
   // News items: prefer LLM's, fallback to raw search results
   let newsItems: JeonjuBriefingData["newsItems"]
