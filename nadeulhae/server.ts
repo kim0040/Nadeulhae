@@ -11,6 +11,7 @@ const handle = app.getRequestHandler()
 
 app.prepare().then(async () => {
   const { createWebSocketServer } = await import("./src/lib/websocket/server")
+  const { startJeonjuBriefingScheduler } = await import("./src/lib/jeonju-scheduler")
 
   const server = createServer(async (req, res) => {
     const parsedUrl = parseUrl(req.url ?? "/", true)
@@ -21,5 +22,6 @@ app.prepare().then(async () => {
 
   server.listen(port, hostname, () => {
     console.log(`> Ready on http://${hostname}:${port}`)
+    startJeonjuBriefingScheduler()
   })
 })
