@@ -130,30 +130,106 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
               const localizedPrecipAmount = translatePrecipAmount(dayForecast.precipAmount)
               const isWetDay = dayForecast.sky?.includes("비") || dayForecast.sky?.includes("눈") || dayForecast.precipChance >= 60
               let advice = ""
+              // Deterministic variety: same day always same tip, different days vary
+              const tipSeed = (dayForecast.date?.length || 0) + (dayForecast.score || 0) + (dayForecast.tempMax || 0)
+              const pick = (arr: string[]) => arr[Math.abs(tipSeed) % arr.length]
+
               if (isWetDay) {
-                advice = language === "ko"
-                  ? "우산은 필수! 비 오는 창밖 풍경을 즐길 수 있는 카페를 추천해요."
-                  : "Stay dry! How about a cafe with a nice rain view?"
-              } else if (dayForecast.tempMax > 28) {
-                advice = language === "ko"
-                  ? "날씨가 꽤 더워요. 시원한 실내 전시회나 쇼핑몰 나들이는 어떨까요?"
-                  : "It's quite hot. Consider visiting a cool exhibition or a shopping mall."
-              } else if (dayForecast.tempMax < 12) {
-                advice = language === "ko"
-                  ? "찬바람이 불어요. 따뜻한 차 한 잔과 함께 실내에서 여유를 즐겨보세요."
-                  : "Cold winds expected. Enjoy some warm tea or indoor relaxation."
-              } else if (dayForecast.score >= 85) {
-                advice = language === "ko"
-                  ? "피크닉 가기 최적의 날! 돗자리를 챙겨 공원으로 지금 바로 떠나보세요."
-                  : "Ideal for a picnic! Head to the park with a picnic mat right now."
-              } else if (dayForecast.score >= 70) {
-                advice = language === "ko"
-                  ? "산책이나 가벼운 야외 활동을 하기에 딱 좋은 날씨입니다."
-                  : "Great weather for a stroll or light outdoor activities."
+                advice = pick(language === "ko" ? [
+                  "우산은 필수! 비 오는 창밖 풍경을 즐길 수 있는 카페를 추천해요.",
+                  "비 오는 날엔 전주 한옥마을 실내 체험이 제격이에요.",
+                  "우산 챙기고 전주천변 카페에서 여유를 즐겨보세요.",
+                  "비 소리 들으며 전주 전통차 한잔 어떠세요?",
+                ] : [
+                  "Stay dry! How about a cafe with a nice rain view?",
+                  "Rainy day? Try indoor activities in Jeonju Hanok Village.",
+                  "Grab an umbrella and enjoy a cafe by Jeonjucheon Stream.",
+                  "Listen to the rain with a warm cup of Korean tea.",
+                ])
+              } else if (dayForecast.tempMax > 30) {
+                advice = pick(language === "ko" ? [
+                  "한낮 더위가 심해요. 시원한 실내 전시회나 쇼핑몰 나들이는 어떨까요?",
+                  "무더위엔 전주 박물관 투어가 딱이에요. 에어컨 아래서 문화 탐방!",
+                  "폭염 수준이니 야외 활동은 아침이나 저녁으로 미루는 게 좋겠어요.",
+                  "더운 날엔 실내에서 즐기는 전주 전통 공예 체험을 추천해요.",
+                ] : [
+                  "Very hot today. How about a cool museum or shopping mall?",
+                  "Perfect day for Jeonju museum tours — culture in air conditioning!",
+                  "Heat advisory level — save outdoor plans for morning or evening.",
+                  "Try indoor Jeonju craft workshops to beat the heat.",
+                ])
+              } else if (dayForecast.tempMax > 26) {
+                advice = pick(language === "ko" ? [
+                  "날씨가 꽤 더워요. 그늘 많은 덕진공원 산책로를 추천해요.",
+                  "더위를 피해 전주 실내 명소를 돌아보는 건 어떨까요?",
+                  "따뜻한 날엔 가벼운 나들이 후 시원한 팥빙수 한 그릇!",
+                ] : [
+                  "Quite warm. Try the shaded trails at Deokjin Park.",
+                  "Beat the heat with Jeonju's indoor attractions.",
+                  "A light outing followed by some cold patbingsu sounds perfect.",
+                ])
+              } else if (dayForecast.tempMax < 8) {
+                advice = pick(language === "ko" ? [
+                  "찬바람이 불어요. 따뜻한 차 한 잔과 함께 실내에서 여유를 즐겨보세요.",
+                  "추운 날엔 전주 전통 찻집에서 몸을 녹이는 건 어떨까요?",
+                  "한파 수준이니 야외는 짧게, 실내 위주로 계획하세요.",
+                ] : [
+                  "Cold winds expected. Enjoy warm tea and indoor relaxation.",
+                  "Chilly day — warm up at a traditional Jeonju tea house.",
+                  "Bundle up! Keep outdoor time short and cozy up indoors.",
+                ])
+              } else if (dayForecast.tempMax < 14) {
+                advice = pick(language === "ko" ? [
+                  "선선한 날씨예요. 가벼운 외투 챙겨서 전주 골목 산책 떠나볼까요?",
+                  "쌀쌀하지만 산책하기 좋은 날이에요. 전주 한옥마을 골목 투어 추천!",
+                  "초봄·초가을 느낌의 날씨. 가볍게 야외에서 시간 보내기 좋아요.",
+                ] : [
+                  "Crisp weather. Grab a light jacket for a Jeonju alley walk.",
+                  "A bit chilly but perfect for a Hanok Village stroll.",
+                  "Early spring/fall vibes — great for casual outdoor time.",
+                ])
+              } else if (dayForecast.score >= 90) {
+                advice = pick(language === "ko" ? [
+                  "피크닉 가기 최적의 날! 돗자리를 챙겨 공원으로 지금 바로 떠나보세요.",
+                  "오늘은 진짜 나들이 데이! 전주 세병호에서 자전거 타기 딱 좋아요.",
+                  "맑은 하늘 아래 전주천변을 따라 걸으면 하루가 행복해질 거예요.",
+                ] : [
+                  "Ideal for a picnic! Head to the park with a picnic mat right now.",
+                  "Perfect outing day! Great for biking around Sebyeong Lake.",
+                  "Walk along Jeonjucheon under clear skies — pure happiness.",
+                ])
+              } else if (dayForecast.score >= 80) {
+                advice = pick(language === "ko" ? [
+                  "산책이나 가벼운 야외 활동을 하기에 딱 좋은 날씨입니다.",
+                  "덕진공원 연꽃길을 따라 여유롭게 걸어보세요. 기분 좋은 하루!",
+                  "전주 동네 카페 투어하기 좋은 날이에요. 걸어서 즐겨보세요.",
+                ] : [
+                  "Great weather for a stroll or light outdoor activities.",
+                  "Take a relaxing walk along Deokjin Park's lotus path.",
+                  "Perfect day for a Jeonju neighborhood cafe walking tour.",
+                ])
+              } else if (dayForecast.score >= 60) {
+                advice = pick(language === "ko" ? [
+                  "무난한 나들이 날씨. 짧은 외출로 기분 전환하기 좋아요.",
+                  "야외도 괜찮지만 실내 대안도 준비해두면 더 좋은 하루예요.",
+                  "전주 근교 짧은 드라이브 코스를 추천해요.",
+                ] : [
+                  "Decent outing weather. A short trip outdoors would be refreshing.",
+                  "Outdoor plans work, but keep an indoor backup just in case.",
+                  "A short drive around Jeonju outskirts sounds nice today.",
+                ])
               } else {
-                advice = language === "ko"
-                  ? "가벼운 외출을 즐기기에 적합한 날씨입니다. 즐거운 하루 되세요!"
-                  : "Suitable for a quick outing. Have a great day!"
+                advice = pick(language === "ko" ? [
+                  "가벼운 외출을 즐기기에 적합한 날씨입니다. 즐거운 하루 되세요!",
+                  "실내 위주로 계획하고 짧은 산책 정도면 괜찮은 날이에요.",
+                  "전주 실내 명소(전주공예품전시관, 전주역사박물관 등)를 추천해요.",
+                  "컨디션에 따라 유연하게 동선을 바꾸는 게 좋은 날입니다.",
+                ] : [
+                  "Suitable for a quick outing. Have a great day!",
+                  "Stick to indoor plans with an optional short walk outside.",
+                  "Check out Jeonju indoor spots — craft museum, history museum, etc.",
+                  "A flexible day — adjust plans based on how you feel.",
+                ])
               }
 
               const cardContent = (
