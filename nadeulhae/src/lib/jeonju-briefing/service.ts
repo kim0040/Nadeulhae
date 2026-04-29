@@ -791,6 +791,8 @@ export async function fetchAndSummarize(
         { role: "user", content: searchContext },
       ],
       requestKind: "chat",
+      maxTokens: 1600,
+      temperature: 0.2,
     })
     completionContent = completion.content
     modelUsed = completion.resolvedModel
@@ -817,8 +819,11 @@ export async function fetchAndSummarize(
     try {
       parsed = parseBriefingJson(jsonText)
     } catch (parseError) {
-      console.error("[jeonju-briefing] JSON parse failed:", parseError)
+      console.error("[jeonju-briefing] JSON parse failed, using raw content as summary:", parseError)
+      parsed.summary = completionContent.slice(0, 1200)
     }
+  } else {
+    parsed.summary = completionContent.slice(0, 1200)
   }
 
   // 6. Normalize & build final result

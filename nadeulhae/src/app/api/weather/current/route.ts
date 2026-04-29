@@ -746,7 +746,7 @@ async function fetchCurrentWeather(nx: number, ny: number, apiKey: string) {
   return snapshot
 }
 
-async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynamicStationName?: string) {
+async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynamicStationName?: string, backupStationNames?: string[]) {
   const explicitProfile = profile
   const normalizedStationName = dynamicStationName?.trim()
   const profileCacheKey = `profile:${explicitProfile.key}:${explicitProfile.areaNo}`
@@ -782,6 +782,35 @@ async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynam
         setCacheWithLimit(airQualityCache, resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
         setCacheWithLimit(airQualityCache, profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
         return { data: snapshot, isFallback: false }
+      }
+    }
+
+    // Try backup station names (candidates 2-3) before falling through to province-level API
+    if (backupStationNames && backupStationNames.length > 0) {
+      for (const backupName of backupStationNames) {
+        if (!backupName || backupName === normalizedStationName) continue
+        try {
+          const backupUrl = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${serviceKey}&returnType=json&numOfRows=48&pageNo=1&stationName=${encodeURIComponent(backupName)}&dataTerm=DAILY&ver=1.0`
+          const backupData = await fetchJsonSafely(backupUrl)
+          const backupItems = toArray(backupData?.response?.body?.items?.item)
+          const backupExactStation = backupItems.find(
+            (item) => String((item as any)?.stationName ?? "").trim() === backupName
+          )
+          const backupStation = backupExactStation ?? backupItems[0] ?? null
+          if (backupStation) {
+            releaseAirQuotaSlot(true)
+            quotaReleased = true
+            const resolvedCacheKey = backupStation.stationName
+              ? `station:${backupStation.stationName.trim()}`
+              : `station:${backupName}`
+            const snapshot = buildAirQualitySnapshot(backupStation)
+            setCacheWithLimit(airQualityCache, resolvedCacheKey, { data: snapshot, lastUpdate: Date.now() })
+            setCacheWithLimit(airQualityCache, profileCacheKey, { data: snapshot, lastUpdate: Date.now() })
+            return { data: snapshot, isFallback: false }
+          }
+        } catch {
+          // Continue to next backup
+        }
       }
     }
 
@@ -1180,7 +1209,10 @@ async function handleGET(req: Request) {
 
   // Wait for station lookup to complete before fetching air quality
   await stationPromise
-  const airResponse = await fetchAirQuality(profile, publicServiceKey, dynamicStationName)
+  const airResponse = await fetchAirQuality(
+    profile, publicServiceKey, dynamicStationName,
+    nearbyStationCandidates.slice(1).map(c => c.name).filter(Boolean)
+  )
 
   if (!weatherData) {
     return NextResponse.json({ error: "Failed to fetch weather data from KMA" }, { status: 503 })

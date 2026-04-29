@@ -309,15 +309,17 @@ function shouldFallback(error: unknown) {
 export async function createNanoGptChatCompletion(input: {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
   requestKind: "chat" | "summary"
+  maxTokens?: number
+  temperature?: number
 }): Promise<FactChatCompletionResult> {
   const models = await resolveModelPair()
   const timeoutMs = input.requestKind === "summary"
     ? CHAT_SUMMARY_PROVIDER_TIMEOUT_MS
     : CHAT_PROVIDER_TIMEOUT_MS
-  const maxTokens = input.requestKind === "summary"
+  const maxTokens = input.maxTokens ?? (input.requestKind === "summary"
     ? CHAT_SUMMARY_MAX_TOKENS
-    : CHAT_COMPLETION_MAX_TOKENS
-  const temperature = input.requestKind === "summary" ? 0.2 : 0.55
+    : CHAT_COMPLETION_MAX_TOKENS)
+  const temperature = input.temperature ?? (input.requestKind === "summary" ? 0.2 : 0.55)
 
   try {
     const primaryResult = await requestCompletion({
