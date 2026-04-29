@@ -15,6 +15,7 @@ import { withApiAnalytics } from "@/lib/analytics/route"
 import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/repository"
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
+import { canCallKmaApi, recordKmaApiCall } from "@/lib/kma-quota"
 
 type CacheEntry<T> = {
   data: T
@@ -121,6 +122,7 @@ async function fetchVillageData(nx: number, ny: number, serviceKey: string) {
 
   const url = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getVilageFcst?authKey=${serviceKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=${nx}&ny=${ny}`
   const data = await fetchJsonSafely(url)
+  recordKmaApiCall()
   if (data) villageCache.set(cacheKey, { data, lastUpdate: Date.now() })
   return data
 }
@@ -133,6 +135,7 @@ async function fetchUltraForecastData(nx: number, ny: number, serviceKey: string
 
   const url = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getUltraSrtFcst?authKey=${serviceKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=${nx}&ny=${ny}`
   const data = await fetchJsonSafely(url)
+  recordKmaApiCall()
   if (data) ultraCache.set(cacheKey, { data, lastUpdate: Date.now() })
   return data
 }
@@ -147,8 +150,8 @@ async function fetchMidData(profile: any, serviceKey: string) {
   const midTempUrl = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/getMidTa?authKey=${serviceKey}&pageNo=1&numOfRows=10&dataType=JSON&regId=${profile.forecastTempReg}&tmFc=${tmFc}`
 
   const [midLand, midTemp] = await Promise.all([
-    fetchJsonSafely(midLandUrl),
-    fetchJsonSafely(midTempUrl),
+    fetchJsonSafely(midLandUrl).then((d) => { recordKmaApiCall(); return d }),
+    fetchJsonSafely(midTempUrl).then((d) => { recordKmaApiCall(); return d }),
   ])
 
   const result = { midLand, midTemp, tmFc }
