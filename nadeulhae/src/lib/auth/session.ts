@@ -103,14 +103,13 @@ function pruneAuthSessionCache(cache: Map<string, AuthSessionCacheEntry>) {
     return
   }
 
+  // Evict least recently touched entries first (LRU)
   const overflow = cache.size - AUTH_SESSION_CACHE_MAX_ENTRIES
-  let removed = 0
-  for (const key of cache.keys()) {
-    cache.delete(key)
-    removed += 1
-    if (removed >= overflow) {
-      break
-    }
+  const entries = [...cache.entries()].sort(
+    (a, b) => a[1].lastTouchedAt - b[1].lastTouchedAt
+  )
+  for (let i = 0; i < overflow && i < entries.length; i++) {
+    cache.delete(entries[i][0])
   }
 }
 

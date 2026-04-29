@@ -469,14 +469,6 @@ async function requestCompletion(input: {
   }
 }
 
-function shouldFallback(error: unknown) {
-  if (!(error instanceof NanoGptError)) {
-    return true
-  }
-
-  return ![401, 402].includes(error.statusCode)
-}
-
 export async function createNanoGptCompletion(input: {
   model: string
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
@@ -688,9 +680,6 @@ export async function createNanoGptCompletionStream(input: {
       onToken: input.onToken,
     })
   } catch (error) {
-    if (!shouldFallback(error)) {
-      throw error
-    }
     throw error
   }
 }
