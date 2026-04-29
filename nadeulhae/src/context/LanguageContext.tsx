@@ -52,6 +52,8 @@ const translations: Record<Language, Record<string, string | string[]>> = {
     loading_locating: "위치 찾는 중...",
     footer_copy: "© 2026 나들해 (Nadeulhae). All rights reserved.",
     footer_notice: "위치 권한이 허용되면 현재 지역 날씨 판단에만 활용되며, 화면 데이터는 기상청·한국환경공단 등 공공 데이터를 기반으로 구성됩니다.",
+    footer_terms: "이용약관 및 개인정보 처리방침",
+    footer_about: "나들해 소개",
     
     // Hero
     hero_title: "오늘 전주는 피크닉 가기 완벽한 날이에요!",
@@ -472,6 +474,8 @@ const translations: Record<Language, Record<string, string | string[]>> = {
     loading_weather: "Loading weather data...",
     footer_copy: "© 2026 Nadeulhae. All rights reserved.",
     footer_notice: "If location access is allowed, it is used only for regional weather decisions, and the interface is built from public datasets such as KMA and AirKorea.",
+    footer_terms: "Terms of Service & Privacy Policy",
+    footer_about: "About Nadeulhae",
 
     // Hero
     hero_title: "Jeonju is perfect for a picnic today!",
