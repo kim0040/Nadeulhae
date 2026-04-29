@@ -9,6 +9,14 @@ import {
   Info, Clock, Database, Droplets, Cloud, CloudRain, ShieldCheck, Zap,
   Navigation, Sun, TriangleAlert, MapPin
 } from "lucide-react"
+import {
+  NON_BULLETIN_MESSAGE_PATTERN,
+  EMPTY_BULLETIN_PATTERN,
+  parseBulletinSummary,
+  getBulletinTone,
+  getBulletinTags,
+  getToneClasses,
+} from "@/lib/bulletin"
 
 interface PicnicBriefingProps {
   weatherData: WeatherData
@@ -22,16 +30,6 @@ interface BriefingPoint {
   type: "success" | "warning" | "info" | "neutral"
   fullWidth?: boolean
 }
-
-type BulletinSegment = {
-  label: string
-  text: string
-}
-
-type BulletinTagTone = "danger" | "caution" | "info" | "neutral"
-
-const NON_BULLETIN_MESSAGE_PATTERN = /(전주 기준 대기질 데이터를 표시 중입니다|showing fallback air quality data)/i
-const EMPTY_BULLETIN_PATTERN = /^(?:[oO○◯●□■▪︎ㆍ·\-\*\s]*)?(?:없음|없\s*음|none|no\s*alerts?|n\/a)(?:[\s.)\]]*)$/i
 
 export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   const { t, language } = useLanguage()
@@ -48,171 +46,6 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       text = text.replace(`{${k}}`, String(v))
     })
     return text
-  }
-
-  const translateBulletinText = (text: string) => {
-    if (language === "ko") return text
-
-    const replacements: Array<[RegExp, string]> = [
-      [/전북/g, "Jeonbuk"],
-      [/전주/g, "Jeonju"],
-      [/오늘/g, "today"],
-      [/내일/g, "tomorrow"],
-      [/모레/g, "the day after tomorrow"],
-      [/글피/g, "in 3 days"],
-      [/오전/g, "morning"],
-      [/오후/g, "afternoon"],
-      [/새벽/g, "early morning"],
-      [/밤/g, "night"],
-      [/비와 눈/g, "rain and snow"],
-      [/소나기/g, "showers"],
-      [/비/g, "rain"],
-      [/눈/g, "snow"],
-      [/안개/g, "fog"],
-      [/황사/g, "dust"],
-      [/미세먼지/g, "fine dust"],
-      [/건조/g, "dry"],
-      [/강풍/g, "strong wind"],
-      [/호우/g, "heavy rain"],
-      [/대설/g, "heavy snow"],
-      [/폭염/g, "heat"],
-      [/한파/g, "cold wave"],
-      [/흐림/g, "cloudy"],
-      [/구름많음/g, "mostly cloudy"],
-      [/맑음/g, "clear"],
-      [/기온/g, "temperature"],
-      [/강수확률/g, "rain chance"],
-      [/강수/g, "precipitation"],
-      [/특보/g, "warning"],
-      [/전망/g, "outlook"],
-      [/예보/g, "forecast"],
-      [/부터/g, "from"],
-    ]
-
-    let translated = text
-    for (const [pattern, replacement] of replacements) {
-      translated = translated.replace(pattern, replacement)
-    }
-    return translated
-  }
-
-  const localizeBulletinLabel = (label: string) => {
-    if (language === "ko") return label
-    const dayMatch = label.match(/(\d{1,2})일/)
-    const dayNumber = dayMatch?.[1]
-
-    const withoutDaySuffix = label.replace(/,\s*\d{1,2}일/g, "").replace(/\d{1,2}일/g, "").trim()
-    const mapped = withoutDaySuffix
-      .replace(/오늘/g, "Today")
-      .replace(/내일/g, "Tomorrow")
-      .replace(/모레/g, "Day after tomorrow")
-      .replace(/글피/g, "In 3 days")
-
-    return dayNumber ? `${mapped}, ${dayNumber}` : mapped
-  }
-
-  const parseBulletinSummary = (summary: string) => {
-    const normalized = summary.replace(/\s+/g, " ").trim()
-    const cleanedSummary = normalized.replace(/^□\s*\(([^)]+)\)\s*/, "").trim()
-    const splitItems = cleanedSummary.split(/\s(?=○\s*\()/).filter(Boolean)
-    const headline = splitItems[0]?.startsWith("○")
-      ? (language === "ko" ? "현재 공식 통보 요약입니다." : "This is the latest official bulletin summary.")
-      : translateBulletinText(splitItems.shift() || (language === "ko" ? "현재 공식 통보에 특이사항이 없습니다." : "No notable official bulletin right now."))
-    const segments: BulletinSegment[] = splitItems
-      .map((item) => item.replace(/^○\s*/, "").trim())
-      .map((item) => {
-        const match = item.match(/^\(([^)]+)\)\s*(.*)$/)
-        if (!match) {
-          return {
-            label: language === "ko" ? "안내" : "Note",
-            text: translateBulletinText(item),
-          }
-        }
-        return {
-          label: localizeBulletinLabel(match[1]),
-          text: translateBulletinText(match[2]),
-        }
-      })
-
-    return {
-      headline,
-      segments: segments.slice(0, 3),
-    }
-  }
-
-  const getBulletinTone = (text: string): BulletinTagTone => {
-    const normalized = text.replace(/\s+/g, "")
-    if (/특보|호우|대설|태풍|강풍|폭염|한파|지진|산불|화재/.test(normalized)) return "danger"
-    if (/건조|비|소나기|눈|안개|황사|미세먼지|기온차|결빙/.test(normalized)) return "caution"
-    if (/맑음|구름|흐림|예보|전망/.test(normalized)) return "info"
-    return "neutral"
-  }
-
-  const getBulletinTags = (text: string) => {
-    const entries = [
-      {
-        match: /건조|산불|화재/,
-        ko: "건조·화재",
-        en: "Dry / Fire",
-        tone: "danger" as const,
-      },
-      {
-        match: /호우|비|소나기/,
-        ko: "강수",
-        en: "Rain",
-        tone: "caution" as const,
-      },
-      {
-        match: /대설|눈|결빙/,
-        ko: "눈·결빙",
-        en: "Snow / Ice",
-        tone: "caution" as const,
-      },
-      {
-        match: /강풍|태풍/,
-        ko: "강풍",
-        en: "Strong Wind",
-        tone: "danger" as const,
-      },
-      {
-        match: /안개/,
-        ko: "안개",
-        en: "Fog",
-        tone: "info" as const,
-      },
-      {
-        match: /황사|미세먼지/,
-        ko: "대기질",
-        en: "Air Quality",
-        tone: "caution" as const,
-      },
-      {
-        match: /기온차|폭염|한파/,
-        ko: "기온 변화",
-        en: "Temperature",
-        tone: "caution" as const,
-      },
-    ]
-
-    return entries
-      .filter((entry) => entry.match.test(text))
-      .map((entry) => ({
-        label: language === "ko" ? entry.ko : entry.en,
-        tone: entry.tone,
-      }))
-  }
-
-  const getToneClasses = (tone: BulletinTagTone) => {
-    switch (tone) {
-      case "danger":
-        return "border-red-500/20 bg-red-500/8 text-red-600 dark:text-red-300"
-      case "caution":
-        return "border-orange-500/20 bg-orange-500/8 text-orange-600 dark:text-orange-300"
-      case "info":
-        return "border-sky-blue/20 bg-sky-blue/8 text-sky-blue"
-      default:
-        return "border-border bg-card text-foreground/80"
-    }
   }
 
   const getScoreNarrative = () => {
@@ -598,8 +431,8 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   const bulletinSummary = metadata?.bulletin?.summary || (
     language === "ko" ? "현재 공식 통보문에 특이사항이 없습니다." : "No notable official bulletin right now."
   )
-  const bulletin = parseBulletinSummary(bulletinSummary)
-  const bulletinTags = getBulletinTags(`${bulletin.headline} ${bulletin.segments.map((segment) => segment.text).join(" ")}`)
+  const bulletin = parseBulletinSummary(bulletinSummary, language)
+  const bulletinTags = getBulletinTags(`${bulletin.headline} ${bulletin.segments.map((segment) => segment.text).join(" ")}`, language)
   const sourceLabels = (() => {
     const sourceText = String(metadata?.dataSource || "")
     const labels: string[] = []

@@ -268,12 +268,11 @@ export function getRoomConnectionCount(room: string) {
 
 export function broadcast(type: string, payload: unknown, excludeWs?: WebSocket) {
   const data = JSON.stringify({ type, payload })
-  // Snapshot avoids mutation issues if safeSend failure triggers removeClient during iteration.
   const snapshot = [...clients.keys()]
   for (const ws of snapshot) {
     if (ws === excludeWs) continue
     if (!safeSend(ws, data)) {
-      removeClient(ws)
+      ws.close()
     }
   }
 }
@@ -285,7 +284,6 @@ export function broadcastToRoom(room: string, type: string, payload: unknown, ex
   }
 
   const data = JSON.stringify({ type, payload })
-  // Snapshot avoids mutation issues if safeSend failure triggers removeClient during iteration.
   const snapshot = [...roomClients]
   for (const ws of snapshot) {
     if (ws === excludeWs) {
@@ -293,7 +291,7 @@ export function broadcastToRoom(room: string, type: string, payload: unknown, ex
     }
 
     if (!safeSend(ws, data)) {
-      removeClient(ws)
+      ws.close()
     }
   }
 }
@@ -303,7 +301,7 @@ export function broadcastToUser(userId: string, type: string, payload: unknown) 
   for (const [ws, meta] of clients) {
     if (meta.userId !== userId) continue
     if (!safeSend(ws, data)) {
-      removeClient(ws)
+      ws.close()
     }
   }
 }

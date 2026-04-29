@@ -16,6 +16,7 @@ import {
 import { getSessionTokenHash } from "@/lib/auth/session"
 import { findUserBySessionTokenHash } from "@/lib/auth/repository"
 import { isValidCodeShareSessionId, toCodeShareRoomName } from "@/lib/code-share/constants"
+import { getCodeShareSessionById } from "@/lib/code-share/repository"
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const CODE_SHARE_ACTOR_COOKIE_NAME = process.env.CODE_SHARE_ACTOR_COOKIE_NAME ?? "nadeulhae_code_share_actor"
@@ -363,7 +364,7 @@ export function createWebSocketServer(server: import("node:http").Server) {
 
     setupHeartbeat(ws)
 
-    ws.on("message", (data) => {
+    ws.on("message", async (data) => {
       const str = typeof data === "string" ? data : data.toString("utf-8")
       const parsed = parseAllowedClientMessage(str)
       if (!parsed) {
@@ -383,6 +384,11 @@ export function createWebSocketServer(server: import("node:http").Server) {
       const room = toCodeShareRoomName(sessionId)
 
       if (parsed.type === "code_share_subscribe") {
+        const session = await getCodeShareSessionById(sessionId).catch(() => null)
+        if (!session) {
+          return
+        }
+
         const joined = joinRoom(ws, room)
         if (!joined) {
           return

@@ -549,52 +549,66 @@ export async function updateUserProfile(input: {
     nicknameTag = await generateUniqueNicknameTag(normalizedNickname)
   }
 
-  await executeStatement(
-    `
-      UPDATE users
-      SET
-        display_name = ?,
-        nickname = ?,
-        nickname_hash = ?,
-        nickname_tag = ?,
-        age_band = ?,
-        primary_region = ?,
-        interest_tags = ?,
-        interest_other = ?,
-        preferred_time_slot = ?,
-        weather_sensitivity = ?,
-        marketing_accepted = ?,
-        analytics_accepted = ?,
-        lab_enabled = ?,
-        marketing_agreed_at = CASE
-          WHEN ? = 1 THEN COALESCE(marketing_agreed_at, NOW())
-          ELSE NULL
-        END,
-        analytics_agreed_at = CASE
-          WHEN ? = 1 THEN COALESCE(analytics_agreed_at, NOW())
-          ELSE NULL
-        END
-      WHERE id = ?
-    `,
-    [
-      encryptDatabaseValue(input.displayName, "users.display_name"),
-      encryptDatabaseValue(normalizedNickname, "users.nickname"),
-      createBlindIndex(normalizedNickname, "users.nickname"),
-      nicknameTag,
-      encryptDatabaseValue(input.ageBand, "users.age_band"),
-      encryptDatabaseValue(input.primaryRegion, "users.primary_region"),
-      encryptDatabaseValue(JSON.stringify(normalizedInterestTags), "users.interest_tags"),
-      encryptDatabaseValueSafely(input.interestOther || null, "users.interest_other"),
-      encryptDatabaseValue(input.preferredTimeSlot, "users.preferred_time_slot"),
-      encryptDatabaseValue(JSON.stringify(normalizedWeatherSensitivity), "users.weather_sensitivity"),
-      input.marketingAccepted ? 1 : 0,
-      input.analyticsAccepted ? 1 : 0,
-      input.labEnabled ? 1 : 0,
-      input.marketingAccepted ? 1 : 0,
-      input.analyticsAccepted ? 1 : 0,
-      input.userId,
-    ]
-  )
+  const connection = await getDbPool().getConnection()
+  try {
+    await connection.beginTransaction()
+
+    await connection.execute(
+      `
+        UPDATE users
+        SET
+          display_name = ?,
+          nickname = ?,
+          nickname_hash = ?,
+          nickname_tag = ?,
+          age_band = ?,
+          primary_region = ?,
+          interest_tags = ?,
+          interest_other = ?,
+          preferred_time_slot = ?,
+          weather_sensitivity = ?,
+          marketing_accepted = ?,
+          analytics_accepted = ?,
+          lab_enabled = ?,
+          marketing_agreed_at = CASE
+            WHEN ? = 1 THEN COALESCE(marketing_agreed_at, NOW())
+            ELSE NULL
+          END,
+          analytics_agreed_at = CASE
+            WHEN ? = 1 THEN COALESCE(analytics_agreed_at, NOW())
+            ELSE NULL
+          END
+        WHERE id = ?
+      `,
+      [
+        encryptDatabaseValue(input.displayName, "users.display_name"),
+        encryptDatabaseValue(normalizedNickname, "users.nickname"),
+        createBlindIndex(normalizedNickname, "users.nickname"),
+        nicknameTag,
+        encryptDatabaseValue(input.ageBand, "users.age_band"),
+        encryptDatabaseValue(input.primaryRegion, "users.primary_region"),
+        encryptDatabaseValue(JSON.stringify(normalizedInterestTags), "users.interest_tags"),
+        encryptDatabaseValueSafely(input.interestOther || null, "users.interest_other"),
+        encryptDatabaseValue(input.preferredTimeSlot, "users.preferred_time_slot"),
+        encryptDatabaseValue(JSON.stringify(normalizedWeatherSensitivity), "users.weather_sensitivity"),
+        input.marketingAccepted ? 1 : 0,
+        input.analyticsAccepted ? 1 : 0,
+        input.labEnabled ? 1 : 0,
+        input.marketingAccepted ? 1 : 0,
+        input.analyticsAccepted ? 1 : 0,
+        input.userId,
+      ]
+    )
+
+    await connection.execute("DELETE FROM user_sessions WHERE user_id = ?", [input.userId])
+
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
 
   return findUserById(input.userId)
 }
