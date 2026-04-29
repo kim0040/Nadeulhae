@@ -717,6 +717,26 @@ export async function generateJeonjuBriefing(
     } catch {
       // ignore cache errors
     }
+
+    // Before 7 AM KST: if yesterday's briefing isn't cached yet,
+    // serve the day-before-yesterday's briefing instead of generating.
+    // The 7 AM scheduler will handle the actual generation.
+    const kstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getHours()
+    if (kstHour < 7) {
+      const twoDaysAgo = new Date(Date.now() + 9 * 60 * 60 * 1000)
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+      const twoDaysAgoStr = twoDaysAgo.toISOString().slice(0, 10)
+      try {
+        const stale = await getJeonjuBriefingByDateAndLocale(twoDaysAgoStr, locale)
+        if (stale && stale.newsItems.length > 0) {
+          setCachedBriefingToMemory(cacheKey, stale)
+          console.log(`[jeonju-briefing] Before 7 AM - serving ${twoDaysAgoStr} briefing as fallback`)
+          return { fromCache: true, data: stale }
+        }
+      } catch {
+        // ignore
+      }
+    }
   }
 
   // 3. Auto-generation safety: avoid repeated re-calls when upstream fails.
