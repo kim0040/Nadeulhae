@@ -51,8 +51,25 @@ interface NanoGptCompletionPayload {
   }
 }
 
-const DASHBOARD_CHAT_MODEL = "deepseek/deepseek-v4-flash"
-const DASHBOARD_CHAT_FALLBACK_MODEL = "deepseek/deepseek-v4-pro"
+const DASHBOARD_CHAT_MODEL = process.env.LLM_MODEL ?? "deepseek/deepseek-v4-flash"
+const DASHBOARD_CHAT_FALLBACK_MODEL = process.env.LLM_FALLBACK_MODEL ?? "deepseek/deepseek-v4-pro"
+
+function requireNanoGptEnv(name: string) {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`)
+  }
+
+  return value
+}
+
+function getNanoGptApiKey(): string {
+  return process.env.LLM_API_KEY ?? requireNanoGptEnv("NANOGPT_API_KEY")
+}
+
+function getNanoGptBaseUrl() {
+  return (process.env.LLM_BASE_URL ?? process.env.NANOGPT_BASE_URL ?? "https://nano-gpt.com/api/v1").replace(/\/$/, "")
+}
 
 export class NanoGptChatError extends Error {
   statusCode: number
@@ -64,19 +81,6 @@ export class NanoGptChatError extends Error {
     this.statusCode = statusCode
     this.code = code ?? null
   }
-}
-
-function requireNanoGptEnv(name: string) {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`)
-  }
-
-  return value
-}
-
-function getNanoGptBaseUrl() {
-  return (process.env.NANOGPT_BASE_URL || "https://nano-gpt.com/api/v1").replace(/\/$/, "")
 }
 
 function buildNanoGptUrl(path: string) {
@@ -149,7 +153,7 @@ async function listNanoGptModels() {
       method: "GET",
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${requireNanoGptEnv("NANOGPT_API_KEY")}`,
+        Authorization: `Bearer ${getNanoGptApiKey()}`,
       },
       cache: "no-store",
     },
@@ -241,7 +245,7 @@ async function requestCompletion(input: {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          Authorization: `Bearer ${requireNanoGptEnv("NANOGPT_API_KEY")}`,
+          Authorization: `Bearer ${getNanoGptApiKey()}`,
         },
         body: JSON.stringify({
           model: input.model,
@@ -388,7 +392,7 @@ async function requestCompletionStream(input: {
       headers: {
         Accept: "text/event-stream",
         "Content-Type": "application/json",
-        Authorization: `Bearer ${requireNanoGptEnv("NANOGPT_API_KEY")}`,
+        Authorization: `Bearer ${getNanoGptApiKey()}`,
       },
       body: JSON.stringify({
         model: input.model,

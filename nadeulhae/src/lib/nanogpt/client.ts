@@ -193,8 +193,12 @@ function requireNanoGptEnv(name: string) {
   return value
 }
 
+function getNanoGptApiKey(): string {
+  return process.env.LLM_API_KEY ?? requireNanoGptEnv("NANOGPT_API_KEY")
+}
+
 function getNanoGptBaseUrl() {
-  return (process.env.NANOGPT_BASE_URL || "https://nano-gpt.com/api/v1").replace(/\/$/, "")
+  return (process.env.LLM_BASE_URL ?? process.env.NANOGPT_BASE_URL ?? "https://nano-gpt.com/api/v1").replace(/\/$/, "")
 }
 
 function buildNanoGptUrl(path: string) {
@@ -290,7 +294,7 @@ async function listNanoGptModelIds() {
       method: "GET",
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${requireNanoGptEnv("NANOGPT_API_KEY")}`,
+        Authorization: `Bearer ${getNanoGptApiKey()}`,
       },
       cache: "no-store",
     },
@@ -405,7 +409,7 @@ async function requestCompletion(input: {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          Authorization: `Bearer ${requireNanoGptEnv("NANOGPT_API_KEY")}`,
+          Authorization: `Bearer ${getNanoGptApiKey()}`,
         },
         body: JSON.stringify({
           model: input.model,
@@ -532,7 +536,7 @@ async function requestCompletionStream(input: {
       headers: {
         Accept: "text/event-stream",
         "Content-Type": "application/json",
-        Authorization: `Bearer ${requireNanoGptEnv("NANOGPT_API_KEY")}`,
+        Authorization: `Bearer ${getNanoGptApiKey()}`,
       },
       body: JSON.stringify({
         model: input.model,

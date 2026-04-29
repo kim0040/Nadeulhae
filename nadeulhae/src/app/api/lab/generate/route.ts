@@ -11,7 +11,7 @@ import {
   clearAuthCookie,
   getAuthenticatedSessionFromRequest,
 } from "@/lib/auth/session"
-import { FactChatError, createFactChatCompletion } from "@/lib/chat/factchat"
+import { NanoGptChatError, createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
 import {
   LAB_DEFAULT_CARD_COUNT,
   LAB_INPUT_MAX_CHARACTERS,
@@ -433,7 +433,7 @@ async function handlePOST(request: NextRequest) {
             ? `\n\n이번은 분할 생성 배치 ${rounds}-${index + 1} 입니다. 다른 배치와 겹치지 않게 다양한 단어를 생성하세요.`
             : `\n\nThis is parallel split batch ${rounds}-${index + 1}. Generate diverse terms that do not overlap with other batches.`
 
-          return createFactChatCompletion({
+          return createNanoGptChatCompletion({
             requestKind: "chat",
             messages: [
               { role: "system", content: prompts.systemPrompt },
@@ -447,7 +447,7 @@ async function handlePOST(request: NextRequest) {
 
         for (const result of generationResults) {
           if (result.status === "rejected") {
-            if (result.reason instanceof FactChatError) {
+            if (result.reason instanceof NanoGptChatError) {
               if (
                 result.reason.statusCode === 429
                 && result.reason.code === "global_daily_limit_reached"
@@ -606,7 +606,7 @@ async function handlePOST(request: NextRequest) {
         }
       }
 
-      if (error instanceof FactChatError) {
+      if (error instanceof NanoGptChatError) {
         if (error.statusCode === 429 && error.code === "global_daily_limit_reached") {
           emitLabGenerateProgress(authenticatedSession.user.id, {
             requestId,
