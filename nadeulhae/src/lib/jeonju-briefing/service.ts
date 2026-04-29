@@ -1114,7 +1114,6 @@ function buildNarrativeSummary(
 ) {
   const top = items[0]
   const second = items[1]
-  const sourceCount = new Set(items.map((item) => item.source).filter(Boolean)).size
 
   if (locale === "ko") {
     if (!top) {
@@ -1345,7 +1344,6 @@ function buildPartialBriefing(
 }
 
 function createFallbackBriefing(dateStr: string, locale: JeonjuBriefingLocale): JeonjuBriefingData {
-  const dateLabel = getFormattedDateLabel(dateStr, locale)
   const isKo = locale === "ko"
 
   return {
