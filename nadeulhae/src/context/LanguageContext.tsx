@@ -411,7 +411,7 @@ const translations: Record<Language, Record<string, string | string[]>> = {
     
     con_hm_name: "김현민",
     con_hm_role: "전북대학교 소프트웨어공학과 24학번",
-    con_hm_desc: "나들해의 모든 프론트엔드(React, UI/UX 디자인, 반응형 레이아웃)와 백엔드(Next.js API 라우트, 서버 아키텍처, WebSocket) 개발을 혼자 도맡았고, 사이트 전체 디자인과 CSS 스타일링까지 책임졌습니다. 데이터베이스는 팀원들과 함께 기상 데이터, 인증 데이터, 실험 데이터 등 도메인별로 나누어 설계했습니다.",
+     con_hm_desc: "프론트엔드, 백엔드, UI/UX 디자인, 서버 구축, DB 설계, 실시간 API 연동을 담당했습니다.",
     
     con_es_name: "김은수",
     con_es_role: "전북대학교 소프트웨어공학과 24학번",
@@ -833,7 +833,7 @@ const translations: Record<Language, Record<string, string | string[]>> = {
     
     con_hm_name: "Hyeonmin Kim",
     con_hm_role: "JNU Software Engineering ('24)",
-    con_hm_desc: "Handled all of Nadeulhae's frontend (React, UI/UX design, responsive layout) and backend (Next.js API routes, server architecture, WebSocket) development solo, plus the entire site design and CSS styling. Database work was split among the team by data domain — weather data, auth data, lab data, and more.",
+     con_hm_desc: "Handled frontend, backend, UI/UX design, server setup, DB design, and real-time API integration.",
     
     con_es_name: "Eunsu Kim",
     con_es_role: "JNU Software Engineering ('24)",
@@ -1257,7 +1257,7 @@ const translations: Record<Language, Record<string, string | string[]>> = {
 
     con_hm_name: "金贤珉",
     con_hm_role: "全北大学 软件工程系 24级",
-    con_hm_desc: "独自负责了나들해的所有前端(React、UI/UX设计、响应式布局)和后端(Next.js API路由、服务器架构、WebSocket)开发，以及整个网站的设计和CSS样式。数据库方面与团队成员按领域(气象数据、认证数据、实验数据等)分工设计。",
+     con_hm_desc: "负责前端、后端、UI/UX设计、服务器搭建、数据库设计、实时API集成。",
 
     con_es_name: "金恩秀",
     con_es_role: "全北大学 软件工程系 24级",
@@ -1681,7 +1681,7 @@ const translations: Record<Language, Record<string, string | string[]>> = {
 
     con_hm_name: "キム・ヒョンミン",
     con_hm_role: "全北大学校 ソフトウェア工学科 24学番",
-    con_hm_desc: "나들해のすべてのフロントエンド(React、UI/UXデザイン、レスポンシブレイアウト)とバックエンド(Next.js APIルート、サーバーアーキテクチャ、WebSocket)開発を一人で担当し、サイト全体のデザインとCSSスタイリングまで責任を持ちました。データベースはチームメンバーと共に気象データ、認証データ、実験データなどドメイン別に分けて設計しました。",
+     con_hm_desc: "フロントエンド、バックエンド、UI/UXデザイン、サーバー構築、DB設計、リアルタイムAPI連携を担当しました。",
 
     con_es_name: "キム・ウンス",
     con_es_role: "全北大学校 ソフトウェア工学科 24学番",
