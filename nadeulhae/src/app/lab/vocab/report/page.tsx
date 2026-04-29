@@ -200,7 +200,7 @@ const REPORT_COPY = {
 
 const PERIOD_OPTIONS = [7, 14, 30] as const
 
-function formatMetricDate(value: string, language: "ko" | "en") {
+function formatMetricDate(value: string, language: string) {
   const parsed = new Date(`${value}T00:00:00+09:00`)
   if (Number.isNaN(parsed.getTime())) {
     return value
@@ -255,7 +255,7 @@ export default function LabVocabReportPage() {
   const { user, status } = useAuth()
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = REPORT_COPY[language]
+  const copy = (REPORT_COPY as any)[language]
 
   const [report, setReport] = useState<LabReportSnapshot | null>(null)
   const [periodDays, setPeriodDays] = useState<(typeof PERIOD_OPTIONS)[number]>(14)

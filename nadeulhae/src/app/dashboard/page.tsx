@@ -22,7 +22,7 @@ import { useLanguage } from "@/context/LanguageContext"
 import { getOptionLabel, PRIMARY_REGION_OPTIONS } from "@/lib/auth/profile-options"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { AuthUser } from "@/lib/auth/types"
-import { formatServerDateTime, parseServerTimestamp } from "@/lib/time/server-time"
+import { formatServerDateTime, parseServerTimestamp, type SupportedLocale } from "@/lib/time/server-time"
 import { cn } from "@/lib/utils"
 import {
   normalizeBulletinText,
@@ -45,7 +45,7 @@ import { SettingsModal } from "@/components/dashboard/settings-modal"
 
 function formatLastUpdate(
   value: WeatherData["metadata"] extends { lastUpdate: infer T } ? T : unknown,
-  language: "ko" | "en"
+  language: SupportedLocale
 ) {
   const formatValue = (raw: string) => {
     const parsed = parseServerTimestamp(raw)
@@ -68,7 +68,7 @@ function formatLastUpdate(
 const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: AuthUser }) {
   const { language, t } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = DASHBOARD_COPY[language]
+  const copy = (DASHBOARD_COPY as any)[language]
 
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [hourlyForecast, setHourlyForecast] = useState<HourlyForecastItem[]>([])
@@ -201,7 +201,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
   const bulletinBodyItems = useMemo(
     () =>
       bulletinBodySegments
-        .map((segment) => toBulletinBodyItem(segment, language))
+        .map((segment) => toBulletinBodyItem(segment, language as any))
         .filter((item) => item.content.length > 0),
     [bulletinBodySegments, language]
   )
@@ -554,7 +554,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { language } = useLanguage()
   const { user, status } = useAuth()
-  const copy = DASHBOARD_COPY[language]
+  const copy = (DASHBOARD_COPY as any)[language]
 
   useEffect(() => {
     if (status === "guest") {

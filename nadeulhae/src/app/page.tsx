@@ -33,7 +33,7 @@ const TodayHourlyForecast = dynamic(() => import("@/components/today-hourly-fore
   loading: () => <div className="h-48 animate-pulse rounded-3xl bg-card" />,
 })
 
-function localizeUvLabel(value: string | undefined, language: "ko" | "en") {
+function localizeUvLabel(value: string | undefined, language: string) {
   if (!value) return "--"
   if (language === "ko") return value
 

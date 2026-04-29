@@ -69,7 +69,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const copy = LOGIN_COPY[language]
+  const copy = (LOGIN_COPY as any)[language]
 
   useEffect(() => {
     if (status === "authenticated") {

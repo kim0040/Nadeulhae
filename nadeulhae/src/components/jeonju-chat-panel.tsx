@@ -76,7 +76,7 @@ const COPY = {
   },
 } as const
 
-function formatChatTime(iso: string, language: "ko" | "en", nowMs: number) {
+function formatChatTime(iso: string, language: string, nowMs: number) {
   return formatServerRelativeTime(iso, nowMs, language)
 }
 
@@ -89,7 +89,7 @@ function ChatBubble({
 }: {
   message: ChatMessage
   isMine: boolean
-  language: "ko" | "en"
+  language: string
   showProfile?: boolean
   nowMs: number
 }) {
@@ -177,7 +177,7 @@ function ChatBubble({
 export function JeonjuChatPanel() {
   const { language } = useLanguage()
   const { user } = useAuth()
-  const copy = COPY[language]
+  const copy = (COPY as any)[language]
   const { subscribe, connected: wsConnected } = useWebSocket()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(true)

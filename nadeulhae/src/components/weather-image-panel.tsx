@@ -53,7 +53,7 @@ function ImageBlock({
   icon: React.ReactNode
   image: { name: string; tm: string; url: string } | null
   emptyText: string
-  language: "ko" | "en"
+  language: string
 }) {
   const localizedImageName = language === "ko"
     ? (image?.name || title)

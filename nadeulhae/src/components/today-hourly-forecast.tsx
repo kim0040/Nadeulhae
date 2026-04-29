@@ -34,7 +34,7 @@ function getMinutesFromStart(baseTime: string, targetTime: string) {
   return (targetHour * 60 + targetMinute) - (baseHour * 60 + baseMinute)
 }
 
-function formatTime(time: string, language: "ko" | "en") {
+function formatTime(time: string, language: string) {
   if (!time || time.length !== 4) return "--:--"
   const hour = parseHour(time)
   const minute = time.slice(2, 4)
@@ -46,7 +46,7 @@ function formatTime(time: string, language: "ko" | "en") {
   return `${hour12}:${minute} ${period}`
 }
 
-function localizeSky(sky: string, language: "ko" | "en") {
+function localizeSky(sky: string, language: string) {
   if (language === "ko") return sky
   if (sky.includes("맑음")) return "Sunny"
   if (sky.includes("구름")) return "Partly Cloudy"
@@ -57,7 +57,7 @@ function localizeSky(sky: string, language: "ko" | "en") {
   return sky
 }
 
-function getSlotLabel(item: HourlyForecastItem, index: number, startTime: string, baseDate: string, language: "ko" | "en") {
+function getSlotLabel(item: HourlyForecastItem, index: number, startTime: string, baseDate: string, language: string) {
   const hour = parseHour(item.time)
   const diffMinutes = getMinutesFromStart(startTime, item.time)
   const isNextDay = item.date !== baseDate

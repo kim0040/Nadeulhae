@@ -35,7 +35,7 @@ export default function LabAiChatPage() {
   const router = useRouter()
   const { user, status } = useAuth()
   const { language } = useLanguage()
-  const copy = PAGE_COPY[language]
+  const copy = (PAGE_COPY as any)[language]
 
   useEffect(() => {
     if (status === "guest") {

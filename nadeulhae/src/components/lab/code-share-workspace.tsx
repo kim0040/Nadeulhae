@@ -207,7 +207,7 @@ const CODE_SHARE_LANGUAGE_PRESETS = [
   "bash",
 ]
 
-function formatDateLabel(value: string, locale: "ko" | "en") {
+function formatDateLabel(value: string, locale: string) {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
     return value
@@ -329,7 +329,7 @@ export function CodeShareWorkspace({
 }) {
   const router = useRouter()
   const { language } = useLanguage()
-  const copy = CODE_SHARE_COPY[language]
+  const copy = (CODE_SHARE_COPY as any)[language]
   const { connected: wsConnected, subscribe, send } = useWebSocket()
 
   const [viewer, setViewer] = useState<ViewerIdentity | null>(null)

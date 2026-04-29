@@ -34,6 +34,16 @@ const NAVBAR_COPY = {
     logoutError: "Failed to log out. Please try again.",
     themeToggle: "Toggle theme",
   },
+  zh: {
+    logout: "登出",
+    logoutError: "登出失败，请重试。",
+    themeToggle: "切换主题",
+  },
+  ja: {
+    logout: "ログアウト",
+    logoutError: "ログアウトに失敗しました。もう一度お試しください。",
+    themeToggle: "テーマ切り替え",
+  },
 } as const
 
 async function readErrorMessage(response: Response, fallback: string) {

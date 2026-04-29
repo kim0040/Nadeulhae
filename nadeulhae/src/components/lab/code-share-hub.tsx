@@ -68,7 +68,7 @@ const HUB_COPY = {
   },
 } as const
 
-function formatDateLabel(value: string, locale: "ko" | "en") {
+function formatDateLabel(value: string, locale: string) {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
     return value
@@ -85,7 +85,7 @@ function formatDateLabel(value: string, locale: "ko" | "en") {
 export function CodeShareHub() {
   const router = useRouter()
   const { language } = useLanguage()
-  const copy = HUB_COPY[language]
+  const copy = (HUB_COPY as any)[language]
 
   const [sessions, setSessions] = useState<CodeShareSessionSummary[]>([])
   const [viewer, setViewer] = useState<ViewerIdentity | null>(null)

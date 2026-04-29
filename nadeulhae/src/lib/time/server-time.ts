@@ -1,4 +1,4 @@
-export type SupportedLocale = "ko" | "en"
+export type SupportedLocale = "ko" | "en" | "zh" | "ja" | string
 
 export const SERVER_TIME_ZONE = "Asia/Seoul"
 

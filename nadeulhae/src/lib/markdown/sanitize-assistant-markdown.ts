@@ -6,7 +6,7 @@ const RAW_MERMAID_ERROR_MARKER_RE = /id=["']d?mermaid-|aria-roledescription=["']
 
 export function sanitizeAssistantMarkdown(input: {
   content: string
-  language: "ko" | "en"
+  language: string
 }) {
   const fallback = input.language === "ko"
     ? "Mermaid 오류 SVG 원문은 숨김 처리되었습니다. `mermaid` 코드블록으로 다시 요청해 주세요."

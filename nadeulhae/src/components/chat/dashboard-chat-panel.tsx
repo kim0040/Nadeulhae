@@ -117,9 +117,11 @@ const CHAT_SUGGESTIONS = {
     "Suggest indoor places for a rainy afternoon",
     "Build a family-friendly route for Jeonju",
   ],
+  zh: [],
+  ja: [],
 } as const
 
-function formatTimestamp(value: string, language: "ko" | "en") {
+function formatTimestamp(value: string, language: string) {
   return formatServerClockTime(value, language)
 }
 
@@ -231,7 +233,7 @@ function ChatBubble({
   groupPosition,
 }: {
   message: UiChatMessage
-  language: "ko" | "en"
+  language: string
   isLastAssistant: boolean
   groupPosition: "first" | "middle" | "last" | "only"
 }) {
@@ -239,7 +241,7 @@ function ChatBubble({
   const showAvatar = !isUser && (groupPosition === "first" || groupPosition === "only")
   const showTimestamp = groupPosition === "last" || groupPosition === "only"
 
-  const copy = CHAT_PANEL_COPY[language]
+  const copy = (CHAT_PANEL_COPY as any)[language]
   const messageContent = !isUser
     ? sanitizeAssistantMarkdown({ content: message.content, language })
     : message.content
@@ -359,7 +361,7 @@ export function DashboardChatPanel({
   weatherContext: ChatWeatherContext | null
 }) {
   const { language } = useLanguage()
-  const copy = CHAT_PANEL_COPY[language]
+  const copy = (CHAT_PANEL_COPY as any)[language]
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)

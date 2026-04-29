@@ -16,7 +16,7 @@ function formatOptionalNumber(value: number | null | undefined, digits = 4) {
   return value.toFixed(digits)
 }
 
-function getStationSourceLabel(source: string | undefined, language: "ko" | "en") {
+function getStationSourceLabel(source: string | undefined, language: string) {
   if (source === "live_api") {
     return language === "ko" ? "실시간 인근 관측소 매핑" : "Live nearby-station mapping"
   }
