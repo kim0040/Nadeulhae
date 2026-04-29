@@ -19,6 +19,7 @@ import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/rep
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { wgs84ToTm } from "@/lib/coords-utils"
 import { broadcast } from "@/lib/websocket/broadcast"
+import { canCallKmaApi, recordKmaApiCall } from "@/lib/kma-quota"
 
 interface WeatherAlertPayload {
   alertType: string
@@ -701,8 +702,8 @@ async function fetchCurrentWeather(nx: number, ny: number, apiKey: string) {
   const nowcastUrl = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getUltraSrtNcst?authKey=${apiKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=${nx}&ny=${ny}`
   const forecastUrl = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getUltraSrtFcst?authKey=${apiKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=${nx}&ny=${ny}`
   const [nowcastData, forecastData] = await Promise.all([
-    fetchJsonSafely(nowcastUrl),
-    fetchJsonSafely(forecastUrl),
+    fetchJsonSafely(nowcastUrl).then((d) => { recordKmaApiCall(); return d }),
+    fetchJsonSafely(forecastUrl).then((d) => { recordKmaApiCall(); return d }),
   ])
   const items = nowcastData?.response?.body?.items?.item
 
@@ -1022,6 +1023,7 @@ async function fetchTsunamiInfo(apiHubKey: string) {
 
   const url = `https://apihub.kma.go.kr/api/typ09/url/tsnm/urlTsnmList.do?orderTy=xml&orderCm=L&authKey=${apiHubKey}`
   const xml = await fetchTextSafely(url)
+  recordKmaApiCall()
   const info = extractXmlBlocks(xml, "info")[0] || ""
 
   const messageType = extractXmlTag(info, "msgKo")
@@ -1055,6 +1057,7 @@ async function fetchVolcanoInfo(apiHubKey: string) {
 
   const url = `https://apihub.kma.go.kr/api/typ09/url/volc/selectVolcInfoList.do?orderTy=xml&orderCm=L&authKey=${apiHubKey}`
   const xml = await fetchTextSafely(url)
+  recordKmaApiCall()
   const info = extractXmlBlocks(xml, "info")[0] || ""
 
   const messageType = extractXmlTag(info, "msgCodeKo")
@@ -1209,14 +1212,15 @@ async function handleGET(req: Request) {
     }
   })()
 
+  const kmaAvailable = canCallKmaApi()
   const [weatherData, uvIndex, bulletin, warning, earthquake, tsunami, volcano] = await Promise.all([
-    fetchCurrentWeather(grid.nx, grid.ny, kmaKey),
+    kmaAvailable ? fetchCurrentWeather(grid.nx, grid.ny, kmaKey) : Promise.resolve(null),
     fetchUvIndex(profile, publicServiceKey),
     fetchRegionalBulletin(profile, publicServiceKey),
     fetchRegionalWarning(profile, publicServiceKey),
     fetchEarthquakeInfo(publicServiceKey),
-    fetchTsunamiInfo(kmaKey),
-    fetchVolcanoInfo(kmaKey),
+    kmaAvailable ? fetchTsunamiInfo(kmaKey) : Promise.resolve(null),
+    kmaAvailable ? fetchVolcanoInfo(kmaKey) : Promise.resolve(null),
   ])
 
   // Wait for station lookup to complete before fetching air quality
@@ -1225,6 +1229,10 @@ async function handleGET(req: Request) {
     profile, publicServiceKey, dynamicStationName,
     nearbyStationCandidates.slice(1).map(c => c.name).filter(Boolean)
   )
+
+  // Use safe defaults when KMA calls were skipped due to daily quota
+  const safeTsunami = tsunami ?? { active: false, title: "", issuedAt: "" }
+  const safeVolcano = volcano ?? { active: false, title: "", issuedAt: "" }
 
   if (!weatherData) {
     return NextResponse.json({ error: "Failed to fetch weather data from KMA" }, { status: 503 })
@@ -1240,8 +1248,8 @@ async function handleGET(req: Request) {
   )
   const isEarthquake = earthquake.active
   const isSevereEarthquake = isEarthquake && earthquake.magnitude >= EARTHQUAKE_KNOCKOUT_MAGNITUDE
-  const isTsunami = tsunami.active
-  const isVolcano = volcano.active
+  const isTsunami = safeTsunami.active
+  const isVolcano = safeVolcano.active
   const isWeatherWarning = warning.active || bulletin.hasAlert
   const isHomeRegion = isFallback || profile.key === HOME_REGION.key
   const scoreBreakdown: ScoreBreakdown = {
@@ -1300,10 +1308,10 @@ async function handleGET(req: Request) {
     warningMessage = warning.title || bulletin.warningStatus || bulletin.summary
   }
   if (isVolcano) {
-    warningMessage = volcano.title || volcano.remark
+    warningMessage = safeVolcano.title || safeVolcano.remark
   }
   if (isTsunami) {
-    warningMessage = tsunami.title || tsunami.remark
+    warningMessage = safeTsunami.title || safeTsunami.remark
   }
   if (isEarthquake) {
     warningMessage = earthquake.title || earthquake.remark
@@ -1323,10 +1331,10 @@ async function handleGET(req: Request) {
     earthquake.remark,
   ]
   if (isTsunami) {
-    hazardSourceItems.push(tsunami.title, tsunami.remark)
+    hazardSourceItems.push(safeTsunami.title, safeTsunami.remark)
   }
   if (isVolcano) {
-    hazardSourceItems.push(volcano.title, volcano.remark)
+    hazardSourceItems.push(safeVolcano.title, safeVolcano.remark)
   }
   const hazardSourceText = hazardSourceItems.join(" ")
   const hazardFlags = detectHazards(hazardSourceText)
@@ -1400,10 +1408,10 @@ async function handleGET(req: Request) {
           }
           : null,
         earthquakeImageUrl: hasEarthquakeRecord ? buildEarthquakeImageUrl(earthquake) : "",
-        tsunamiTitle: isTsunami ? tsunami.title : "",
-        tsunamiUpdatedAt: isTsunami ? tsunami.issuedAt : "",
-        volcanoTitle: isVolcano ? volcano.title : "",
-        volcanoUpdatedAt: isVolcano ? volcano.issuedAt : "",
+        tsunamiTitle: isTsunami ? safeTsunami.title : "",
+        tsunamiUpdatedAt: isTsunami ? safeTsunami.issuedAt : "",
+        volcanoTitle: isVolcano ? safeVolcano.title : "",
+        volcanoUpdatedAt: isVolcano ? safeVolcano.issuedAt : "",
         hazardTags,
       },
       locationContext: {
