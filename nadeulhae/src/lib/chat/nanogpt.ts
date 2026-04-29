@@ -315,11 +315,12 @@ export async function createNanoGptChatCompletion(input: {
   requestKind: "chat" | "summary"
   maxTokens?: number
   temperature?: number
+  timeoutMs?: number
 }): Promise<FactChatCompletionResult> {
   const models = await resolveModelPair()
-  const timeoutMs = input.requestKind === "summary"
+  const timeoutMs = input.timeoutMs ?? (input.requestKind === "summary"
     ? CHAT_SUMMARY_PROVIDER_TIMEOUT_MS
-    : CHAT_PROVIDER_TIMEOUT_MS
+    : CHAT_PROVIDER_TIMEOUT_MS)
   const maxTokens = input.maxTokens ?? (input.requestKind === "summary"
     ? CHAT_SUMMARY_MAX_TOKENS
     : CHAT_COMPLETION_MAX_TOKENS)
