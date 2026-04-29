@@ -1182,7 +1182,8 @@ async function handleGET(req: Request) {
     }
     const nearbyStationUrl = `https://apis.data.go.kr/B552584/MsrstnInfoInqireSvc/getNearbyMsrstnList?serviceKey=${publicServiceKey}&returnType=json&tmX=${tmX}&tmY=${tmY}&ver=1.0`
     const nearbyData = await fetchJsonSafely(nearbyStationUrl)
-    const nearbyItems = toArray(nearbyData?.response?.body?.items?.item)
+    const rawItems = nearbyData?.response?.body?.items
+    const nearbyItems = Array.isArray(rawItems) ? rawItems : toArray(rawItems?.item)
     nearbyStationCandidates = nearbyItems
       .map((item: any) => ({
         name: String(item?.stationName || "").trim(),
