@@ -162,6 +162,9 @@ export function validateAuthMutationRequest(request: NextRequest, locale?: AuthL
     )
   }
 
+  // Body size guard: Next.js has its own body parser limit,
+  // but we add an explicit check when Content-Length is present.
+  // When the header is absent (rare), Next.js's built-in limit applies.
   const contentLength = Number(request.headers.get("content-length") ?? "0")
   if (Number.isFinite(contentLength) && contentLength > AUTH_BODY_LIMIT_BYTES) {
     return createAuthJsonResponse(
