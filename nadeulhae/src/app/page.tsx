@@ -23,6 +23,7 @@ import { WordPullUp } from "@/components/magicui/word-pull-up"
 import { ShineBorder } from "@/components/magicui/shine-border"
 import { MagicCard } from "@/components/ui/magic-card"
 import type { HourlyForecastItem } from "@/components/today-hourly-forecast"
+import Link from "next/link"
 import type { WeatherImageData } from "@/components/weather-image-panel"
 
 const PicnicBriefing = dynamic(() => import("@/components/picnic-briefing").then(m => ({ default: m.PicnicBriefing })), { ssr: false })
@@ -334,6 +335,15 @@ export default function Home() {
           <p className="max-w-3xl text-xs leading-relaxed text-neutral-400 dark:text-neutral-500">
             {t("footer_notice")}
           </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <Link href="/terms" className="text-xs font-medium text-sky-blue/70 hover:text-sky-blue transition-colors">
+              {t("footer_terms")}
+            </Link>
+            <span className="text-neutral-300 dark:text-neutral-600">·</span>
+            <Link href="/about" className="text-xs font-medium text-sky-blue/70 hover:text-sky-blue transition-colors">
+              {t("footer_about")}
+            </Link>
+          </div>
         </div>
       </footer>
     </main>
