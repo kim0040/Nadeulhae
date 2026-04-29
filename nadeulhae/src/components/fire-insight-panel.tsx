@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 
 interface FireInsightPanelProps {
   data: FireSummaryData
-  language: "ko" | "en"
+  language: string
   variant?: "full" | "compact"
 }
 

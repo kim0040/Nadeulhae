@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react"
 
-type Language = "ko" | "en"
+type Language = "ko" | "en" | "zh" | "ja"
 const LANGUAGE_STORAGE_KEY = "nadeulhae_language"
 
 interface LanguageContextType {
@@ -409,7 +409,7 @@ const translations: Record<Language, Record<string, string | string[]>> = {
     
     con_hm_name: "김현민",
     con_hm_role: "전북대학교 소프트웨어공학과 24학번",
-    con_hm_desc: "서비스 전체 구조를 잡고 기상 데이터를 효율적으로 저장할 수 있는 데이터베이스의 뼈대를 설계했습니다.",
+    con_hm_desc: "나들해의 모든 프론트엔드(React, UI/UX 디자인, 반응형 레이아웃)와 백엔드(Next.js API 라우트, 서버 아키텍처, WebSocket) 개발을 혼자 도맡았고, 사이트 전체 디자인과 CSS 스타일링까지 책임졌습니다. 데이터베이스는 팀원들과 함께 기상 데이터, 인증 데이터, 실험 데이터 등 도메인별로 나누어 설계했습니다.",
     
     con_es_name: "김은수",
     con_es_role: "전북대학교 소프트웨어공학과 24학번",
@@ -829,7 +829,7 @@ const translations: Record<Language, Record<string, string | string[]>> = {
     
     con_hm_name: "Hyeonmin Kim",
     con_hm_role: "JNU Software Engineering ('24)",
-    con_hm_desc: "Handled the overall service structure and designed the core database foundation for storing weather data efficiently.",
+    con_hm_desc: "Handled all of Nadeulhae's frontend (React, UI/UX design, responsive layout) and backend (Next.js API routes, server architecture, WebSocket) development solo, plus the entire site design and CSS styling. Database work was split among the team by data domain — weather data, auth data, lab data, and more.",
     
     con_es_name: "Eunsu Kim",
     con_es_role: "JNU Software Engineering ('24)",
@@ -852,7 +852,11 @@ const translations: Record<Language, Record<string, string | string[]>> = {
     cal_insight_text: "In Jeonju, the 2nd and 3rd weekends of May have traditionally recorded the most pleasant picnic index.",
     cal_origin_title: "Data Origin",
     cal_origin_desc: "Dates with the sparkle icon indicate recommended days with picnic score 80+.",
-  }
+  },
+
+  zh: {},
+
+  ja: {},
 }
 
 
@@ -866,14 +870,19 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       ? window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
       : null
 
-    if (savedLanguage === "ko" || savedLanguage === "en") {
+    if (savedLanguage === "ko" || savedLanguage === "en" || savedLanguage === "zh" || savedLanguage === "ja") {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLanguage(savedLanguage)
       return
     }
 
     const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'ko'
-    const targetLang = browserLang === 'ko' ? 'ko' : 'en'
+    const targetLang: Language = (() => {
+      if (browserLang === 'ko') return 'ko'
+      if (browserLang === 'zh') return 'zh'
+      if (browserLang === 'ja') return 'ja'
+      return 'en'
+    })()
 
     setLanguage(targetLang)
   }, [])
@@ -897,7 +906,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }
 
   const t = (key: string, seed?: string | number) => {
-    const val = translations[language][key]
+    const val = translations[language]?.[key] ?? translations.ko?.[key]
     if (Array.isArray(val)) {
       const hourSeed = new Date().getHours()
       const keySeed = Array.from(key).reduce((sum, char) => sum + char.charCodeAt(0), 0)

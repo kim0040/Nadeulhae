@@ -315,7 +315,7 @@ const POLICY_CONTENT: Record<
 export default function TermsPage() {
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = POLICY_CONTENT[language]
+  const copy = POLICY_CONTENT[language as "ko" | "en"] ?? POLICY_CONTENT.en
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-20 pt-24 sm:px-6 sm:pt-28 lg:px-8">

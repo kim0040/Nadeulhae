@@ -394,7 +394,7 @@ function compactRequestText(content: string) {
     .slice(0, 96)
 }
 
-function extractRequestSignals(content: string, language: "ko" | "en") {
+function extractRequestSignals(content: string, language: string) {
   const normalized = content.replace(/\r\n?/g, "\n")
   const lines = normalized
     .split("\n")
@@ -419,12 +419,12 @@ function extractRequestSignals(content: string, language: "ko" | "en") {
 
 function buildThoughtSummaryDetails(input: {
   kind: ThoughtSummaryKind
-  language: "ko" | "en"
+  language: string
   userMessage: string
   modelLabel: string
   isThinkingMode: boolean
 }): ThoughtSummaryDetails {
-  const base = THOUGHT_SUMMARIES[input.language][input.kind]
+  const base = (THOUGHT_SUMMARIES as any)[input.language][input.kind]
   const signal = extractRequestSignals(input.userMessage, input.language)
 
   if (input.language === "ko") {
@@ -485,7 +485,7 @@ function normalizeAttachmentText(content: string) {
     .trim()
 }
 
-function buildAttachmentBlock(fileName: string, content: string, language: "ko" | "en") {
+function buildAttachmentBlock(fileName: string, content: string, language: string) {
   const safeName = normalizeAttachmentFileName(fileName)
   if (language === "ko") {
     return [
@@ -579,7 +579,7 @@ function ThinkingProgressPanel({
 
 export function LabAiChatPanel() {
   const { language } = useLanguage()
-  const copy = COPY[language]
+  const copy = (COPY as any)[language]
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)
@@ -1547,7 +1547,7 @@ export function LabAiChatPanel() {
                 <h1 className="mt-5 text-2xl font-semibold text-foreground sm:text-3xl">{copy.welcomeTitle}</h1>
                 <p className="mt-3 max-w-xl text-base leading-7 text-muted-foreground">{copy.welcomeDescription}</p>
                 <div className="mt-7 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
-                  {copy.suggestions.map((suggestion) => (
+                  {copy.suggestions.map((suggestion: any) => (
                     <button
                       key={suggestion}
                       type="button"

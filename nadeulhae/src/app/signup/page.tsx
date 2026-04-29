@@ -249,7 +249,7 @@ export default function SignupPage() {
   const { status, setAuthenticatedUser } = useAuth()
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
-  const copy = SIGNUP_COPY[language]
+  const copy = (SIGNUP_COPY as any)[language]
 
   const [form, setForm] = useState<FormState>({
     displayName: "",
@@ -303,8 +303,8 @@ export default function SignupPage() {
   const localizedRegions = useMemo(
     () => PRIMARY_REGION_OPTIONS.map((option) => ({
       ...option,
-      label: option.label[language],
-      description: option.description?.[language],
+      label: (option.label as any)[language],
+      description: (option.description as any)?.[language],
     })),
     [language]
   )
@@ -551,7 +551,7 @@ export default function SignupPage() {
                 <OptionButton
                   key={option.value}
                   selected={form.ageBand === option.value}
-                  label={option.label[language]}
+                  label={(option.label as any)[language]}
                   onClick={() => setForm((current) => ({ ...current, ageBand: option.value }))}
                 />
               ))}
@@ -589,7 +589,7 @@ export default function SignupPage() {
                 <ToggleChip
                   key={option.value}
                   selected={form.interestTags.includes(option.value)}
-                  label={option.label[language]}
+                  label={(option.label as any)[language]}
                   onClick={() => toggleInterest(option.value)}
                 />
               ))}
@@ -612,7 +612,7 @@ export default function SignupPage() {
                 <OptionButton
                   key={option.value}
                   selected={form.preferredTimeSlot === option.value}
-                  label={option.label[language]}
+                  label={(option.label as any)[language]}
                   onClick={() => setForm((current) => ({ ...current, preferredTimeSlot: option.value }))}
                 />
               ))}
@@ -627,7 +627,7 @@ export default function SignupPage() {
                 <ToggleChip
                   key={option.value}
                   selected={form.weatherSensitivity.includes(option.value)}
-                  label={option.label[language]}
+                  label={(option.label as any)[language]}
                   onClick={() => toggleWeatherSensitivity(option.value)}
                 />
               ))}

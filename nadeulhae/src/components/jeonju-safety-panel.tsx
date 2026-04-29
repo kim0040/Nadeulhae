@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 interface JeonjuSafetyPanelProps {
   weatherData: WeatherData
   fireSummary: FireSummaryData | null
-  language: "ko" | "en"
+  language: string
 }
 
 type Tone = "safe" | "info" | "caution" | "danger"
@@ -32,7 +32,7 @@ function formatDateLabel(date: string) {
   return `${date.slice(0, 4)}.${date.slice(4, 6)}.${date.slice(6, 8)}`
 }
 
-function formatShortDateLabel(date: string, language: "ko" | "en") {
+function formatShortDateLabel(date: string, language: string) {
   if (!date || date.length !== 8) return date
   const month = Number(date.slice(4, 6))
   const day = Number(date.slice(6, 8))
@@ -75,7 +75,7 @@ function selectOfficialAlertText(weatherData: WeatherData) {
       && !EMPTY_BULLETIN_PATTERN.test(value)) || ""
 }
 
-function getHazardChips(weatherData: WeatherData, language: "ko" | "en") {
+function getHazardChips(weatherData: WeatherData, language: string) {
   const chips: Array<{ label: string; tone: Tone }> = []
   const { eventData, metadata } = weatherData
 
@@ -112,7 +112,7 @@ function getHazardChips(weatherData: WeatherData, language: "ko" | "en") {
   return chips
 }
 
-function getHazardSummary(weatherData: WeatherData, language: "ko" | "en") {
+function getHazardSummary(weatherData: WeatherData, language: string) {
   const { eventData } = weatherData
   const detail = selectOfficialAlertText(weatherData)
 
@@ -151,7 +151,7 @@ function getHazardSummary(weatherData: WeatherData, language: "ko" | "en") {
   }
 }
 
-function getMobilitySummary(weatherData: WeatherData, language: "ko" | "en") {
+function getMobilitySummary(weatherData: WeatherData, language: string) {
   const { details, eventData, metadata } = weatherData
   const bulletin = metadata?.bulletin?.summary || ""
 
@@ -214,7 +214,7 @@ function getMobilitySummary(weatherData: WeatherData, language: "ko" | "en") {
   }
 }
 
-function getFireFlowBadge(fireSummary: FireSummaryData | null, language: "ko" | "en") {
+function getFireFlowBadge(fireSummary: FireSummaryData | null, language: string) {
   if (!fireSummary) {
     return {
       tone: "info" as const,
@@ -249,7 +249,7 @@ function getFireFlowBadge(fireSummary: FireSummaryData | null, language: "ko" | 
   }
 }
 
-function getFirePlaceNarrative(fireSummary: FireSummaryData | null, language: "ko" | "en") {
+function getFirePlaceNarrative(fireSummary: FireSummaryData | null, language: string) {
   if (!fireSummary?.topPlaces?.length) {
     return {
       title: language === "ko" ? "장소 패턴 집계 중" : "Reading place patterns",
@@ -308,7 +308,7 @@ function getFirePlaceNarrative(fireSummary: FireSummaryData | null, language: "k
   }
 }
 
-function getOverallSafetyGuide(weatherData: WeatherData, fireSummary: FireSummaryData | null, language: "ko" | "en") {
+function getOverallSafetyGuide(weatherData: WeatherData, fireSummary: FireSummaryData | null, language: string) {
   const alertDetail = selectOfficialAlertText(weatherData)
 
   if (weatherData.eventData?.isEarthquake || weatherData.eventData?.isTsunami || weatherData.eventData?.isVolcano) {

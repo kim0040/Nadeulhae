@@ -54,7 +54,7 @@ type LabDeckSnapshot = {
   topic: string
   cardCount: number
   createdAt: string
-  locale?: "ko" | "en"
+  locale?: string
 }
 
 type LabCardSnapshot = {
@@ -150,7 +150,7 @@ function parseGenerateProgressPayload(payload: unknown): LabGenerateProgressPayl
   }
 }
 
-function formatGenerateProgressTime(value: string, language: "ko" | "en") {
+function formatGenerateProgressTime(value: string, language: string) {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
     return ""
@@ -163,7 +163,7 @@ function formatGenerateProgressTime(value: string, language: "ko" | "en") {
   })
 }
 
-function formatGenerateProgressMessage(progress: LabGenerateProgressPayload, language: "ko" | "en") {
+function formatGenerateProgressMessage(progress: LabGenerateProgressPayload, language: string) {
   switch (progress.status) {
     case "started":
       return language === "ko"
@@ -205,7 +205,7 @@ function formatGenerateProgressMessage(progress: LabGenerateProgressPayload, lan
 
 function formatLiveGenerationHeadline(
   progress: LabGenerateProgressPayload | null,
-  language: "ko" | "en",
+  language: string,
   isGenerating: boolean,
   elapsedSeconds: number,
   pulseFrame: number
@@ -571,7 +571,7 @@ const LAB_COPY = {
   },
 } as const
 
-function formatLabDate(value: string, language: "ko" | "en") {
+function formatLabDate(value: string, language: string) {
   const parsed = parseServerTimestamp(value)
   if (!parsed) {
     return value
@@ -650,7 +650,7 @@ export default function LabPage() {
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
   const { subscribe, connected: wsConnected } = useWebSocket()
-  const copy = LAB_COPY[language]
+  const copy = (LAB_COPY as any)[language]
 
   const [state, setState] = useState<LabStateSnapshot | null>(null)
   const [stateError, setStateError] = useState<string | null>(null)

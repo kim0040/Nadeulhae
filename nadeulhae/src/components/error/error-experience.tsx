@@ -194,7 +194,7 @@ export function ErrorExperience({
   const router = useRouter()
   const { language, setLanguage } = useLanguage()
   const { theme, setTheme, resolvedTheme } = useTheme()
-  const copy = COPY[language]
+  const copy = (COPY as any)[language]
   const mode = copy.modes[variant]
   const activeTheme = theme === "system" ? resolvedTheme ?? "system" : theme
   const particleColor = activeTheme === "dark" ? "#dff4ff" : "#2f6fe4"
@@ -387,7 +387,7 @@ export function ErrorExperience({
                       {copy.stepsTitle}
                     </p>
                     <ul className="mt-4 space-y-3">
-                      {mode.steps.map((step) => (
+                      {mode.steps.map((step: any) => (
                         <li
                           key={step}
                           className="flex gap-3 text-sm leading-6 text-[var(--muted-foreground)]"

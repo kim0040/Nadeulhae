@@ -1,3 +1,5 @@
+type BulletinLanguage = "ko" | "en" | "zh" | "ja"
+
 /**
  * @fileoverview Shared bulletin text parsing and formatting utilities.
  *
@@ -193,7 +195,7 @@ export const BULLETIN_TAG_RULES: Array<{
   id: string
   regex: RegExp
   tone: BulletinSeverity
-  label: Record<"ko" | "en", string>
+  label: Record<string, string>
 }> = [
   {
     id: "typhoon",
@@ -667,7 +669,7 @@ export function extractBulletinCategoryToken(segment: string) {
  */
 export function formatBulletinCategoryLabel(
   token: string,
-  language: "ko" | "en"
+  language: BulletinLanguage
 ) {
   if (language === "ko") {
     switch (token) {
@@ -714,7 +716,7 @@ export function formatBulletinCategoryLabel(
  */
 export function toBulletinBodyItem(
   segment: string,
-  language: "ko" | "en"
+  language: BulletinLanguage
 ): BulletinBodyItem {
   const normalized = normalizeBulletinText(segment)
   if (!normalized) {
@@ -748,7 +750,7 @@ export function toBulletinBodyItem(
  */
 export function extractBulletinKeywordTags(
   sources: string[],
-  language: "ko" | "en"
+  language: BulletinLanguage
 ): BulletinKeywordTag[] {
   const merged = sources
     .map((source) => normalizeBulletinText(source))
@@ -790,7 +792,7 @@ export function extractBulletinKeywordTags(
  */
 export function translateBulletinText(
   text: string,
-  language: "ko" | "en"
+  language: BulletinLanguage
 ) {
   if (language === "ko") return text
 
@@ -850,7 +852,7 @@ export function translateBulletinText(
  */
 export function localizeBulletinLabel(
   label: string,
-  language: "ko" | "en"
+  language: BulletinLanguage
 ) {
   if (language === "ko") return label
   const dayMatch = label.match(/(\d{1,2})일/)
@@ -892,7 +894,7 @@ export function localizeBulletinLabel(
  */
 export function parseBulletinSummary(
   summary: string,
-  language: "ko" | "en"
+  language: BulletinLanguage
 ): ParsedBulletin {
   const normalized = summary.replace(/\s+/g, " ").trim()
 
@@ -983,7 +985,7 @@ export function getBulletinTone(text: string): BulletinTagTone {
  */
 export function getBulletinTags(
   text: string,
-  language: "ko" | "en"
+  language: BulletinLanguage
 ): BulletinBriefTag[] {
   const entries = [
     {
@@ -1072,7 +1074,7 @@ export function getToneClasses(tone: BulletinTagTone) {
  */
 export function formatBulletin(
   text: string,
-  language: "ko" | "en"
+  language: BulletinLanguage
 ) {
   const parsed = parseBulletinSummary(text, language)
   const severity = getBulletinSeverity(text)

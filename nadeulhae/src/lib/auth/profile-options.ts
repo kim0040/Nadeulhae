@@ -3,10 +3,14 @@ export interface LocalizedOption {
   label: {
     ko: string
     en: string
+    zh?: string
+    ja?: string
   }
   description?: {
     ko: string
     en: string
+    zh?: string
+    ja?: string
   }
 }
 
@@ -92,9 +96,9 @@ export const WEATHER_SENSITIVITY_OPTIONS: LocalizedOption[] = [
 export function getOptionLabel(
   options: LocalizedOption[],
   value: string,
-  language: "ko" | "en"
+  language: string
 ) {
-  return options.find((option) => option.value === value)?.label[language] ?? value
+  return options.find((option) => option.value === value)?.label[language as "ko" | "en"] ?? value
 }
 
 export function filterAllowedValues(

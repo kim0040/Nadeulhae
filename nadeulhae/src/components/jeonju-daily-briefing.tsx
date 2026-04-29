@@ -51,11 +51,11 @@ function getKstDateKey() {
   return kstNow.toISOString().slice(0, 10)
 }
 
-function getCacheKey(lang: "ko" | "en") {
+function getCacheKey(lang: string) {
   return `${CACHE_PREFIX}:${lang}:${getKstDateKey()}`
 }
 
-function readCache(lang: "ko" | "en"): BriefingData | null {
+function readCache(lang: string): BriefingData | null {
   if (typeof window === "undefined") return null
   try {
     const raw = localStorage.getItem(getCacheKey(lang))
@@ -71,7 +71,7 @@ function readCache(lang: "ko" | "en"): BriefingData | null {
   }
 }
 
-function writeCache(lang: "ko" | "en", data: BriefingData) {
+function writeCache(lang: string, data: BriefingData) {
   if (typeof window === "undefined") return
   const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
   const nextMidnight = new Date(kstNow)
@@ -80,7 +80,7 @@ function writeCache(lang: "ko" | "en", data: BriefingData) {
   localStorage.setItem(getCacheKey(lang), JSON.stringify({ data, exp }))
 }
 
-function formatDate(date: string, lang: "ko" | "en") {
+function formatDate(date: string, lang: string) {
   const d = new Date(date)
   if (Number.isNaN(d.getTime())) return date
   return d.toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", {
@@ -96,7 +96,7 @@ function formatDate(date: string, lang: "ko" | "en") {
 // ------------------------------------------------------------------
 
 interface JeonjuDailyBriefingProps {
-  language: "ko" | "en"
+  language: string | "zh" | "ja"
 }
 
 export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
