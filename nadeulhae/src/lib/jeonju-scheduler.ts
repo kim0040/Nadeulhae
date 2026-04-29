@@ -47,10 +47,14 @@ async function generateForToday(): Promise<void> {
   try {
     console.log(`[jeonju-scheduler] Starting auto-generation for ${dateStr}...`)
 
-    const [ko, en] = await Promise.all([
-      generateJeonjuBriefing({ locale: "ko", forceRefresh: true, skipMemoryCache: true }),
-      generateJeonjuBriefing({ locale: "en", forceRefresh: true, skipMemoryCache: true }),
-    ])
+    // Generate Korean first, then translate to English for consistency
+    const ko = await generateJeonjuBriefing({ locale: "ko", forceRefresh: true, skipMemoryCache: true })
+    const en = await generateJeonjuBriefing({
+      locale: "en",
+      forceRefresh: true,
+      skipMemoryCache: true,
+      koreanBriefing: ko.data,
+    })
 
     console.log(
       `[jeonju-scheduler] Auto-generation complete for ${dateStr}. ` +

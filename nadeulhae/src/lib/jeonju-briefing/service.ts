@@ -13,6 +13,7 @@ interface GenerateBriefingOptions {
   locale?: JeonjuBriefingLocale
   forceRefresh?: boolean
   skipMemoryCache?: boolean
+  koreanBriefing?: JeonjuBriefingData
 }
 
 interface BriefingGenerationResult {
@@ -681,6 +682,7 @@ export async function generateJeonjuBriefing(
     locale = "ko",
     forceRefresh = false,
     skipMemoryCache = false,
+    koreanBriefing,
   } = options
   const yesterdayDate = getYesterdayInKst()
   const cacheKey = getBriefingCacheKey(yesterdayDate, locale)
@@ -722,7 +724,7 @@ export async function generateJeonjuBriefing(
   const generationPromise = (async (): Promise<BriefingGenerationResult> => {
     // 5. Generate fresh briefing
     try {
-      const result = await fetchAndSummarize(yesterdayDate, locale)
+      const result = await fetchAndSummarize(yesterdayDate, locale, koreanBriefing)
 
       // Save to memory cache first so repeated reads do not hit DB.
       setCachedBriefingToMemory(cacheKey, result)
@@ -809,10 +811,16 @@ export async function generateJeonjuBriefing(
 
 export async function fetchAndSummarize(
   dateStr: string,
-  locale: JeonjuBriefingLocale
+  locale: JeonjuBriefingLocale,
+  koreanBriefing?: JeonjuBriefingData
 ): Promise<JeonjuBriefingData & { tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
   const dateLabel = getFormattedDateLabel(dateStr, locale)
   const relativeLabel = getRelativeDayLabel(dateStr, locale)
+
+  // English mode: translate Korean briefing instead of generating independently
+  if (locale === "en" && koreanBriefing) {
+    return translateBriefingToEnglish(dateStr, koreanBriefing)
+  }
 
   // 1. Run Tavily searches
   const { results: allResults, answer: searchAnswer, totalSearches } = await executeMultiSearch(dateStr, locale)
@@ -895,6 +903,135 @@ export async function fetchAndSummarize(
 
   // 6. Normalize & build final result
   return buildFinalBriefing(dateStr, locale, allResults, parsed, modelUsed, tokenUsage)
+}
+
+/**
+ * Translate a Korean briefing to English using the LLM.
+ * This ensures consistent content between ko/en versions
+ * instead of independently generating both from search results.
+ */
+async function translateBriefingToEnglish(
+  dateStr: string,
+  koreanBriefing: JeonjuBriefingData
+): Promise<JeonjuBriefingData & { tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+  const koContent = JSON.stringify({
+    headline: koreanBriefing.headline,
+    summary: koreanBriefing.summary,
+    newsItems: koreanBriefing.newsItems.slice(0, 6).map((n) => ({
+      title: n.title,
+      snippet: n.snippet,
+      source: n.source,
+    })),
+    aiInsight: koreanBriefing.aiInsight,
+    keywordTags: koreanBriefing.keywordTags,
+  })
+
+  const systemPrompt = `You are a professional Korean-to-English translator for a Jeonju local news briefing.
+Translate the given Korean JSON content into natural, fluent English.
+Keep the same JSON structure and field names.
+Maintain a warm, friendly tone similar to the Korean original.
+Do NOT add or remove any information. Translate faithfully.
+
+Return ONLY valid JSON with these fields:
+{
+  "headline": "English headline (concise, under 80 chars)",
+  "summary": "English summary preserving the friendly intro greeting style",
+  "newsItems": [{"title": "...", "snippet": "...", "source": "..."}],
+  "aiInsight": "Translated insight or null",
+  "keywordTags": ["translated tags"]
+}`
+
+  const userPrompt = `Translate this Korean Jeonju briefing to English:\n\n${koContent}`
+
+  let modelUsed: string | null = null
+  let tokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+
+  try {
+    const completion = await createNanoGptChatCompletion({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      requestKind: "chat",
+      maxTokens: 2200,
+      temperature: 0.2,
+      timeoutMs: 60000,
+    })
+
+    modelUsed = completion.resolvedModel
+    tokenUsage = {
+      promptTokens: completion.usage.promptTokens ?? 0,
+      completionTokens: completion.usage.completionTokens ?? 0,
+      totalTokens: completion.usage.totalTokens ?? 0,
+    }
+
+    const jsonText = extractJsonFromResponse(completion.content)
+    const parsed = jsonText ? parseBriefingJson(jsonText) : null
+
+    if (parsed?.summary) {
+      return {
+        briefingDate: dateStr,
+        locale: "en",
+        headline: parsed.headline || koreanBriefing.headline,
+        summary: ensureFriendlyIntro(parsed.summary.replace(/[\x00-\x1f]/g, " "), "en"),
+        newsItems: parsed.newsItems?.length > 0
+          ? parsed.newsItems
+          : koreanBriefing.newsItems.map((n) => ({ ...n })),
+        aiInsight: parsed.aiInsight,
+        weatherNote: null,
+        festivalNote: null,
+        keywordTags: parsed.keywordTags?.length > 0
+          ? parsed.keywordTags
+          : koreanBriefing.keywordTags.map((t) => t.replace("#", "#")),
+        modelUsed,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        tokenUsage,
+      }
+    }
+
+    // Fallback: use raw translation text as summary
+    return {
+      briefingDate: dateStr,
+      locale: "en",
+      headline: koreanBriefing.headline,
+      summary: ensureFriendlyIntro(
+        (completion.content || "").replace(/[\x00-\x1f]/g, " ").slice(0, 1200),
+        "en"
+      ),
+      newsItems: koreanBriefing.newsItems.map((n) => ({ ...n })),
+      aiInsight: null,
+      weatherNote: null,
+      festivalNote: null,
+      keywordTags: koreanBriefing.keywordTags.map((t) => t.replace("#", "#")),
+      modelUsed,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tokenUsage,
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error(`[jeonju-briefing] English translation failed: ${msg.slice(0, 120)}`)
+    // Fallback: serve Korean data as-is with English wrapper
+    return {
+      briefingDate: dateStr,
+      locale: "en",
+      headline: koreanBriefing.headline,
+      summary: ensureFriendlyIntro(
+        "I've compiled the latest Jeonju updates for you. The original Korean briefing is provided below.",
+        "en"
+      ),
+      newsItems: koreanBriefing.newsItems.map((n) => ({ ...n })),
+      aiInsight: koreanBriefing.aiInsight,
+      weatherNote: null,
+      festivalNote: null,
+      keywordTags: koreanBriefing.keywordTags.map((t) => t.replace("#", "#")),
+      modelUsed: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    }
+  }
 }
 
 // ------------------------------------------------------------------
