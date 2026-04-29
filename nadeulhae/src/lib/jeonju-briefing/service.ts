@@ -840,7 +840,7 @@ export async function fetchAndSummarize(
         { role: "user", content: searchContext },
       ],
       requestKind: "chat",
-      maxTokens: 1600,
+      maxTokens: 2200,
       temperature: 0.2,
     })
     completionContent = completion.content
@@ -874,7 +874,12 @@ export async function fetchAndSummarize(
       parsed = parseBriefingJson(jsonText)
     } catch (parseError) {
       console.error("[jeonju-briefing] JSON parse failed, using raw content as summary:", parseError)
-      parsed.summary = completionContent.slice(0, 1200)
+      // Strip JSON structure from raw content: keep only text before the first '{'
+      const firstBrace = completionContent.indexOf("{")
+      const textOnly = firstBrace > 0
+        ? completionContent.slice(0, firstBrace).trim()
+        : completionContent
+      parsed.summary = textOnly.slice(0, 1200)
     }
   } else {
     parsed.summary = completionContent.slice(0, 1200)
