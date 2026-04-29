@@ -1407,10 +1407,46 @@ function buildFinalBriefing(
   // Strip control characters that break JSON (raw newlines, tabs, etc.)
   summary = summary.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, " ")
 
-  // News items: prefer LLM's, fallback to raw search results
+  // News items: cross-reference LLM items with real search results for valid URLs
   let newsItems: JeonjuBriefingData["newsItems"]
   if (parsed.newsItems.length > 0) {
-    newsItems = parsed.newsItems.slice(0, 10)
+    // Build a lookup from search results by title+source for URL matching
+    const resultMap = new Map<string, typeof searchResults[0]>()
+    for (const r of searchResults) {
+      const key = normalizeUrlForDedup(`${r.title}|${r.source || extractDomain(r.url)}`)
+      resultMap.set(key, r)
+    }
+    // Match each LLM news item to a real search result for valid URLs
+    newsItems = parsed.newsItems.slice(0, 10).map((item) => {
+      let matchedUrl = item.url
+      let matchedSource = item.source
+      // Try exact title match first
+      for (const r of searchResults) {
+        if (r.title === item.title || r.title.includes(item.title.slice(0, 30)) || item.title.includes(r.title.slice(0, 30))) {
+          matchedUrl = r.url
+          matchedSource = r.source || extractDomain(r.url) || item.source
+          break
+        }
+      }
+      // If no title match, try source + snippet overlap
+      if (matchedUrl === item.url) {
+        for (const r of searchResults) {
+          const overlap = item.snippet.slice(0, 30)
+          if (r.content.includes(overlap) && (r.source || "").includes(item.source.slice(0, 10))) {
+            matchedUrl = r.url
+            matchedSource = r.source || extractDomain(r.url) || item.source
+            break
+          }
+        }
+      }
+      return {
+        title: item.title,
+        url: matchedUrl,
+        source: matchedSource,
+        snippet: item.snippet.replace(/\s+/g, " ").trim().slice(0, 110),
+        publishedDate: item.publishedDate || null,
+      }
+    })
   } else if (searchResults.length > 0) {
     newsItems = searchResults.slice(0, 10).map((r) => ({
       title: r.title,
