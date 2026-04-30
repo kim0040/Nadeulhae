@@ -41,6 +41,12 @@ function buildUserProfileSummary(user: AuthUser, locale: ChatLocale) {
     getOptionLabel(WEATHER_SENSITIVITY_OPTIONS, value, locale)
   )
 
+  const yesNo = (b: boolean) => {
+    if (locale === "zh") return b ? "是" : "否"
+    if (locale === "ja") return b ? "はい" : "いいえ"
+    return locale === "ko" ? (b ? "예" : "아니오") : (b ? "yes" : "no")
+  }
+
   if (locale === "ko") {
     return [
       `이름: ${user.displayName}`,
@@ -49,18 +55,48 @@ function buildUserProfileSummary(user: AuthUser, locale: ChatLocale) {
       `선호 시간대: ${getOptionLabel(TIME_SLOT_OPTIONS, user.preferredTimeSlot, locale)}`,
       `관심사: ${formatList(interests)}`,
       `민감한 날씨 요소: ${formatList(sensitivities)}`,
-      `알림 수신 동의: ${user.marketingAccepted ? "예" : "아니오"}`,
+      `알림 수신 동의: ${yesNo(user.marketingAccepted)}`,
     ].join("\n")
   }
 
+  const labelMap: Record<string, Record<string, string>> = {
+    zh: {
+      name: "姓名",
+      ageBand: "年龄段",
+      primaryRegion: "主要使用区域",
+      preferredTime: "偏好时间段",
+      interests: "兴趣爱好",
+      weatherSensitivities: "敏感天气要素",
+      marketingConsent: "通知接收同意",
+    },
+    ja: {
+      name: "名前",
+      ageBand: "年齢層",
+      primaryRegion: "主な利用地域",
+      preferredTime: "希望時間帯",
+      interests: "興味・関心",
+      weatherSensitivities: "敏感な天気要素",
+      marketingConsent: "通知受信の同意",
+    },
+  }
+  const labels = labelMap[locale] ?? labelMap.zh ?? {
+    name: "Name",
+    ageBand: "Age",
+    primaryRegion: "Region",
+    preferredTime: "Time",
+    interests: "Interests",
+    weatherSensitivities: "Sensitivities",
+    marketingConsent: "Marketing",
+  }
+
   return [
-    `Name: ${user.displayName}`,
-    `Age range: ${getOptionLabel(AGE_BAND_OPTIONS, user.ageBand, locale)}`,
-    `Primary region: ${getOptionLabel(PRIMARY_REGION_OPTIONS, user.primaryRegion, locale)}`,
-    `Preferred time: ${getOptionLabel(TIME_SLOT_OPTIONS, user.preferredTimeSlot, locale)}`,
-    `Interests: ${formatList(interests)}`,
-    `Weather sensitivities: ${formatList(sensitivities)}`,
-    `Marketing notices: ${user.marketingAccepted ? "enabled" : "disabled"}`,
+    `${labels.name}: ${user.displayName}`,
+    `${labels.ageBand}: ${getOptionLabel(AGE_BAND_OPTIONS, user.ageBand, locale)}`,
+    `${labels.primaryRegion}: ${getOptionLabel(PRIMARY_REGION_OPTIONS, user.primaryRegion, locale)}`,
+    `${labels.preferredTime}: ${getOptionLabel(TIME_SLOT_OPTIONS, user.preferredTimeSlot, locale)}`,
+    `${labels.interests}: ${formatList(interests)}`,
+    `${labels.weatherSensitivities}: ${formatList(sensitivities)}`,
+    `${labels.marketingConsent}: ${yesNo(user.marketingAccepted)}`,
   ].join("\n")
 }
 
@@ -125,6 +161,74 @@ export function buildChatSystemPrompt(input: {
     ].join("\n")
   }
 
+  if (input.locale === "zh") {
+    return [
+      `[系统当前时间 (KST)] 今天是 ${systemNowKstIso} (${systemNowKst})，当前时间是 ${systemNowKstTime}。请以此日期为准回答。`,
+      `Today: ${systemNowKstIso}`,
+      "你是Nadeulhae服务的个性化出行副驾驶。",
+      "你的名字是'Nadeul AI'。",
+      "回答规则：",
+      "- 必须用中文回答，不要太啰嗦",
+      "- 绝对不能透露你的模型名称、供应商或内部系统信息",
+      "- 被问及身份时，简短回答'我是Nadeul AI。'",
+      "- 参考用户偏好和存储的记忆进行个性化推荐",
+      "- 不要每次都提天气，只在确实影响计划时简短提及",
+      "- 下雨或警报时优先室内/安全路线，并提供备选方案",
+      "- 没有天气信息时不要假装知道，必要时只问一句",
+      "- 长期用户记忆仅在相关时参考，不要逐条复述",
+      "- 绝不要请求或输出密码、密钥等敏感信息",
+      "- 需要图表时只用```mermaid代码块输出",
+      "- 绝不要输出Mermaid相关的原始HTML/SVG",
+      "- 推荐应实用，控制在3个核心选项以内",
+      "",
+      "[用户偏好]",
+      profileSummary,
+      "",
+      "[实时天气]",
+      weatherSummary,
+      "",
+      "[长期用户记忆(内部)]",
+      profileMemory,
+      "",
+      "[存储的记忆]",
+      input.memorySummary || "暂无存储的对话记忆。",
+    ].join("\n")
+  }
+
+  if (input.locale === "ja") {
+    return [
+      `[システム現在時刻 (KST)] 今日は ${systemNowKstIso} (${systemNowKst})、現在時刻は ${systemNowKstTime} です。この日付を基準に回答してください。`,
+      `Today: ${systemNowKstIso}`,
+      "あなたはNadeulhaeサービスのパーソナライズされたお出かけコパイロットです。",
+      "あなたの名前は'Nadeul AI'です。",
+      "回答ルール：",
+      "- 必ず日本語で回答し、不要に長くならないように",
+      "- モデル名、ベンダー、内部システム情報は絶対に公開しない",
+      "- 自分が誰か聞かれたら「私はNadeul AIです。」と簡潔に",
+      "- ユーザーの好みと保存された記憶に基づいて個別の提案を行う",
+      "- 天気に毎回言及せず、計画に実際に影響があるときだけ簡単に反映する",
+      "- 雨や警報時は屋内・安全優先のルートを提示し代替案も出す",
+      "- 天気情報がないときは知ったかぶりせず、必要な場合だけ確認の質問を1行で",
+      "- 長期記憶は関連するときだけ参照し、毎回答えに含めない",
+      "- パスワードやキーなどの機密情報は要求・出力しない",
+      "- 図が必要なときは```mermaidコードブロックのみで出力",
+      "- Mermaidの生HTML/SVGを絶対に出力しない",
+      "- 提案は実用的に、3つ以内の核心オプションにまとめる",
+      "",
+      "[ユーザープロフィール]",
+      profileSummary,
+      "",
+      "[リアルタイム天気]",
+      weatherSummary,
+      "",
+      "[長期ユーザー記憶(内部)]",
+      profileMemory,
+      "",
+      "[保存された記憶]",
+      input.memorySummary || "まだ保存された会話の記憶はありません。",
+    ].join("\n")
+  }
+
   return [
     `[System Current Time (KST)] Today is ${systemNowKstIso} (${systemNowKst}), current time is ${systemNowKstTime}. Use this as the current date for all responses.`,
     `Today: ${systemNowKstIso}`,
@@ -167,22 +271,23 @@ function buildProfileMemoryContext(input: {
   const assessment = input.assessment?.trim() || null
 
   if (!summary && !assessment) {
-    return input.locale === "ko"
-      ? "아직 누적된 사용자 장기 메모리 없음"
-      : "No long-term user memory available yet"
+    if (input.locale === "ko") return "아직 누적된 사용자 장기 메모리 없음"
+    if (input.locale === "zh") return "暂无累积的用户长期记忆"
+    if (input.locale === "ja") return "まだ累積されたユーザーの長期記憶はありません"
+    return "No long-term user memory available yet"
   }
 
   if (input.locale === "ko") {
-    return [
-      `요약: ${summary || "-"}`,
-      `평가: ${assessment || "-"}`,
-    ].join("\n")
+    return [`요약: ${summary || "-"}`, `평가: ${assessment || "-"}`].join("\n")
+  }
+  if (input.locale === "zh") {
+    return [`摘要: ${summary || "-"}`, `评估: ${assessment || "-"}`].join("\n")
+  }
+  if (input.locale === "ja") {
+    return [`要約: ${summary || "-"}`, `評価: ${assessment || "-"}`].join("\n")
   }
 
-  return [
-    `Summary: ${summary || "-"}`,
-    `Assessment: ${assessment || "-"}`,
-  ].join("\n")
+  return [`Summary: ${summary || "-"}`, `Assessment: ${assessment || "-"}`].join("\n")
 }
 
 function buildWeatherSummary(
@@ -190,42 +295,66 @@ function buildWeatherSummary(
   locale: ChatLocale
 ) {
   if (!weather) {
-    return locale === "ko"
-      ? "사용 가능한 실시간 날씨 컨텍스트 없음"
-      : "No live weather context available"
+    if (locale === "ko") return "사용 가능한 실시간 날씨 컨텍스트 없음"
+    if (locale === "zh") return "暂无实时天气信息"
+    if (locale === "ja") return "利用可能なリアルタイム天気情報はありません"
+    return "No live weather context available"
   }
 
-  if (locale === "ko") {
-    return [
-      `지역: ${weather.region || "-"}`,
-      `피크닉 지수: ${weather.score ?? "-"}`,
-      `현재 상태: ${weather.status || "-"}`,
-      `기온/체감: ${weather.temperatureC ?? "-"}°C / ${weather.feelsLikeC ?? "-"}°C`,
-      `습도/풍속: ${weather.humidityPct ?? "-"}% / ${weather.windMs ?? "-"}m/s`,
-      `대기질(PM10/PM2.5): ${weather.pm10 ?? "-"} / ${weather.pm25 ?? "-"}`,
-      `자외선: ${weather.uvLabel || "-"}`,
-      `강수 여부: ${weather.rainingNow ? "예" : "아니오"}`,
-      `특보/위험 여부: ${weather.severeAlert ? "있음" : "없음"}`,
-      `위험 태그: ${weather.hazardTags.length > 0 ? weather.hazardTags.join(", ") : "-"}`,
-      `브리핑: ${weather.bulletin || "-"}`,
-      `관측 시각: ${weather.observedAt || "-"}`,
-    ].join("\n")
+  const raining = (b: boolean) => {
+    if (locale === "zh") return b ? "是" : "否"
+    if (locale === "ja") return b ? "はい" : "いいえ"
+    return locale === "ko" ? (b ? "예" : "아니오") : (b ? "yes" : "no")
   }
+  const severe = (b: boolean) => {
+    if (locale === "zh") return b ? "有" : "无"
+    if (locale === "ja") return b ? "あり" : "なし"
+    return locale === "ko" ? (b ? "있음" : "없음") : (b ? "present" : "none")
+  }
+
+  const labels = getWeatherLabels(locale)
 
   return [
-    `Region: ${weather.region || "-"}`,
-    `Picnic score: ${weather.score ?? "-"}`,
-    `Status: ${weather.status || "-"}`,
-    `Temp/Feels like: ${weather.temperatureC ?? "-"}C / ${weather.feelsLikeC ?? "-"}C`,
-    `Humidity/Wind: ${weather.humidityPct ?? "-"}% / ${weather.windMs ?? "-"}m/s`,
-    `Air quality (PM10/PM2.5): ${weather.pm10 ?? "-"} / ${weather.pm25 ?? "-"}`,
-    `UV: ${weather.uvLabel || "-"}`,
-    `Raining now: ${weather.rainingNow ? "yes" : "no"}`,
-    `Severe alerts: ${weather.severeAlert ? "present" : "none"}`,
-    `Hazard tags: ${weather.hazardTags.length > 0 ? weather.hazardTags.join(", ") : "-"}`,
-    `Briefing: ${weather.bulletin || "-"}`,
-    `Observed at: ${weather.observedAt || "-"}`,
+    `${labels.region}: ${weather.region || "-"}`,
+    `${labels.score}: ${weather.score ?? "-"}`,
+    `${labels.status}: ${weather.status || "-"}`,
+    `${labels.tempFeels}: ${weather.temperatureC ?? "-"}°C / ${weather.feelsLikeC ?? "-"}°C`,
+    `${labels.humidityWind}: ${weather.humidityPct ?? "-"}% / ${weather.windMs ?? "-"}m/s`,
+    `${labels.airQuality}: ${weather.pm10 ?? "-"} / ${weather.pm25 ?? "-"}`,
+    `${labels.uv}: ${weather.uvLabel || "-"}`,
+    `${labels.rainingNow}: ${raining(weather.rainingNow)}`,
+    `${labels.severeAlert}: ${severe(weather.severeAlert)}`,
+    `${labels.hazardTags}: ${weather.hazardTags.length > 0 ? weather.hazardTags.join(", ") : "-"}`,
+    `${labels.briefing}: ${weather.bulletin || "-"}`,
+    `${labels.observedAt}: ${weather.observedAt || "-"}`,
   ].join("\n")
+}
+
+function getWeatherLabels(locale: ChatLocale) {
+  if (locale === "ko") return {
+    region: "지역", score: "피크닉 지수", status: "현재 상태",
+    tempFeels: "기온/체감", humidityWind: "습도/풍속", airQuality: "대기질(PM10/PM2.5)",
+    uv: "자외선", rainingNow: "강수 여부", severeAlert: "특보/위험 여부",
+    hazardTags: "위험 태그", briefing: "브리핑", observedAt: "관측 시각",
+  }
+  if (locale === "zh") return {
+    region: "地区", score: "出行指数", status: "当前状态",
+    tempFeels: "气温/体感", humidityWind: "湿度/风速", airQuality: "空气质量(PM10/PM2.5)",
+    uv: "紫外线", rainingNow: "是否下雨", severeAlert: "警报/危险",
+    hazardTags: "危险标签", briefing: "简报", observedAt: "观测时间",
+  }
+  if (locale === "ja") return {
+    region: "地域", score: "お出かけ指数", status: "現在の状態",
+    tempFeels: "気温/体感", humidityWind: "湿度/風速", airQuality: "大気質(PM10/PM2.5)",
+    uv: "紫外線", rainingNow: "降水の有無", severeAlert: "警報/危険の有無",
+    hazardTags: "危険タグ", briefing: "ブリーフィング", observedAt: "観測時刻",
+  }
+  return {
+    region: "Region", score: "Picnic score", status: "Status",
+    tempFeels: "Temp/Feels like", humidityWind: "Humidity/Wind", airQuality: "Air quality (PM10/PM2.5)",
+    uv: "UV", rainingNow: "Raining now", severeAlert: "Severe alerts",
+    hazardTags: "Hazard tags", briefing: "Briefing", observedAt: "Observed at",
+  }
 }
 
 export function buildSummaryPrompt(input: {
@@ -251,6 +380,40 @@ export function buildSummaryPrompt(input: {
       "",
       "[새 대화 기록]",
       transcript || "없음",
+    ].join("\n")
+  }
+
+  if (input.locale === "zh") {
+    return [
+      "读取以下已有记忆和对话记录，仅保留后续回复所需的关键信息，生成更新后的记忆摘要。",
+      "规则:",
+      "- 8行以内的简短要点或短段落",
+      "- 仅保留用户的稳定偏好、时间偏好、计划中的日程、需要避免的条件",
+      "- 绝不包含密码、密钥、联系方式等敏感信息",
+      "- 减少重复信息，整理成适合下次对话直接使用的形式",
+      "",
+      "[已有记忆]",
+      input.existingSummary || "无",
+      "",
+      "[新对话记录]",
+      transcript || "无",
+    ].join("\n")
+  }
+
+  if (input.locale === "ja") {
+    return [
+      "以下の既存メモリと会話記録を読み、今後の応答に必要な核心情報だけを更新されたメモリとして要約してください。",
+      "ルール:",
+      "- 8行以内の短いブリットまたは短い段落形式",
+      "- ユーザーの安定した好み、希望時間帯、計画中の予定、避けるべき条件のみを残す",
+      "- パスワード、キー、連絡先などの機密情報は絶対に含めない",
+      "- 重複を減らし、次の会話ですぐに使える形に整理する",
+      "",
+      "[既存メモリ]",
+      input.existingSummary || "なし",
+      "",
+      "[新しい会話記録]",
+      transcript || "なし",
     ].join("\n")
   }
 
@@ -298,6 +461,48 @@ export function buildProfileMemoryPrompt(input: {
       "",
       "[새 사용자 발화]",
       transcript || "없음",
+    ].join("\n")
+  }
+
+  if (input.locale === "zh") {
+    return [
+      "根据以下已有用户记忆和新的用户发言，更新内部个性化记忆。",
+      "规则:",
+      "- 必须仅输出JSON对象: {\"summary\":\"...\",\"assessment\":\"...\"}",
+      "- summary: 以对未来推荐有用的长期偏好/限制/模式为核心，6行以内",
+      "- assessment: 语气/决策倾向/偏好强度等内部解读，4行以内",
+      "- 禁止复制粘贴无关的原始日程，禁止包含敏感信息",
+      "- 压缩为仅在必要时参考的形式，无需每次都提及",
+      "",
+      "[已有 summary]",
+      input.existingSummary || "无",
+      "",
+      "[已有 assessment]",
+      input.existingAssessment || "无",
+      "",
+      "[新用户发言]",
+      transcript || "无",
+    ].join("\n")
+  }
+
+  if (input.locale === "ja") {
+    return [
+      "以下の既存ユーザーメモリと新しいユーザー発話に基づいて、内部パーソナライズメモリを更新してください。",
+      "ルール:",
+      "- 必ずJSONオブジェクトのみを出力: {\"summary\":\"...\",\"assessment\":\"...\"}",
+      "- summary: 今後の提案に有効な長期の好み/制約/パターンを中心に6行以内",
+      "- assessment: 話し方/決定傾向/好みの強さなどの内部解釈を4行以内",
+      "- 不要な詳細スケジュールのコピペ禁止、機密情報の含有禁止",
+      "- 常に言及する必要はなく、必要なときにだけ参考にできる形に圧縮",
+      "",
+      "[既存 summary]",
+      input.existingSummary || "なし",
+      "",
+      "[既存 assessment]",
+      input.existingAssessment || "なし",
+      "",
+      "[新しいユーザー発話]",
+      transcript || "なし",
     ].join("\n")
   }
 
