@@ -33,7 +33,9 @@ brain/
 temp/
 /tmp/
 
-# Planning & Documentation (see docs/ folder)
+# Planning & Documentation (local only)
+docs/나들해_계획서.md
+docs/나들해_UIUX_컴포넌트_설계서.md
 
 # TypeScript
 *.tsbuildinfo
