@@ -65,7 +65,7 @@ export function Navbar() {
   const { language, setLanguage, t } = useLanguage()
   const { theme, setTheme } = useTheme()
   const { user, setAuthenticatedUser } = useAuth()
-  const copy = NAVBAR_COPY[language]
+  const copy = (NAVBAR_COPY as any)[language] ?? NAVBAR_COPY.ko
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,

@@ -650,7 +650,7 @@ export default function LabPage() {
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
   const { subscribe, connected: wsConnected } = useWebSocket()
-  const copy = (LAB_COPY as any)[language]
+  const copy = ((LAB_COPY as any)[language] ?? LAB_COPY.ko)
 
   const [state, setState] = useState<LabStateSnapshot | null>(null)
   const [stateError, setStateError] = useState<string | null>(null)

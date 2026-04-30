@@ -329,7 +329,7 @@ export function CodeShareWorkspace({
 }) {
   const router = useRouter()
   const { language } = useLanguage()
-  const copy = (CODE_SHARE_COPY as any)[language]
+  const copy = ((CODE_SHARE_COPY as any)[language] ?? CODE_SHARE_COPY.ko)
   const { connected: wsConnected, subscribe, send } = useWebSocket()
 
   const [viewer, setViewer] = useState<ViewerIdentity | null>(null)

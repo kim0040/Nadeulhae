@@ -241,7 +241,7 @@ function ChatBubble({
   const showAvatar = !isUser && (groupPosition === "first" || groupPosition === "only")
   const showTimestamp = groupPosition === "last" || groupPosition === "only"
 
-  const copy = (CHAT_PANEL_COPY as any)[language]
+  const copy = (((CHAT_PANEL_COPY as any)[language] ?? CHAT_PANEL_COPY.ko) ?? CHAT_PANEL_COPY.ko)
   const messageContent = !isUser
     ? sanitizeAssistantMarkdown({ content: message.content, language })
     : message.content
@@ -361,7 +361,7 @@ export function DashboardChatPanel({
   weatherContext: ChatWeatherContext | null
 }) {
   const { language } = useLanguage()
-  const copy = (CHAT_PANEL_COPY as any)[language]
+  const copy = (((CHAT_PANEL_COPY as any)[language] ?? CHAT_PANEL_COPY.ko) ?? CHAT_PANEL_COPY.ko)
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)

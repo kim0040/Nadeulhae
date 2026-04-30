@@ -194,7 +194,7 @@ export function ErrorExperience({
   const router = useRouter()
   const { language, setLanguage } = useLanguage()
   const { theme, setTheme, resolvedTheme } = useTheme()
-  const copy = (COPY as any)[language]
+  const copy = ((COPY as any)[language] ?? COPY.ko)
   const mode = copy.modes[variant]
   const activeTheme = theme === "system" ? resolvedTheme ?? "system" : theme
   const particleColor = activeTheme === "dark" ? "#dff4ff" : "#2f6fe4"

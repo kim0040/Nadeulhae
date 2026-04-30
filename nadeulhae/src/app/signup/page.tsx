@@ -249,7 +249,7 @@ export default function SignupPage() {
   const { status, setAuthenticatedUser } = useAuth()
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
-  const copy = (SIGNUP_COPY as any)[language]
+  const copy = ((SIGNUP_COPY as any)[language] ?? SIGNUP_COPY.ko)
 
   const [form, setForm] = useState<FormState>({
     displayName: "",

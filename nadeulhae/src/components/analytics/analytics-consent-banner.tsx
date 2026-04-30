@@ -75,7 +75,7 @@ export function AnalyticsConsentBanner() {
   const [optimisticPreference, setOptimisticPreference] = useState<AnalyticsConsentPreference | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const copy = (BANNER_COPY as any)[language]
+  const copy = ((BANNER_COPY as any)[language] ?? BANNER_COPY.ko)
   const cookiePreference = useSyncExternalStore(
     () => () => {},
     readConsentPreferenceFromDocument,
