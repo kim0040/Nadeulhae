@@ -1,5 +1,7 @@
 # 나들해 (Nadeulhae)
 
+> 🌐 [English](../README.md) · [한국어](README_KO.md) · [中文](README_ZH.md) · [日本語](README_JA.md)
+
 > **天气智能评分 + AI仪表板聊天 + 实验室(词汇/代码共享) + 全州地区简报**
 
 基于 Next.js 16 的全栈 Web 应用。集实时协作代码编辑器、FSRS 间隔重复学习、AI 网络搜索聊天、GPS 天气评分于一体。
