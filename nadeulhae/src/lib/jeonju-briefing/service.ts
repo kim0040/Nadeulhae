@@ -679,24 +679,34 @@ function extractDomain(url: string): string {
 // JSON Extraction
 // ------------------------------------------------------------------
 
+/**
+ * Extract a JSON object string from LLM response text.
+ *
+ * The LLM may return JSON in several formats:
+ * 1. Pure JSON: `{"headline": "...", ...}`
+ * 2. Markdown fenced: ` ```json\n{...}\n``` `
+ * 3. Mixed: preamble text + JSON object + trailing text
+ *
+ * Returns the extracted JSON string (between the first `{` and last `}`)
+ * or null if no JSON-like structure is found.
+ */
 function extractJsonFromResponse(content: string): string | null {
-  const trimmed = content.trim()
+  // Preprocess: strip markdown code fences (```json / ```)
+  let work = content
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim()
 
-  if (trimmed.startsWith("```")) {
-    const start = trimmed.indexOf("{")
-    const end = trimmed.lastIndexOf("}")
-    if (start >= 0 && end > start) {
-      return trimmed.slice(start, end + 1)
-    }
-  }
+  const firstBrace = work.indexOf("{")
+  const lastBrace = work.lastIndexOf("}")
+  if (firstBrace < 0 || lastBrace <= firstBrace) return null
 
-  const firstBrace = trimmed.indexOf("{")
-  const lastBrace = trimmed.lastIndexOf("}")
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    return trimmed.slice(firstBrace, lastBrace + 1)
-  }
+  const candidate = work.slice(firstBrace, lastBrace + 1)
 
-  return null
+  // Quick sanity: must be non-trivial JSON
+  if (candidate.length < 10) return null
+
+  return candidate
 }
 
 // ------------------------------------------------------------------
@@ -926,18 +936,32 @@ export async function fetchAndSummarize(
 
   if (jsonText) {
     try {
-      parsed = parseBriefingJson(jsonText)
+      // Attempt to sanitise common LLM JSON formatting issues before parsing:
+      // - Unescaped control characters inside string values
+      // - Trailing commas before closing brackets
+      // - Single quotes instead of double quotes (rare but possible)
+      const sanitized = jsonText
+        .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, " ") // strip control chars except \n and \t
+        .replace(/,\s*}/g, "}")  // trailing comma before }
+        .replace(/,\s*]/g, "]")  // trailing comma before ]
+      parsed = parseBriefingJson(sanitized)
     } catch (parseError) {
       console.error("[jeonju-briefing] JSON parse failed, using raw content as summary:", parseError)
-      // Strip JSON structure from raw content: keep only text before the first '{'
+      // Strip ALL JSON-like content and keep only the natural language preamble
       const firstBrace = completionContent.indexOf("{")
       const textOnly = firstBrace > 0
         ? completionContent.slice(0, firstBrace).trim()
-        : completionContent
+        : completionContent.replace(/[{}[\]"]/g, " ").replace(/\s+/g, " ").trim()
       parsed.summary = textOnly.slice(0, 1200)
     }
   } else {
-    parsed.summary = completionContent.slice(0, 1200)
+    // No JSON found at all — use the whole response as summary, but strip any
+    // remaining bracket artefacts that might confuse the renderer
+    parsed.summary = completionContent
+      .replace(/[{}[\]"\\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 1200)
   }
 
   // 6. Normalize & build final result
@@ -1498,6 +1522,16 @@ function buildFinalBriefing(
   summary = ensureFriendlyIntro(summary, locale)
   // Strip control characters that break JSON (raw newlines, tabs, etc.)
   summary = summary.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, " ")
+  // Defensive: if the summary still contains raw JSON artefacts (from a
+  // previously broken cache entry), strip them out.
+  if (/[\{\[\]\"]/.test(summary) && (summary.includes('"headline"') || summary.includes('"summary"'))) {
+    const jsonStart = summary.indexOf("{")
+    if (jsonStart > 0) {
+      summary = summary.slice(0, jsonStart).trim()
+    } else {
+      summary = summary.replace(/[{}[\]"\\]/g, " ").replace(/\s+/g, " ").trim()
+    }
+  }
 
   // News items: cross-reference LLM items with real search results for valid URLs
   let newsItems: JeonjuBriefingData["newsItems"]
