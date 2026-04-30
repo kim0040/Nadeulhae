@@ -40,3 +40,8 @@ docs/나들해_UIUX_컴포넌트_설계서.md
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Internal docs (local only)
+docs/CODE_REVIEW_REPORT.md
+docs/api_data_list.md
+docs/updateplan.md
