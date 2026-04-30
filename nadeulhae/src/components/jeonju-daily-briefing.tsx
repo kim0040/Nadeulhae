@@ -394,7 +394,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 // ------------------------------------------------------------------
 
 const KO = {
-  badge: "나들AI 아침 브리핑",
+  badge: "나들AI 어제 아침 브리핑",
   dateLabel: "기준일",
   summaryLabel: "나들AI 브리핑",
   tipsLabel: "오늘의 팁",
@@ -409,7 +409,7 @@ const KO = {
 }
 
 const EN = {
-  badge: "NadeulAI Morning Briefing",
+  badge: "NadeulAI Yesterday Briefing",
   dateLabel: "Reference date",
   summaryLabel: "NadeulAI Briefing",
   tipsLabel: "Today's Tips",
@@ -424,7 +424,7 @@ const EN = {
 }
 
 const ZH = {
-  badge: "NadeulAI 晨间简报",
+  badge: "NadeulAI 昨日晨间简报",
   dateLabel: "基准日期",
   summaryLabel: "NadeulAI 简报",
   tipsLabel: "今日小贴士",
@@ -439,7 +439,7 @@ const ZH = {
 }
 
 const JA = {
-  badge: "NadeulAI 朝のブリーフィング",
+  badge: "NadeulAI 昨日の朝ブリーフィング",
   dateLabel: "基準日",
   summaryLabel: "NadeulAI ブリーフィング",
   tipsLabel: "今日のヒント",
