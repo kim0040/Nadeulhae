@@ -1,3 +1,24 @@
+/**
+ * System prompt builders for the Nadeul AI dashboard chat copilot.
+ *
+ * This module constructs prompt strings injected into LLM calls for the
+ * `/api/chat` dashboard chat feature. Each function handles all four
+ * supported locales (ko, en, zh, ja) via locale-specific branching.
+ *
+ * ## Prompt architecture
+ * 1. `buildChatSystemPrompt` — the main system prompt combining profile,
+ *    weather context, long-term memory, and session memory into a single
+ *    structured prompt with locale-specific response rules.
+ * 2. `buildSummaryPrompt` — instructs the LLM to compact conversation memory
+ *    (triggered after ~12 messages) for efficient context window usage.
+ * 3. `buildProfileMemoryPrompt` — instructs the LLM to refresh the user's
+ *    long-term personality/preference profile from recent utterances.
+ *
+ * ## KST time injection
+ * The current time in Asia/Seoul (KST) is injected into every system prompt
+ * as both a human-readable date and an ISO 8601 date string so the LLM can
+ * anchor its responses to the correct calendar day.
+ */
 import {
   AGE_BAND_OPTIONS,
   INTEREST_OPTIONS,
@@ -100,6 +121,25 @@ function buildUserProfileSummary(user: AuthUser, locale: ChatLocale) {
   ].join("\n")
 }
 
+/**
+ * Build the complete system prompt for dashboard chat LLM calls.
+ *
+ * Injects four data sections into the prompt:
+ * - **System current time** (KST): date + time for temporal anchoring
+ * - **User profile**: display name, age band, region, time slot, interests,
+ *   weather sensitivities, marketing consent (from {@link buildUserProfileSummary})
+ * - **Live weather context**: structured weather snapshot (from {@link buildWeatherSummary})
+ * - **Long-term memory**: user preference summary + assessment (from {@link buildProfileMemoryContext})
+ * - **Session memory**: compacted conversation memory summary
+ *
+ * @param input.locale - Target language for the prompt and LLM response rules
+ * @param input.user - Authenticated user profile data
+ * @param input.memorySummary - Compact conversation memory (null initially)
+ * @param input.profileSummary - Long-term user preference summary
+ * @param input.profileAssessment - Long-term user decision-style assessment
+ * @param input.weatherContext - Live weather snapshot (null if unavailable)
+ * @returns A locale-specific system prompt string ready for NanoGPT API
+ */
 export function buildChatSystemPrompt(input: {
   locale: ChatLocale
   user: AuthUser
@@ -365,6 +405,18 @@ function getWeatherLabels(locale: ChatLocale) {
   }
 }
 
+/**
+ * Build a prompt instructing the LLM to compact conversation memory.
+ *
+ * Called by the chat API route when the conversation exceeds ~12 messages
+ * or ~2400 estimated tokens. The LLM is asked to summarise the transcript
+ * into a concise memory block that preserves durable preferences, active
+ * plans, and constraints while discarding transient chat.
+ *
+ * @param input.locale - Target language for the prompt
+ * @param input.existingSummary - Previously compacted memory (null if first compaction)
+ * @param input.messages - Recent conversation messages to summarise
+ */
 export function buildSummaryPrompt(input: {
   locale: ChatLocale
   existingSummary: string | null
@@ -441,6 +493,22 @@ export function buildSummaryPrompt(input: {
   ].join("\n")
 }
 
+/**
+ * Build a prompt instructing the LLM to refresh the user's long-term profile memory.
+ *
+ * The LLM is asked to produce a JSON object with two fields:
+ * - `summary`: durable preferences, constraints, and patterns (≤6 lines)
+ * - `assessment`: interpretation of tone, decision style, preference strength (≤4 lines)
+ *
+ * This memory is used selectively in future prompts — it should NOT be
+ * dumped into every response. The JSON is parsed by {@link parseProfileMemoryPayload}
+ * in the chat API route.
+ *
+ * @param input.locale - Target language for the prompt
+ * @param input.existingSummary - Previous profile summary (null initially)
+ * @param input.existingAssessment - Previous profile assessment (null initially)
+ * @param input.messages - Recent user utterances to analyse
+ */
 export function buildProfileMemoryPrompt(input: {
   locale: ChatLocale
   existingSummary: string | null
