@@ -564,7 +564,7 @@ function extractRequestSignals(content: string, language: string) {
     return compact
   }
 
-  return language === "ko" ? "최근 요청과 대화 흐름" : "The latest request and conversation context"
+  return language === "ko" ? "최근 요청과 대화 흐름" : language === "zh" ? "最近的请求与对话内容" : language === "ja" ? "最新のリクエストと会話の流れ" : "The latest request and conversation context"
 }
 
 function buildThoughtSummaryDetails(input: {

@@ -43,7 +43,7 @@ export function FireInsightPanel({
               {language === "ko" ? "지역 화재 흐름" : language === "zh" ? "区域火灾趋势" : language === "ja" ? "地域の火災状況" : "Regional fire flow"}
             </div>
             <p className="mt-2 text-base sm:text-lg font-bold leading-relaxed text-foreground break-keep">
-              {language === "ko" ? data.overview.shortMessageKo : data.overview.shortMessageEn}
+              {language === "ko" ? data.overview.shortMessageKo : language === "zh" ? data.overview.shortMessageZh : language === "ja" ? data.overview.shortMessageJa : data.overview.shortMessageEn}
             </p>
           </div>
           <div className={cn("inline-flex w-fit shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-wide sm:justify-self-end", cautionTone)}>

@@ -230,7 +230,7 @@ export default function Home() {
       label: t("hero_temp"),
       value: `${weatherData.details.temp ?? "--"}°C`,
       tone: "text-orange-400",
-      meta: `${language === "ko" ? "체감" : "Feels"} ${feelsLikeValue ?? "--"}°C`,
+      meta: `${language === "ko" ? "체감" : language === "zh" ? "体感" : language === "ja" ? "体感" : "Feels"} ${feelsLikeValue ?? "--"}°C`,
     },
     { icon: DropletsIcon, label: t("hero_humidity"), value: `${weatherData.details.humidity ?? "--"}%`, tone: "text-blue-400" },
     { icon: WindIcon, label: t("hero_wind"), value: `${weatherData.details.wind ?? "--"}m/s`, tone: "text-teal-400" },

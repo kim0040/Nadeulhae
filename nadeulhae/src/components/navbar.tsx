@@ -95,7 +95,7 @@ export function Navbar() {
 
   const authItem = user
     ? {
-        name: language === "ko" ? "대시보드" : "Dashboard",
+        name: (() => { if (language === "ko") return "대시보드"; if (language === "zh") return "仪表盘"; if (language === "ja") return "ダッシュボード"; return "Dashboard" })(),
         href: "/dashboard",
         icon: LayoutDashboard,
       }

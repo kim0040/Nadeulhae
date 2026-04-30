@@ -372,7 +372,7 @@ function toSessionSnapshot(row: ChatSessionWithCountRow): ChatSessionSnapshot {
       row.locale === "en" ? "New chat" : "새 대화",
       `session-title:${row.id}`
     ) ?? (row.locale === "en" ? "New chat" : "새 대화"),
-    locale: row.locale === "en" ? "en" : "ko",
+    locale: (["en", "zh", "ja"].includes(row.locale) ? row.locale : "ko") as ChatLocale,
     isAutoTitle: Boolean(row.is_auto_title),
     messageCount: Math.max(0, row.message_count),
     lastMessageAt: row.last_message_at ? toIsoString(row.last_message_at) : null,

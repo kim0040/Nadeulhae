@@ -631,7 +631,7 @@ export function JeonjuSafetyPanel({
             </div>
             <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-keep">
               {fireSummary
-                ? (language === "ko" ? fireSummary.overview.shortMessageKo : fireSummary.overview.shortMessageEn)
+                ? (language === "ko" ? fireSummary.overview.shortMessageKo : language === "zh" ? fireSummary.overview.shortMessageZh : language === "ja" ? fireSummary.overview.shortMessageJa : fireSummary.overview.shortMessageEn)
                 : (language === "ko" ? "최근 화재 접수 흐름과 장소 패턴을 곧 반영합니다." : language === "zh" ? "最近的火灾接报趋势和场所模式将很快显示。" : language === "ja" ? "最近の火災受付の流れと場所パターンを間もなく反映します。" : "Recent fire flow and place patterns will appear here once loaded.")}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
