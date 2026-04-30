@@ -1,5 +1,25 @@
 "use client"
 
+/**
+ * Language/i18n context for the Nadeulhae app.
+ *
+ * ## How translations work
+ * All UI strings are stored in `src/data/locales/{ko,en,zh,ja}.ts` as flat
+ * key-value objects. The `t()` function resolves a key against the currently
+ * selected language, falling back to Korean, then to the raw key.
+ *
+ * ## Language detection priority
+ * 1. `localStorage` key `nadeulhae_language`
+ * 2. Browser `navigator.language` (first segment, e.g., `"zh"` from `"zh-CN"`)
+ * 3. Default: Korean (`"ko"`)
+ *
+ * ## Adding a new language
+ * See `src/data/locales/index.ts` for the full step-by-step guide.
+ *
+ * ## State persistence
+ * The selected language is synced to `localStorage` and `document.documentElement.lang`
+ * (for accessibility/screen-reader support) on every change.
+ */
 import React, { createContext, useContext, useState, useEffect } from "react"
 import { translations, type Language } from "@/data/locales"
 
@@ -23,6 +43,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       : null
 
     if (savedLanguage === "ko" || savedLanguage === "en" || savedLanguage === "zh" || savedLanguage === "ja") {
+      // Safe setState in effect: runs once on mount, only re-applies previously persisted value
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLanguage(savedLanguage)
       return
@@ -57,6 +78,24 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return null
   }
 
+  /**
+   * Resolve a translation key for the current language.
+   *
+   * ## Resolution strategy
+   * 1. Look up `key` in the current language's translation object
+   * 2. If missing, fall back to Korean (`translations.ko`)
+   * 3. If still missing, return the raw key string (visible bug signal in UI)
+   *
+   * ## Array values (randomised variants)
+   * When the resolved value is a `string[]`, one element is selected using
+   * a deterministic seed derived from the current hour + the key's char codes.
+   * This gives natural variety to greeting/status messages without flickering.
+   * An optional `seed` parameter overrides the time-based seed for reproducibility.
+   *
+   * @param key - Translation key matching the locale file key names
+   * @param seed - Optional seed for deterministic array selection
+   * @returns The resolved translation string, or the raw key if not found
+   */
   const t = (key: string, seed?: string | number) => {
     const val = translations[language]?.[key] ?? translations.ko?.[key]
     if (Array.isArray(val)) {

@@ -1,3 +1,34 @@
+/**
+ * Home page AI weather briefing endpoint.
+ *
+ * Generates a 3-5 sentence natural-language weather summary for the picnic
+ * briefing card using the NanoGPT LLM backend. Supports all four UI locales
+ * (ko, en, zh, ja) with locale-specific prompt templates.
+ *
+ * ## Rate limiting (three-layer defence)
+ * 1. **IP-level sliding window** — 30 requests per minute per client IP.
+ *    Stored in `globalThis.__nadeulhaeHomeBriefingIpRateLimit` (max 2000 entries).
+ * 2. **Result cache** — per-locale, per-date, per-region, per-weather-profile.
+ *    Cache key includes KST date, region slug, score tier (high/mid/low),
+ *    rain/alert flags, hazard signals, and bulletin snippet. 15-minute TTL,
+ *    max 64 entries. Stored in `globalThis.__nadeulhaeHomeBriefingCache`.
+ * 3. **Per-user daily quota** (optional) — when the request body includes a
+ *    `userId`, the request counts against the `home_briefing` action quota
+ *    (default 50/day). Uses the same `llm_user_action_usage_daily` DB table
+ *    as other LLM features.
+ *
+ * ## Caching strategy
+ * Cache keys are date-aware (via KST `YYYY-MM-DD`) and region-aware so that
+ * two users in different regions with different weather will receive different
+ * summaries. Score is bucketed into tiers (≥80 high, ≥40 mid, <40 low) to
+ * increase cache hit rate within similar conditions.
+ *
+ * ## Error handling
+ * All errors return `{ summary: null, fromCache: false }` — the client
+ * falls back to the rule-based `getIntegratedGuide()` text in PicnicBriefing.
+ *
+ * @route POST /api/weather/briefing?locale=ko
+ */
 import { NextRequest, NextResponse } from "next/server"
 import { createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
 import {
@@ -37,18 +68,43 @@ declare global {
   var __nadeulhaeHomeBriefingIpRateLimit: Map<string, { count: number; resetAt: number }> | undefined
 }
 
+// ---------------------------------------------------------------------------
+// Cache & rate-limit configuration
+// ---------------------------------------------------------------------------
+
+/** Maximum number of cached briefing results. Eviction is LRU by expiry. */
 const CACHE_MAX_ENTRIES = 64
+
+/** How long a cached result is valid (15 minutes). Balances freshness vs. LLM cost. */
 const CACHE_TTL_MS = 15 * 60 * 1000
+
+/** Max briefing requests per IP per 60-second sliding window. Prevents abuse. */
 const IP_RATE_LIMIT_MAX = 30
+
+/** Sliding-window duration for IP rate limiting. */
 const IP_RATE_LIMIT_WINDOW_MS = 60 * 1000
+
+/**
+ * Quota key used for per-user daily rate limiting via the LLM quota system.
+ * Maximum 50 LLM calls per user per day for the home briefing feature.
+ */
 const USER_DAILY_QUOTA_KEY = "home_briefing"
 const USER_DAILY_QUOTA_LIMIT = 50
 
+/**
+ * Returns the current date string in Asia/Seoul timezone (YYYY-MM-DD).
+ * Used as a cache-key partition so cached results expire naturally at midnight KST.
+ */
 function getKstDateStr() {
   const kst = new Date(Date.now() + 9 * 60 * 60 * 1000)
   return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}-${String(kst.getDate()).padStart(2, "0")}`
 }
 
+/**
+ * Lazy-initialise the in-memory briefing cache.
+ * Uses `globalThis` so the cache survives hot-module reloads during development
+ * and is shared across all requests within a single Node.js process.
+ */
 function getCache() {
   if (!globalThis.__nadeulhaeHomeBriefingCache) {
     globalThis.__nadeulhaeHomeBriefingCache = new Map()
@@ -56,6 +112,7 @@ function getCache() {
   return globalThis.__nadeulhaeHomeBriefingCache
 }
 
+/** Lazy-initialise the IP rate-limit map (same globalThis pattern as cache). */
 function getIpRateLimitMap() {
   if (!globalThis.__nadeulhaeHomeBriefingIpRateLimit) {
     globalThis.__nadeulhaeHomeBriefingIpRateLimit = new Map()
@@ -63,6 +120,18 @@ function getIpRateLimitMap() {
   return globalThis.__nadeulhaeHomeBriefingIpRateLimit
 }
 
+/**
+ * Build a deterministic cache key from locale + weather snapshot.
+ *
+ * Key strategy:
+ * - KST date partitions results by calendar day (natural TTL at midnight)
+ * - Region slug normalised to lowercase alphanumeric (first 20 chars)
+ * - Score bucketed into tiers: ≥80 "high", ≥40 "mid", <40 "low"
+ *   (increases cache hit rate for similar conditions)
+ * - Rain/alert flags + sorted hazard signals provide fine-grained distinction
+ *   for safety-critical conditions
+ * - Bulletin snippet (first 40 non-whitespace chars) catches content changes
+ */
 function buildCacheKey(locale: BriefingLocale, snapshot: WeatherSnapshot) {
   const datePart = getKstDateStr()
   const regionPart = snapshot.region.replace(/[^a-z0-9가-힣]/gi, "").toLowerCase()
@@ -78,6 +147,11 @@ function buildCacheKey(locale: BriefingLocale, snapshot: WeatherSnapshot) {
   return `${locale}:${signals}`
 }
 
+/**
+ * Check cache for an existing briefing result.
+ * Opportunistically evicts expired entries during lookup to avoid separate
+ * cleanup passes.
+ */
 function getCached(cacheKey: string): string | null {
   const cache = getCache()
   const now = Date.now()
@@ -90,6 +164,10 @@ function getCached(cacheKey: string): string | null {
   return null
 }
 
+/**
+ * Store a briefing result in the cache.
+ * If cache exceeds max size, evicts the oldest-by-expiry entries first.
+ */
 function setCache(cacheKey: string, data: string) {
   const cache = getCache()
   cache.set(cacheKey, {
@@ -283,6 +361,9 @@ async function handlePOST(request: NextRequest) {
   const weatherContext = buildWeatherContext(snapshot, locale)
   const systemPrompt = buildBriefingPrompt(locale, weatherContext)
 
+  // Quota check (optional — userId not required; silently skipped if absent)
+  // This consumes one slot from the user's daily `home_briefing` quota.
+  // If the user is over the limit, we return 429 without calling the LLM.
   let reservation: DailyQuotaReservation | null = null
   if (body && typeof body === "object" && "userId" in body) {
     const uid = (body as Record<string, unknown>).userId

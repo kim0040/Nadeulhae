@@ -273,7 +273,9 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       points.push(scoreNarrative)
     }
     
-    // -- Temperature --
+    // Temperature thresholds (based on Korean weather service comfort zones):
+    // <5°C: freezing/biting cold, 5-15°C: chilly, 15-20°C: cool/mild,
+    // 20-25°C: ideal/perfect, 25-28°C: warm, 28-31°C: hot, >31°C: heatwave
     const temp = details.temp
     if (temp < 5) {
       points.push({ text: formatBriefing("brief_temp_v_cold", { temp }), type: "warning", icon: <AlertCircle size={18} /> })
@@ -291,7 +293,8 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       points.push({ text: formatBriefing("brief_temp_v_hot", { temp }), type: "warning", icon: <AlertCircle size={18} /> })
     }
 
-    // -- Dust & Air --
+    // Dust/PM thresholds (WHO 2021 guidelines + Korean CAI mapping):
+    // PM10: ≤30 excellent, ≤80 moderate, >80 high (mask recommended)
     const pm10 = details.pm10 || 0
     if (pm10 > 0) {
       if (pm10 <= 30) {
@@ -407,6 +410,21 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   const integratedGuide = getIntegratedGuide()
   const techData = getTechnicalPoints()
 
+  /**
+   * AI-generated natural-language briefing text.
+   *
+   * Fetched asynchronously from `/api/weather/briefing` on mount and whenever
+   * key weather conditions change (score, temp, humidity, wind, PM, rain,
+   * weather warnings, bulletin text). The API has its own 15-min result cache
+   * plus per-user daily quota, so repeated re-renders are cheap.
+   *
+   * On failure (network error, LLM timeout, quota exhausted), the value stays
+   * null and the UI falls back to the rule-based {@link integratedGuide.text}.
+   * The 18-second `AbortSignal.timeout` gives the LLM generous room while
+   * preventing stale loading states.
+   *
+   * @see /api/weather/briefing
+   */
   const [aiBriefingText, setAiBriefingText] = useState<string | null>(null)
 
   useEffect(() => {
