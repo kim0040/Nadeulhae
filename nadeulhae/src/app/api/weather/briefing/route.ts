@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
+import {
+  reserveUserActionDailyRequest,
+  recordGlobalLlmRequestOutcome,
+  type DailyQuotaReservation,
+} from "@/lib/llm/quota"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
@@ -24,14 +29,25 @@ interface WeatherSnapshot {
 interface BriefingCacheEntry {
   data: string
   expiresAtMs: number
+  metricDate: string
 }
 
 declare global {
   var __nadeulhaeHomeBriefingCache: Map<string, BriefingCacheEntry> | undefined
+  var __nadeulhaeHomeBriefingIpRateLimit: Map<string, { count: number; resetAt: number }> | undefined
 }
 
-const CACHE_MAX_ENTRIES = 32
-const CACHE_TTL_MS = 30 * 60 * 1000
+const CACHE_MAX_ENTRIES = 64
+const CACHE_TTL_MS = 15 * 60 * 1000
+const IP_RATE_LIMIT_MAX = 30
+const IP_RATE_LIMIT_WINDOW_MS = 60 * 1000
+const USER_DAILY_QUOTA_KEY = "home_briefing"
+const USER_DAILY_QUOTA_LIMIT = 50
+
+function getKstDateStr() {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}-${String(kst.getDate()).padStart(2, "0")}`
+}
 
 function getCache() {
   if (!globalThis.__nadeulhaeHomeBriefingCache) {
@@ -40,13 +56,24 @@ function getCache() {
   return globalThis.__nadeulhaeHomeBriefingCache
 }
 
+function getIpRateLimitMap() {
+  if (!globalThis.__nadeulhaeHomeBriefingIpRateLimit) {
+    globalThis.__nadeulhaeHomeBriefingIpRateLimit = new Map()
+  }
+  return globalThis.__nadeulhaeHomeBriefingIpRateLimit
+}
+
 function buildCacheKey(locale: BriefingLocale, snapshot: WeatherSnapshot) {
+  const datePart = getKstDateStr()
+  const regionPart = snapshot.region.replace(/[^a-z0-9가-힣]/gi, "").toLowerCase()
   const signals = [
-    snapshot.region,
+    datePart,
+    regionPart.slice(0, 20),
+    snapshot.score >= 80 ? "high" : snapshot.score >= 40 ? "mid" : "low",
     snapshot.rainingNow ? "rain" : "dry",
     snapshot.severeAlert ? "alert" : "safe",
     ...snapshot.hazardSignals.sort(),
-    snapshot.bulletin?.slice(0, 60) ?? "",
+    snapshot.bulletin?.slice(0, 40)?.replace(/\s+/g, "") ?? "",
   ].join("|")
   return `${locale}:${signals}`
 }
@@ -54,28 +81,55 @@ function buildCacheKey(locale: BriefingLocale, snapshot: WeatherSnapshot) {
 function getCached(cacheKey: string): string | null {
   const cache = getCache()
   const now = Date.now()
-
   for (const [key, value] of cache.entries()) {
     if (value.expiresAtMs <= now) cache.delete(key)
   }
-
   const entry = cache.get(cacheKey)
-  if (entry && entry.expiresAtMs > now) return entry.data
-
+  if (entry?.expiresAtMs && entry.expiresAtMs > now) return entry.data
   if (entry) cache.delete(cacheKey)
   return null
 }
 
 function setCache(cacheKey: string, data: string) {
   const cache = getCache()
-  cache.set(cacheKey, { data, expiresAtMs: Date.now() + CACHE_TTL_MS })
-
+  cache.set(cacheKey, {
+    data,
+    expiresAtMs: Date.now() + CACHE_TTL_MS,
+    metricDate: getKstDateStr(),
+  })
   if (cache.size > CACHE_MAX_ENTRIES) {
     const oldest = [...cache.entries()].sort((a, b) => a[1].expiresAtMs - b[1].expiresAtMs)
     for (let i = 0; i < oldest.length - CACHE_MAX_ENTRIES; i++) {
       cache.delete(oldest[i][0])
     }
   }
+}
+
+function getClientIp(request: NextRequest) {
+  return (
+    request.headers.get("cf-connecting-ip")
+    || request.headers.get("x-real-ip")
+    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || "anon"
+  ).slice(0, 48)
+}
+
+function checkIpRateLimit(ip: string): boolean {
+  const map = getIpRateLimitMap()
+  const now = Date.now()
+  const entry = map.get(ip)
+  if (entry && entry.resetAt > now && entry.count >= IP_RATE_LIMIT_MAX) return false
+  if (!entry || entry.resetAt <= now) {
+    map.set(ip, { count: 1, resetAt: now + IP_RATE_LIMIT_WINDOW_MS })
+  } else {
+    entry.count++
+  }
+  if (map.size > 2000) {
+    for (const [key, val] of map.entries()) {
+      if (val.resetAt <= now) map.delete(key)
+    }
+  }
+  return true
 }
 
 function sanitizeSnapshot(raw: unknown): WeatherSnapshot | null {
@@ -197,6 +251,11 @@ ${context}`
 }
 
 async function handlePOST(request: NextRequest) {
+  const ip = getClientIp(request)
+  if (!checkIpRateLimit(ip)) {
+    return NextResponse.json({ error: "Too many briefing requests" }, { status: 429 })
+  }
+
   const searchParams = request.nextUrl.searchParams
   const locale = (searchParams.get("locale") ?? "ko") as BriefingLocale
   if (!["ko", "en", "zh", "ja"].includes(locale)) {
@@ -224,6 +283,26 @@ async function handlePOST(request: NextRequest) {
   const weatherContext = buildWeatherContext(snapshot, locale)
   const systemPrompt = buildBriefingPrompt(locale, weatherContext)
 
+  let reservation: DailyQuotaReservation | null = null
+  if (body && typeof body === "object" && "userId" in body) {
+    const uid = (body as Record<string, unknown>).userId
+    if (typeof uid === "string" && uid.length > 0 && uid.length <= 64) {
+      try {
+        reservation = await reserveUserActionDailyRequest({
+          userId: uid,
+          quotaKey: USER_DAILY_QUOTA_KEY,
+          limit: USER_DAILY_QUOTA_LIMIT,
+        })
+        if (!reservation.allowed) {
+          return NextResponse.json(
+            { error: "Daily briefing quota reached", summary: null, fromCache: false },
+            { status: 429 }
+          )
+        }
+      } catch {}
+    }
+  }
+
   try {
     const result = await createNanoGptChatCompletion({
       requestKind: "chat",
@@ -241,9 +320,22 @@ async function handlePOST(request: NextRequest) {
       setCache(cacheKey, summary)
     }
 
+    if (reservation) {
+      recordGlobalLlmRequestOutcome({
+        metricDate: reservation.usage.metricDate,
+        success: true,
+      }).catch(() => {})
+    }
+
     return NextResponse.json({ summary: summary || "", fromCache: false })
   } catch (error) {
     console.error("[home-briefing] LLM call failed:", error)
+    if (reservation) {
+      recordGlobalLlmRequestOutcome({
+        metricDate: reservation.usage.metricDate,
+        success: false,
+      }).catch(() => {})
+    }
     return NextResponse.json({ summary: null, fromCache: false })
   }
 }
