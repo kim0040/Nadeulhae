@@ -1,12 +1,12 @@
-# 나들해 (Nadeulhae) — Architecture & UML Documentation
+# Nadeulhae — Architecture & UML Documentation
 
 > **Version**: 0.1.0 | **Framework**: Next.js 16.2.4 (App Router) | **Language**: TypeScript 6.0
 
 ---
 
-## 1. 프로젝트 개요 (Project Overview)
+## 1. Project Overview
 
-**Nadeulhae**("나들이" + "해")는 **날씨 기반 야외활동 점수 서비스 + AI Chat + 코드 공유 플랫폼**이다. 전주시를 중심으로 기상청(KMA), 한국환경공단(AirKorea), APIHub의 실시간 데이터를 결합해 0~100점의 피크닉 지수를 산출하고, NanoGPT/FactChat 기반의 AI 채팅, FSRS 알고리즘을 활용한 어휘 암기(Lab), 그리고 WebSocket 기반 실시간 협업 코드 에디터를 제공한다.
+**Nadeulhae** (a portmanteau of "Nadeuri" meaning outing + "Hae" meaning sun/sea) is a **weather-based outdoor activity scoring service + AI Chat + code sharing platform**. Centered on Jeonju city, it combines real-time data from KMA, AirKorea, and APIHub to compute a 0-100 picnic score, along with NanoGPT/FactChat-based AI chat, FSRS-algorithm vocabulary learning (Lab), and a WebSocket-based real-time collaborative code editor.
 
 ---
 
@@ -48,9 +48,9 @@ graph TB
     end
 
     subgraph ExternalAPIs["External APIs"]
-        KMA["KMA (기상청)<br/>초단기예보 / 단기예보 / 중기예보"]
-        AIR["AirKorea<br/>PM10 / PM2.5 / 통합대기지수"]
-        APIHUB["APIHub<br/>기상특보 / 위성/레이더/지진 이미지"]
+        KMA["KMA<br/>Ultra-short / short / mid-range forecast"]
+        AIR["AirKorea<br/>PM10 / PM2.5 / CAI index"]
+        APIHUB["APIHub<br/>Weather warnings / satellite / radar / quake images"]
         NANOGPT["NanoGPT API<br/>OpenAI-compatible LLM (Primary)"]
         FACTCHAT["FactChat API<br/>SAIT 3 Pro (Fallback)"]
         TAVILY["Tavily API (Web Search)"]
@@ -670,10 +670,10 @@ flowchart TD
 
     GRID_LOOKUP --> PARALLEL_CALLS
     subgraph PARALLEL_CALLS["Parallel API Calls (Promise.all)"]
-        KMA_ULTRA["KMA 초단기예보: T1H(temp), POP(rain), SKY, WSD(wind)"]
-        KMA_SHORT["KMA 단기예보: Max/Min temp, RN1(rainfall), REH(humidity)"]
+        KMA_ULTRA["KMA Ultra-short forecast: T1H(temp), POP(rain), SKY, WSD(wind)"]
+        KMA_SHORT["KMA Short-range forecast: Max/Min temp, RN1(rainfall), REH(humidity)"]
         AIR_QUALITY["AirKorea: PM10, PM2.5, CAI, O3, UV"]
-        APIHUB_ALERT["APIHub 기상특보: Typhoon, Earthquake, Tsunami, Warning"]
+        APIHUB_ALERT["APIHub Weather Warnings: Typhoon, Earthquake, Tsunami, Warning"]
         APIHUB_IMAGE["APIHub Images: Satellite, Radar, Earthquake maps"]
     end
 
@@ -1266,7 +1266,7 @@ graph TB
         NANOGPT_EXT["NanoGPT API (LLM Completions)"]
         FACTCHAT_EXT["FactChat API (Fallback LLM)"]
         TAVILY_EXT["Tavily Search API"]
-        KMA_EXT["KMA 기상청 API"]
+        KMA_EXT["KMA API"]
         AIR_EXT["AirKorea API"]
         APIHUB_EXT["APIHub"]
     end

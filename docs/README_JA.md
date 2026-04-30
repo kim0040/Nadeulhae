@@ -1,6 +1,6 @@
 # Nadeulhae (나들해) — README
 
-> 🌐 [한국어](README.md) · [English](README.en.md) · [中文](README.zh.md)
+> 🌐 [한국어](../README.md) · [English](README_EN.md) · [中文](README_ZH.md) · [日本語](README_JA.md)
 
 **天気インテリジェンス + AIダッシュボードチャット + ラボ(単語/コード共有) + 全州地域ブリーフィング**
 
