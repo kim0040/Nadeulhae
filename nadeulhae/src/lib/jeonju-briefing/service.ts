@@ -1148,7 +1148,7 @@ function buildSystemPrompt(
 순수 JSON만 반환하세요. 마크다운/코드블록/설명 텍스트 없이 JSON 오브젝트만 출력합니다.
 
 {
-  "headline": "어제 전주 핵심을 담은 친근한 한 줄 제목 (25자 이내)",
+  "headline": "어제 전주 핵심을 담은 친근한 한 줄 제목. '어제'라는 단어를 포함할 것 (25자 이내)",
   "summary": "5~7문장의 상세하고 자연스러운 아침 브리핑. 기사 내용을 구체적으로 풀어서 친한 친구에게 이야기하듯 써주세요.",
   "newsItems": [{"title":"제목","url":"https://...","source":"출처","snippet":"핵심 요약(80자이내)","publishedDate":"YYYY-MM-DD"}],
   "aiInsight": "오늘 일정에 참고할 실용적인 팁 1~2개 (각 항목 '•'로 시작)",
@@ -1510,7 +1510,8 @@ function buildFinalBriefing(
   const isKo = locale === "ko"
 
   // Headline: use LLM's or generate
-  const headline = (parsed.headline || `${dateLabel} ${isKo ? "전주 브리핑" : "Jeonju Briefing"}`).replace(/[\x00-\x1f]/g, " ").trim()
+  const relativeLabel = getRelativeDayLabel(dateStr, locale)
+  const headline = (parsed.headline || `${relativeLabel} ${dateLabel} ${isKo ? "전주 브리핑" : locale === "zh" ? "全州简报" : locale === "ja" ? "全州ブリーフィング" : "Jeonju Briefing"}`).replace(/[\x00-\x1f]/g, " ").trim()
 
   // Summary: use LLM's or fallback
   let summary = parsed.summary
