@@ -542,7 +542,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                     {__l("오늘의 종합 안내", "Today's guidance")}
                   </span>
                 </div>
-                <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-keep">
+                <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-keep break-words">
                   {integratedGuide.title}
                 </div>
                 <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-foreground/80 dark:text-current break-words">

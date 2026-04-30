@@ -269,7 +269,7 @@ export default function AboutPage() {
             words={t("about_hero_title")}
             className="text-5xl md:text-7xl font-black mb-10 leading-tight tracking-tighter"
           />
-          <p className="text-neutral-800 dark:text-neutral-400 text-xl md:text-2xl max-w-2xl mx-auto leading-relaxed font-semibold">
+          <p className="text-neutral-800 dark:text-neutral-400 text-xl md:text-2xl max-w-2xl mx-auto leading-relaxed break-words font-semibold">
             {t("about_hero_desc")}
           </p>
         </div>
@@ -297,7 +297,7 @@ export default function AboutPage() {
       <section id="features" className="container mx-auto py-32 px-4">
         <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
           <div className="max-w-xl">
-            <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">{t("about_features_title")}</h2>
+            <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight break-words">{t("about_features_title")}</h2>
             <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium">
               {t("about_features_desc")}
             </p>
@@ -340,7 +340,7 @@ export default function AboutPage() {
           <AnimatedGradientText className="text-4xl md:text-5xl font-black tracking-tight">
             {t("about_algo_title")}
           </AnimatedGradientText>
-          <p className="mt-6 text-neutral-500 dark:text-neutral-400 text-xl font-medium leading-relaxed">
+          <p className="mt-6 text-neutral-500 dark:text-neutral-400 text-xl font-medium leading-relaxed break-words">
             {t("about_algo_desc")}
           </p>
         </div>
@@ -382,7 +382,7 @@ export default function AboutPage() {
           <AnimatedGradientText className="text-4xl md:text-5xl font-black tracking-tight">
             {t("about_live_title")}
           </AnimatedGradientText>
-          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium leading-relaxed">
+          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium leading-relaxed break-words">
             {t("about_live_desc")}
           </p>
         </div>
@@ -400,7 +400,7 @@ export default function AboutPage() {
                 <h3 className="text-2xl font-black text-foreground tracking-tight mb-4">
                   {t(card.titleKey)}
                 </h3>
-                <p className="text-sm sm:text-base font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
+                <p className="text-sm sm:text-base font-semibold leading-relaxed break-words text-neutral-800 dark:text-neutral-400">
                   {t(card.descKey)}
                 </p>
               </div>
@@ -414,7 +414,7 @@ export default function AboutPage() {
           <AnimatedGradientText className="text-4xl md:text-5xl font-black tracking-tight">
             {t("about_structure_title")}
           </AnimatedGradientText>
-          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium leading-relaxed">
+          <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium leading-relaxed break-words">
             {t("about_structure_desc")}
           </p>
         </div>
@@ -447,7 +447,7 @@ export default function AboutPage() {
           <AnimatedGradientText className="text-3xl md:text-5xl font-black tracking-tight">
             {t("guide_title")}
           </AnimatedGradientText>
-          <p className="mt-4 text-base sm:text-lg text-neutral-500 dark:text-neutral-400 font-medium leading-relaxed">
+          <p className="mt-4 text-base sm:text-lg text-neutral-500 dark:text-neutral-400 font-medium leading-relaxed break-words">
             {t("guide_desc")}
           </p>
         </div>
@@ -492,7 +492,7 @@ export default function AboutPage() {
           <AnimatedGradientText className="text-4xl md:text-5xl font-black tracking-tight">
             {texts.liveTitle}
           </AnimatedGradientText>
-          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
+          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed break-words text-neutral-800 dark:text-neutral-400">
             {texts.liveDesc}
           </p>
         </div>
@@ -516,7 +516,7 @@ export default function AboutPage() {
           <AnimatedGradientText className="text-4xl md:text-5xl font-black tracking-tight">
             {texts.futureTitle}
           </AnimatedGradientText>
-          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
+          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed break-words text-neutral-800 dark:text-neutral-400">
             {texts.futureDesc}
           </p>
         </div>
@@ -546,7 +546,7 @@ export default function AboutPage() {
             <AnimatedGradientText className="text-3xl sm:text-5xl font-black tracking-tight">
               {texts.pipelineTitle}
             </AnimatedGradientText>
-            <p className="mt-4 text-base sm:text-lg font-medium leading-relaxed text-neutral-500 dark:text-neutral-400">
+            <p className="mt-4 text-base sm:text-lg font-medium leading-relaxed break-words text-neutral-500 dark:text-neutral-400">
               {texts.pipelineDesc}
             </p>
           </div>
@@ -577,7 +577,7 @@ export default function AboutPage() {
         </div>
         
         <div className="text-center mb-20">
-          <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">{t("about_contributors_title")}</h2>
+          <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight break-words">{t("about_contributors_title")}</h2>
           <p className="text-neutral-500 dark:text-neutral-400 text-xl font-medium max-w-3xl mx-auto">
             {t("about_contributors_desc")}
           </p>
@@ -625,7 +625,7 @@ export default function AboutPage() {
 
                   <div className="mb-8 h-1.5 w-14 rounded-full bg-sky-blue/20 transition-all duration-300 group-hover:w-20 group-hover:bg-sky-blue/50" />
 
-                  <p className="px-4 text-center text-sm sm:text-base font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
+                  <p className="px-4 text-center text-sm sm:text-base font-semibold leading-relaxed break-words text-neutral-800 dark:text-neutral-400">
                     {t(person.descKey)}
                   </p>
                 </div>
