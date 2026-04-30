@@ -1523,13 +1523,29 @@ function buildFinalBriefing(
   // Strip control characters that break JSON (raw newlines, tabs, etc.)
   summary = summary.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, " ")
   // Defensive: if the summary still contains raw JSON artefacts (from a
-  // previously broken cache entry), strip them out.
-  if (/[\{\[\]\"]/.test(summary) && (summary.includes('"headline"') || summary.includes('"summary"'))) {
+  // previously broken cache entry or LLM output), strip them out.
+  // Pattern 1: proper JSON with braces and quoted keys: {"headline": ...}
+  // Pattern 2: unquoted key-value pairs: headline : ..., summary : ...
+  if (
+    /[\{\[\]\"]/.test(summary) && (summary.includes('"headline"') || summary.includes('"summary"'))
+    || /\bheadline\s*:\s|\bsummary\s*:\s|\bnewsItems\s*:\s/i.test(summary)
+  ) {
     const jsonStart = summary.indexOf("{")
     if (jsonStart > 0) {
       summary = summary.slice(0, jsonStart).trim()
     } else {
-      summary = summary.replace(/[{}[\]"\\]/g, " ").replace(/\s+/g, " ").trim()
+      // No braces found — strip all JSON-like artefacts from plain text
+      summary = summary
+        .replace(/\bheadline\s*:.*?(?:,\s*|$)/gi, " ")
+        .replace(/\bsummary\s*:.*?(?:,\s*|$)/gi, " ")
+        .replace(/\bnewsItems\s*:.*?(?:,\s*|$)/gi, " ")
+        .replace(/\bkeywordTags\s*:.*?(?:,\s*|$)/gi, " ")
+        .replace(/\baiInsight\s*:.*?(?:,\s*|$)/gi, " ")
+        .replace(/\bweatherNote\s*:.*?(?:,\s*|$)/gi, " ")
+        .replace(/\bfestivalNote\s*:.*?(?:,\s*|$)/gi, " ")
+        .replace(/[{}[\]"\\]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
     }
   }
 
