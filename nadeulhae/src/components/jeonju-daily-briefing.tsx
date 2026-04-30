@@ -200,8 +200,8 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
     return (
       <div className="rounded-[2.5rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-8 sm:p-12 text-center">
         <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-orange-400" />
-        <p className="text-base font-black text-muted-foreground">{t.error}</p>
-        <p className="mt-2 text-sm font-bold text-muted-foreground/70">{errorMsg || t.errorSub}</p>
+        <p className="text-base font-black text-muted-foreground break-words">{t.error}</p>
+        <p className="mt-2 text-sm font-bold text-muted-foreground/70 break-words">{errorMsg || t.errorSub}</p>
         <button
           onClick={() => fetchBriefing(false)}
           className="mt-6 inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-5 py-2.5 text-sm font-black text-sky-blue hover:bg-sky-blue/20 transition-colors"
@@ -227,7 +227,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
             <Newspaper size={24} />
           </div>
           <div>
-            <h3 className="text-2xl sm:text-4xl font-black text-foreground tracking-tight leading-none">
+            <h3 className="text-2xl sm:text-4xl font-black text-foreground tracking-tight leading-none break-words">
               {briefing.headline}
             </h3>
             <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.3em] mt-2 italic opacity-70">
@@ -264,7 +264,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           </span>
         </div>
         <div className="rounded-[1.4rem] border border-sky-blue/15 bg-card px-4 py-4">
-          <p className="text-sm sm:text-base font-bold leading-relaxed text-foreground/90 break-keep whitespace-pre-line">
+          <p className="text-sm sm:text-base font-bold leading-relaxed text-foreground/90 break-keep break-words whitespace-pre-line">
             {briefing.summary}
           </p>
         </div>
@@ -286,7 +286,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
               return (
                 <div key={idx} className="flex items-start gap-3 rounded-[1.4rem] border border-nature-green/15 bg-card px-4 py-3 min-w-0">
                   <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-nature-green" />
-                  <span className="text-sm sm:text-base font-bold leading-relaxed text-foreground break-keep">{cleaned}</span>
+                  <span className="text-sm sm:text-base font-bold leading-relaxed text-foreground break-keep break-words">{cleaned}</span>
                 </div>
               )
             })}
@@ -305,7 +305,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                   {t.weather}
                 </span>
               </div>
-              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-keep">
+              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-keep break-words">
                 {briefing.weatherNote}
               </div>
             </div>
@@ -318,7 +318,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                   {t.events}
                 </span>
               </div>
-              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-keep">
+              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-keep break-words">
                 {briefing.festivalNote}
               </div>
             </div>
@@ -353,11 +353,11 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                   {i + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm sm:text-base font-black text-foreground break-keep group-hover:text-sky-blue transition-colors">
+                  <p className="text-sm sm:text-base font-black text-foreground break-keep break-words group-hover:text-sky-blue transition-colors">
                     {item.title}
                   </p>
                   {item.snippet && (
-                    <p className="mt-1 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground break-keep">
+                    <p className="mt-1 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground break-keep break-words">
                       {item.snippet}
                     </p>
                   )}
