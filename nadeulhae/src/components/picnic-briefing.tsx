@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useLanguage } from "@/context/LanguageContext"
 import { WeatherData } from "@/services/dataService"
 import { motion } from "framer-motion"
@@ -405,6 +406,49 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   const quotes = getBriefingQuotes()
   const integratedGuide = getIntegratedGuide()
   const techData = getTechnicalPoints()
+
+  const [aiBriefingText, setAiBriefingText] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const snapshot = {
+      region: metadata?.region || "Jeonju",
+      score: weatherData.score,
+      status: weatherData.status || "",
+      temperatureC: details.temp ?? null,
+      humidityPct: details.humidity ?? null,
+      windMs: details.wind ?? null,
+      pm10: details.pm10 ?? null,
+      pm25: details.pm25 ?? null,
+      rainingNow: Boolean(eventData?.isRain || (details.rn1 ?? 0) > 0),
+      severeAlert: Boolean(eventData?.isWeatherWarning || eventData?.isEarthquake || eventData?.isTyphoon || eventData?.isTsunami || eventData?.isVolcano),
+      hazardSignals: [
+        eventData?.isTyphoon && "typhoon",
+        eventData?.isEarthquake && "earthquake",
+        eventData?.isTsunami && "tsunami",
+        eventData?.isVolcano && "volcano",
+        eventData?.isWeatherWarning && "weather_warning",
+        eventData?.isRain && "rain",
+      ].filter(Boolean) as string[],
+      bulletin: metadata?.bulletin?.summary || metadata?.alertSummary?.warningTitle || null,
+    }
+    const fetchBriefing = async () => {
+      try {
+        const res = await fetch(`/api/weather/briefing?locale=${language}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(snapshot),
+          signal: AbortSignal.timeout(18000),
+        })
+        if (cancelled) return
+        const data = await res.json().catch(() => null)
+        if (data?.summary) setAiBriefingText(data.summary)
+      } catch {}
+    }
+    fetchBriefing()
+    return () => { cancelled = true }
+  }, [language, weatherData.score, weatherData.status, details.temp, details.humidity, details.wind, details.pm10, details.pm25, eventData?.isRain, eventData?.isWeatherWarning, eventData?.isEarthquake, eventData?.isTyphoon, eventData?.isTsunami, eventData?.isVolcano, metadata?.bulletin?.summary, metadata?.alertSummary?.warningTitle])
+
   const bulletinSummary = metadata?.bulletin?.summary || (
     __l("현재 공식 통보문에 특이사항이 없습니다.", "No notable official bulletin right now.")
   )
@@ -502,7 +546,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                   {integratedGuide.title}
                 </div>
                 <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-foreground/80 dark:text-current break-words">
-                  {integratedGuide.text}
+                  {aiBriefingText || integratedGuide.text}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 lg:max-w-[280px] lg:justify-end">
