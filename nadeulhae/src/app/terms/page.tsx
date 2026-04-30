@@ -18,7 +18,7 @@ type PolicySection = {
 }
 
 const POLICY_CONTENT: Record<
-  "ko" | "en",
+  "ko" | "en" | "zh" | "ja",
   {
     badge: string
     title: string
@@ -310,12 +310,155 @@ const POLICY_CONTENT: Record<
       },
     ],
   },
+  zh: {
+    badge: "服务条款",
+    title: "Nadeulhae 服务条款 · 隐私政策 · 分析/Cookie 政策",
+    description: "以下文件基于当前实现范围编写，涵盖注册、登录、位置天气查询及服务改善分析。",
+    effectiveDate: "生效日期: 2026年4月29日 (v2.0)",
+    contentsTitle: "快速导航",
+    summaryTitle: "核心摘要",
+    summary: [
+      { label: "必要信息", value: "账户 + 个人资料 + 安全日志", detail: "电子邮件、姓名、昵称、加密密码、年龄段、地区、兴趣、时间偏好、同意记录、访问日志" },
+      { label: "可选信息", value: "营销 · 分析 · AI", detail: "营销同意、分析同意、实验室功能激活、AI聊天机器人为可选。" },
+      { label: "AI数据处理", value: "聊天内容加密传输", detail: "AI聊天对话使用AES-256-GCM加密，仅发送至LLM提供商用于推理，不用于模型训练。" },
+      { label: "默认分析", value: "匿名每日汇总", detail: "同意前仅存储匿名路由计数、响应时间和错误率。" },
+    ],
+    sections: [
+      { id: "service", eyebrow: "服务条款", title: "1. Nadeulhae 服务条款", items: [
+        "Nadeulhae 是一项综合性户外活动平台，汇总公共数据(KMA、AirKorea、APIHub)提供实时天气、空气质量、紫外线、天气警报和0-100户外适宜性评分，以及AI驱动的仪表板聊天机器人、实验室中心(词汇/FSRS、AI网络搜索聊天、代码共享)和全州AI每日简报及社区聊天。",
+        "访问通常是免费的，但用户必须注册真实准确的信息。禁止通过仇恨言论、辱骂、垃圾邮件、恶意AI提示注入或流量攻击扰乱社区运营，违者可能导致账号暂停或AI功能限制。",
+        "服务可能因公共API不稳定、LLM提供商(NanoGPT、FactChat)故障或定期维护而停机。运营方不对不可预见的服务中断造成的间接损失承担责任，重大过失除外。",
+      ]},
+      { id: "ai-services", eyebrow: "AI & LLM", title: "2. AI/LLM 服务条款", items: [
+        "Nadeulhae 提供以下AI服务: (a) 仪表板AI聊天机器人 — 天气感知户外活动助手，(b) 实验室AI聊天 — Tavily网络搜索集成知识聊天机器人，(c) 实验室词汇生成器 — FSRS闪卡AI自动生成含翻译和例句，(d) 全州AI每日简报 — 本地新闻和事件AI摘要。",
+        "AI服务通过第三方LLM提供商(NanoGPT: 'deepseek-v4-flash/pro', FactChat: 'SAIT 3 Pro')和网络搜索提供商(Tavily)处理。用户输入仅暂时传输用于响应生成，绝不用于模型训练。",
+        "所有AI生成内容(天气推荐、聊天机器人回答、词汇定义、新闻摘要)均为机器学习推理输出，可能不准确。全州简报新闻摘要和实验室AI聊天网络搜索结果仅供参考；关键决策请核实官方来源。",
+        "AI服务设有每日使用限制(LLM全局: 5,000次/天，每用户: 100-200次/天，网络搜索: 800次/月)。超出限制可能导致AI功能暂时受限。恶意重复调用可能导致AI功能永久限制。",
+      ]},
+      { id: "privacy", eyebrow: "隐私声明", title: "3. 个人信息收集与使用", items: [
+        "必填: 电子邮件、显示名称、昵称、加密密码、年龄段、主要地区、兴趣标签、时间偏好、天气敏感度、同意时间戳、访问IP安全日志。",
+        "选填: 自定义兴趣描述、营销同意、分析同意(来源、设备信息、主题、按钮交互)、实验室功能激活、AI聊天机器人使用。",
+        "数据处理: 仪表板AI聊天和全州社区聊天内容在数据库中使用AES-256-GCM加密。AI聊天对话在LLM API传输时暂时解密，生成响应后从提供商服务器丢弃。",
+        "词汇数据: 实验室中创建的词库、卡片(术语、释义、例句、学习进度)归用户所有并使用AES-256-GCM加密。绝不与其他用户共享。",
+        "代码共享数据: 代码编辑器中编写的源代码连同标题、语言和内容存储。会话采用链接共享模式 — 任何知道会话ID的人均可访问。切勿在代码共享会话中包含敏感信息(API密钥、密码)。",
+      ]},
+      { id: "encryption", eyebrow: "数据保护", title: "4. 数据加密与保护", items: [
+        "所有敏感个人数据使用AES-256-GCM字段级加密和HKDF密钥派生保护。每个字段使用独立的上下文密钥，防止单密钥泄露导致跨字段暴露。",
+        "电子邮件和昵称使用盲索引(HMAC-SHA256哈希)进行重复注册检查，无需解密原文。",
+        "密码使用scrypt(N=16384, r=8, p=1)单向哈希和Pepper(AUTH_PEPPER环境变量)。明文密码绝不存储在内存或数据库中。对不存在的账户执行相同计算以防止时序攻击。",
+        "所有数据传输通过TLS/SSL进行。生产部署应用HSTS(max-age=2年)、CSP、SameSite=Lax cookie和其他安全标头。",
+      ]},
+      { id: "location", eyebrow: "位置隐私", title: "5. 位置服务", items: [
+        "Nadeulhae 使用浏览器定位API获取用户授权坐标，用于即时天气、空气质量、附近站点匹配和AI路线推荐。",
+        "位置数据仅用于单次天气计算，从不作为连续轨迹存储。API响应包含四舍五入到2位小数的近似坐标。",
+        "根据韩国《位置数据法》，用于争议解决的'位置数据使用验证记录'保留6个月后自动删除。",
+        "用户可通过浏览器权限或应用内设置随时撤销定位同意。",
+      ]},
+      { id: "cross-border", eyebrow: "跨境传输", title: "6. 跨境数据传输通知", items: [
+        "由于云数据库(TiDB Cloud)和AI API提供商基础设施位于海外，Nadeulhae 根据PIPA第28-8条披露以下信息。",
+        "① 接收方: PingCAP Inc.(TiDB Cloud数据库), Vultr(云基础设施), NanoGPT & FactChat(AI模型API), Tavily(网络搜索API)。",
+        "② 国家: 日本(AWS ap-northeast, TiDB), 美国(Vultr & AI提供商基础设施)。",
+        "③ 传输数据: 电子邮件、个人资料信息、哈希密码、加密聊天消息、临时AI聊天对话、加密词汇数据。",
+        "④ 目的: 高可用性全球云存储和AI/LLM API处理。",
+        "⑤ 拒绝后果: 拒绝跨境传输将使核心基础设施(AI功能、数据存储)无法运行，需要删除账户。",
+      ]},
+      { id: "retention", eyebrow: "数据保留", title: "7. 数据保留与删除", items: [
+        "账户删除: 在单个事务中级联删除10+个相关表中的所有用户数据(账户、个人资料、会话、仪表板聊天、实验室词库/卡片、拥有的代码共享会话、全州聊天、分析)。",
+        "安全日志: 认证安全事件记录(登录、注册、退出)保留90天后自动删除。",
+        "全州社区聊天: 消息发布168小时(7天)后自动从数据库删除，不保留备份。",
+        "加密密钥: 数据保护密钥(DATA_PROTECTION_KEY)通过环境变量管理。丢失此密钥将使加密数据永久无法恢复。",
+      ]},
+      { id: "cookies", eyebrow: "Cookie & 分析", title: "8. Cookie、分析与会话政策", items: [
+        "必要Cookie: 认证会话('nadeulhae_auth', httpOnly, SameSite=Lax, Secure)、代码共享访客标识符和匿名会话Cookie。这些是服务运行所必需的。",
+        "分析数据: 经同意后收集去标识化的可用性数据(页面访问路径、页面停留时间、按钮点击、设备类型、主题、语言设置)。不存储原始IP地址。",
+        "分析数据仅以每日汇总统计形式存储，旨在防止个人识别。可在账户设置中随时撤销分析同意。",
+        "LLM使用追踪: 记录AI聊天机器人使用指标(提示令牌、响应令牌、请求计数)用于服务质量管理和每日限制执行。对话内容加密存储，与令牌计数分开。",
+      ]},
+      { id: "rights", eyebrow: "用户权利", title: "9. 用户权利与联系", items: [
+        "所有会员可在仪表板账户设置中自由查看、编辑和删除账户信息，更改营销/分析同意，切换实验室功能，删除账户。",
+        "如需退出AI聊天机器人功能，请在账户设置中禁用实验室功能。基本服务(天气查询)无需AI功能即可使用。",
+        "关于隐私、位置、AI数据处理或系统问题，请通过官方支持邮箱 kim0040@jbnu.ac.kr 联系我们。",
+      ]},
+    ],
+  },
+  ja: {
+    badge: "利用規約",
+    title: "Nadeulhae 利用規約 · プライバシーポリシー · 分析/Cookie ポリシー",
+    description: "以下の文書は現在の実装範囲に基づいて作成され、会員登録、ログイン、位置情報天気照会、サービス改善分析をカバーしています。",
+    effectiveDate: "発効日: 2026年4月29日 (v2.0)",
+    contentsTitle: "クイックナビゲーション",
+    summaryTitle: "主要サマリー",
+    summary: [
+      { label: "必須情報", value: "アカウント + プロフィール + セキュリティログ", detail: "メールアドレス、表示名、ニックネーム、暗号化パスワード、年齢層、地域、興味、時間帯設定、同意記録、アクセスログ" },
+      { label: "任意情報", value: "マーケティング · 分析 · AI", detail: "マーケティング同意、分析同意、ラボ機能の有効化、AIチャットボットは任意です。" },
+      { label: "AIデータ処理", value: "チャット内容の暗号化転送", detail: "AIチャット会話はAES-256-GCMで暗号化され、LLMプロバイダーに推論目的でのみ送信され、モデル学習には使用されません。" },
+      { label: "デフォルト分析", value: "匿名の日次集計", detail: "同意前は、匿名のルートカウント、応答時間、エラー率のみが保存されます。" },
+    ],
+    sections: [
+      { id: "service", eyebrow: "利用規約", title: "1. Nadeulhae 利用規約", items: [
+        "Nadeulhaeは、公共データ(KMA、AirKorea、APIHub)を集約してリアルタイムの天気、空気質、UV、気象警報、0-100の屋外適性スコアを提供し、AI搭載のダッシュボードチャットボット、ラボハブ(語彙/FSRS、AI Web検索チャット、コード共有)、全州AIデイリーブリーフィングとコミュニティチャットを統合した包括的なアウトドア活動プラットフォームです。",
+        "アクセスは基本的に無料ですが、ユーザーは正確な情報で登録する必要があります。ヘイトスピーチ、悪用、スパム、悪意のあるAIプロンプト注入、トラフィック攻撃によるコミュニティ運営の妨害は禁止されており、アカウント停止やAI機能制限の対象となります。",
+        "公共APIの不安定性、LLMプロバイダー(NanoGPT、FactChat)の障害、または定期メンテナンスによりサービスが停止する場合があります。運営者は、重大な過失がない限り、予期せぬ中断による間接的な損害について責任を負いません。",
+      ]},
+      { id: "ai-services", eyebrow: "AI & LLM", title: "2. AI/LLM サービス利用規約", items: [
+        "Nadeulhaeは以下のAIサービスを提供します: (a) ダッシュボードAIチャットボット — 天気認識型アウトドアアシスタント、(b) ラボAIチャット — Tavily Web検索統合型知識チャットボット、(c) ラボ語彙ジェネレーター — 翻訳と例文付きFSRSフラッシュカードAI自動生成、(d) 全州AIデイリーブリーフィング — ローカルニュースとイベントのAIサマリー。",
+        "AIサービスはサードパーティLLMプロバイダー(NanoGPT: 'deepseek-v4-flash/pro', FactChat: 'SAIT 3 Pro')およびWeb検索プロバイダー(Tavily)を通じて処理されます。ユーザー入力は応答生成の目的でのみ一時的に送信され、モデル学習には一切使用されません。",
+        "すべてのAI生成コンテンツ(天気推奨、チャットボット回答、語彙定義、ニュースサマリー)は機械学習推論の出力であり、不正確な場合があります。全州ブリーフィングのニュースサマリーとラボAIチャットのWeb検索結果は参考用です。重要な判断は公式ソースで確認してください。",
+        "AIサービスには1日の使用制限があります(LLMグローバル: 5,000回/日、ユーザーあたり: 100-200回/日、Web検索: 800回/月)。制限を超えるとAI機能が一時的に制限される場合があります。悪意のある繰り返し呼び出しは、AI機能の永続的な制限につながる場合があります。",
+      ]},
+      { id: "privacy", eyebrow: "プライバシー通知", title: "3. 個人情報の収集と利用", items: [
+        "必須: メールアドレス、表示名、ニックネーム、暗号化パスワード、年齢層、主な地域、興味タグ、時間帯設定、天気感度、同意タイムスタンプ、アクセスIPセキュリティログ。",
+        "任意: カスタム興味説明、マーケティング同意、分析同意(紹介元、デバイス情報、テーマ、ボタン操作)、ラボ機能の有効化、AIチャットボットの使用。",
+        "データ処理: ダッシュボードAIチャットと全州コミュニティチャットの内容はデータベースでAES-256-GCM暗号化されています。AIチャットの会話はLLM API送信時に一時的に復号され、応答生成後にプロバイダーのサーバーから破棄されます。",
+        "語彙データ: ラボで作成されたデッキ、カード(用語、意味、例文、学習進捗)はユーザー所有でAES-256-GCM暗号化されています。他のユーザーと共有されることはありません。",
+        "コード共有データ: コードエディターで作成されたソースコードは、タイトル、言語、内容とともに保存されます。セッションはリンク共有モデルで運営され、セッションIDを知っている人は誰でもアクセスできます。APIキーやパスワードなどの機密情報をコード共有セッションに含めないでください。",
+      ]},
+      { id: "encryption", eyebrow: "データ保護", title: "4. データ暗号化と保護", items: [
+        "すべての機密個人データは、AES-256-GCMフィールドレベル暗号化とHKDFキー導出で保護されています。各フィールドは独立したコンテキストキーを使用し、単一キーの漏洩によるクロスフィールド露出を防ぎます。",
+        "メールアドレスとニックネームは、原文を復号することなく重複登録をチェックするためにブラインドインデックス(HMAC-SHA256ハッシュ)を使用します。",
+        "パスワードはscrypt(N=16384, r=8, p=1)一方向ハッシュとPepper(AUTH_PEPPER環境変数)を使用します。平文パスワードがメモリやデータベースに保存されることはありません。存在しないアカウントに対しても同一の計算を実行し、タイミング攻撃を防ぎます。",
+        "すべてのデータ転送はTLS/SSL経由で行われます。本番環境ではHSTS(max-age=2年)、CSP、SameSite=Lax Cookie、その他のセキュリティヘッダーが適用されます。",
+      ]},
+      { id: "location", eyebrow: "位置情報プライバシー", title: "5. 位置情報サービス", items: [
+        "Nadeulhaeはブラウザの位置情報APIを使用して、ユーザーが許可した座標を即時の天気、空気質、近隣観測所マッチング、AIコース推奨に使用します。",
+        "位置データは単一の天気計算にのみ使用され、連続的な軌跡として保存されることはありません。API応答には小数点以下2桁に丸められた近似座標が含まれます。",
+        "韓国の「位置データ法」に基づき、紛争解決のための「位置データ利用検証記録」は6か月間保持され、その後自動的に削除されます。",
+        "ユーザーはブラウザの権限またはアプリ内設定を通じて、いつでも位置情報の同意を取り消すことができます。",
+      ]},
+      { id: "cross-border", eyebrow: "越境転送", title: "6. 越境データ転送に関する通知", items: [
+        "クラウドデータベース(TiDB Cloud)とAI APIプロバイダーのインフラが海外にあるため、NadeulhaeはPIPA第28-8条に基づき以下を開示します。",
+        "① 受領者: PingCAP Inc.(TiDB Cloudデータベース)、Vultr(クラウドインフラ)、NanoGPT & FactChat(AIモデルAPI)、Tavily(Web検索API)。",
+        "② 国: 日本(AWS ap-northeast、TiDB)、米国(Vultr & AIプロバイダーインフラ)。",
+        "③ 転送データ: メールアドレス、プロフィール情報、ハッシュ化パスワード、暗号化チャットメッセージ、一時的なAIチャット会話、暗号化語彙データ。",
+        "④ 目的: 高可用性グローバルクラウドストレージとAI/LLM API処理。",
+        "⑤ 拒否の結果: 越境転送を拒否すると、コアインフラ(AI機能、データストレージ)が動作不能になり、アカウント削除が必要になります。",
+      ]},
+      { id: "retention", eyebrow: "データ保持", title: "7. データ保持と削除", items: [
+        "アカウント削除: 単一トランザクションで10以上の関連テーブル(アカウント、プロフィール、セッション、ダッシュボードチャット、ラボデッキ/カード、所有コード共有セッション、全州チャット、分析)からすべてのユーザーデータが連鎖削除されます。",
+        "セキュリティログ: 認証セキュリティイベント記録(ログイン、サインアップ、ログアウト)は90日間保持され、その後自動削除されます。",
+        "全州コミュニティチャット: メッセージは投稿後168時間(7日)でデータベースから自動的に削除され、バックアップは保持されません。",
+        "暗号化キー: データ保護キー(DATA_PROTECTION_KEY)は環境変数で管理されます。このキーを紛失すると、暗号化データが永久に復元不能になります。",
+      ]},
+      { id: "cookies", eyebrow: "Cookie & 分析", title: "8. Cookie、分析、セッションポリシー", items: [
+        "必須Cookie: 認証セッション('nadeulhae_auth', httpOnly, SameSite=Lax, Secure)、コード共有ゲスト識別子、匿名セッションCookie。これらはサービス運用に必須です。",
+        "分析データ: 同意がある場合、非識別化されたユーザビリティデータ(ページ訪問経路、滞在時間、ボタンクリック、デバイスタイプ、テーマ、言語設定)が収集されます。生のIPアドレスは保存されません。",
+        "分析データは個人識別を防ぐよう設計された日次集計統計としてのみ保存されます。分析同意はアカウント設定でいつでも取り消せます。",
+        "LLM使用量追跡: AIチャットボットの使用指標(プロンプトトークン、応答トークン、リクエスト数)がサービス品質管理と日次制限の実施のために記録されます。会話内容は暗号化され、トークン数とは別に保存されます。",
+      ]},
+      { id: "rights", eyebrow: "ユーザー権利", title: "9. ユーザー権利とお問い合わせ", items: [
+        "すべてのメンバーはダッシュボードのアカウント設定から、アカウント情報の表示・編集・削除、マーケティング/分析同意の変更、ラボ機能の切り替え、アカウント削除を自由に行えます。",
+        "AIチャットボット機能をオプトアウトするには、アカウント設定でラボ機能を無効にしてください。基本サービス(天気照会)はAI機能なしで利用可能です。",
+        "プライバシー、位置情報、AIデータ処理、システムの問題については、公式サポートメール kim0040@jbnu.ac.kr までお問い合わせください。",
+      ]},
+    ],
+  },
 }
 
 export default function TermsPage() {
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = POLICY_CONTENT[language as "ko" | "en"] ?? POLICY_CONTENT.en
+  const copy = (POLICY_CONTENT as any)[language] ?? POLICY_CONTENT.en
+  const typedCopy = copy as typeof POLICY_CONTENT.en
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-20 pt-24 sm:px-6 sm:pt-28 lg:px-8">
@@ -341,19 +484,19 @@ export default function TermsPage() {
             <div className="relative z-10 space-y-5">
               <span className="inline-flex items-center gap-2 rounded-full border border-active-blue/20 bg-active-blue/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.3em] text-active-blue">
                 <FileCheck2 className="size-3.5" />
-                {copy.badge}
+                {typedCopy.badge}
               </span>
               <div className="space-y-3">
                 <AnimatedGradientText className="text-3xl font-black tracking-tight sm:text-4xl">
-                  {copy.title}
+                  {typedCopy.title}
                 </AnimatedGradientText>
                 <p className="max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
-                  {copy.description}
+                  {typedCopy.description}
                 </p>
               </div>
               <div className="grid gap-3">
                 <div className="rounded-[1.5rem] border border-card-border/70 bg-background/70 px-5 py-4 text-sm font-semibold text-foreground">
-                  {copy.effectiveDate}
+                  {typedCopy.effectiveDate}
                 </div>
               </div>
             </div>
@@ -365,14 +508,14 @@ export default function TermsPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
-                  {copy.contentsTitle}
+                  {typedCopy.contentsTitle}
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground">
-                  {copy.summaryTitle}
+                  {typedCopy.summaryTitle}
                 </h2>
               </div>
               <div className="flex flex-wrap gap-2">
-                {copy.sections.map((section) => (
+                {typedCopy.sections.map((section) => (
                   <a
                     key={section.id}
                     href={`#${section.id}`}
@@ -387,7 +530,7 @@ export default function TermsPage() {
         </MagicCard>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {copy.summary.map((item) => (
+          {typedCopy.summary.map((item) => (
             <MagicCard
               key={item.label}
               className="rounded-[1.7rem]"
@@ -410,7 +553,7 @@ export default function TermsPage() {
         </div>
 
         <div className="grid gap-5 sm:gap-6">
-          {copy.sections.map((section) => (
+          {typedCopy.sections.map((section) => (
             <MagicCard
               key={section.id}
               className="rounded-[2rem]"
