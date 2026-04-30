@@ -692,7 +692,7 @@ function extractDomain(url: string): string {
  */
 function extractJsonFromResponse(content: string): string | null {
   // Preprocess: strip markdown code fences (```json / ```)
-  let work = content
+  const work = content
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
     .trim()
