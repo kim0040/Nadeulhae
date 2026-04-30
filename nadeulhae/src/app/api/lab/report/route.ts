@@ -7,6 +7,7 @@ import {
   clearAuthCookie,
   getAuthenticatedSessionFromRequest,
 } from "@/lib/auth/session"
+import type { LabLocale } from "@/lib/lab/types"
 import { getLabReportSnapshot } from "@/lib/lab/repository"
 
 export const runtime = "nodejs"
@@ -24,10 +25,24 @@ const LAB_REPORT_ERRORS = {
     invalidPeriod: "Invalid report period value.",
     failed: "Failed to load lab report.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "实验室功能未开启。请先在仪表盘设置中启用。",
+    invalidPeriod: "报告期间值无效。",
+    failed: "无法加载学习报告。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が無効です。ダッシュボード設定から先に有効にしてください。",
+    invalidPeriod: "レポート期間の値が正しくありません。",
+    failed: "学習レポートの読み込みに失敗しました。",
+  },
 } as const
 
-function getLocale(request: NextRequest): "ko" | "en" {
+function getLocale(request: NextRequest): LabLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 

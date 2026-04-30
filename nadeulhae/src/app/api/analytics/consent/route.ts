@@ -27,6 +27,14 @@ const CONSENT_ERRORS = {
     invalidRequest: "Invalid analytics consent request.",
     invalidPreference: "A valid analytics consent preference is required.",
   },
+  zh: {
+    invalidRequest: "无效的分析同意请求。",
+    invalidPreference: "需要有效的分析同意设置。",
+  },
+  ja: {
+    invalidRequest: "無効な分析同意リクエストです。",
+    invalidPreference: "有効な分析同意設定が必要です。",
+  },
 } as const
 
 type ConsentLocale = keyof typeof CONSENT_ERRORS
@@ -49,6 +57,14 @@ function normalizeLocale(value: unknown): ConsentLocale | null {
     return "en"
   }
 
+  if (trimmed.startsWith("zh")) {
+    return "zh"
+  }
+
+  if (trimmed.startsWith("ja")) {
+    return "ja"
+  }
+
   return null
 }
 
@@ -64,7 +80,8 @@ function resolveConsentLocale(request: NextRequest, payloadLocale?: unknown): Co
 
 async function handlePOST(request: NextRequest) {
   const headerLocale = resolveConsentLocale(request)
-  const requestViolation = validateAuthMutationRequest(request, headerLocale)
+  const authLocale: "ko" | "en" = headerLocale === "zh" || headerLocale === "ja" ? "en" : headerLocale
+  const requestViolation = validateAuthMutationRequest(request, authLocale)
   if (requestViolation) {
     return requestViolation
   }

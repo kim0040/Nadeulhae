@@ -33,6 +33,26 @@ function pruneMapIfOverSize(map: Map<string, { count: number; lastReset: number 
   }
 }
 
+let __rateLimitPruneTimer: ReturnType<typeof setInterval> | undefined
+
+function ensurePeriodicPruning() {
+  if (__rateLimitPruneTimer) return
+  __rateLimitPruneTimer = setInterval(() => {
+    const now = Date.now()
+    const windowMs = WINDOW * 5
+    for (const [key, value] of rateLimitMap.entries()) {
+      if (now - value.lastReset > windowMs) rateLimitMap.delete(key)
+    }
+    for (const [key, value] of authRateLimitMap.entries()) {
+      if (now - value.lastReset > windowMs) authRateLimitMap.delete(key)
+    }
+  }, 300_000) // every 5 minutes
+  // Allow Node.js to exit even if the timer is still active
+  if (__rateLimitPruneTimer && typeof __rateLimitPruneTimer === "object" && "unref" in __rateLimitPruneTimer) {
+    __rateLimitPruneTimer.unref()
+  }
+}
+
 function getClientKey(request: NextRequest) {
   if (!TRUST_PROXY_HEADERS) {
     return "anonymous"
@@ -95,6 +115,7 @@ const IMMUTABLE_EXTENSIONS = [
 ]
 
 export function proxy(request: NextRequest) {
+  ensurePeriodicPruning()
   const { pathname } = request.nextUrl
 
   if (pathname.startsWith("/api")) {

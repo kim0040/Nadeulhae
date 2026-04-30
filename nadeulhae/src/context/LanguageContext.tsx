@@ -470,9 +470,10 @@ const translations: Record<Language, Record<string, string | string[]>> = {
     signup_has_account: "Already have an account?",
     signup_go_login: "Login",
     
-    // UI General
-    loading_weather: "Loading weather data...",
-    footer_copy: "© 2026 Nadeulhae. All rights reserved.",
+     // UI General
+     loading_weather: "Loading weather data...",
+     loading_locating: "Locating...",
+     footer_copy: "© 2026 Nadeulhae. All rights reserved.",
     footer_notice: "If location access is allowed, it is used only for regional weather decisions, and the interface is built from public datasets such as KMA and AirKorea.",
     footer_terms: "Terms of Service & Privacy Policy",
     footer_about: "About Nadeulhae",

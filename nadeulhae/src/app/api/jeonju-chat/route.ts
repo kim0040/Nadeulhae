@@ -44,12 +44,32 @@ const JEONJU_CHAT_ERRORS = {
     profanity: "Your message contains inappropriate language. Please revise it.",
     sendFailed: "Failed to send the message.",
   },
+  zh: {
+    loadFailed: "无法加载聊天消息。",
+    authRequired: "请先登录。",
+    rateLimited: "消息发送过于频繁，请稍后再试。",
+    invalidRequest: "无效的请求。",
+    invalidLength: "消息长度须在 1 到 500 个字符之间。",
+    profanity: "消息中包含不当用语，请重新编辑。",
+    sendFailed: "消息发送失败。",
+  },
+  ja: {
+    loadFailed: "チャットメッセージを読み込めませんでした。",
+    authRequired: "ログインが必要です。",
+    rateLimited: "メッセージを送りすぎています。しばらくしてからお試しください。",
+    invalidRequest: "無効なリクエストです。",
+    invalidLength: "メッセージは1文字以上500文字以内で入力してください。",
+    profanity: "不適切な表現が含まれています。書き直してください。",
+    sendFailed: "メッセージの送信に失敗しました。",
+  },
 } as const
 
 type JeonjuChatLocale = keyof typeof JEONJU_CHAT_ERRORS
 
 function resolveLocale(request: Request): JeonjuChatLocale {
   const acceptLanguage = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (acceptLanguage.startsWith("zh")) return "zh"
+  if (acceptLanguage.startsWith("ja")) return "ja"
   return acceptLanguage.startsWith("en") ? "en" : "ko"
 }
 
@@ -112,8 +132,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const locale = resolveLocale(request)
+  const authLocale: "ko" | "en" = locale === "zh" || locale === "ja" ? "en" : locale
   try {
-    const requestViolation = validateAuthMutationRequest(request, locale)
+    const requestViolation = validateAuthMutationRequest(request, authLocale)
     if (requestViolation) {
       return requestViolation
     }

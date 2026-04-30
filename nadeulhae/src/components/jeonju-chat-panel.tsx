@@ -74,6 +74,44 @@ const COPY = {
     charCount: "chars",
     anonymous: "Anonymous",
   },
+  zh: {
+    sectionTag: "全州交流",
+    title: "全州开放聊天",
+    description: "与邻居轻松分享全州的实时消息或出游小贴士的空间。",
+    loginRequired: "需要登录才能参与对话。",
+    loginAction: "前往登录",
+    placeholder: "留下关于全州的故事...",
+    send: "发送",
+    anonymousToggle: "匿名发送",
+    empty: "还没有消息。快来开始第一场对话吧！",
+    loading: "正在加载消息...",
+    error: "无法加载消息。",
+    sendError: "消息发送失败。",
+    profanityError: "消息包含不当用语。",
+    retentionNotice: "为保持交流环境清洁，消息将在7天后消失。",
+    onlineLabel: "实时",
+    charCount: "字",
+    anonymous: "匿名",
+  },
+  ja: {
+    sectionTag: "全州トーク",
+    title: "全州オープンチャット",
+    description: "全州のリアルタイム情報やお出かけ情報を気軽に共有するスペースです。",
+    loginRequired: "会話に参加するにはログインが必要です。",
+    loginAction: "ログインする",
+    placeholder: "全州についての話を残してみましょう...",
+    send: "送信",
+    anonymousToggle: "匿名で送信",
+    empty: "まだメッセージがありません。最初の会話を始めましょう！",
+    loading: "メッセージを読み込み中...",
+    error: "メッセージの読み込みに失敗しました。",
+    sendError: "メッセージの送信に失敗しました。",
+    profanityError: "不適切な表現が含まれています。",
+    retentionNotice: "清潔な交流のため、7日後にメッセージは削除されます。",
+    onlineLabel: "ライブ",
+    charCount: "文字",
+    anonymous: "匿名",
+  },
 } as const
 
 function formatChatTime(iso: string, language: string, nowMs: number) {
@@ -94,7 +132,7 @@ function ChatBubble({
   nowMs: number
 }) {
   const displayName = message.isAnonymous
-    ? (language === "ko" ? "익명" : "Anonymous")
+    ? (language === "ko" ? "익명" : language === "zh" || language === "ja" ? "匿名" : "Anonymous")
     : `${message.nickname}#${message.nicknameTag}`
 
   const showTimestamp = showProfile

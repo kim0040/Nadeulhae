@@ -65,7 +65,7 @@ export function SettingsModal({
   }, [copy.noSensitivity, form.weatherSensitivity, language])
 
   const joinedAtLabel = useMemo(
-    () => new Date(user.createdAt).toLocaleDateString(language === "ko" ? "ko-KR" : "en-US"),
+    () => new Date(user.createdAt).toLocaleDateString(language === "ko" ? "ko-KR" : language === "zh" ? "zh-CN" : language === "ja" ? "ja-JP" : "en-US"),
     [language, user.createdAt]
   )
 

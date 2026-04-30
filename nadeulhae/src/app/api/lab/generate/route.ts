@@ -90,10 +90,36 @@ const LAB_GENERATE_ERRORS = {
     dailyLimit: "You have reached today's lab generation limit.",
     internal: "An error occurred while generating lab cards.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "实验室功能未开启。请先在仪表盘设置中启用。",
+    invalidRequest: "实验室卡片生成请求格式无效。",
+    invalidTopic: "请输入至少 2 个字符的主题。",
+    tooLongTopic: `主题长度不能超过 ${LAB_INPUT_MAX_CHARACTERS} 个字符。`,
+    providerFailure: "卡片生成失败，请稍后再试。",
+    globalLlmLimit: "今日 AI 请求额度已达上限，请明天再试。",
+    parseFailure: "无法解析生成结果，请尝试更换描述。",
+    dailyLimit: "今日实验室卡片生成次数已用完。",
+    internal: "实验室卡片生成过程中发生错误。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が無効です。ダッシュボード設定から先に有効にしてください。",
+    invalidRequest: "ラボカード生成リクエストの形式が正しくありません。",
+    invalidTopic: "トピックは2文字以上入力してください。",
+    tooLongTopic: `トピックは ${LAB_INPUT_MAX_CHARACTERS} 文字以内である必要があります。`,
+    providerFailure: "カード生成に失敗しました。しばらくしてからお試しください。",
+    globalLlmLimit: "本日の AI リクエスト上限に達しました。明日再試行してください。",
+    parseFailure: "生成結果を解析できませんでした。別の表現でお試しください。",
+    dailyLimit: "本日のラボカード生成上限に達しました。",
+    internal: "ラボカード生成中にエラーが発生しました。",
+  },
 } as const
 
 function getLocale(request: NextRequest): LabLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -265,9 +291,10 @@ function parseDeckFromCompletion(content: string, maxCards: number) {
 
 async function handlePOST(request: NextRequest) {
   const locale = getLocale(request)
+  const authLocale: "ko" | "en" = locale === "zh" || locale === "ja" ? "en" : locale
 
   try {
-    const requestViolation = validateAuthMutationRequest(request, locale)
+    const requestViolation = validateAuthMutationRequest(request, authLocale)
     if (requestViolation) {
       return requestViolation
     }

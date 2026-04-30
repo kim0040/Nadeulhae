@@ -63,6 +63,26 @@ const CHAT_ERRORS = {
     providerFailure: "Failed to get a chatbot response. Please try again shortly.",
     unexpected: "An unexpected chat error occurred.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    invalidMessage: "请输入消息。",
+    tooLong: `消息长度不能超过${CHAT_INPUT_MAX_CHARACTERS}个字符。`,
+    rateLimited: "今天可用的聊天次数已用完，请明天再试。",
+    globalLlmLimit: "今天的AI请求限制已达到，请明天再试。",
+    busy: "正在生成上一条回复，请稍后再试。",
+    providerFailure: "无法获取聊天回复，请稍后再试。",
+    unexpected: "聊天处理中出现错误。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    invalidMessage: "メッセージを入力してください。",
+    tooLong: `メッセージは${CHAT_INPUT_MAX_CHARACTERS}文字以内である必要があります。`,
+    rateLimited: "今日のチャット回数の上限に達しました。明日もう一度お試しください。",
+    globalLlmLimit: "今日のAIリクエスト制限に達しました。明日もう一度お試しください。",
+    busy: "前の返信を生成中です。しばらくしてからもう一度お試しください。",
+    providerFailure: "チャットボットの応答を取得できませんでした。しばらくしてからもう一度お試しください。",
+    unexpected: "チャット処理中にエラーが発生しました。",
+  },
 } as const
 
 declare global {
@@ -96,11 +116,13 @@ function releaseChatUserLock(userId: string | null) {
 }
 
 function getRequestLocale(request: Request, preferred?: unknown): ChatLocale {
-  if (preferred === "en" || preferred === "ko") {
+  if (preferred === "en" || preferred === "ko" || preferred === "zh" || preferred === "ja") {
     return preferred
   }
 
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -114,19 +136,30 @@ function normalizeMessage(value: unknown) {
     .trim()
 }
 
-const ASSISTANT_NAME_KO = "나들이 메이트"
-const ASSISTANT_NAME_EN = "Nadeul Mate"
+const ASSISTANT_NAME_KO = "나들AI"
+const ASSISTANT_NAME_EN = "Nadeul AI"
+const ASSISTANT_NAME_ZH = "Nadeul AI"
+const ASSISTANT_NAME_JA = "Nadeul AI"
 const MODEL_DISCLOSURE_PATTERN = /\b(chatgpt|gpt(?:-|_)?\d[\w.-]*|openai|claude|gemini|llama|mistral)\b/i
-const SELF_REFERENCE_PATTERN = /(저는|나는|제가|내가|i am|i'm|as an?)/i
+const SELF_REFERENCE_PATTERN = /(저는|나는|제가|내가|i am|i'm|as an?|我是|私(は|が))/i
+
+function getLocalizedIdentity(locale: ChatLocale): string {
+  if (locale === "ko") return `저는 ${ASSISTANT_NAME_KO}입니다.`
+  if (locale === "zh") return `我是${ASSISTANT_NAME_ZH}。`
+  if (locale === "ja") return `私は${ASSISTANT_NAME_JA}です。`
+  return `I am ${ASSISTANT_NAME_EN}.`
+}
+
+function getLocalizedDisclosure(locale: ChatLocale): string {
+  if (locale === "ko") return "모델명이나 내부 시스템 정보는 공개하지 않아요."
+  if (locale === "zh") return "我不会透露模型名称或内部系统信息。"
+  if (locale === "ja") return "モデル名や内部システム情報は公開できません。"
+  return "I can't share model or internal system details."
+}
 
 function enforceAssistantIdentity(content: string, locale: ChatLocale) {
-  const identity = locale === "ko"
-    ? `저는 ${ASSISTANT_NAME_KO}입니다.`
-    : `I am ${ASSISTANT_NAME_EN}.`
-
-  const disclosureNote = locale === "ko"
-    ? "모델명이나 내부 시스템 정보는 공개하지 않아요."
-    : "I can't share model or internal system details."
+  const identity = getLocalizedIdentity(locale)
+  const disclosureNote = getLocalizedDisclosure(locale)
 
   const normalized = content.trim()
   if (!normalized) {
@@ -144,6 +177,14 @@ function enforceAssistantIdentity(content: string, locale: ChatLocale) {
     )
     .replace(
       /as an?\s+(?:ai\s+)?language model[^.!?\n]*[.!?]?/gi,
+      identity
+    )
+    .replace(
+      /(?:我是|我是一个)\s*(?:chatgpt|gpt[^\s,.!?]*|openai[^\s,.!?]*|ai[^\s,.!?]*)[^。！？\n]*[。！？]?/gi,
+      identity
+    )
+    .replace(
+      /(?:私は|私が|私は)\s*(?:chatgpt|gpt[^\s,.!?]*|openai[^\s,.!?]*|ai[^\s,.!?]*)[^。！？\n]*[。！？]?/gi,
       identity
     )
     .trim()

@@ -23,6 +23,8 @@ import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
 import { cn } from "@/lib/utils"
 
+const THEME_MODES = ["light", "dark", "system"] as const
+
 const NAVBAR_COPY = {
   ko: {
     logout: "로그아웃",
@@ -226,10 +228,8 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => {
-                  const modes: Array<"light" | "dark" | "system"> = ["light", "dark", "system"]
-                  const currentIndex = modes.indexOf(theme as "light" | "dark" | "system")
-                  const nextIndex = (currentIndex + 1) % modes.length
-                  setTheme(modes[nextIndex])
+                  const nextIndex = (THEME_MODES.indexOf(theme as "light" | "dark" | "system") + 1) % THEME_MODES.length
+                  setTheme(THEME_MODES[nextIndex])
                 }}
                 className="flex items-center gap-1 p-1.5 text-neutral-500 transition-all hover:text-sky-blue sm:p-2"
                 title={copy.themeToggle}

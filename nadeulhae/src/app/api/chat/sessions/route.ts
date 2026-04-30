@@ -30,14 +30,28 @@ const SESSION_ERRORS = {
     cannotDelete: "The last remaining session cannot be deleted.",
     unexpected: "An unexpected session error occurred.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    invalidSession: "找不到有效的会话。",
+    cannotDelete: "最后一个会话无法删除。",
+    unexpected: "会话处理中出错。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    invalidSession: "有効なセッションが見つかりません。",
+    cannotDelete: "最後のセッションは削除できません。",
+    unexpected: "セッション処理中にエラーが発生しました。",
+  },
 } as const
 
 function getRequestLocale(request: Request, preferred?: unknown): ChatLocale {
-  if (preferred === "en" || preferred === "ko") {
+  if (preferred === "en" || preferred === "ko" || preferred === "zh" || preferred === "ja") {
     return preferred
   }
 
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 

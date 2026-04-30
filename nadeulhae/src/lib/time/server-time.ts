@@ -69,7 +69,8 @@ export function parseServerTimestamp(value: unknown): Date | null {
 }
 
 function getLocaleCode(language: SupportedLocale) {
-  return language === "ko" ? "ko-KR" : "en-US"
+  const localeMap: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" }
+  return localeMap[language] ?? "en-US"
 }
 
 export function formatServerClockTime(value: unknown, language: SupportedLocale) {
@@ -127,17 +128,17 @@ export function formatServerRelativeTime(value: unknown, nowMs: number, language
   const diff = Math.max(0, nowMs - parsed.getTime())
 
   if (diff < 60_000) {
-    return language === "ko" ? "방금" : "Just now"
+    return language === "ko" ? "방금" : language === "zh" ? "刚刚" : language === "ja" ? "たった今" : "Just now"
   }
 
   if (diff < 3_600_000) {
     const minutes = Math.floor(diff / 60_000)
-    return language === "ko" ? `${minutes}분 전` : `${minutes}m ago`
+    return language === "ko" ? `${minutes}분 전` : language === "zh" ? `${minutes}分钟前` : language === "ja" ? `${minutes}分前` : `${minutes}m ago`
   }
 
   if (diff < 86_400_000) {
     const hours = Math.floor(diff / 3_600_000)
-    return language === "ko" ? `${hours}시간 전` : `${hours}h ago`
+    return language === "ko" ? `${hours}시간 전` : language === "zh" ? `${hours}小时前` : language === "ja" ? `${hours}時間前` : `${hours}h ago`
   }
 
   return parsed.toLocaleString(getLocaleCode(language), {

@@ -18,12 +18,12 @@ function formatOptionalNumber(value: number | null | undefined, digits = 4) {
 
 function getStationSourceLabel(source: string | undefined, language: string) {
   if (source === "live_api") {
-    return language === "ko" ? "실시간 인근 관측소 매핑" : "Live nearby-station mapping"
+    return language === "ko" ? "실시간 인근 관측소 매핑" : language === "zh" ? "实时邻近观测站映射" : language === "ja" ? "リアルタイム近隣観測所マッピング" : "Live nearby-station mapping"
   }
   if (source === "cache") {
-    return language === "ko" ? "관측소 캐시 매핑" : "Cached station mapping"
+    return language === "ko" ? "관측소 캐시 매핑" : language === "zh" ? "观测站缓存映射" : language === "ja" ? "観測所キャッシュマッピング" : "Cached station mapping"
   }
-  return language === "ko" ? "권역 기본 매핑" : "Regional default mapping"
+  return language === "ko" ? "권역 기본 매핑" : language === "zh" ? "区域默认映射" : language === "ja" ? "地域デフォルトマッピング" : "Regional default mapping"
 }
 
 export function LocationGridPanel({ weatherData }: LocationGridPanelProps) {
@@ -45,18 +45,44 @@ export function LocationGridPanel({ weatherData }: LocationGridPanelProps) {
         profile: "지역 프로파일",
         weatherStation: "기상 통보소",
       }
-    : {
-        title: "Map · Grid Mapping",
-        subtitle: "Current coordinates converted into weather-grid and observation mapping.",
-        coord: "Current Coordinates (WGS84)",
-        grid: "Weather Grid (DFS)",
-        tm: "TM Coordinates (AirKorea)",
-        station: "Selected Station",
-        candidates: "Nearby Station Candidates",
-        none: "No candidate stations are available.",
-        profile: "Regional Profile",
-        weatherStation: "Weather Station ID",
-      }
+    : language === "zh"
+      ? {
+          title: "地图 · 网格映射",
+          subtitle: "当前坐标已转换为气象网格和观测映射的结果。",
+          coord: "当前坐标 (WGS84)",
+          grid: "气象网格 (DFS)",
+          tm: "TM 坐标 (AirKorea)",
+          station: "所选观测站",
+          candidates: "邻近观测站候选",
+          none: "暂无可用候选项。",
+          profile: "区域概况",
+          weatherStation: "气象站 ID",
+        }
+      : language === "ja"
+        ? {
+            title: "地図 · グリッドマッピング",
+            subtitle: "現在の座標を気象グリッドと観測体系に変換した結果です。",
+            coord: "現在の座標 (WGS84)",
+            grid: "気象グリッド (DFS)",
+            tm: "TM 座標 (AirKorea)",
+            station: "選択観測所",
+            candidates: "近隣観測所候補",
+            none: "表示可能な候補はありません。",
+            profile: "地域プロファイル",
+            weatherStation: "気象官署 ID",
+          }
+        : {
+            title: "Map · Grid Mapping",
+            subtitle: "Current coordinates converted into weather-grid and observation mapping.",
+            coord: "Current Coordinates (WGS84)",
+            grid: "Weather Grid (DFS)",
+            tm: "TM Coordinates (AirKorea)",
+            station: "Selected Station",
+            candidates: "Nearby Station Candidates",
+            none: "No candidate stations are available.",
+            profile: "Regional Profile",
+            weatherStation: "Weather Station ID",
+          }
 
   return (
     <section className="mt-8 w-full max-w-5xl mx-auto">

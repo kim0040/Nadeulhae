@@ -156,7 +156,8 @@ function formatGenerateProgressTime(value: string, language: string) {
     return ""
   }
 
-  return parsed.toLocaleTimeString(language === "ko" ? "ko-KR" : "en-US", {
+  const localeMap: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" }
+  return parsed.toLocaleTimeString(localeMap[language] ?? "en-US", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -166,25 +167,30 @@ function formatGenerateProgressTime(value: string, language: string) {
 function formatGenerateProgressMessage(progress: LabGenerateProgressPayload, language: string) {
   switch (progress.status) {
     case "started":
-      return language === "ko"
-        ? `LLM API 요청 접수 · 목표 ${progress.targetCount}장`
-        : `LLM API request accepted · target ${progress.targetCount} cards`
+      if (language === "ko") return `LLM API 요청 접수 · 목표 ${progress.targetCount}장`
+      if (language === "zh") return `LLM API请求已接收 · 目标${progress.targetCount}张`
+      if (language === "ja") return `LLM APIリクエスト受付 · 目標${progress.targetCount}枚`
+      return `LLM API request accepted · target ${progress.targetCount} cards`
     case "round_started":
-      return language === "ko"
-        ? `LLM API 응답 생성 중 · 라운드 ${progress.round ?? 1}`
-        : `LLM API response in progress · round ${progress.round ?? 1}`
+      if (language === "ko") return `LLM API 응답 생성 중 · 라운드 ${progress.round ?? 1}`
+      if (language === "zh") return `LLM API响应生成中 · 第${progress.round ?? 1}轮`
+      if (language === "ja") return `LLM API応答生成中 · ラウンド${progress.round ?? 1}`
+      return `LLM API response in progress · round ${progress.round ?? 1}`
     case "round_finished":
-      return language === "ko"
-        ? `LLM 응답 수신 · +${progress.addedThisRound ?? 0}장 정제 완료 (누적 ${progress.collectedCount}/${progress.targetCount})`
-        : `LLM response received · +${progress.addedThisRound ?? 0} cards normalized (${progress.collectedCount}/${progress.targetCount})`
+      if (language === "ko") return `LLM 응답 수신 · +${progress.addedThisRound ?? 0}장 정제 완료 (누적 ${progress.collectedCount}/${progress.targetCount})`
+      if (language === "zh") return `LLM响应已接收 · +${progress.addedThisRound ?? 0}张已整理（累计${progress.collectedCount}/${progress.targetCount}）`
+      if (language === "ja") return `LLM応答受信 · +${progress.addedThisRound ?? 0}枚整理完了（累積${progress.collectedCount}/${progress.targetCount}）`
+      return `LLM response received · +${progress.addedThisRound ?? 0} cards normalized (${progress.collectedCount}/${progress.targetCount})`
     case "saving":
-      return language === "ko"
-        ? `카드 저장 중 · ${progress.collectedCount}장 준비됨`
-        : `Saving deck · ${progress.collectedCount} cards prepared`
+      if (language === "ko") return `카드 저장 중 · ${progress.collectedCount}장 준비됨`
+      if (language === "zh") return `卡片保存中 · ${progress.collectedCount}张已准备`
+      if (language === "ja") return `カード保存中 · ${progress.collectedCount}枚準備完了`
+      return `Saving deck · ${progress.collectedCount} cards prepared`
     case "completed":
-      return language === "ko"
-        ? `완료 · ${progress.collectedCount}장 저장`
-        : `Completed · ${progress.collectedCount} cards saved`
+      if (language === "ko") return `완료 · ${progress.collectedCount}장 저장`
+      if (language === "zh") return `完成 · ${progress.collectedCount}张已保存`
+      if (language === "ja") return `完了 · ${progress.collectedCount}枚保存`
+      return `Completed · ${progress.collectedCount} cards saved`
     case "failed":
       if (language === "ko") {
         if (progress.reason === "daily_limit") return "실패 · 오늘 생성 한도 초과"
@@ -192,6 +198,20 @@ function formatGenerateProgressMessage(progress: LabGenerateProgressPayload, lan
         if (progress.reason === "provider_failure") return "실패 · 생성 모델 응답 실패"
         if (progress.reason === "parse_failure") return "실패 · 생성 결과 파싱 실패"
         return "실패 · 내부 오류"
+      }
+      if (language === "zh") {
+        if (progress.reason === "daily_limit") return "失败 · 今日生成限额已超"
+        if (progress.reason === "global_limit") return "失败 · 全局AI请求限额已满"
+        if (progress.reason === "provider_failure") return "失败 · 生成模型响应失败"
+        if (progress.reason === "parse_failure") return "失败 · 生成结果解析失败"
+        return "失败 · 内部错误"
+      }
+      if (language === "ja") {
+        if (progress.reason === "daily_limit") return "失敗 · 本日の生成上限超過"
+        if (progress.reason === "global_limit") return "失敗 · グローバルAIリクエスト上限到達"
+        if (progress.reason === "provider_failure") return "失敗 · 生成モデル応答エラー"
+        if (progress.reason === "parse_failure") return "失敗 · 生成結果の解析エラー"
+        return "失敗 · 内部エラー"
       }
       if (progress.reason === "daily_limit") return "Failed · daily generation limit reached"
       if (progress.reason === "global_limit") return "Failed · global AI quota reached"
@@ -211,41 +231,64 @@ function formatLiveGenerationHeadline(
   pulseFrame: number
 ) {
   if (!isGenerating && !progress) {
-    return language === "ko" ? "생성 요청을 시작하면 여기에서 진행 상태를 보여줍니다." : "Progress appears here after you start generation."
+    if (language === "ko") return "생성 요청을 시작하면 여기에서 진행 상태를 보여줍니다."
+    if (language === "zh") return "开始生成请求后，此处将显示进度状态。"
+    if (language === "ja") return "生成リクエストを開始すると、ここに進行状況が表示されます。"
+    return "Progress appears here after you start generation."
   }
 
   const dots = ".".repeat((pulseFrame % 3) + 1)
 
   if (progress?.status === "saving") {
-    return language === "ko" ? `생성 카드 저장 중${dots}` : `Saving generated cards${dots}`
+    if (language === "ko") return `생성 카드 저장 중${dots}`
+    if (language === "zh") return `正在保存生成的卡片${dots}`
+    if (language === "ja") return `生成カードを保存中${dots}`
+    return `Saving generated cards${dots}`
   }
   if (progress?.status === "completed") {
-    return language === "ko" ? "생성이 완료되었습니다." : "Generation completed."
+    if (language === "ko") return "생성이 완료되었습니다."
+    if (language === "zh") return "生成已完成。"
+    if (language === "ja") return "生成が完了しました。"
+    return "Generation completed."
   }
   if (progress?.status === "failed") {
     return formatGenerateProgressMessage(progress, language)
   }
   if (progress?.status === "round_started") {
-    return language === "ko"
-      ? `LLM API 응답 생성 중 · 라운드 ${progress.round ?? 1}${dots}`
-      : `LLM API is generating responses · round ${progress.round ?? 1}${dots}`
+    if (language === "ko") return `LLM API 응답 생성 중 · 라운드 ${progress.round ?? 1}${dots}`
+    if (language === "zh") return `LLM API响应生成中 · 第${progress.round ?? 1}轮${dots}`
+    if (language === "ja") return `LLM API応答生成中 · ラウンド${progress.round ?? 1}${dots}`
+    return `LLM API is generating responses · round ${progress.round ?? 1}${dots}`
   }
   if (progress?.status === "round_finished") {
-    return language === "ko"
-      ? `응답 정제 중 · 누적 ${progress.collectedCount}/${progress.targetCount}장${dots}`
-      : `Normalizing responses · ${progress.collectedCount}/${progress.targetCount}${dots}`
+    if (language === "ko") return `응답 정제 중 · 누적 ${progress.collectedCount}/${progress.targetCount}장${dots}`
+    if (language === "zh") return `响应整理中 · 累计${progress.collectedCount}/${progress.targetCount}张${dots}`
+    if (language === "ja") return `応答整理中 · 累積${progress.collectedCount}/${progress.targetCount}枚${dots}`
+    return `Normalizing responses · ${progress.collectedCount}/${progress.targetCount}${dots}`
   }
 
   if (elapsedSeconds < 4) {
-    return language === "ko" ? `LLM API에 요청 전송 중${dots}` : `Sending request to LLM API${dots}`
+    if (language === "ko") return `LLM API에 요청 전송 중${dots}`
+    if (language === "zh") return `正在向LLM API发送请求${dots}`
+    if (language === "ja") return `LLM APIにリクエスト送信中${dots}`
+    return `Sending request to LLM API${dots}`
   }
   if (elapsedSeconds < 18) {
-    return language === "ko" ? `LLM API 답변 생성 중${dots}` : `LLM API is generating responses${dots}`
+    if (language === "ko") return `LLM API 답변 생성 중${dots}`
+    if (language === "zh") return `LLM API正在生成回答${dots}`
+    if (language === "ja") return `LLM API応答生成中${dots}`
+    return `LLM API is generating responses${dots}`
   }
   if (elapsedSeconds < 40) {
-    return language === "ko" ? `응답 정리 및 중복 제거 중${dots}` : `Refining responses and removing duplicates${dots}`
+    if (language === "ko") return `응답 정리 및 중복 제거 중${dots}`
+    if (language === "zh") return `整理响应并去重中${dots}`
+    if (language === "ja") return `応答整理・重複削除中${dots}`
+    return `Refining responses and removing duplicates${dots}`
   }
-  return language === "ko" ? `추가 라운드 생성 중${dots}` : `Running extra generation rounds${dots}`
+  if (language === "ko") return `추가 라운드 생성 중${dots}`
+  if (language === "zh") return `正在执行额外轮次生成${dots}`
+  if (language === "ja") return `追加ラウンド生成中${dots}`
+  return `Running extra generation rounds${dots}`
 }
 
 const PART_OF_SPEECH_KO: Record<string, string> = {
@@ -568,6 +611,284 @@ const LAB_COPY = {
     importInvalidLabel: "invalid rows",
     messageExported: "Export completed.",
     messageTemplateDownloaded: "Template downloaded.",
+  },
+  zh: {
+    loading: "正在加载实验室...",
+    loginRequired: "需要登录。正在跳转到登录页面。",
+    disabledTitle: "实验室功能已关闭。",
+    disabledDescription:
+      "在仪表盘个人设置中开启'实验室功能'即可使用。",
+    goDashboard: "前往仪表盘",
+    badge: "实验功能",
+    title: "拿得实验室 · 词汇记忆",
+    subtitle:
+      "基于个人资料生成定制学习卡片，通过SRS复习保持记忆的实验功能。",
+    quickGuideTitle: "快速使用指南",
+    quickGuideStudy: "确认答案后，通过再次/困难/一般/简单调节复习间隔。",
+    quickGuideGenerate: "选择主题和卡片数量创建新词库。",
+    quickGuideManage: "处理手动添加、导入/导出、词库设置。",
+    quickGuideReport: "查看各阶段复习量、难度、状态分布。",
+    usageRemaining: "今日可生成",
+    usageCreated: "今日已生成",
+    usageReviewed: "今日已复习",
+    stateError: "无法加载实验室状态。",
+    reload: "重新加载",
+    topicLabel: "输入主题",
+    topicPlaceholder: "例如：周末全州出游英语表达",
+    invalidTopic: "请输入至少2个字符的主题。",
+    cardCountLabel: "生成卡片数量",
+    generate: "生成卡片",
+    generating: "生成中...",
+    generateHint: "AI会根据主题自动生成适合学习的实用词汇，例句说明字段会同时添加翻译。",
+    generateUsageTitle: "自动生成状态",
+    generateProgressTitle: "生成进度",
+    generateProgressRealtime: "实时更新",
+    dueTitle: "待复习卡片",
+    reveal: "查看答案",
+    gradeAgain: "再次",
+    gradeHard: "困难",
+    gradeGood: "一般",
+    gradeEasy: "简单",
+    reviewing: "提交中...",
+    learningState: "学习状态",
+    learningNew: "新卡片",
+    learningLearning: "学习中",
+    learningReview: "长期复习",
+    learningRelearning: "重新学习",
+    stability: "记忆稳定性",
+    difficulty: "难度",
+    retrievability: "回忆概率",
+    totalReviews: "累计复习",
+    lapses: "重新学习次数",
+    noDue: "当前没有待复习的卡片。请创建新卡片或等待下次复习时间。",
+    queueLabel: "等待卡片",
+    recentDecks: "最近创建的词库",
+    noDecks: "还没有创建的词库。",
+    nextReviewAt: "下次复习",
+    stage: "阶段",
+    cards: "卡片",
+    generatedAt: "创建时间",
+    tabStudy: "学习",
+    tabGenerate: "自动生成",
+    tabManage: "管理",
+    tabReport: "学习报告",
+    whatToStudy: "要学习哪个词库？",
+    stopStudy: "停止学习",
+    studyFinished: "已完成此词库的复习！",
+    manageTitle: "词库管理",
+    manageSubtitle: "选择词库后，可在一个页面内处理卡片列表/编辑/删除/添加及导入/导出。",
+    deckListTitle: "词库列表",
+    deckListHint: "在左侧选择词库，右侧将显示卡片列表。",
+    selectDeckPrompt: "请选择一个词库。",
+    cardListTitle: "卡片列表",
+    cardListHint: "点击卡片可编辑或直接删除。",
+    cardSearchPlaceholder: "搜索单词/释义",
+    cardEmpty: "此词库中还没有卡片。",
+    editCard: "编辑",
+    saveCard: "保存",
+    cancelEdit: "取消",
+    deleteCard: "删除",
+    deletingCard: "删除中...",
+    cardsLoading: "正在加载卡片列表...",
+    deckSettings: "词库设置",
+    deckSelect: "目标词库",
+    deckName: "词库名称",
+    deckTopic: "主题/描述",
+    deckTopicPlaceholder: "例如：通勤英语表达",
+    saveDeck: "保存设置",
+    savingDeck: "保存中...",
+    deleteDeck: "删除词库",
+    deletingDeck: "删除中...",
+    deleteConfirm: "此词库及其中所有卡片将被永久删除。确定继续吗？",
+    cardDeleteConfirm: "确定删除此卡片？",
+    createDeck: "创建新词库",
+    creatingDeck: "创建中...",
+    createDeckHint: "创建后可在手动添加和导入中直接选择。",
+    manualTitle: "手动添加卡片",
+    manualTarget: "添加目标",
+    targetExistingDeck: "已有词库",
+    targetNewDeck: "新词库",
+    termLabel: "单词 (Term)",
+    meaningLabel: "释义 (Meaning)",
+    posLabel: "词性 (POS)",
+    exampleLabel: "例句 (Example)",
+    exampleTranslationLabel: "例句说明 (Explanation)",
+    autoFill: "自动填写释义/词性/例句",
+    autoFilling: "填写中...",
+    autoFillHint: "只需输入单词，点击后将根据当前语言自动生成释义/词性/例句/说明。",
+    addCard: "添加卡片",
+    addingCard: "添加中...",
+    manualHint: "重复的单词+释义组合将自动跳过。",
+    transferTitle: "导入 · 导出",
+    importFormat: "导入格式",
+    sourceLabel: "数据内容",
+    sourcePlaceholderCsv: "粘贴CSV内容或使用文件上传。",
+    sourcePlaceholderJson: "粘贴JSON内容或使用文件上传。",
+    loadFile: "上传文件",
+    downloadTemplateCsv: "CSV模板",
+    downloadTemplateJson: "JSON模板",
+    importCards: "执行导入",
+    importingCards: "导入中...",
+    exportCsv: "导出CSV",
+    exportJson: "导出JSON",
+    exporting: "导出中...",
+    transferHint: "CSV可直接在Excel中打开。JSON适合备份包含学习状态的数据。",
+    manageInvalidDeck: "请选择目标词库。",
+    manageInvalidCard: "请输入单词和释义。",
+    manageInvalidTerm: "请先输入单词。",
+    manageInvalidSource: "请输入要导入的数据内容。",
+    manageInvalidDeckName: "请输入词库名称。",
+    messageDeckCreated: "已创建新词库。",
+    messageDeckSaved: "词库设置已保存。",
+    messageCardUpdated: "卡片内容已保存。",
+    messageCardDeleted: "卡片已删除。",
+    messageManualAdded: "已添加手动卡片。",
+    messageManualAutofilled: "已自动填写释义/例句。",
+    messageImported: "导入完成。",
+    importAddedLabel: "已添加",
+    importSkippedLabel: "跳过/重复",
+    importInvalidLabel: "格式错误行",
+    messageExported: "导出完成。",
+    messageTemplateDownloaded: "模板已下载。",
+  },
+  ja: {
+    loading: "ラボを読み込み中...",
+    loginRequired: "ログインが必要です。ログインページに移動します。",
+    disabledTitle: "ラボ機能が無効です。",
+    disabledDescription:
+      "ダッシュボードのプロフィール設定で「ラボ機能を有効化」をオンにすると使用できます。",
+    goDashboard: "ダッシュボードへ",
+    badge: "実験的ラボ",
+    title: "ナドゥルラボ · 単語暗記",
+    subtitle:
+      "プロフィールに基づいてカスタム学習カードを生成し、SRS復習で記憶を維持する実験機能です。",
+    quickGuideTitle: "クイックガイド",
+    quickGuideStudy: "正解確認後、再び/難しい/普通/簡単で復習間隔を調整します。",
+    quickGuideGenerate: "テーマとカード数を選択して新しい単語帳を作成します。",
+    quickGuideManage: "手動追加、インポート・エクスポート、単語帳設定を管理します。",
+    quickGuideReport: "期間別の復習量・難易度・状態分布を確認します。",
+    usageRemaining: "本日生成可能",
+    usageCreated: "本日生成",
+    usageReviewed: "本日復習",
+    stateError: "ラボの状態を読み込めませんでした。",
+    reload: "再読み込み",
+    topicLabel: "テーマ入力",
+    topicPlaceholder: "例：週末の全州お出かけ英語表現",
+    invalidTopic: "テーマは2文字以上で入力してください。",
+    cardCountLabel: "生成カード数",
+    generate: "カード生成",
+    generating: "生成中...",
+    generateHint: "AIがテーマに合わせて学習に最適な実践的な単語を自動生成します。例文解説フィールドに訳も追加されます。",
+    generateUsageTitle: "自動生成状況",
+    generateProgressTitle: "生成進捗",
+    generateProgressRealtime: "リアルタイム更新",
+    dueTitle: "今すぐ復習するカード",
+    reveal: "答えを見る",
+    gradeAgain: "再び",
+    gradeHard: "難しい",
+    gradeGood: "普通",
+    gradeEasy: "簡単",
+    reviewing: "反映中...",
+    learningState: "学習状態",
+    learningNew: "新しいカード",
+    learningLearning: "学習中",
+    learningReview: "長期復習",
+    learningRelearning: "再学習",
+    stability: "記憶安定性",
+    difficulty: "難易度",
+    retrievability: "想起確率",
+    totalReviews: "累積復習",
+    lapses: "再学習回数",
+    noDue: "現在復習すべきカードはありません。新しいカードを作成するか、次の復習時間をお待ちください。",
+    queueLabel: "待機カード",
+    recentDecks: "最近作成したデッキ",
+    noDecks: "まだ作成されたデッキはありません。",
+    nextReviewAt: "次の復習",
+    stage: "段階",
+    cards: "カード",
+    generatedAt: "作成日時",
+    tabStudy: "学習",
+    tabGenerate: "自動生成",
+    tabManage: "管理",
+    tabReport: "学習レポート",
+    whatToStudy: "どの単語帳を学習しますか？",
+    stopStudy: "学習を中止",
+    studyFinished: "単語帳の復習が完了しました！",
+    manageTitle: "単語帳管理",
+    manageSubtitle: "単語帳を選択すると、カード一覧・編集・削除・追加とインポート・エクスポートを1画面で処理できます。",
+    deckListTitle: "単語帳リスト",
+    deckListHint: "左側で単語帳を選択すると、右側にカード一覧が表示されます。",
+    selectDeckPrompt: "単語帳を選択してください。",
+    cardListTitle: "カード一覧",
+    cardListHint: "カードをクリックして編集するか、直接削除できます。",
+    cardSearchPlaceholder: "単語/意味を検索",
+    cardEmpty: "この単語帳に登録されたカードはありません。",
+    editCard: "編集",
+    saveCard: "保存",
+    cancelEdit: "キャンセル",
+    deleteCard: "削除",
+    deletingCard: "削除中...",
+    cardsLoading: "カード一覧を読み込み中...",
+    deckSettings: "単語帳設定",
+    deckSelect: "対象単語帳",
+    deckName: "単語帳名",
+    deckTopic: "テーマ/説明",
+    deckTopicPlaceholder: "例：通勤英語表現",
+    saveDeck: "設定を保存",
+    savingDeck: "保存中...",
+    deleteDeck: "単語帳を削除",
+    deletingDeck: "削除中...",
+    deleteConfirm: "この単語帳と内部のすべてのカードが完全に削除されます。続行しますか？",
+    cardDeleteConfirm: "このカードを削除しますか？",
+    createDeck: "新しい単語帳を作成",
+    creatingDeck: "作成中...",
+    createDeckHint: "作成後、手動追加とインポートで直接選択できます。",
+    manualTitle: "手動カード追加",
+    manualTarget: "追加先",
+    targetExistingDeck: "既存の単語帳",
+    targetNewDeck: "新しい単語帳",
+    termLabel: "単語 (Term)",
+    meaningLabel: "意味 (Meaning)",
+    posLabel: "品詞 (POS)",
+    exampleLabel: "例文 (Example)",
+    exampleTranslationLabel: "例文解説 (Explanation)",
+    autoFill: "意味/品詞/例文を自動入力",
+    autoFilling: "入力中...",
+    autoFillHint: "単語を入力してクリックすると、現在の言語に基づいて意味/品詞/例文/解説を自動生成します。",
+    addCard: "カード追加",
+    addingCard: "追加中...",
+    manualHint: "重複する単語+意味の組み合わせは自動的にスキップされます。",
+    transferTitle: "インポート · エクスポート",
+    importFormat: "インポート形式",
+    sourceLabel: "データ内容",
+    sourcePlaceholderCsv: "CSV内容を貼り付けるか、ファイルを読み込んでください。",
+    sourcePlaceholderJson: "JSON内容を貼り付けるか、ファイルを読み込んでください。",
+    loadFile: "ファイルを読み込む",
+    downloadTemplateCsv: "CSVテンプレート",
+    downloadTemplateJson: "JSONテンプレート",
+    importCards: "インポート実行",
+    importingCards: "インポート中...",
+    exportCsv: "CSVエクスポート",
+    exportJson: "JSONエクスポート",
+    exporting: "エクスポート中...",
+    transferHint: "CSVはExcelで直接開けます。JSONは学習状態もバックアップするのに便利です。",
+    manageInvalidDeck: "対象の単語帳を選択してください。",
+    manageInvalidCard: "単語と意味を両方入力してください。",
+    manageInvalidTerm: "単語を先に入力してください。",
+    manageInvalidSource: "インポートするデータ内容を入力してください。",
+    manageInvalidDeckName: "単語帳名を入力してください。",
+    messageDeckCreated: "新しい単語帳を作成しました。",
+    messageDeckSaved: "単語帳設定を保存しました。",
+    messageCardUpdated: "カード内容を保存しました。",
+    messageCardDeleted: "カードを削除しました。",
+    messageManualAdded: "手動カードが追加されました。",
+    messageManualAutofilled: "意味/例文を自動入力しました。",
+    messageImported: "インポートが完了しました。",
+    importAddedLabel: "追加",
+    importSkippedLabel: "スキップ",
+    importInvalidLabel: "形式エラー行",
+    messageExported: "エクスポートが完了しました。",
+    messageTemplateDownloaded: "テンプレートをダウンロードしました。",
   },
 } as const
 
@@ -2040,7 +2361,7 @@ export default function LabPage() {
                         : `0/${cardCount}`}
                     </span>
                     {isGenerating ? (
-                      <span>{language === "ko" ? `경과 ${generateElapsedSeconds}초` : `${generateElapsedSeconds}s elapsed`}</span>
+                      <span>{language === "ko" ? `경과 ${generateElapsedSeconds}초` : language === "zh" ? `已过 ${generateElapsedSeconds}秒` : language === "ja" ? `${generateElapsedSeconds}秒経過` : `${generateElapsedSeconds}s elapsed`}</span>
                     ) : null}
                     {activeGenerateRequestId ? (
                       <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80">

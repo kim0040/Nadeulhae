@@ -34,10 +34,26 @@ const LAB_REVIEW_ERRORS = {
     cardNotFound: "The card could not be found.",
     failed: "An error occurred while processing lab review.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "实验室功能未开启。请先在仪表盘设置中启用。",
+    invalidRequest: "实验室复习请求格式无效。",
+    cardNotFound: "未找到该卡片。",
+    failed: "实验室复习处理过程中发生错误。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が無効です。ダッシュボード設定から先に有効にしてください。",
+    invalidRequest: "ラボ復習リクエストの形式が正しくありません。",
+    cardNotFound: "カードが見つかりません。",
+    failed: "ラボ復習処理中にエラーが発生しました。",
+  },
 } as const
 
 function getLocale(request: NextRequest): LabLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -67,9 +83,10 @@ function parseReviewGrade(value: unknown) {
 
 async function handlePOST(request: NextRequest) {
   const locale = getLocale(request)
+  const authLocale: "ko" | "en" = locale === "zh" || locale === "ja" ? "en" : locale
 
   try {
-    const requestViolation = validateAuthMutationRequest(request, locale)
+    const requestViolation = validateAuthMutationRequest(request, authLocale)
     if (requestViolation) {
       return requestViolation
     }

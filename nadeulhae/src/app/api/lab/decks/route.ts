@@ -39,10 +39,30 @@ const LAB_DECK_ERRORS = {
     notFound: "Deck not found.",
     failed: "Failed to process deck request.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "实验室功能未开启。请先在仪表盘设置中启用。",
+    invalidRequest: "词库请求格式无效。",
+    invalidDeckId: "词库标识符无效。",
+    invalidTitle: "请输入词库名称。",
+    notFound: "未找到该词库。",
+    failed: "词库信息处理失败。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が無効です。ダッシュボード設定から先に有効にしてください。",
+    invalidRequest: "デッキリクエストの形式が正しくありません。",
+    invalidDeckId: "デッキIDが正しくありません。",
+    invalidTitle: "デッキ名を入力してください。",
+    notFound: "デッキが見つかりません。",
+    failed: "デッキ情報の処理に失敗しました。",
+  },
 } as const
 
 function getLocale(request: NextRequest): LabLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -127,9 +147,10 @@ async function handleGET(request: NextRequest) {
 
 async function handlePOST(request: NextRequest) {
   const locale = getLocale(request)
+  const authLocale: "ko" | "en" = locale === "zh" || locale === "ja" ? "en" : locale
 
   try {
-    const requestViolation = validateAuthMutationRequest(request, locale)
+    const requestViolation = validateAuthMutationRequest(request, authLocale)
     if (requestViolation) {
       return requestViolation
     }
@@ -198,9 +219,10 @@ async function handlePOST(request: NextRequest) {
 
 async function handlePATCH(request: NextRequest) {
   const locale = getLocale(request)
+  const authLocale: "ko" | "en" = locale === "zh" || locale === "ja" ? "en" : locale
 
   try {
-    const requestViolation = validateAuthMutationRequest(request, locale)
+    const requestViolation = validateAuthMutationRequest(request, authLocale)
     if (requestViolation) {
       return requestViolation
     }
@@ -296,9 +318,10 @@ async function handlePATCH(request: NextRequest) {
 
 async function handleDELETE(request: NextRequest) {
   const locale = getLocale(request)
+  const authLocale: "ko" | "en" = locale === "zh" || locale === "ja" ? "en" : locale
 
   try {
-    const requestViolation = validateAuthMutationRequest(request, locale)
+    const requestViolation = validateAuthMutationRequest(request, authLocale)
     if (requestViolation) {
       return requestViolation
     }

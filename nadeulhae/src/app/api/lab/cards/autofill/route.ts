@@ -40,6 +40,28 @@ const LAB_CARD_AUTOFILL_ERRORS = {
     parseFailure: "Could not parse generated card details. Please try with a more specific term.",
     failed: "An error occurred while autofilling the card.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "实验室功能未开启。请先在仪表盘设置中启用。",
+    invalidRequest: "自动填写请求格式无效。",
+    invalidTerm: "请输入要自动填写的单词。",
+    dailyLimit: "今日自动填写次数已用完，请明天再试。",
+    globalLlmLimit: "今日 AI 请求额度已达上限，请明天再试。",
+    providerFailure: "自动填写失败，请稍后再试。",
+    parseFailure: "无法解析生成结果，请尝试输入更具体的单词。",
+    failed: "自动填写处理过程中发生错误。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が無効です。ダッシュボード設定から先に有効にしてください。",
+    invalidRequest: "自動入力リクエストの形式が正しくありません。",
+    invalidTerm: "自動入力する単語を入力してください。",
+    dailyLimit: "本日の自動入力上限に達しました。明日再試行してください。",
+    globalLlmLimit: "本日の AI リクエスト上限に達しました。明日再試行してください。",
+    providerFailure: "自動入力に失敗しました。しばらくしてからお試しください。",
+    parseFailure: "生成結果を解析できませんでした。より具体的な単語を入力してください。",
+    failed: "自動入力処理中にエラーが発生しました。",
+  },
 } as const
 
 const LAB_CARD_AUTOFILL_DAILY_LIMIT = (() => {
@@ -54,6 +76,8 @@ type AutofillExampleLanguage = "ko" | "en" | "ja"
 
 function getLocale(request: NextRequest): LabLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -179,9 +203,10 @@ function parseAutofillContent(content: string) {
 
 async function handlePOST(request: NextRequest) {
   const locale = getLocale(request)
+  const authLocale: "ko" | "en" = locale === "zh" || locale === "ja" ? "en" : locale
 
   try {
-    const requestViolation = validateAuthMutationRequest(request, locale)
+    const requestViolation = validateAuthMutationRequest(request, authLocale)
     if (requestViolation) {
       return requestViolation
     }
