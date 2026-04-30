@@ -68,7 +68,7 @@ function formatLastUpdate(
 const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: AuthUser }) {
   const { language, t } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = (DASHBOARD_COPY as any)[language]
+  const copy = (((DASHBOARD_COPY as any)[language] ?? DASHBOARD_COPY.ko) ?? DASHBOARD_COPY.ko)
 
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [hourlyForecast, setHourlyForecast] = useState<HourlyForecastItem[]>([])
@@ -554,7 +554,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { language } = useLanguage()
   const { user, status } = useAuth()
-  const copy = (DASHBOARD_COPY as any)[language]
+  const copy = (((DASHBOARD_COPY as any)[language] ?? DASHBOARD_COPY.ko) ?? DASHBOARD_COPY.ko)
 
   useEffect(() => {
     if (status === "guest") {

@@ -255,7 +255,7 @@ export default function LabVocabReportPage() {
   const { user, status } = useAuth()
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = (REPORT_COPY as any)[language]
+  const copy = ((REPORT_COPY as any)[language] ?? REPORT_COPY.ko)
 
   const [report, setReport] = useState<LabReportSnapshot | null>(null)
   const [periodDays, setPeriodDays] = useState<(typeof PERIOD_OPTIONS)[number]>(14)

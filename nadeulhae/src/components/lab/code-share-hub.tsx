@@ -85,7 +85,7 @@ function formatDateLabel(value: string, locale: string) {
 export function CodeShareHub() {
   const router = useRouter()
   const { language } = useLanguage()
-  const copy = (HUB_COPY as any)[language]
+  const copy = ((HUB_COPY as any)[language] ?? HUB_COPY.ko)
 
   const [sessions, setSessions] = useState<CodeShareSessionSummary[]>([])
   const [viewer, setViewer] = useState<ViewerIdentity | null>(null)

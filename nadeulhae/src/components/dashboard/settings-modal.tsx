@@ -49,7 +49,7 @@ export function SettingsModal({
   const router = useRouter()
   const { language } = useLanguage()
   const { setAuthenticatedUser } = useAuth()
-  const copy = (DASHBOARD_COPY as any)[language]
+  const copy = ((DASHBOARD_COPY as any)[language] ?? DASHBOARD_COPY.ko)
 
   const [form, setForm] = useState<ProfileFormState>(() => createProfileFormState(user))
   const [isSaving, setIsSaving] = useState(false)

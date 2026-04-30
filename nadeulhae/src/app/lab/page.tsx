@@ -69,7 +69,7 @@ export default function LabHubPage() {
   const router = useRouter()
   const { user, status } = useAuth()
   const { language } = useLanguage()
-  const copy = (LAB_HUB_COPY as any)[language]
+  const copy = ((LAB_HUB_COPY as any)[language] ?? LAB_HUB_COPY.ko)
   const [isCompactViewport, setIsCompactViewport] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const [isLowPowerDevice, setIsLowPowerDevice] = useState(false)

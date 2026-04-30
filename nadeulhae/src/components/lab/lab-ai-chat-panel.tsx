@@ -579,7 +579,7 @@ function ThinkingProgressPanel({
 
 export function LabAiChatPanel() {
   const { language } = useLanguage()
-  const copy = (COPY as any)[language]
+  const copy = ((COPY as any)[language] ?? COPY.ko)
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)

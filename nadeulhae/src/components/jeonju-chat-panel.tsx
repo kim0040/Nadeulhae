@@ -177,7 +177,7 @@ function ChatBubble({
 export function JeonjuChatPanel() {
   const { language } = useLanguage()
   const { user } = useAuth()
-  const copy = (COPY as any)[language]
+  const copy = ((COPY as any)[language] ?? COPY.ko)
   const { subscribe, connected: wsConnected } = useWebSocket()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(true)
