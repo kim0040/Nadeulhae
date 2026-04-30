@@ -33,10 +33,28 @@ const LAB_EXPORT_ERRORS = {
     notFound: "Deck not found.",
     failed: "Failed to export deck.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "实验室功能未开启。请先在仪表盘设置中启用。",
+    invalidDeckId: "词库标识符无效。",
+    invalidFormat: "仅支持 csv 或 json 格式导出。",
+    notFound: "未找到该词库。",
+    failed: "词库导出失败。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が無効です。ダッシュボード設定から先に有効にしてください。",
+    invalidDeckId: "デッキIDが正しくありません。",
+    invalidFormat: "csv または json 形式のみエクスポートに対応しています。",
+    notFound: "デッキが見つかりません。",
+    failed: "デッキのエクスポートに失敗しました。",
+  },
 } as const
 
 function getLocale(request: NextRequest): LabLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 

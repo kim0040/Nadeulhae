@@ -49,6 +49,38 @@ const BANNER_COPY = {
     saving: "Saving...",
     saveError: "Failed to save your consent preference. Please try again.",
   },
+  zh: {
+    badge: "privacy controls",
+    title: "请选择是否同意服务改进分析",
+    description:
+      "基本运营统计仅以匿名日汇总形式存储。详细访问分析仅在获得同意后扩展。",
+    essentialTitle: "仅保留基本指标",
+    essentialDescription: "仅存储用于安全、可靠性和基本流量监控的匿名日汇总数据。",
+    allowTitle: "允许服务改进分析",
+    allowDescription: "添加来源渠道、页面上下文和独立访客/会员数量，以改进推荐和用户体验。",
+    note: "原始 IP 地址和完整来源 URL 不会存储在分析表中。",
+    essentialAction: "仅保留基本项",
+    allowAction: "允许分析",
+    link: "查看条款和隐私政策",
+    saving: "保存中...",
+    saveError: "同意设置保存失败，请重试。",
+  },
+  ja: {
+    badge: "privacy controls",
+    title: "サービス改善のための分析設定を選択してください",
+    description:
+      "基本運用統計は匿名の日次集計としてのみ保存されます。詳細な訪問分析は同意された場合のみ拡張されます。",
+    essentialTitle: "基本指標のみ保持",
+    essentialDescription: "セキュリティ、信頼性、基本トラフィック監視のための匿名日次集計のみを保存します。",
+    allowTitle: "改善分析を許可",
+    allowDescription: "流入経路、ページコンテキスト、固有訪問者・会員数を追加集計し、レコメンデーションとUX改善に活用します。",
+    note: "元のIPアドレスと完全なリファラーURLは分析テーブルに保存されません。",
+    essentialAction: "基本のみ",
+    allowAction: "分析を許可",
+    link: "規約・プライバシーを表示",
+    saving: "保存中...",
+    saveError: "同意設定の保存に失敗しました。もう一度お試しください。",
+  },
 } as const
 
 function readConsentPreferenceFromDocument() {

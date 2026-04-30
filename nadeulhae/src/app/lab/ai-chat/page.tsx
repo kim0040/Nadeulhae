@@ -29,6 +29,24 @@ const PAGE_COPY = {
     pageTitle: "Nadeul AI Chat",
     pageDescription: "Keep a conversation going with Nadeul AI across work, study, writing, coding, and summaries.",
   },
+  zh: {
+    loading: "正在加载聊天...",
+    loginRequired: "请先登录。正在跳转到登录页面。",
+    disabledTitle: "实验室功能未开启。",
+    disabledDescription: "请在仪表盘个人设置中开启「实验性实验室功能」即可使用。",
+    goDashboard: "前往仪表盘",
+    pageTitle: "Nadeul AI 聊天",
+    pageDescription: "与 Nadeul AI 在工作、学习、写作、编程、摘要等方面持续对话。",
+  },
+  ja: {
+    loading: "チャットを読み込み中...",
+    loginRequired: "ログインが必要です。ログインページに移動します。",
+    disabledTitle: "ラボ機能が無効です。",
+    disabledDescription: "ダッシュボードのプロフィール設定でラボ機能を有効にしてください。",
+    goDashboard: "ダッシュボードへ",
+    pageTitle: "Nadeul AI チャット",
+    pageDescription: "Nadeul AI と仕事、学習、文章作成、コーディング、要約まで継続して会話できます。",
+  },
 } as const
 
 export default function LabAiChatPage() {

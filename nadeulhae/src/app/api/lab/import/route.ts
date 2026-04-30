@@ -42,10 +42,32 @@ const LAB_IMPORT_ERRORS = {
     invalidFormat: "Unsupported format. Use CSV or JSON.",
     failed: "Failed to import cards.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "实验室功能未开启。请先在仪表盘设置中启用。",
+    invalidRequest: "导入请求格式无效。",
+    invalidDeck: "未找到目标词库。",
+    empty: "没有可导入的有效卡片，请检查模板格式。",
+    tooLarge: "导入数据过大，请拆分文件后重试。",
+    invalidFormat: "不支持的格式，请使用 CSV 或 JSON。",
+    failed: "卡片导入失败。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が無効です。ダッシュボード設定から先に有効にしてください。",
+    invalidRequest: "インポートリクエストの形式が正しくありません。",
+    invalidDeck: "対象デッキが見つかりません。",
+    empty: "インポート可能なカードがありません。テンプレート形式を確認してください。",
+    tooLarge: "インポートデータが大きすぎます。ファイルを分割してお試しください。",
+    invalidFormat: "サポートされていない形式です。CSV または JSON をご利用ください。",
+    failed: "カードのインポートに失敗しました。",
+  },
 } as const
 
 function getLocale(request: NextRequest): LabLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -95,9 +117,10 @@ function parseFormat(value: unknown) {
 
 async function handlePOST(request: NextRequest) {
   const locale = getLocale(request)
+  const authLocale: "ko" | "en" = locale === "zh" || locale === "ja" ? "en" : locale
 
   try {
-    const sameOriginViolation = validateSameOriginRequest(request, locale)
+    const sameOriginViolation = validateSameOriginRequest(request, authLocale)
     if (sameOriginViolation) {
       return sameOriginViolation
     }

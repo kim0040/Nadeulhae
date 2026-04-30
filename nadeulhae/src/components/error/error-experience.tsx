@@ -150,6 +150,122 @@ const COPY = {
       },
     },
   },
+  zh: {
+    surfaceBadge: "nadeulhae 恢复界面",
+    quickStatus: "状态检查",
+    theme: "主题",
+    language: "语言",
+    recovery: "恢复路径",
+    themeLight: "明亮",
+    themeDark: "深色",
+    themeSystem: "系统",
+    langValue: "中文",
+    retry: "重试",
+    reload: "刷新",
+    home: "回到首页",
+    dashboard: "控制台",
+    back: "返回",
+    toggleLanguage: "切换语言",
+    stepsTitle: "你可以尝试以下操作",
+    digestLabel: "错误参考",
+    detailsLabel: "开发详情",
+    modes: {
+      notFound: {
+        code: "404",
+        eyebrow: "页面未找到",
+        title: "请求的页面无法找到。",
+        description:
+          "该路径可能已更改或不再存在。返回首页或从控制台重新进入。",
+        steps: [
+          "如果手动输入了网址，请重新检查路径。",
+          "如果已登录，请从控制台重新进入主要功能。",
+          "如果问题重复出现，请从首页刷新后重试。",
+        ],
+      },
+      routeError: {
+        code: "500",
+        eyebrow: "渲染错误",
+        title: "加载此屏幕时出现问题。",
+        description:
+          "加载数据或渲染路径时发生异常。请重试此屏幕或从首页恢复流程。",
+        steps: [
+          "首先点击重试，重新加载同一屏幕。",
+          "如果重复出现，请移动到首页或控制台，从其他路径重新进入。",
+          "如果持续存在，请根据错误参考值追溯原因。",
+        ],
+      },
+      globalError: {
+        code: "fatal",
+        eyebrow: "全局错误",
+        title: "应用程序发生了意外问题。",
+        description:
+          "根级别发生异常，无法维持正常界面。请先刷新或返回首页以恢复流程。",
+        steps: [
+          "刷新以重新初始化应用程序外壳。",
+          "如果无法恢复，请前往首页从头开始重新启动流程。",
+          "如果持续存在，请根据错误参考值检查日志。",
+        ],
+      },
+    },
+  },
+  ja: {
+    surfaceBadge: "nadeulhae リカバリー画面",
+    quickStatus: "状態確認",
+    theme: "テーマ",
+    language: "言語",
+    recovery: "復旧手段",
+    themeLight: "ライト",
+    themeDark: "ダーク",
+    themeSystem: "システム",
+    langValue: "日本語",
+    retry: "再試行",
+    reload: "リロード",
+    home: "ホームへ",
+    dashboard: "ダッシュボード",
+    back: "戻る",
+    toggleLanguage: "言語切替",
+    stepsTitle: "次に試せること",
+    digestLabel: "エラー参照",
+    detailsLabel: "開発詳細",
+    modes: {
+      notFound: {
+        code: "404",
+        eyebrow: "ページが見つかりません",
+        title: "リクエストされたページが見つかりませんでした。",
+        description:
+          "URLが変更されたか、提供が終了した可能性があります。ホームに戻るか、ダッシュボードから再進入してください。",
+        steps: [
+          "URLを直接入力した場合は、パスを再確認してください。",
+          "ログインユーザーはダッシュボードから主要機能に再進入してください。",
+          "問題が繰り返される場合は、ホームでリロードしてから再試行してください。",
+        ],
+      },
+      routeError: {
+        code: "500",
+        eyebrow: "レンダリングエラー",
+        title: "この画面の読み込み中に問題が発生しました。",
+        description:
+          "データの読み込みまたはレンダリング中に例外が発生しました。同じ画面を再試行するか、ホームに移動してフローを復旧できます。",
+        steps: [
+          "まず再試行を押して、同じ画面をもう一度読み込みます。",
+          "繰り返される場合は、ホームやダッシュボードに移動して別の経路から進入します。",
+          "継続する場合は、エラー参照値とともに原因を追跡します。",
+        ],
+      },
+      globalError: {
+        code: "fatal",
+        eyebrow: "グローバルエラー",
+        title: "アプリ全体で予期しない問題が発生しました。",
+        description:
+          "ルートレベルで例外が発生し、通常のインターフェースを維持できません。まずリロードするか、ホームに戻って復旧を試みてください。",
+        steps: [
+          "リロードでアプリシェルを再初期化します。",
+          "復旧できない場合は、ホームに移動して最初からフローを再開します。",
+          "継続する場合は、エラー参照値を基準にログを確認します。",
+        ],
+      },
+    },
+  },
 } as const
 
 function getThemeLabel(
@@ -358,7 +474,7 @@ export function ErrorExperience({
 
                     <button
                       type="button"
-                      onClick={() => setLanguage(language === "ko" ? "en" : "ko")}
+                        onClick={() => setLanguage((["ko", "en", "zh", "ja"][(["ko", "en", "zh", "ja"].indexOf(language) + 1) % 4]) as "ko" | "en" | "zh" | "ja")}
                       className="inline-flex items-center gap-2 rounded-full border border-[var(--interactive-border)] bg-[var(--interactive)] px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--muted-foreground)] transition hover:text-[var(--foreground)]"
                     >
                       <Languages className="size-4" />
@@ -414,7 +530,7 @@ export function ErrorExperience({
                     <div className="border-t border-[var(--border)] pt-5">
                       <button
                         type="button"
-                        onClick={() => setLanguage(language === "ko" ? "en" : "ko")}
+                      onClick={() => setLanguage((["ko", "en", "zh", "ja"][(["ko", "en", "zh", "ja"].indexOf(language) + 1) % 4]) as "ko" | "en" | "zh" | "ja")}
                         className="inline-flex items-center gap-2 text-sm font-black text-[var(--accent-secondary)] transition hover:opacity-80"
                       >
                         <Languages className="size-4" />

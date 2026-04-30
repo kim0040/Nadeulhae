@@ -63,6 +63,30 @@ const LAB_AI_CHAT_ERRORS = {
     providerFailure: "Failed to get an AI response. Please try again shortly.",
     unexpected: "An unexpected chat error occurred.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "仅限启用实验室功能的用户使用。",
+    invalidMessage: "请输入消息。",
+    invalidModel: "不允许使用该模型。",
+    tooLong: `消息长度不能超过 ${LAB_AI_CHAT_INPUT_MAX_CHARACTERS} 个字符。`,
+    rateLimited: "今日对话次数已用完，明天再来继续吧。",
+    globalLlmLimit: "今日 AI 请求额度已达上限，请明天再试。",
+    busy: "正在处理上一条消息，请稍后再试。",
+    providerFailure: "未能获取 AI 响应，请稍后再试。",
+    unexpected: "聊天处理过程中发生错误。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が有効なユーザーのみ利用できます。",
+    invalidMessage: "メッセージを入力してください。",
+    invalidModel: "許可されていないモデルです。",
+    tooLong: `メッセージは ${LAB_AI_CHAT_INPUT_MAX_CHARACTERS} 文字以内である必要があります。`,
+    rateLimited: "今日のチャット回数を使い切りました。また明日お越しください。",
+    globalLlmLimit: "本日の AI リクエスト上限に達しました。明日再試行してください。",
+    busy: "前のメッセージを処理中です。しばらくしてからお試しください。",
+    providerFailure: "AI 応答の取得に失敗しました。しばらくしてからお試しください。",
+    unexpected: "チャット処理中にエラーが発生しました。",
+  },
 } as const
 
 declare global {
@@ -96,11 +120,13 @@ function releaseChatUserLock(userId: string | null) {
 }
 
 function getRequestLocale(request: Request, preferred?: unknown): LabAiChatLocale {
-  if (preferred === "en" || preferred === "ko") {
-    return preferred
+  if (preferred === "en" || preferred === "ko" || preferred === "zh" || preferred === "ja") {
+    return preferred as LabAiChatLocale
   }
 
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -231,12 +257,25 @@ function createAssistantReasoningStreamFilter() {
 
 function enforceAssistantIdentity(content: string, locale: LabAiChatLocale) {
   const identity = locale === "ko"
-    ? `저는 ${ASSISTANT_NAME_KO}입니다.`
-    : `I am ${ASSISTANT_NAME_EN}.`
+        ? `저는 ${ASSISTANT_NAME_KO}입니다.`
+    : locale === "zh"
+      ? `我是${ASSISTANT_NAME_KO}。`
+      : locale === "ja"
+        ? `私は${ASSISTANT_NAME_KO}です。`
+        : `I am ${ASSISTANT_NAME_EN}.`
 
   const disclosureNote = locale === "ko"
     ? "모델명이나 내부 시스템 정보는 공개하지 않아요."
-    : "I can't share model or internal system details."
+    : locale === "zh"
+      ? "我不会透露模型或内部系统信息。"
+      : locale === "ja"
+        ? "モデル名や内部システム情報は公開しません。"
+        : "I can't share model or internal system details."
+
+  const selfRefPatternKo = /(?:저는|나는|제가|내가)\s*(?:chatgpt|gpt[^\s,.!?]*|openai[^\s,.!?]*|ai\s*언어\s*모델|인공지능\s*모델)[^.!?\n]*[.!?]?/gi
+  const selfRefPatternEn = /(?:i am|i'm)\s*(?:chatgpt|gpt[^\s,.!?]*|an?\s+(?:ai\s+)?language model|openai[^\s,.!?]*)[^.!?\n]*[.!?]?/gi
+  const selfRefPatternZh = /(?:我是|我是一个|我是(?:一个)?)\s*(?:chatgpt|gpt[^\s,.!?]*|openai[^\s,.!?]*|ai\s*(?:语言|人工智能)\s*(?:模型|助手))[^.!?\n]*[.!?]?/gi
+  const selfRefPatternJa = /(?:私は|私が|わたしは)\s*(?:chatgpt|gpt[^\s,.!?]*|openai[^\s,.!?]*|ai\s*(?:言語)?\s*(?:モデル|アシスタント))[^.!?\n]*[.!?]?/gi
 
   const normalized = stripAssistantReasoning(content)
   if (!normalized) {
@@ -244,18 +283,11 @@ function enforceAssistantIdentity(content: string, locale: LabAiChatLocale) {
   }
 
   const sanitized = normalized
-    .replace(
-      /(?:저는|나는|제가|내가)\s*(?:chatgpt|gpt[^\s,.!?]*|openai[^\s,.!?]*|ai\s*언어\s*모델|인공지능\s*모델)[^.!?\n]*[.!?]?/gi,
-      identity
-    )
-    .replace(
-      /(?:i am|i'm)\s*(?:chatgpt|gpt[^\s,.!?]*|an?\s+(?:ai\s+)?language model|openai[^\s,.!?]*)[^.!?\n]*[.!?]?/gi,
-      identity
-    )
-    .replace(
-      /as an?\s+(?:ai\s+)?language model[^.!?\n]*[.!?]?/gi,
-      identity
-    )
+    .replace(selfRefPatternKo, identity)
+    .replace(selfRefPatternEn, identity)
+    .replace(selfRefPatternZh, identity)
+    .replace(selfRefPatternJa, identity)
+    .replace(/as an?\s+(?:ai\s+)?language model[^.!?\n]*[.!?]?/gi, identity)
     .trim()
 
   if (!sanitized) {
@@ -334,7 +366,11 @@ function addLengthLimitNotice(content: string, locale: LabAiChatLocale) {
 
   const notice = locale === "ko"
     ? "답변이 길어져 여기서 잠시 멈췄어요. '계속'이라고 보내면 이어서 작성할게요."
-    : "The answer got long, so I paused here. Send \"continue\" and I will keep going."
+    : locale === "zh"
+      ? "回答过长，暂时在此停顿。发送「继续」我会接着写。"
+      : locale === "ja"
+        ? "回答が長くなったため一時停止しました。「続けて」と送信すると続きを書きます。"
+        : "The answer got long, so I paused here. Send \"continue\" and I will keep going."
 
   if (trimmed.includes(notice)) {
     return trimmed
@@ -352,7 +388,11 @@ function finalizeAssistantMessage(content: string, locale: LabAiChatLocale, fini
     ? sanitizedMessage
     : (locale === "ko"
       ? "검색 내용을 바탕으로 핵심만 정리해 다시 답변할게요."
-      : "I will summarize the search findings and answer concisely.")
+      : locale === "zh"
+        ? "我将根据搜索内容整理要点后重新回答。"
+        : locale === "ja"
+          ? "検索結果を基に要点を整理して回答します。"
+          : "I will summarize the search findings and answer concisely.")
   return finishReason === "length"
     ? addLengthLimitNotice(assistantMessage, locale)
     : assistantMessage
@@ -441,6 +481,56 @@ function getLabAiChatStatusMessage(locale: LabAiChatLocale, kind: LabAiChatStatu
         return "답변을 저장하는 중..."
       case "state_syncing":
         return "최종 상태를 반영하는 중..."
+      default:
+        return ""
+    }
+  }
+
+  if (locale === "zh") {
+    switch (kind) {
+      case "memory_check":
+        return "正在检查会话内存状态..."
+      case "memory_compacting":
+        return "正在压缩会话内存..."
+      case "memory_compacted":
+        return "会话内存压缩完成。"
+      case "memory_skip":
+        return "会话内存检查完成。"
+      case "memory_failed":
+        return "内存压缩失败，将继续使用现有内存。"
+      case "context_loading":
+        return "正在加载对话上下文..."
+      case "response_generating":
+        return "正在生成回答..."
+      case "response_saving":
+        return "正在保存回答..."
+      case "state_syncing":
+        return "正在同步最终状态..."
+      default:
+        return ""
+    }
+  }
+
+  if (locale === "ja") {
+    switch (kind) {
+      case "memory_check":
+        return "セッションメモリを確認中..."
+      case "memory_compacting":
+        return "セッションメモリを圧縮中..."
+      case "memory_compacted":
+        return "セッションメモリの圧縮が完了しました。"
+      case "memory_skip":
+        return "セッションメモリの確認が完了しました。"
+      case "memory_failed":
+        return "メモリ圧縮に失敗しました。既存のメモリで続行します。"
+      case "context_loading":
+        return "会話のコンテキストを読み込み中..."
+      case "response_generating":
+        return "回答を生成中..."
+      case "response_saving":
+        return "回答を保存中..."
+      case "state_syncing":
+        return "最終状態を反映中..."
       default:
         return ""
     }

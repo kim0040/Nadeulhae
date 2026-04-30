@@ -34,20 +34,115 @@ const CODE_SHARE_ERRORS = {
     unauthorized: "로그인이 필요합니다.",
     disabled: "실험실 기능을 활성화한 사용자만 코드공유 세션을 만들 수 있습니다.",
     invalidRequest: "코드공유 요청 형식이 올바르지 않습니다.",
+    rateLimited: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+    dailyLimit: "오늘 코드공유 세션 생성 가능 횟수를 모두 사용했습니다. 내일 다시 시도해 주세요.",
     failed: "코드공유 세션 처리 중 오류가 발생했습니다.",
   },
   en: {
     unauthorized: "You need to log in first.",
     disabled: "Only users with lab access enabled can create code-share sessions.",
     invalidRequest: "Invalid code-share request.",
+    rateLimited: "Too many requests. Please try again shortly.",
+    dailyLimit: "You have reached today's code-share session creation limit. Please try again tomorrow.",
     failed: "Failed to process code-share sessions.",
+  },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "只有启用实验室功能的用户才能创建代码共享会话。",
+    invalidRequest: "代码共享请求格式不正确。",
+    rateLimited: "请求过多，请稍后再试。",
+    dailyLimit: "今天的代码共享会话创建次数已用完，请明天再试。",
+    failed: "代码共享会话处理失败。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能を有効にしたユーザーのみコード共有セッションを作成できます。",
+    invalidRequest: "コード共有リクエストの形式が正しくありません。",
+    rateLimited: "リクエストが多すぎます。しばらくしてからもう一度お試しください。",
+    dailyLimit: "今日のコード共有セッション作成回数の上限に達しました。明日もう一度お試しください。",
+    failed: "コード共有セッションの処理中にエラーが発生しました。",
   },
 } as const
 
-type CodeShareLocale = "ko" | "en"
+type CodeShareLocale = keyof typeof CODE_SHARE_ERRORS
+
+type RateLimitEntry = {
+  count: number
+  windowStartMs: number
+}
+
+declare global {
+  var __codeShareCreateWindowMap: Map<string, RateLimitEntry> | undefined
+  var __codeShareCreateDailyMap: Map<string, RateLimitEntry> | undefined
+}
+
+const CODE_SHARE_CREATE_WINDOW_MS = 60_000
+const CODE_SHARE_CREATE_WINDOW_LIMIT = 5
+const CODE_SHARE_CREATE_DAILY_LIMIT = 20
+const RATE_LIMIT_MAX_ENTRIES = 4000
+
+function getWindowMap() {
+  if (!globalThis.__codeShareCreateWindowMap) {
+    globalThis.__codeShareCreateWindowMap = new Map()
+  }
+  return globalThis.__codeShareCreateWindowMap
+}
+
+function getDailyMap() {
+  if (!globalThis.__codeShareCreateDailyMap) {
+    globalThis.__codeShareCreateDailyMap = new Map()
+  }
+  return globalThis.__codeShareCreateDailyMap
+}
+
+function cleanupRateLimitMap(map: Map<string, RateLimitEntry>, windowMs: number, nowMs: number) {
+  for (const [key, value] of map.entries()) {
+    if (nowMs - value.windowStartMs > windowMs * 2) {
+      map.delete(key)
+    }
+  }
+  if (map.size <= RATE_LIMIT_MAX_ENTRIES) return
+  const overflow = map.size - RATE_LIMIT_MAX_ENTRIES
+  let removed = 0
+  for (const key of map.keys()) {
+    map.delete(key)
+    removed += 1
+    if (removed >= overflow) break
+  }
+}
+
+function checkFixedWindow(
+  map: Map<string, RateLimitEntry>,
+  key: string,
+  limit: number,
+  windowMs: number,
+  nowMs: number
+) {
+  const current = map.get(key)
+  if (!current || nowMs - current.windowStartMs >= windowMs) {
+    map.set(key, { count: 1, windowStartMs: nowMs })
+    return { allowed: true }
+  }
+  if (current.count >= limit) {
+    return { allowed: false }
+  }
+  current.count += 1
+  map.set(key, current)
+  return { allowed: true }
+}
+
+function getClientKey(request: NextRequest) {
+  const ua = request.headers.get("user-agent")?.trim().slice(0, 120) || "unknown"
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "anon"
+  return `${ip}:${ua}`
+}
 
 function getLocale(request: NextRequest): CodeShareLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -153,7 +248,7 @@ async function handlePOST(request: NextRequest) {
   const locale = getLocale(request)
 
   try {
-    const violation = validateAuthMutationRequest(request, locale)
+    const violation = validateAuthMutationRequest(request, locale === "zh" || locale === "ja" ? "en" : locale)
     if (violation) {
       return violation
     }
@@ -187,6 +282,27 @@ async function handlePOST(request: NextRequest) {
           { status: 403 }
         ),
         authenticatedSession
+      )
+    }
+
+    const nowMs = Date.now()
+    const clientKey = getClientKey(request)
+    const windowMap = getWindowMap()
+    const dailyMap = getDailyMap()
+    cleanupRateLimitMap(windowMap, CODE_SHARE_CREATE_WINDOW_MS, nowMs)
+    cleanupRateLimitMap(dailyMap, CODE_SHARE_CREATE_WINDOW_MS, nowMs)
+
+    if (!checkFixedWindow(windowMap, clientKey, CODE_SHARE_CREATE_WINDOW_LIMIT, CODE_SHARE_CREATE_WINDOW_MS, nowMs).allowed) {
+      return createAuthJsonResponse(
+        { error: CODE_SHARE_ERRORS[locale].rateLimited },
+        { status: 429 }
+      )
+    }
+
+    if (!checkFixedWindow(dailyMap, `${clientKey}:daily`, CODE_SHARE_CREATE_DAILY_LIMIT, 24 * 60 * 60 * 1000, nowMs).allowed) {
+      return createAuthJsonResponse(
+        { error: CODE_SHARE_ERRORS[locale].dailyLimit },
+        { status: 429 }
       )
     }
 

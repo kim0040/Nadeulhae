@@ -66,6 +66,42 @@ const HUB_COPY = {
     statusActive: "Active",
     statusClosed: "Closed",
   },
+  zh: {
+    badge: "realtime collaboration",
+    title: "代码共享中心",
+    subtitle: "一键创建会话，从下方列表中重新打开或删除之前的会话。",
+    create: "创建新会话",
+    creating: "正在创建...",
+    listTitle: "历史会话",
+    noSessions: "暂无历史会话。",
+    loading: "正在加载会话列表...",
+    loadFailed: "加载会话信息失败。",
+    deleteConfirm: "确定要永久删除此会话吗？",
+    deleting: "正在删除...",
+    delete: "删除",
+    refresh: "刷新",
+    mine: "我的名字",
+    statusActive: "活跃",
+    statusClosed: "已结束",
+  },
+  ja: {
+    badge: "realtime collaboration",
+    title: "コード共有ハブ",
+    subtitle: "ワンクリックでセッションを作成し、以下のリストから以前のセッションを再開または削除できます。",
+    create: "新規セッション作成",
+    creating: "作成中...",
+    listTitle: "過去のセッション",
+    noSessions: "過去のセッションはありません。",
+    loading: "セッション一覧を読み込み中...",
+    loadFailed: "セッション情報の読み込みに失敗しました。",
+    deleteConfirm: "このセッションを完全に削除しますか？",
+    deleting: "削除中...",
+    delete: "削除",
+    refresh: "更新",
+    mine: "自分の名前",
+    statusActive: "アクティブ",
+    statusClosed: "終了",
+  },
 } as const
 
 function formatDateLabel(value: string, locale: string) {
@@ -74,7 +110,8 @@ function formatDateLabel(value: string, locale: string) {
     return value
   }
 
-  return parsed.toLocaleString(locale === "ko" ? "ko-KR" : "en-US", {
+  const localeMap: Record<string, string> = { ko: "ko-KR", zh: "zh-CN", ja: "ja-JP" }
+  return parsed.toLocaleString(localeMap[locale] ?? "en-US", {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",

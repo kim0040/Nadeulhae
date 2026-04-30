@@ -8,11 +8,14 @@ import {
   getAuthenticatedSessionFromRequest,
 } from "@/lib/auth/session"
 import { getLabState } from "@/lib/lab/repository"
+import type { LabLocale } from "@/lib/lab/types"
 
 export const runtime = "nodejs"
 
-function getLocale(request: NextRequest): "ko" | "en" {
+function getLocale(request: NextRequest): LabLocale {
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 
@@ -26,6 +29,16 @@ const LAB_STATE_ERRORS = {
     unauthorized: "You need to log in first.",
     disabled: "Lab is disabled. Enable it first from dashboard settings.",
     failed: "Failed to load lab state.",
+  },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "实验室功能未开启。请先在仪表盘设置中启用。",
+    failed: "无法加载实验室状态。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が無効です。ダッシュボード設定から先に有効にしてください。",
+    failed: "ラボの状態を読み込めませんでした。",
   },
 } as const
 

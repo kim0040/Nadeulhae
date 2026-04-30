@@ -32,14 +32,30 @@ const SESSION_ERRORS = {
     cannotDelete: "The last remaining session cannot be deleted.",
     unexpected: "An unexpected session error occurred.",
   },
+  zh: {
+    unauthorized: "请先登录。",
+    disabled: "仅限启用实验室功能的用户使用。",
+    invalidSession: "无法找到有效的会话。",
+    cannotDelete: "无法删除最后一个会话。",
+    unexpected: "会话处理过程中发生错误。",
+  },
+  ja: {
+    unauthorized: "ログインが必要です。",
+    disabled: "ラボ機能が有効なユーザーのみ利用できます。",
+    invalidSession: "有効なセッションが見つかりません。",
+    cannotDelete: "最後のセッションは削除できません。",
+    unexpected: "セッション処理中にエラーが発生しました。",
+  },
 } as const
 
 function getRequestLocale(request: Request, preferred?: unknown): LabAiChatLocale {
-  if (preferred === "en" || preferred === "ko") {
-    return preferred
+  if (preferred === "en" || preferred === "ko" || preferred === "zh" || preferred === "ja") {
+    return preferred as LabAiChatLocale
   }
 
   const header = request.headers.get("accept-language")?.toLowerCase() ?? ""
+  if (header.startsWith("zh")) return "zh"
+  if (header.startsWith("ja")) return "ja"
   return header.startsWith("en") ? "en" : "ko"
 }
 

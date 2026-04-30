@@ -1,4 +1,4 @@
-export type LabAiChatLocale = "ko" | "en"
+export type LabAiChatLocale = "ko" | "en" | "zh" | "ja"
 export type LabAiChatMessageRole = "user" | "assistant"
 export type LabAiChatRequestKind = "chat" | "summary"
 export type LabAiChatRequestStatus = "success" | "provider_error" | "rate_limited" | "validation_error"

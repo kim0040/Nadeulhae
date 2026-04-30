@@ -128,7 +128,11 @@ function checkFixedWindow(
 function createRateLimitResponse(locale: JeonjuBriefingLocale, retryAfterSeconds: number) {
   const message = locale === "ko"
     ? "갱신 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
-    : "Too many refresh requests. Please try again shortly."
+    : locale === "zh"
+      ? "刷新请求过多，请稍后再试。"
+      : locale === "ja"
+        ? "更新リクエストが多すぎます。しばらくしてからもう一度お試しください。"
+        : "Too many refresh requests. Please try again shortly."
 
   const response = NextResponse.json(
     {
@@ -168,7 +172,7 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url)
   const localeParam = searchParams.get("locale")
   const locale: JeonjuBriefingLocale =
-    localeParam === "en" ? "en" : "ko"
+    localeParam === "en" ? "en" : localeParam === "zh" ? "zh" : localeParam === "ja" ? "ja" : "ko"
 
   const forceRequested = searchParams.get("force") === "true"
   const warmAll = searchParams.get("warm_all") === "true"
@@ -185,6 +189,8 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
       if (warmAll) {
         purgeJeonjuBriefingCache(briefingDate, "ko")
         purgeJeonjuBriefingCache(briefingDate, "en")
+        purgeJeonjuBriefingCache(briefingDate, "zh")
+        purgeJeonjuBriefingCache(briefingDate, "ja")
       } else {
         purgeJeonjuBriefingCache(briefingDate, locale)
       }
@@ -197,13 +203,17 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
   if (forceRequested) {
     try {
       if (warmAll) {
-        const [koCached, enCached] = await Promise.all([
+        const [koCached, enCached, zhCached, jaCached] = await Promise.all([
           getJeonjuBriefingByDateAndLocale(briefingDate, "ko"),
           getJeonjuBriefingByDateAndLocale(briefingDate, "en"),
+          getJeonjuBriefingByDateAndLocale(briefingDate, "zh"),
+          getJeonjuBriefingByDateAndLocale(briefingDate, "ja"),
         ])
         if (
           koCached
           && enCached
+          && zhCached
+          && jaCached
           && isRecentlyUpdated(koCached.updatedAt, nowMs, FORCE_REFRESH_MIN_INTERVAL_MS)
           && isRecentlyUpdated(enCached.updatedAt, nowMs, FORCE_REFRESH_MIN_INTERVAL_MS)
         ) {
@@ -214,6 +224,8 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
             data: {
               ko: koCached,
               en: enCached,
+              zh: zhCached,
+              ja: jaCached,
             },
           })
           response.headers.set("Cache-Control", BRIEFING_PUBLIC_CACHE_CONTROL)
@@ -287,22 +299,20 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
 
   try {
     if (warmAll) {
-      const ko = await generateJeonjuBriefing({
-        locale: "ko",
-        forceRefresh: force,
-        skipMemoryCache: refresh,
-      })
-      const en = await generateJeonjuBriefing({
-        locale: "en",
-        forceRefresh: force,
-        skipMemoryCache: refresh,
-      })
+      const [ko, en, zh, ja] = await Promise.all([
+        generateJeonjuBriefing({ locale: "ko", forceRefresh: force, skipMemoryCache: refresh }),
+        generateJeonjuBriefing({ locale: "en", forceRefresh: force, skipMemoryCache: refresh }),
+        generateJeonjuBriefing({ locale: "zh", forceRefresh: force, skipMemoryCache: refresh }),
+        generateJeonjuBriefing({ locale: "ja", forceRefresh: force, skipMemoryCache: refresh }),
+      ])
       const response = NextResponse.json({
         success: true,
         warmed: true,
         data: {
           ko: ko.data,
           en: en.data,
+          zh: zh.data,
+          ja: ja.data,
         },
       })
       response.headers.set("Cache-Control", force ? "no-store" : BRIEFING_PUBLIC_CACHE_CONTROL)

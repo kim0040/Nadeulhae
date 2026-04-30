@@ -1,4 +1,4 @@
-export type LabLocale = "ko" | "en"
+export type LabLocale = "ko" | "en" | "zh" | "ja"
 export type LabLearningState = "new" | "learning" | "review" | "relearning"
 export type LabReviewGrade = 1 | 2 | 3 | 4
 

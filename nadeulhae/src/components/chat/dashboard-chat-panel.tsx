@@ -45,7 +45,7 @@ const TOKEN_CLASS_BY_KIND: Record<HighlightKind, string> = {
 
 const CHAT_PANEL_COPY = {
   ko: {
-    title: "나들이 메이트",
+    title: "나들AI",
     description:
       "원하는 조건을 말하면 전주 나들이 코스, 대체 일정, 준비물을 추천해요.",
     canAskLabel: "이렇게 활용해보세요",

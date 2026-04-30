@@ -429,57 +429,59 @@ async function requestCompletionStream(input: {
     let providerRequestId: string | null = null
     let resolvedModel = input.model
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          break
+        }
 
-      buffer += decoder.decode(value, { stream: true })
-      const parts = buffer.split("\n\n")
-      buffer = parts.pop() ?? ""
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split("\n\n")
+        buffer = parts.pop() ?? ""
 
-      for (const part of parts) {
-        for (const rawLine of part.split("\n")) {
-          const trimmed = rawLine.trim()
-          if (!trimmed.startsWith("data: ")) {
-            continue
-          }
-
-          const data = trimmed.slice(6)
-          if (data === "[DONE]") {
-            continue
-          }
-
-          try {
-            const parsed = JSON.parse(data) as {
-              id?: string
-              model?: string
-              choices?: Array<{
-                delta?: {
-                  content?: string
-                }
-              }>
-            }
-            providerRequestId = parsed.id ?? providerRequestId
-            resolvedModel = parsed.model ?? resolvedModel
-
-            const token = typeof parsed.choices?.[0]?.delta?.content === "string"
-              ? parsed.choices[0].delta.content
-              : ""
-
-            if (!token) {
+        for (const part of parts) {
+          for (const rawLine of part.split("\n")) {
+            const trimmed = rawLine.trim()
+            if (!trimmed.startsWith("data: ")) {
               continue
             }
 
-            accumulated += token
-            input.onToken(token)
-          } catch {}
+            const data = trimmed.slice(6)
+            if (data === "[DONE]") {
+              continue
+            }
+
+            try {
+              const parsed = JSON.parse(data) as {
+                id?: string
+                model?: string
+                choices?: Array<{
+                  delta?: {
+                    content?: string
+                  }
+                }>
+              }
+              providerRequestId = parsed.id ?? providerRequestId
+              resolvedModel = parsed.model ?? resolvedModel
+
+              const token = typeof parsed.choices?.[0]?.delta?.content === "string"
+                ? parsed.choices[0].delta.content
+                : ""
+
+              if (!token) {
+                continue
+              }
+
+              accumulated += token
+              input.onToken(token)
+            } catch {}
+          }
         }
       }
+    } finally {
+      try { await reader.cancel() } catch {}
     }
-
-    await reader.cancel()
 
     await recordGlobalLlmRequestOutcome({
       metricDate: reservation.usage.metricDate,

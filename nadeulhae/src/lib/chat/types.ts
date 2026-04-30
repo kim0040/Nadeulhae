@@ -1,4 +1,4 @@
-export type ChatLocale = "ko" | "en"
+export type ChatLocale = "ko" | "en" | "zh" | "ja"
 export type ChatMessageRole = "user" | "assistant"
 export type ChatRequestKind = "chat" | "summary"
 export type ChatRequestStatus = "success" | "provider_error" | "rate_limited" | "validation_error"

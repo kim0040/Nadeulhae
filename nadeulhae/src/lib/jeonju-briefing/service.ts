@@ -66,14 +66,30 @@ function getFormattedDateLabel(dateStr: string, locale: JeonjuBriefingLocale): s
     const [year, month, day] = dateStr.split("-")
     return `${year}년 ${Number(month)}월 ${Number(day)}일`
   }
+  if (locale === "zh") {
+    const [year, month, day] = dateStr.split("-")
+    return `${year}年${Number(month)}月${Number(day)}日`
+  }
+  if (locale === "ja") {
+    const [year, month, day] = dateStr.split("-")
+    return `${year}年${Number(month)}月${Number(day)}日`
+  }
   const d = new Date(dateStr)
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 }
 
 function getRelativeDayLabel(dateStr: string, locale: JeonjuBriefingLocale): string {
   const today = getTodayInKst()
-  if (dateStr === today) return locale === "ko" ? "오늘" : "today"
-  if (dateStr === getYesterdayInKst()) return locale === "ko" ? "어제" : "yesterday"
+  if (dateStr === today) {
+    if (locale === "zh") return "今天"
+    if (locale === "ja") return "今日"
+    return locale === "ko" ? "오늘" : "today"
+  }
+  if (dateStr === getYesterdayInKst()) {
+    if (locale === "zh") return "昨天"
+    if (locale === "ja") return "昨日"
+    return locale === "ko" ? "어제" : "yesterday"
+  }
   return getFormattedDateLabel(dateStr, locale)
 }
 
@@ -1174,12 +1190,13 @@ function ensureFriendlyIntro(summary: string, locale: JeonjuBriefingLocale) {
   if (!trimmed) return trimmed
   const koIntro = "안녕하세요! 나들AI예요 ☀️ 어제 전주에서 있었던 일들을 알려드릴게요~"
   const enIntro = "Hi there! It's NadeulAI ☀️ Let me catch you up on what happened in Jeonju yesterday~"
-  const intro = locale === "ko" ? koIntro : enIntro
-  if (trimmed.startsWith(koIntro) || trimmed.startsWith(enIntro)) {
+  const zhIntro = "你好！我是나들AI ☀️ 让我来告诉你昨天全州发生了什么吧~"
+  const jaIntro = "こんにちは！나들AIです ☀️ 昨日の全州で何があったかお知らせしますね〜"
+  const intro = locale === "ko" ? koIntro : locale === "zh" ? zhIntro : locale === "ja" ? jaIntro : enIntro
+  if (trimmed.startsWith(koIntro) || trimmed.startsWith(enIntro) || trimmed.startsWith(zhIntro) || trimmed.startsWith(jaIntro)) {
     return trimmed
   }
-  // Also check for old intros
-  if (trimmed.startsWith("안녕하세요!") || trimmed.startsWith("Hi there!") || trimmed.startsWith("Hello!")) {
+  if (trimmed.startsWith("안녕하세요!") || trimmed.startsWith("Hi there!") || trimmed.startsWith("Hello!") || trimmed.startsWith("你好") || trimmed.startsWith("こんにちは")) {
     return trimmed
   }
   return `${intro} ${trimmed}`
@@ -1329,6 +1346,26 @@ function buildNarrativeSummary(
     return ensureFriendlyIntro(body, locale)
   }
 
+  if (locale === "zh") {
+    if (!top) {
+      return ensureFriendlyIntro("昨天全州没有什么特别的新消息。建议查看全州市厅公告或交通信息。祝您度过愉快的一天！😊", locale)
+    }
+    const body = second
+      ? `昨天有"${top.title}"的消息，还确认了"${second.title}"相关内容。共收集了${items.length}条消息，出门前查看一下会有帮助！`
+      : `昨天"${top.title}"的相关消息值得关注。今天开始行程前简单确认一下吧！`
+    return ensureFriendlyIntro(body, locale)
+  }
+
+  if (locale === "ja") {
+    if (!top) {
+      return ensureFriendlyIntro("昨日は全州で特に新しい情報は多くありませんでした。全州市庁のお知らせや交通情報をご確認されることをおすすめします。今日も良い一日を！😊", locale)
+    }
+    const body = second
+      ? `昨日は「${top.title}」のニュースがあり、「${second.title}」関連の内容も確認されました。合計${items.length}件の情報をまとめましたので、お出かけ前にご確認ください！`
+      : `昨日は「${top.title}」に関するニュースが注目されました。今日の予定前に軽くチェックしてみてください！`
+    return ensureFriendlyIntro(body, locale)
+  }
+
   if (!top) {
     return ensureFriendlyIntro(
       `It was a pretty quiet day in Jeonju yesterday! I'd recommend checking official city notices and traffic updates. Have a wonderful day! 😊`,
@@ -1346,9 +1383,10 @@ function buildInsightFromItems(
   items: JeonjuBriefingData["newsItems"]
 ) {
   if (items.length === 0) {
-    return locale === "ko"
-      ? "• 전주시청 공지와 교통 안내를 먼저 확인하세요.\n• 방문 예정 장소의 운영 시간 변동 여부를 확인하세요."
-      : "• Check Jeonju city notices and traffic updates first.\n• Verify operating hours for planned destinations."
+    if (locale === "zh") return "• 请优先查看全州市厅公告和交通信息。\n• 确认计划访问场所的营业时间是否有变动。"
+    if (locale === "ja") return "• 全州市庁のお知らせと交通情報を先にご確認ください。\n• 訪問予定場所の営業時間の変更がないかご確認ください。"
+    if (locale === "ko") return "• 전주시청 공지와 교통 안내를 먼저 확인하세요.\n• 방문 예정 장소의 운영 시간 변동 여부를 확인하세요."
+    return "• Check Jeonju city notices and traffic updates first.\n• Verify operating hours for planned destinations."
   }
 
   const bullets: string[] = []
@@ -1367,6 +1405,34 @@ function buildInsightFromItems(
     }
     if (bullets.length < 3) {
       bullets.push("• 오늘 일정과 직접 관련된 링크 2~3개만 먼저 확인하고 출발하세요.")
+    }
+    return bullets.slice(0, 4).join("\n")
+  }
+
+  if (locale === "zh") {
+    bullets.push(`• 请在${top.source}原文中确认"${top.title}"的最新更新时间。`)
+    if (/(교통|통제|도로|우회|혼잡|안전|사고|traffic|road|closure|safety)/i.test(`${mergedTop} ${mergedSecond}`)) {
+      bullets.push("• 出行前确认绕行路线和停车区域可减少等待时间。")
+    }
+    if (/(행사|축제|공연|전시|event|festival|exhibition|culture)/i.test(`${mergedTop} ${mergedSecond}`)) {
+      bullets.push("• 参加活动/展览前请确认营业时间和入场条件。")
+    }
+    if (bullets.length < 3) {
+      bullets.push("• 优先确认与今日计划直接相关的2~3个链接再出发。")
+    }
+    return bullets.slice(0, 4).join("\n")
+  }
+
+  if (locale === "ja") {
+    bullets.push(`• ${top.source}の原文で「${top.title}」の最新更新時刻を先にご確認ください。`)
+    if (/(교통|통제|도로|우회|혼잡|안전|사고|traffic|road|closure|safety)/i.test(`${mergedTop} ${mergedSecond}`)) {
+      bullets.push("• 移動前に迂回路・駐車可能エリアを確認すると待ち時間を減らせます。")
+    }
+    if (/(행사|축제|공연|전시|event|festival|exhibition|culture)/i.test(`${mergedTop} ${mergedSecond}`)) {
+      bullets.push("• イベント・展示参加前に営業時間と入場条件を確認してください。")
+    }
+    if (bullets.length < 3) {
+      bullets.push("• 今日の予定に直接関連するリンク2〜3個を先に確認してから出かけましょう。")
     }
     return bullets.slice(0, 4).join("\n")
   }
@@ -1543,6 +1609,34 @@ function buildFinalBriefing(
 // Fallbacks
 // ------------------------------------------------------------------
 
+function getLocalizedHeadline(dateLabel: string, locale: JeonjuBriefingLocale) {
+  if (locale === "zh") return `${dateLabel} 全州新闻`
+  if (locale === "ja") return `${dateLabel} 全州ニュース`
+  if (locale === "ko") return `${dateLabel} 전주 소식`
+  return `Jeonju News ${dateLabel}`
+}
+
+function getLocalizedSummary(locale: JeonjuBriefingLocale) {
+  if (locale === "zh") return ensureFriendlyIntro(`我整理了昨天全州的相关信息。只提取了可靠的内容，出门前看看会很有帮助！`, locale)
+  if (locale === "ja") return ensureFriendlyIntro(`昨日の全州に関する情報を簡単にまとめました。確かな情報だけを厳選しましたので、お出かけ前にご活用ください！`, locale)
+  if (locale === "ko") return ensureFriendlyIntro(`오늘은 어제 기준 수집된 전주 관련 원문을 간단히 정리했어요. 확실한 정보만 쏙쏙 뽑아 담았으니, 외출하시기 전에 유용하게 활용해 보세요!`, locale)
+  return ensureFriendlyIntro(`I've compiled some helpful Jeonju-related updates for you. Have a quick look to stay informed before starting your day!`, locale)
+}
+
+function getLocalizedInsight(locale: JeonjuBriefingLocale) {
+  if (locale === "zh") return "今日提示：参加活动前请确认营业时间和雨天备选路线。"
+  if (locale === "ja") return "今日のチェックポイント：イベント前に営業時間と雨天時の動線を確認してください。"
+  if (locale === "ko") return "오늘 체크포인트: 행사 방문 전 운영시간과 우천 시 동선을 먼저 확인하세요."
+  return "Today's checklist: confirm operating hours and rainy-day routes before heading out."
+}
+
+function getLocalizedTags(locale: JeonjuBriefingLocale): string[] {
+  if (locale === "zh") return ["#全州", "#Nadeulhae", "#全州旅行"]
+  if (locale === "ja") return ["#全州", "#Nadeulhae", "#全州旅行"]
+  if (locale === "ko") return ["#전주", "#나들해", "#전주여행"]
+  return ["#Jeonju", "#Nadeulhae", "#JeonjuTravel"]
+}
+
 function buildPartialBriefing(
   dateStr: string,
   locale: JeonjuBriefingLocale,
@@ -1550,15 +1644,12 @@ function buildPartialBriefing(
   modelUsed: string | null
 ): JeonjuBriefingData {
   const dateLabel = getFormattedDateLabel(dateStr, locale)
-  const isKo = locale === "ko"
 
   return {
     briefingDate: dateStr,
     locale,
-    headline: isKo ? `${dateLabel} 전주 소식` : `Jeonju News ${dateLabel}`,
-    summary: isKo
-      ? ensureFriendlyIntro(`오늘은 어제 기준 수집된 전주 관련 원문을 간단히 정리했어요. 확실한 정보만 쏙쏙 뽑아 담았으니, 외출하시기 전에 유용하게 활용해 보세요!`, locale)
-      : ensureFriendlyIntro(`I've compiled some helpful Jeonju-related updates for you. Have a quick look to stay informed before starting your day!`, locale),
+    headline: getLocalizedHeadline(dateLabel, locale),
+    summary: getLocalizedSummary(locale),
     newsItems: searchResults.length > 0
       ? searchResults.slice(0, 6).map((r) => ({
           title: r.title,
@@ -1568,54 +1659,106 @@ function buildPartialBriefing(
           publishedDate: r.publishedDate,
         }))
       : [],
-    aiInsight: isKo
-      ? "오늘 체크포인트: 행사 방문 전 운영시간과 우천 시 동선을 먼저 확인하세요."
-      : "Today's checklist: confirm operating hours and rainy-day routes before heading out.",
+    aiInsight: getLocalizedInsight(locale),
     weatherNote: null,
     festivalNote: null,
-    keywordTags: isKo
-      ? ["#전주", "#나들해", "#전주여행"]
-      : ["#Jeonju", "#Nadeulhae", "#JeonjuTravel"],
+    keywordTags: getLocalizedTags(locale),
     modelUsed,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
 }
 
+const FALLBACK_CONTENT: Record<JeonjuBriefingLocale, {
+  headline: string
+  summary: string
+  newsTitle1: string
+  newsSource1: string
+  newsSnippet1: string
+  newsTitle2: string
+  newsSource2: string
+  newsSnippet2: string
+  aiInsight: string
+  tags: string[]
+}> = {
+  ko: {
+    headline: "새로운 전주 소식을 찾아보고 있어요",
+    summary: "어제 하루 동안 전해진 새로운 소식이 많지 않네요. 중요한 공식 공지나 일정은 전주시청 및 지역 언론 채널을 먼저 참고해 주시면 좋겠습니다. 오늘도 좋은 하루 보내세요!",
+    newsTitle1: "전주 한옥마을 - 조선의 정취를 품은 골목",
+    newsSource1: "전주관광공사",
+    newsSnippet1: "관광 기본 정보와 운영 안내 확인",
+    newsTitle2: "전주시청 공지사항",
+    newsSource2: "전주시청",
+    newsSnippet2: "교통·행사·안전 관련 최신 공지 확인",
+    aiInsight: "오늘 체크포인트: 출발 전 공식 공지의 갱신 시각을 확인하면 변동 이슈를 놓치지 않을 수 있어요.",
+    tags: ["#전주", "#나들해", "#전주한옥마을", "#전주여행", "#남부시장"],
+  },
+  en: {
+    headline: "Gathering new Jeonju updates",
+    summary: "There weren't many new updates yesterday. Please check Jeonju city's official notices and local media for the latest announcements. Have a wonderful day!",
+    newsTitle1: "Jeonju Hanok Village - Alleys of Joseon Charm",
+    newsSource1: "Visit Jeonju",
+    newsSnippet1: "Check official travel info and operation guidance",
+    newsTitle2: "Jeonju city official notices",
+    newsSource2: "Jeonju City",
+    newsSnippet2: "Check latest traffic/event/safety notices",
+    aiInsight: "Today's checklist: confirm the update timestamp on official notices before you head out.",
+    tags: ["#Jeonju", "#Nadeulhae", "#HanokVillage", "#JeonjuTravel", "#NambuMarket"],
+  },
+  zh: {
+    headline: "正在查找全州最新消息",
+    summary: "昨天全州的新消息不多。请参考全州市厅和本地媒体的官方公告获取最新信息。祝您度过美好的一天！",
+    newsTitle1: "全州韩屋村 - 蕴含朝鲜韵味的巷弄",
+    newsSource1: "全州旅游发展局",
+    newsSnippet1: "查看旅游基本信息和运营指南",
+    newsTitle2: "全州市厅公告",
+    newsSource2: "全州市厅",
+    newsSnippet2: "查看交通、活动、安全相关最新公告",
+    aiInsight: "今日提示：出发前确认官方公告的更新时间，以免错过变动信息。",
+    tags: ["#全州", "#Nadeulhae", "#全州韩屋村", "#全州旅行", "#南部市场"],
+  },
+  ja: {
+    headline: "新しい全州ニュースを探しています",
+    summary: "昨日は全州であまり新しい情報がありませんでした。重要な公式発表や予定は全州市庁や地域メディアをご確認ください。今日も良い一日をお過ごしください！",
+    newsTitle1: "全州韓屋村 - 朝鮮の趣を感じる路地",
+    newsSource1: "全州観光公社",
+    newsSnippet1: "観光基本情報と運営案内を確認",
+    newsTitle2: "全州市庁のお知らせ",
+    newsSource2: "全州市庁",
+    newsSnippet2: "交通・イベント・安全に関する最新のお知らせを確認",
+    aiInsight: "今日のチェックポイント：出発前に公式発表の更新時刻を確認すると、変更を見逃しません。",
+    tags: ["#全州", "#Nadeulhae", "#全州韓屋村", "#全州旅行", "#南bu市場"],
+  },
+}
+
 function createFallbackBriefing(dateStr: string, locale: JeonjuBriefingLocale): JeonjuBriefingData {
-  const isKo = locale === "ko"
+  const content = FALLBACK_CONTENT[locale] ?? FALLBACK_CONTENT.en
 
   return {
     briefingDate: dateStr,
     locale,
-    headline: isKo ? "새로운 전주 소식을 찾아보고 있어요" : "Gathering new Jeonju updates",
-    summary: isKo
-      ? ensureFriendlyIntro(`어제 하루 동안 전해진 새로운 소식이 많지 않네요. 중요한 공식 공지나 일정은 전주시청 및 지역 언론 채널을 먼저 참고해 주시면 좋겠습니다. 오늘도 좋은 하루 보내세요!`, locale)
-      : ensureFriendlyIntro(`There weren't many new updates yesterday. Please check Jeonju city's official notices and local media for the latest announcements. Have a wonderful day!`, locale),
+    headline: content.headline,
+    summary: ensureFriendlyIntro(content.summary, locale),
     newsItems: [
       {
-        title: isKo ? "전주 한옥마을 - 조선의 정취를 품은 골목" : "Jeonju Hanok Village - Alleys of Joseon Charm",
+        title: content.newsTitle1,
         url: "https://www.visitjeonju.net",
-        source: isKo ? "전주관광공사" : "Visit Jeonju",
-        snippet: isKo ? "관광 기본 정보와 운영 안내 확인" : "Check official travel info and operation guidance",
+        source: content.newsSource1,
+        snippet: content.newsSnippet1,
         publishedDate: null,
       },
       {
-        title: isKo ? "전주시청 공지사항" : "Jeonju city official notices",
+        title: content.newsTitle2,
         url: "https://www.jeonju.go.kr",
-        source: isKo ? "전주시청" : "Jeonju City",
-        snippet: isKo ? "교통·행사·안전 관련 최신 공지 확인" : "Check latest traffic/event/safety notices",
+        source: content.newsSource2,
+        snippet: content.newsSnippet2,
         publishedDate: null,
       },
     ],
-    aiInsight: isKo
-      ? "오늘 체크포인트: 출발 전 공식 공지의 갱신 시각을 확인하면 변동 이슈를 놓치지 않을 수 있어요."
-      : "Today's checklist: confirm the update timestamp on official notices before you head out.",
+    aiInsight: content.aiInsight,
     weatherNote: null,
     festivalNote: null,
-    keywordTags: isKo
-      ? ["#전주", "#나들해", "#전주한옥마을", "#전주여행", "#남부시장"]
-      : ["#Jeonju", "#Nadeulhae", "#HanokVillage", "#JeonjuTravel", "#NambuMarket"],
+    keywordTags: content.tags,
     modelUsed: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

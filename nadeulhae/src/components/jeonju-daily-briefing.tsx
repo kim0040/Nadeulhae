@@ -83,7 +83,8 @@ function writeCache(lang: string, data: BriefingData) {
 function formatDate(date: string, lang: string) {
   const d = new Date(date)
   if (Number.isNaN(d.getTime())) return date
-  return d.toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", {
+  const locale = lang === "ko" ? "ko-KR" : lang === "zh" ? "zh-CN" : lang === "ja" ? "ja-JP" : "en-US"
+  return d.toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -105,7 +106,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fetchingRef = useRef(false)
 
-  const t = language === "ko" ? KO : EN
+  const t = language === "ko" ? KO : language === "zh" ? ZH : language === "ja" ? JA : EN
 
   const fetchBriefing = useCallback(
     async (force = false, attempt = 0) => {
@@ -335,7 +336,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
             </span>
             {sourceCount > 0 && (
               <span className="text-[10px] font-bold text-muted-foreground/60">
-                {language === "ko" ? `${sourceCount}개 출처` : `${sourceCount} sources`}
+                {language === "ko" ? `${sourceCount}개 출처` : language === "zh" ? `${sourceCount}个来源` : language === "ja" ? `${sourceCount}件のソース` : `${sourceCount} sources`}
               </span>
             )}
           </div>
@@ -420,4 +421,34 @@ const EN = {
   weather: "Weather",
   events: "Events",
   sources: "Related Articles",
+}
+
+const ZH = {
+  badge: "NadeulAI 晨间简报",
+  dateLabel: "基准日期",
+  summaryLabel: "NadeulAI 简报",
+  tipsLabel: "今日小贴士",
+  loading: "正在准备昨日的新聞…",
+  error: "无法加载简报",
+  errorSub: "请稍后再试。",
+  retry: "重试",
+  refresh: "刷新",
+  weather: "天气",
+  events: "活动",
+  sources: "相关文章",
+}
+
+const JA = {
+  badge: "NadeulAI 朝のブリーフィング",
+  dateLabel: "基準日",
+  summaryLabel: "NadeulAI ブリーフィング",
+  tipsLabel: "今日のヒント",
+  loading: "昨日のニュースを準備中…",
+  error: "ブリーフィングを読み込めませんでした",
+  errorSub: "しばらくしてからもう一度お試しください。",
+  retry: "再試行",
+  refresh: "更新",
+  weather: "天気",
+  events: "イベント",
+  sources: "関連記事",
 }
