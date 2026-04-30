@@ -22,6 +22,7 @@ import { Meteors } from "@/components/magicui/meteors"
 import { WordPullUp } from "@/components/magicui/word-pull-up"
 import { ShineBorder } from "@/components/magicui/shine-border"
 import { MagicCard } from "@/components/ui/magic-card"
+import { OutlookBanner } from "@/components/outlook-banner"
 import type { HourlyForecastItem } from "@/components/today-hourly-forecast"
 import Link from "next/link"
 import type { WeatherImageData } from "@/components/weather-image-panel"
@@ -318,6 +319,9 @@ export default function Home() {
 
       <div className="container mx-auto px-4 relative z-20 pb-24 sm:pb-28">
         <TodayHourlyForecast items={hourlyForecast} />
+        {weatherData && (
+          <OutlookBanner weatherData={weatherData} language={language} />
+        )}
         <PicnicBriefing weatherData={weatherData} />
         {fireSummary?.overview?.showOnHome && (
           <div className="mt-6">
