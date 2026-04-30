@@ -270,12 +270,14 @@ function buildWeatherContext(snapshot: WeatherSnapshot, locale: BriefingLocale) 
 
 function buildBriefingPrompt(locale: BriefingLocale, context: string) {
   if (locale === "ko") {
-    return `아래 전주 날씨 컨텍스트를 3~5문장으로 친근하게 요약하세요.
+    return `아래 전주 날씨 컨텍스트를 4~6문장으로 친근하게 요약하세요.
 - 자연스럽고 따뜻한 톤
-- 점수와 위험 신호를 우선 언급
-- 특별한 위험(지진/태풍/호우 등)이 있으면 첫 문장에서 경고
+- 첫 문장은 점수와 위험 신호를 우선 언급 (예: "⚠️ 지진 경보가 발효 중이니 안전에 각별히 주의하세요! 오늘 전주는 날씨 점수 90점으로...")
+- 특별한 위험(지진/태풍/호우 등)이 있으면 위험 종류를 정확히 명시하고, 가능하면 어느 지역인지 언급 (예: "덕진동 쪽은 비 소식이 없지만 전북 동부 지역은 오후부터 비가 올 수 있어요")
+- 태풍이면 태풍명, 지진이면 규모/위치, 호우면 강수량 등 구체적 수치를 포함
 - 비가 오면 우산이나 실내 팁을 짧게
-- 먼지·미세먼지가 나쁘면 마스크 권고
+- 먼지·미세먼지가 나쁘면 마스크 권고와 함께 현재 수치(PM10/PM2.5)를 언급
+- 기온, 습도, 풍속 등 기본 날씨를 간략히 덧붙이기 (수치 포함)
 - 특별한 위험이 없으면 "오늘은 무난한 나들이 날씨"로 시작
 - 반드시 한국어로만 답변
 - 마크다운/JSON 없이 순수 텍스트만
@@ -285,12 +287,14 @@ ${context}`
   }
 
   if (locale === "zh") {
-    return `请用3~5句话亲切地总结以下全州天气信息。
+    return `请用4~6句话亲切地总结以下全州天气信息。
 - 自然温暖的语气
-- 优先提及评分和危险信号
-- 如有特殊危险（地震/台风/暴雨等），第一句就警告
+- 第一句优先提及评分和危险信号（例如："⚠️ 当前有地震警报，请注意安全！今天全州天气评分90分..."）
+- 如有特殊危险（地震/台风/暴雨等），准确说明危险类型，尽量提及影响区域（例如："德津洞无雨，但全北东部地区下午起可能有雨"）
+- 台风请说明台风名称，地震请说明震级/位置，暴雨请说明降水量等具体数值
 - 下雨时简短提及雨伞或室内建议
-- 尘埃/雾霾严重时建议戴口罩
+- 尘埃/雾霾严重时建议戴口罩并说明当前PM10/PM2.5数值
+- 简略补充气温、湿度、风速等基本天气数据（含数值）
 - 无特殊危险时以"今天是个不错的出行日子"开头
 - 请仅使用中文回答
 - 纯文本，不要用Markdown或JSON
@@ -300,12 +304,14 @@ ${context}`
   }
 
   if (locale === "ja") {
-    return `以下の全州の天気情報を3〜5文で親しみやすく要約してください。
+    return `以下の全州の天気情報を4〜6文で親しみやすく要約してください。
 - 自然で温かみのあるトーン
-- スコアと危険信号を最初に言及
-- 特別な危険（地震/台風/豪雨など）があれば最初の文で警告
+- 最初の文でスコアと危険信号を優先して言及（例：「⚠️ 地震警報が発令中ですので安全に十分注意してください！今日の全州は天気スコア90点で...」）
+- 特別な危険（地震/台風/豪雨など）があれば危険の種類を正確に明示し、可能であれば影響地域も言及（例：「徳津洞付近は雨の心配がありませんが、全北東部地域は午後から雨の可能性があります」）
+- 台風なら台風名、地震なら規模/位置、豪雨なら降水量など具体的な数値を含める
 - 雨の場合は傘や屋内のアドバイスを簡潔に
-- 粉塵・微細粉塵が悪い場合はマスクを推奨
+- 粉塵・微細粉塵が悪い場合はマスクを推奨し現在のPM10/PM2.5数値を言及
+- 気温、湿度、風速などの基本天気を簡潔に補足（数値を含む）
 - 特別な危険がなければ「今日は無難なお出かけ日和」で始める
 - 必ず日本語のみで回答
 - マークダウン/JSONなし、純粋なテキストのみ
@@ -314,12 +320,14 @@ ${context}`
 ${context}`
   }
 
-  return `Summarize the Jeonju weather context below in 3-5 friendly sentences.
+  return `Summarize the Jeonju weather context below in 4-6 friendly sentences.
 - Warm, natural tone
-- Mention score and hazards first
-- If there's a severe hazard (earthquake/typhoon/heavy rain), warn in the first sentence
+- First sentence: mention score and hazards with urgency (e.g., "⚠️ An earthquake alert is active — stay safe! Today's Jeonju score is 90...")
+- If there's a severe hazard (earthquake/typhoon/heavy rain), name the specific hazard type and, if available, the affected area (e.g., "Deokjin-dong should stay dry, but eastern Jeonbuk may see rain in the afternoon")
+- For typhoons name the typhoon, for earthquakes mention magnitude/location, for heavy rain mention rainfall amounts with specific numbers
 - If raining, briefly mention umbrella/indoor tips
-- If dust/PM is bad, recommend a mask
+- If dust/PM is bad, recommend a mask and mention current PM10/PM2.5 values
+- Briefly include temperature, humidity, wind speed with actual numbers
 - If no special hazard, start with "Today looks like a decent outing day"
 - Answer in English only
 - Plain text only, no markdown or JSON
