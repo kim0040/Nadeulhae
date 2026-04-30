@@ -447,7 +447,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     }
     fetchBriefing()
     return () => { cancelled = true }
-  }, [language, weatherData.score, weatherData.status, details.temp, details.humidity, details.wind, details.pm10, details.pm25, eventData?.isRain, eventData?.isWeatherWarning, eventData?.isEarthquake, eventData?.isTyphoon, eventData?.isTsunami, eventData?.isVolcano, metadata?.bulletin?.summary, metadata?.alertSummary?.warningTitle])
+  }, [language, weatherData.score, weatherData.status, details.temp, details.humidity, details.wind, details.pm10, details.pm25, details.rn1, metadata?.region, eventData?.isRain, eventData?.isWeatherWarning, eventData?.isEarthquake, eventData?.isTyphoon, eventData?.isTsunami, eventData?.isVolcano, metadata?.bulletin?.summary, metadata?.alertSummary?.warningTitle])
 
   const bulletinSummary = metadata?.bulletin?.summary || (
     __l("현재 공식 통보문에 특이사항이 없습니다.", "No notable official bulletin right now.")
