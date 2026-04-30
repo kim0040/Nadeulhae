@@ -1356,7 +1356,9 @@ export function LabAiChatPanel() {
   const markdownComponents = useMemo<Components>(() => ({
     pre({ children, node, ...props }) {
       void node
-      const childArray = Children.toArray(children)
+      const childArray = Children.toArray(children).filter(
+        (child) => !(typeof child === "string" && child.trim() === "")
+      )
       if (
         childArray.length === 1 &&
         isValidElement(childArray[0]) &&
