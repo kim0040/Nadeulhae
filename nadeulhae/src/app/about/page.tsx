@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import { 
   AlertTriangle,
   CloudSunIcon, 
@@ -104,12 +104,12 @@ export default function AboutPage() {
 
   const devSteps = ["01", "02", "03", "04", "05"]
 
-  const locale = (ko: string, en = ko, zh = en, ja = zh) => {
+  const locale = useCallback((ko: string, en = ko, zh = en, ja = zh) => {
     if (language === "ko") return ko
     if (language === "zh") return zh
     if (language === "ja") return ja
     return en
-  }
+  }, [language])
   
   const futureContent = useMemo(() => [
     {
@@ -564,7 +564,7 @@ export default function AboutPage() {
           <div className="mt-8 flex flex-wrap gap-3">
             <a href="/statistics/calendar" className="inline-flex items-center gap-2 rounded-full border border-card-border bg-[var(--interactive)] px-5 py-3 text-sm font-black text-foreground transition-colors hover:bg-[var(--interactive-border)]">
               <CalendarClock size={16} />
-              {language === "ko" ? "통계 달력 보기" : "Open Calendar"}
+              {locale("통계 달력 보기", "Open Calendar", "查看统计日历", "統計カレンダーを見る")}
             </a>
           </div>
         </div>
