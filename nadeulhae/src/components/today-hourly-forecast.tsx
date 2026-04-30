@@ -62,17 +62,17 @@ function getSlotLabel(item: HourlyForecastItem, index: number, startTime: string
   const diffMinutes = getMinutesFromStart(startTime, item.time)
   const isNextDay = item.date !== baseDate
 
-  if (index === 0) return language === "ko" ? "지금" : "Now"
-  if (isNextDay && hour < 12) return language === "ko" ? "내일 아침" : "Tomorrow AM"
-  if (isNextDay) return language === "ko" ? "내일" : "Tomorrow"
-  if (hour >= 21) return language === "ko" ? "늦은 밤" : "Late night"
-  if (hour >= 18) return language === "ko" ? "저녁" : "Evening"
-  if (hour >= 12) return language === "ko" ? "오후" : "Afternoon"
+  if (index === 0) return language === "ko" ? "지금" : language === "zh" ? "现在" : language === "ja" ? "今" : "Now"
+  if (isNextDay && hour < 12) return language === "ko" ? "내일 아침" : language === "zh" ? "明天早上" : language === "ja" ? "明日の朝" : "Tomorrow AM"
+  if (isNextDay) return language === "ko" ? "내일" : language === "zh" ? "明天" : language === "ja" ? "明日" : "Tomorrow"
+  if (hour >= 21) return language === "ko" ? "늦은 밤" : language === "zh" ? "深夜" : language === "ja" ? "深夜" : "Late night"
+  if (hour >= 18) return language === "ko" ? "저녁" : language === "zh" ? "傍晚" : language === "ja" ? "夕方" : "Evening"
+  if (hour >= 12) return language === "ko" ? "오후" : language === "zh" ? "下午" : language === "ja" ? "午後" : "Afternoon"
   if (diffMinutes >= 180) {
     const diffHour = Math.round(diffMinutes / 60)
-    return language === "ko" ? `${diffHour}시간 뒤` : `In ${diffHour}h`
+    return language === "ko" ? `${diffHour}시간 뒤` : language === "zh" ? `${diffHour}小时后` : language === "ja" ? `${diffHour}時間後` : `In ${diffHour}h`
   }
-  return language === "ko" ? "곧" : "Soon"
+  return language === "ko" ? "곧" : language === "zh" ? "即将" : language === "ja" ? "まもなく" : "Soon"
 }
 
 function WeatherIcon({ sky, night }: { sky: string; night: boolean }) {
@@ -89,6 +89,13 @@ function WeatherIcon({ sky, night }: { sky: string; night: boolean }) {
 
 export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
   const { language } = useLanguage()
+  const __l = (ko: string, en: string, zh?: string, ja?: string) => {
+    if (language === "ko") return ko
+    if (language === "zh") return zh || en || ko
+    if (language === "ja") return ja || en || ko
+    return en || ko
+  }
+
 
   if (!items.length) return null
 
@@ -103,7 +110,7 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <h3 className="text-[1.7rem] sm:text-[2.05rem] font-black tracking-tight text-foreground">
-                {language === "ko" ? "시간대별 날씨" : "Hourly Forecast"}
+                {__l("시간대별 날씨", "Hourly Forecast")}
               </h3>
             </div>
 
@@ -189,7 +196,7 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
 
                         <div className="mt-5 flex items-center justify-between gap-2">
                           <div className="text-sm sm:text-sm font-bold text-muted-foreground">
-                            {language === "ko" ? `강수 ${item.precipChance}%` : `Rain ${item.precipChance}%`}
+                            {language === "ko" ? `강수 ${item.precipChance}%` : language === "zh" ? `降雨 ${item.precipChance}%` : language === "ja" ? `降水 ${item.precipChance}%` : `Rain ${item.precipChance}%`}
                           </div>
                           <div className={cn(
                             "text-sm sm:text-sm font-black",

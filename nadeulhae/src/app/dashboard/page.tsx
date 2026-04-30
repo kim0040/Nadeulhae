@@ -285,7 +285,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
             </span>
             <div className="min-w-0">
               <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", bulletinHighlightTone.kicker)}>
-                {language === "ko" ? "핵심 공지" : "Key Notice"}
+                {language === "ko" ? "핵심 공지" : language === "zh" ? "重要公告" : language === "ja" ? "重要なお知らせ" : "Key Notice"}
               </p>
               <p className={cn("mt-1 text-sm font-semibold leading-6 sm:text-[15px]", bulletinHighlightTone.text)}>
                 {bulletinHighlight}

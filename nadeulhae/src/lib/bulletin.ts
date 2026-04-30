@@ -927,7 +927,7 @@ export function parseBulletinSummary(
       const match = item.match(/^\(([^)]+)\)\s*(.*)$/)
       if (!match) {
         return {
-          label: language === "ko" ? "안내" : "Note",
+          label: language === "ko" ? "안내" : language === "zh" ? "通知" : language === "ja" ? "案内" : "Note",
           text: translateBulletinText(item, language),
         }
       }
@@ -992,42 +992,56 @@ export function getBulletinTags(
       match: /건조|산불|화재/,
       ko: "건조·화재",
       en: "Dry / Fire",
+      zh: "干燥·火灾",
+      ja: "乾燥·火災",
       tone: "danger" as const,
     },
     {
       match: /호우|비|소나기/,
       ko: "강수",
       en: "Rain",
+      zh: "降雨",
+      ja: "降水",
       tone: "caution" as const,
     },
     {
       match: /대설|눈|결빙/,
       ko: "눈·결빙",
       en: "Snow / Ice",
+      zh: "降雪·结冰",
+      ja: "雪·凍結",
       tone: "caution" as const,
     },
     {
       match: /강풍|태풍/,
       ko: "강풍",
       en: "Strong Wind",
+      zh: "强风",
+      ja: "強風",
       tone: "danger" as const,
     },
     {
       match: /안개/,
       ko: "안개",
       en: "Fog",
+      zh: "雾",
+      ja: "霧",
       tone: "info" as const,
     },
     {
       match: /황사|미세먼지/,
       ko: "대기질",
       en: "Air Quality",
+      zh: "空气质量",
+      ja: "大気質",
       tone: "caution" as const,
     },
     {
       match: /기온차|폭염|한파/,
       ko: "기온 변화",
       en: "Temperature",
+      zh: "温度变化",
+      ja: "気温変化",
       tone: "caution" as const,
     },
   ]
@@ -1035,7 +1049,7 @@ export function getBulletinTags(
   return entries
     .filter((entry) => entry.match.test(text))
     .map((entry) => ({
-      label: language === "ko" ? entry.ko : entry.en,
+      label: language === "ko" ? entry.ko : language === "zh" ? entry.zh : language === "ja" ? entry.ja : entry.en,
       tone: entry.tone,
     }))
 }

@@ -14,15 +14,22 @@ interface PicnicCalendarProps {
 
 export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
   const { language, t } = useLanguage()
+  const __l = (ko: string, en: string, zh?: string, ja?: string) => {
+    if (language === "ko") return ko
+    if (language === "zh") return zh || en || ko
+    if (language === "ja") return ja || en || ko
+    return en || ko
+  }
+
   const [forecast, setForecast] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const locale = language === "ko" ? ko : enUS
-  const todayLabel = language === "ko" ? "오늘" : "Today"
-  const forecastTitle = language === "ko" ? "10일 예보" : "10-Day Forecast"
-  const rainChanceLabel = language === "ko" ? "강수확률" : "Rain Chance"
-  const rainAmountLabel = language === "ko" ? "예상 강수" : "Expected Rain"
-  const outdoorTipLabel = language === "ko" ? "야외 팁" : "Outdoor Tip"
-  const pointLabel = language === "ko" ? "점" : "Pts"
+  const todayLabel = __l("오늘", "Today")
+  const forecastTitle = __l("10일 예보", "10-Day Forecast")
+  const rainChanceLabel = __l("강수확률", "Rain Chance")
+  const rainAmountLabel = __l("예상 강수", "Expected Rain")
+  const outdoorTipLabel = __l("야외 팁", "Outdoor Tip")
+  const pointLabel = __l("점", "Pts")
 
   const translateWeatherText = (text?: string) => {
     if (!text) return "--"
@@ -121,7 +128,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
         <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6 py-6 relative z-10">
           <AnimatePresence>
             {isLoading ? (
-               <div className="w-full flex justify-center py-20 text-nature-green animate-pulse font-bold tracking-widest uppercase">{language === "ko" ? "예보 불러오는 중..." : "Loading Forecast..."}</div>
+               <div className="w-full flex justify-center py-20 text-nature-green animate-pulse font-bold tracking-widest uppercase">{__l("예보 불러오는 중...", "Loading Forecast...")}</div>
             ) : forecast?.daily?.map((dayForecast: any, i: number) => {
               const dayDate = new Date(dayForecast.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'))
               const isToday = isSameDay(dayDate, today)
@@ -261,7 +268,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                         {isRecommended && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-nature-green/25 bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-nature-green shadow-md dark:bg-card">
                             <Sparkles size={12} />
-                            {language === "ko" ? "추천" : "Best"}
+                            {__l("추천", "Best")}
                           </span>
                         )}
                       </div>
@@ -349,7 +356,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
       <div className="mt-8 flex justify-end items-center gap-2 px-4 opacity-50">
         <div className="size-2 rounded-full bg-nature-green animate-pulse" />
         <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-muted-foreground">
-          {language === "ko" ? "출처" : "Source"}: {language === "ko" ? (forecast?.metadata?.dataSource || "기상청") : "KMA"} ({language === "ko" ? "업데이트" : "Updated"}: {forecast?.metadata?.lastUpdate || "--:--"})
+          {__l("출처", "Source")}: {language === "ko" ? (forecast?.metadata?.dataSource || "기상청") : "KMA"} ({__l("업데이트", "Updated")}: {forecast?.metadata?.lastUpdate || "--:--"})
         </span>
       </div>
 

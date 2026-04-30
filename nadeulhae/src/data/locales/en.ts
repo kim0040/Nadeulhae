@@ -3,6 +3,7 @@ export const en = {
   nav_home: "Home",
   nav_jeonju: "Jeonju+",
   nav_about: "About",
+  nav_stats: "Stats Calendar",
   nav_calendar: "Calendar",
   nav_lab: "Lab",
   nav_login: "Login",

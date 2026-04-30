@@ -93,6 +93,13 @@ function ImageBlock({
 
 export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
   const { language } = useLanguage()
+  const __l = (ko: string, en: string, zh?: string, ja?: string) => {
+    if (language === "ko") return ko
+    if (language === "zh") return zh || en || ko
+    if (language === "ja") return ja || en || ko
+    return en || ko
+  }
+
   const labels = language === "ko"
     ? {
         title: "기상 이미지",
@@ -240,7 +247,7 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
             <p className="mt-2 text-sm sm:text-base font-medium text-muted-foreground">{labels.subtitle}</p>
           </div>
           <span className="text-[11px] font-black uppercase tracking-widest text-sky-blue">
-            {labels.source}: {language === "ko" ? "기상청" : "KMA"}
+            {labels.source}: {__l("기상청", "KMA")}
           </span>
         </div>
 

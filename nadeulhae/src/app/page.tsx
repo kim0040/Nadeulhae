@@ -293,7 +293,7 @@ export default function Home() {
               )}
               {hasBriefingAlert && (
                 <div className="mt-3 rounded-full border border-orange-500/20 bg-orange-500/8 px-3 py-1 text-[10px] sm:text-xs font-black tracking-wide text-orange-600 dark:text-orange-300">
-                  {language === "ko" ? "세부 경고는 아래 브리핑에서 확인" : "See briefing below for active alerts"}
+                  {language === "ko" ? "세부 경고는 아래 브리핑에서 확인" : language === "zh" ? "请查看下方简报中的详细警告" : language === "ja" ? "詳細な警告は下のブリーフィングでご確認ください" : "See briefing below for active alerts"}
                 </div>
               )}
             </div>
