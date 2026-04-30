@@ -19,8 +19,6 @@ Full-stack Next.js 16 web application. Real-time collaborative code editor, FSRS
 | [📙 docs/api_data_list.md](docs/api_data_list.md) | API data reference |
 | [📙 docs/updateplan.md](docs/updateplan.md) | Update plan |
 | [📙 docs/CODE_REVIEW_REPORT.md](docs/CODE_REVIEW_REPORT.md) | Code review report |
-| [📙 docs/나들해_UIUX_컴포넌트_설계서.md](docs/나들해_UIUX_컴포넌트_설계서.md) | UI/UX component design (Korean) |
-| [📙 docs/나들해_계획서.md](docs/나들해_계획서.md) | Project plan (Korean) |
 
 ---
 
