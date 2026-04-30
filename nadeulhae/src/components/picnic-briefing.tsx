@@ -557,7 +557,9 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                 <div className="flex items-center gap-2">
                   {integratedGuide.icon}
                   <span className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
-                    {__l("오늘의 종합 안내", "Today's guidance")}
+                    {aiBriefingText
+                      ? __l("나들AI 종합 안내", "NadeulAI Briefing", "NadeulAI 综合指南", "NadeulAI 総合案内")
+                      : __l("오늘의 종합 안내", "Today's guidance")}
                   </span>
                 </div>
                 <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-keep break-words">
