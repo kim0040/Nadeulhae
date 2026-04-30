@@ -65,7 +65,7 @@ export function OutlookBanner({ weatherData, language }: Props) {
         </div>
         {loading ? (
           <p className="text-sm text-muted-foreground animate-pulse">
-            {language === "ko" ? "AI가 날씨를 분석하고 있습니다..." : "AI is analyzing the weather..."}
+            {language === "ko" ? "AI가 날씨를 분석하고 있습니다..." : language === "zh" ? "AI正在分析天气..." : language === "ja" ? "AIが天気を分析中..." : "AI is analyzing the weather..."}
           </p>
         ) : (
           <p className="text-sm sm:text-base font-medium leading-relaxed text-foreground/85">

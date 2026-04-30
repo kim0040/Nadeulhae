@@ -219,6 +219,8 @@ export interface FireSummaryData {
     showOnHome: boolean;
     shortMessageKo: string;
     shortMessageEn: string;
+    shortMessageZh: string;
+    shortMessageJa: string;
   };
   dailyTrend: Array<{
     date: string;

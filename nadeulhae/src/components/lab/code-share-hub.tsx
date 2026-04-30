@@ -169,7 +169,7 @@ export function CodeShareHub() {
         },
         credentials: "include",
         body: JSON.stringify({
-          title: language === "ko" ? "새 코드공유 세션" : "New code-share session",
+          title: language === "ko" ? "새 코드공유 세션" : language === "zh" ? "新建代码共享会话" : language === "ja" ? "新しいコード共有セッション" : "New code-share session",
           language: "typescript",
           code: "",
         }),

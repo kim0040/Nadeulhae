@@ -103,103 +103,152 @@ export default function AboutPage() {
   const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
   const devSteps = ["01", "02", "03", "04", "05"]
+
+  const locale = (ko: string, en = ko, zh = en, ja = zh) => {
+    if (language === "ko") return ko
+    if (language === "zh") return zh
+    if (language === "ja") return ja
+    return en
+  }
   
-  const futureContent = [
+  const futureContent = useMemo(() => [
     {
       icon: Database,
-      title: language === "ko" ? "과거 날씨 통계 DB" : "Historical weather DB",
-      desc: language === "ko"
-        ? "수년치 전주 기상 데이터, 평균값, 월별/요일별 통계를 적재해 과거 아카이브와 인사이트를 엽니다."
-        : "Stores Jeonju's multi-year weather history, averages, and weekday/monthly stats for archive and insight views.",
+      title: locale("과거 날씨 통계 DB", "Historical weather DB", "历史天气统计数据库", "過去の天気統計DB"),
+      desc: locale(
+        "수년치 전주 기상 데이터, 평균값, 월별/요일별 통계를 적재해 과거 아카이브와 인사이트를 엽니다.",
+        "Stores Jeonju's multi-year weather history, averages, and weekday/monthly stats for archive and insight views.",
+        "存储全州多年气象数据、平均值及按月份/星期的统计信息，用于历史存档和洞察分析。",
+        "全州の長年の気象データ、平均値、月別・曜日別統計を蓄積し、過去のアーカイブとインサイトを提供します。"
+      ),
     },
     {
       icon: MapIcon,
-      title: language === "ko" ? "전주 장소 DB" : "Jeonju place DB",
-      desc: language === "ko"
-        ? "음식점, 카페, 야외 스팟을 실내/야외 유형과 위치 태그까지 가공해 반나절 코스 추천에 연결합니다."
-        : "Builds restaurants, cafes, and outdoor spots with indoor/outdoor types and location tags for routing.",
+      title: locale("전주 장소 DB", "Jeonju place DB", "全州地点数据库", "全州スポットDB"),
+      desc: locale(
+        "음식점, 카페, 야외 스팟을 실내/야외 유형과 위치 태그까지 가공해 반나절 코스 추천에 연결합니다.",
+        "Builds restaurants, cafes, and outdoor spots with indoor/outdoor types and location tags for routing.",
+        "将餐厅、咖啡馆、户外地点按室内/室外类型和位置标签进行整理，用于半日路线推荐。",
+        "飲食店、カフェ、屋外スポットを屋内/屋外タイプと位置タグ付きで整理し、半日コースの提案に活用します。"
+      ),
     },
     {
       icon: Route,
-      title: language === "ko" ? "AI 반나절 코스" : "AI half-day course",
-      desc: language === "ko"
-        ? "시간대별 날씨 흐름과 장소 DB를 묶어 야외에서 실내로 이어지는 전주 맞춤 동선을 생성합니다."
-        : "Combines time-based weather flow and the place DB to generate Jeonju-specific half-day routes.",
+      title: locale("AI 반나절 코스", "AI half-day course", "AI 半日路线", "AI半日コース"),
+      desc: locale(
+        "시간대별 날씨 흐름과 장소 DB를 묶어 야외에서 실내로 이어지는 전주 맞춤 동선을 생성합니다.",
+        "Combines time-based weather flow and the place DB to generate Jeonju-specific half-day routes.",
+        "结合各时段天气变化和地点数据库，生成从户外到室内的全州专属半日路线。",
+        "時間帯ごとの天気の流れとスポットDBを組み合わせ、屋外から屋内へつながる全州カスタマイズの動線を生成します。"
+      ),
     },
-  ]
+  ], [locale])
 
-  const stepContent = [
+  const stepContent = useMemo(() => [
     {
-      title: language === "ko" ? "기획 구체화 및 DB 설계" : "Planning and DB design",
-      desc: language === "ko"
-        ? "날씨 테이블, 장소 테이블, API 키 점검, 전주 스팟 초기 데이터 정리를 먼저 합니다."
-        : "Start with weather tables, place tables, API key checks, and seed data for Jeonju spots.",
+      title: locale("기획 구체화 및 DB 설계", "Planning and DB design", "规划细化与数据库设计", "企画具体化とDB設計"),
+      desc: locale(
+        "날씨 테이블, 장소 테이블, API 키 점검, 전주 스팟 초기 데이터 정리를 먼저 합니다.",
+        "Start with weather tables, place tables, API key checks, and seed data for Jeonju spots.",
+        "首先进行天气表、地点表的设计、API密钥检查以及全州地点初始数据整理。",
+        "天気テーブル、場所テーブル、APIキーの確認、全州スポットの初期データ整理から始めます。"
+      ),
     },
     {
-      title: language === "ko" ? "데이터 수집 파이프라인" : "Data collection pipeline",
-      desc: language === "ko"
-        ? "배치와 스케줄러로 기상 데이터와 실시간 예보를 DB와 캐시에 채웁니다."
-        : "Use batch jobs and schedulers to populate the DB and cache with historical and live weather.",
+      title: locale("데이터 수집 파이프라인", "Data collection pipeline", "数据采集管道", "データ収集パイプライン"),
+      desc: locale(
+        "배치와 스케줄러로 기상 데이터와 실시간 예보를 DB와 캐시에 채웁니다.",
+        "Use batch jobs and schedulers to populate the DB and cache with historical and live weather.",
+        "使用批处理和调度器将气象数据和实时预报填充到数据库和缓存中。",
+        "バッチとスケジューラーで気象データとリアルタイム予報をDBとキャッシュに格納します。"
+      ),
     },
     {
-      title: language === "ko" ? "기본 API 및 화면 연동" : "Base API and UI integration",
-      desc: language === "ko"
-        ? "피크닉 점수와 통계 데이터를 API로 내려주고 UI와 연결합니다."
-        : "Expose picnic score and statistics APIs, then connect them to the UI.",
+      title: locale("기본 API 및 화면 연동", "Base API and UI integration", "基本API与界面联动", "基本APIと画面連携"),
+      desc: locale(
+        "피크닉 점수와 통계 데이터를 API로 내려주고 UI와 연결합니다.",
+        "Expose picnic score and statistics APIs, then connect them to the UI.",
+        "通过API提供野餐评分和统计数据，并与UI界面连接。",
+        "ピクニックスコアと統計データをAPIで提供し、UIと連携します。"
+      ),
     },
     {
-      title: language === "ko" ? "시간대별 날씨-장소 매칭" : "Time-based weather-place matching",
-      desc: language === "ko"
-        ? "비가 오기 전 야외, 바람이 강해진 뒤 실내처럼 룰 기반 1차 매칭을 수행합니다."
-        : "Do first-pass rule matching such as outdoors before rain, indoors after strong winds.",
+      title: locale("시간대별 날씨-장소 매칭", "Time-based weather-place matching", "按时段的天气-地点匹配", "時間帯別の天気-場所マッチング"),
+      desc: locale(
+        "비가 오기 전 야외, 바람이 강해진 뒤 실내처럼 룰 기반 1차 매칭을 수행합니다.",
+        "Do first-pass rule matching such as outdoors before rain, indoors after strong winds.",
+        "执行基于规则的一级匹配，例如下雨前推荐户外、强风后推荐室内。",
+        "雨が降る前は屋外、風が強まった後は屋内といったルールベースの一次マッチングを行います。"
+      ),
     },
     {
-      title: language === "ko" ? "RAG 기반 LLM 고도화" : "RAG-based LLM layer",
-      desc: language === "ko"
-        ? "정리된 날씨/장소 데이터를 바탕으로 자연스러운 전주 반나절 코스 문장을 생성합니다."
-        : "Generate natural Jeonju half-day course text from structured weather and place data.",
+      title: locale("RAG 기반 LLM 고도화", "RAG-based LLM layer", "基于RAG的LLM增强层", "RAGベースLLM高度化"),
+      desc: locale(
+        "정리된 날씨/장소 데이터를 바탕으로 자연스러운 전주 반나절 코스 문장을 생성합니다.",
+        "Generate natural Jeonju half-day course text from structured weather and place data.",
+        "基于整理好的天气/地点数据，生成自然的全州半日路线文本。",
+        "整理された天気/場所データをもとに、自然な全州半日コースの文章を生成します。"
+      ),
     },
-  ]
+  ], [locale])
 
-  const texts = {
-    futureTitle: language === "ko" ? "추후 열릴 전주 전용 기능" : "Jeonju features opening later",
-    futureDesc: language === "ko"
-      ? "전주만의 깊이 있는 경험을 위해, 서버 시스템과 데이터베이스 구축 단계에 맞춰 다음 기능들을 순차적으로 선보일 예정입니다."
-      : "To provide a deeper Jeonju experience, we will sequentially roll out the following features as we complete our server-side and database architecture.",
-    pipelineTitle: language === "ko" ? "개발 순서와 데이터 흐름" : "Development sequence and data flow",
-    pipelineDesc: language === "ko"
-      ? "나들해의 진화는 단순히 화면을 늘리는 것이 아닙니다. 데이터 수집부터 체계적인 저장, 서버 처리, 그리고 AI 생성에 이르는 철저한 데이터 파이프라인을 구축해 나갑니다."
-      : "Nadeulhae's evolution is more than just UI. We are building a robust data pipeline that encompasses everything from collection and structured storage to server-side processing and AI generation.",
-    openLater: language === "ko" ? "추후 오픈" : "Opens Later",
-    liveTitle: language === "ko" ? "지금 가능한 전주 기능" : "What is already live for Jeonju",
-    liveDesc: language === "ko"
-      ? "현재는 전주 기준 실시간 점수, 브리핑, 예보 캘린더까지 동작합니다."
-      : "Right now, Jeonju already has a live score, briefing, and forecast calendar.",
-  }
+  const texts = useMemo(() => ({
+    futureTitle: locale("추후 열릴 전주 전용 기능", "Jeonju features opening later", "即将推出的全州专属功能", "今後オープン予定の全州専用機能"),
+    futureDesc: locale(
+      "전주만의 깊이 있는 경험을 위해, 서버 시스템과 데이터베이스 구축 단계에 맞춰 다음 기능들을 순차적으로 선보일 예정입니다.",
+      "To provide a deeper Jeonju experience, we will sequentially roll out the following features as we complete our server-side and database architecture.",
+      "为了提供更深层次的全州体验，我们将在服务器系统和数据库建设阶段依次推出以下功能。",
+      "全州ならではの深い体験のために、サーバーシステムとデータベース構築の段階に合わせて、以下の機能を順次公開予定です。"
+    ),
+    pipelineTitle: locale("개발 순서와 데이터 흐름", "Development sequence and data flow", "开发顺序与数据流", "開発手順とデータフロー"),
+    pipelineDesc: locale(
+      "나들해의 진화는 단순히 화면을 늘리는 것이 아닙니다. 데이터 수집부터 체계적인 저장, 서버 처리, 그리고 AI 생성에 이르는 철저한 데이터 파이프라인을 구축해 나갑니다.",
+      "Nadeulhae's evolution is more than just UI. We are building a robust data pipeline that encompasses everything from collection and structured storage to server-side processing and AI generation.",
+      "나들해的进化不仅仅是增加页面。我们正在构建一条从数据采集、结构化存储、服务器处理到AI生成的完整数据管道。",
+      "나들해의進化は単に画面を増やすことではありません。データ収集から体系的な保存、サーバー処理、AI生成に至る徹底したデータパイプラインを構築しています。"
+    ),
+    openLater: locale("추후 오픈", "Opens Later", "即将开放", "今後オープン"),
+    liveTitle: locale("지금 가능한 전주 기능", "What is already live for Jeonju", "当前可用的全州功能", "現在利用可能な全州機能"),
+    liveDesc: locale(
+      "현재는 전주 기준 실시간 점수, 브리핑, 예보 캘린더까지 동작합니다.",
+      "Right now, Jeonju already has a live score, briefing, and forecast calendar.",
+      "目前，全州已支持实时评分、简报和预报日历功能。",
+      "現在は全州基準のリアルタイムスコア、ブリーフィング、予報カレンダーまで動作しています。"
+    ),
+  }), [locale])
 
-  const liveContent = [
+  const liveContent = useMemo(() => [
     {
       icon: SparklesIcon,
-      title: language === "ko" ? "실시간 전주 점수" : "Live Jeonju score",
-      desc: language === "ko"
-        ? "기상청·에어코리아·기상통보문 데이터를 모아 전주 기준 피크닉 점수를 계산합니다."
-        : "Combines KMA, AirKorea, and weather bulletin data to compute Jeonju's picnic score.",
+      title: locale("실시간 전주 점수", "Live Jeonju score", "实时全州评分", "リアルタイム全州スコア"),
+      desc: locale(
+        "기상청·에어코리아·기상통보문 데이터를 모아 전주 기준 피크닉 점수를 계산합니다.",
+        "Combines KMA, AirKorea, and weather bulletin data to compute Jeonju's picnic score.",
+        "综合气象厅、AirKorea和气象通报数据，计算全州野餐评分。",
+        "気象庁・AirKorea・気象通報文のデータを集めて全州基準のピクニックスコアを計算します。"
+      ),
     },
     {
       icon: Route,
-      title: language === "ko" ? "전주 고정 브리핑·캘린더" : "Jeonju-fixed briefing and calendar",
-      desc: language === "ko"
-        ? "나들이 브리핑과 10일 예보 캘린더를 모두 위치 추적 없이 전주 기준으로만 보여줍니다."
-        : "Shows both the outing briefing and the 10-day forecast calendar strictly in Jeonju mode, without geolocation.",
+      title: locale("전주 고정 브리핑·캘린더", "Jeonju-fixed briefing and calendar", "全州固定简报与日历", "全州固定ブリーフィング・カレンダー"),
+      desc: locale(
+        "나들이 브리핑과 10일 예보 캘린더를 모두 위치 추적 없이 전주 기준으로만 보여줍니다.",
+        "Shows both the outing briefing and the 10-day forecast calendar strictly in Jeonju mode, without geolocation.",
+        "无需位置追踪，仅以全州为基准显示出行简报和10天预报日历。",
+        "お出かけブリーフィングと10日間予報カレンダーを、位置追跡なしで常に全州基準でのみ表示します。"
+      ),
     },
     {
       icon: ShieldCheck,
-      title: language === "ko" ? "로컬 fallback 경험" : "Local fallback experience",
-      desc: language === "ko"
-        ? "위치 권한이 없거나 대기 응답이 비정상이면 전주 홈 기준 화면으로 안전하게 대체합니다."
-        : "If location is unavailable or air data is unstable, the service safely falls back to Jeonju home mode.",
+      title: locale("로컬 fallback 경험", "Local fallback experience", "本地回退体验", "ローカルフォールバック体験"),
+      desc: locale(
+        "위치 권한이 없거나 대기 응답이 비정상이면 전주 홈 기준 화면으로 안전하게 대체합니다.",
+        "If location is unavailable or air data is unstable, the service safely falls back to Jeonju home mode.",
+        "当缺少位置权限或空气质量数据异常时，安全地回退到全州首页模式。",
+        "位置権限がないか大気データが異常な場合、全州ホーム基準の画面に安全に代替します。"
+      ),
     },
-  ]
+  ], [locale])
 
   return (
     <main className="min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">

@@ -58,6 +58,8 @@ type FireSummaryResponse = {
     showOnHome: boolean
     shortMessageKo: string
     shortMessageEn: string
+    shortMessageZh: string
+    shortMessageJa: string
   }
   dailyTrend: Array<{
     date: string
@@ -217,6 +219,8 @@ function createFireNotice(
     return {
       ko: `최근 ${fireSidoName} 화재 접수가 평소보다 많은 편입니다. 바깥 일정 전 한 번 더 살펴두면 좋겠습니다.`,
       en: `Recent fire reports in ${fireSidoName} are running above the usual baseline. It is worth checking before heading outside.`,
+      zh: `最近${fireSidoName}的火灾接报比平常偏多。外出前请多加留意。`,
+      ja: `最近${fireSidoName}での火災受付が通常より多い傾向です。外出前にご確認ください。`,
     }
   }
 
@@ -224,12 +228,16 @@ function createFireNotice(
     return {
       ko: `최근 ${fireSidoName}에서는 '${topPlace}' 쪽 화재가 눈에 띕니다. 야외 일정 전 가볍게 참고해 두면 좋겠습니다.`,
       en: `Recent fire activity in ${fireSidoName} stands out around '${topPlace}'-type locations. It is a useful extra check before outdoor plans.`,
+      zh: `最近${fireSidoName}的'${topPlace}'附近火灾较为突出。户外出行前建议留意。`,
+      ja: `最近${fireSidoName}では「${topPlace}」付近の火災が目立ちます。屋外の予定前に軽くご確認ください。`,
     }
   }
 
   return {
     ko: `최근 ${fireSidoName} 화재 흐름은 비교적 차분한 편입니다. 지역 안전 흐름을 가볍게 참고해 주세요.`,
     en: `Recent fire activity in ${fireSidoName} looks relatively calm. Use it as a light regional safety reference.`,
+    zh: `最近${fireSidoName}的火灾趋势相对平稳。建议作为区域安全参考留意。`,
+    ja: `最近${fireSidoName}の火災の流れは比較的穏やかです。地域の安全情報として軽くご参考ください。`,
   }
 }
 
@@ -365,6 +373,8 @@ async function handleGET(request: Request) {
       showOnHome: cautionLevel !== "low",
       shortMessageKo: notice.ko,
       shortMessageEn: notice.en,
+      shortMessageZh: notice.zh,
+      shortMessageJa: notice.ja,
     },
     dailyTrend: dailyTrend.map((day) => ({
       date: day.date,
