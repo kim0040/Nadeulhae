@@ -316,10 +316,10 @@ export default function AboutPage() {
                 <div className="inline-flex rounded-2xl border border-sky-blue/20 bg-sky-blue/10 p-4 text-sky-blue">
                   <card.icon size={24} />
                 </div>
-                <h3 className="mt-6 text-2xl font-black tracking-tight text-foreground break-keep">
+                <h3 className="mt-6 text-2xl font-black tracking-tight text-foreground break-keep break-all">
                   {t(card.titleKey)}
                 </h3>
-                <p className="mt-4 text-sm sm:text-base font-semibold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
+                <p className="mt-4 text-sm sm:text-base font-semibold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep break-all">
                   {t(card.descKey)}
                 </p>
               </div>
@@ -380,10 +380,10 @@ export default function AboutPage() {
                 <div className="mb-6 inline-flex rounded-2xl border border-sky-blue/20 bg-sky-blue/10 p-4 text-sky-blue">
                   <card.icon size={26} />
                 </div>
-                <h3 className="text-2xl font-black text-foreground tracking-tight mb-4 break-keep">
+                <h3 className="text-2xl font-black text-foreground tracking-tight mb-4 break-keep break-all">
                   {t(card.titleKey)}
                 </h3>
-                <p className="text-sm sm:text-base font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep">
+                <p className="text-sm sm:text-base font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep break-all">
                   {t(card.descKey)}
                 </p>
               </div>
@@ -425,10 +425,10 @@ export default function AboutPage() {
                   <item.icon size={20} />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-lg sm:text-xl font-black text-foreground break-words">
+                  <h3 className="text-lg sm:text-xl font-black text-foreground break-all">
                     {t(`${item.tag}_t`)}
                   </h3>
-                  <p className="mt-2 text-sm sm:text-[15px] leading-relaxed font-semibold text-neutral-800 dark:text-neutral-400 break-words">
+                  <p className="mt-2 text-sm sm:text-[15px] leading-relaxed font-semibold text-neutral-800 dark:text-neutral-400 break-all">
                     {t(`${item.tag}_d`)}
                   </p>
                 </div>
@@ -453,8 +453,8 @@ export default function AboutPage() {
               <div className="inline-flex rounded-2xl border border-sky-blue/20 bg-sky-blue/10 p-4 text-sky-blue">
                 <item.icon size={24} />
               </div>
-              <h3 className="mt-6 text-2xl font-black tracking-tight text-foreground break-keep">{item.title}</h3>
-              <p className="mt-4 text-sm sm:text-base font-bold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep">
+              <h3 className="mt-6 text-2xl font-black tracking-tight text-foreground break-keep break-all">{item.title}</h3>
+              <p className="mt-4 text-sm sm:text-base font-bold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep break-all">
                 {item.desc}
               </p>
             </div>
@@ -481,9 +481,9 @@ export default function AboutPage() {
                 <span className="inline-flex rounded-full border border-active-blue/20 bg-active-blue/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-active-blue">
                   {texts.openLater}
                 </span>
-                <h3 className="mt-4 text-2xl font-black tracking-tight text-foreground break-keep">{item.title}</h3>
+                <h3 className="mt-4 text-2xl font-black tracking-tight text-foreground break-keep break-all">{item.title}</h3>
               </div>
-              <p className="mt-4 text-sm sm:text-base font-bold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep">
+              <p className="mt-4 text-sm sm:text-base font-bold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep break-all">
                 {item.desc}
               </p>
             </div>
@@ -505,8 +505,8 @@ export default function AboutPage() {
             {stepContent.map((step, index) => (
               <div key={step.title} className="rounded-[2rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5 min-w-0">
                 <div className="text-sm font-black uppercase tracking-[0.24em] text-sky-blue">{devSteps[index]}</div>
-                <h3 className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground break-keep">{step.title}</h3>
-                <p className="mt-3 text-base font-bold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep">
+                <h3 className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground break-keep break-all">{step.title}</h3>
+                <p className="mt-3 text-base font-bold leading-relaxed text-neutral-900 dark:text-neutral-300 break-keep break-all">
                   {step.desc}
                 </p>
               </div>
