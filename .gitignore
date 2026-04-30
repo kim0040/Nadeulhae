@@ -33,11 +33,7 @@ brain/
 temp/
 /tmp/
 
-# Planning & Documentation
-api_data_list.md
-나들해 계획서.md
-나들해 UIUX 및 컴포넌트 설계서.md
-updateplan.md
+# Planning & Documentation (see docs/ folder)
 
 # TypeScript
 *.tsbuildinfo

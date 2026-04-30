@@ -1,6 +1,6 @@
 # Nadeulhae (나들해) — README
 
-> 🌐 [English](README.en.md) · [中文](README.zh.md) · [日本語](README.ja.md)
+> 🌐 [한국어](../README.md) · [English](README_EN.md) · [中文](README_ZH.md) · [日本語](README_JA.md)
 
 **Weather intelligence + AI dashboard chat + Lab (vocab/code-share) + Jeonju local briefing**
 
