@@ -376,7 +376,7 @@ export default function TermsPage() {
                   <a
                     key={section.id}
                     href={`#${section.id}`}
-                    className="rounded-full border border-card-border/70 bg-background/70 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
+                    className="rounded-full border border-card-border max-w-[180px] truncate/70 bg-background/70 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
                   >
                     {section.title}
                   </a>
@@ -436,7 +436,7 @@ export default function TermsPage() {
                     {section.items.map((item, index) => (
                       <li
                         key={item}
-                        className="flex gap-3 rounded-[1.25rem] border border-card-border/70 bg-background/70 px-4 py-3.5 text-sm leading-6 text-foreground"
+                        className="flex gap-3 rounded break-words-[1.25rem] border border-card-border/70 bg-background/70 px-4 py-3.5 text-sm leading-6 text-foreground"
                       >
                         <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-blue/10 text-[11px] font-black text-sky-blue">
                           {index + 1}
