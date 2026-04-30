@@ -1052,8 +1052,8 @@ graph LR
     SECURITY_LIB --> DB_LIB
     LLM_QUOTA --> DB_LIB
 
-    SERVICES -->|fetch()| PAGES
-    CONTEXT -->|fetch()| PAGES
+    SERVICES -->|fetch| PAGES
+    CONTEXT -->|fetch| PAGES
 ```
 
 ---
