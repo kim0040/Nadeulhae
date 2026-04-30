@@ -81,6 +81,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     return {
       text: language === "ko"
         ? `현재 지수는 대기질 ${breakdown.air}점, 기온 ${breakdown.temperature}점, 하늘 ${breakdown.sky}점, 바람 ${breakdown.wind}점을 합산한 총 ${breakdown.total}점입니다.`
+        : language === "zh"
+        ? `当前评分：空气质量${breakdown.air}分 + 温度${breakdown.temperature}分 + 天空${breakdown.sky}分 + 风力${breakdown.wind}分，总分${breakdown.total}分。`
+        : language === "ja"
+        ? `現在のスコア：大気質${breakdown.air}点 + 気温${breakdown.temperature}点 + 空${breakdown.sky}点 + 風${breakdown.wind}点、合計${breakdown.total}点です。`
         : `Today's score is ${breakdown.total}, built from air ${breakdown.air}, temperature ${breakdown.temperature}, sky ${breakdown.sky}, and wind ${breakdown.wind}.`,
       type: "neutral" as const,
       icon: <ShieldCheck size={18} />,
@@ -301,6 +305,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
         points.push({
           text: language === "ko"
             ? `${regionLabel}의 미세먼지 농도는 ${pm10}µg/m³로 매우 낮아 공기가 맑고 깨끗합니다.`
+            : language === "zh"
+            ? `${regionLabel}的PM10浓度为${pm10}µg/m³，非常低，空气清新洁净。`
+            : language === "ja"
+            ? `${regionLabel}のPM10濃度は${pm10}µg/m³で非常に低く、空気がきれいで澄んでいます。`
             : `PM10 in ${regionLabel} is ${pm10}µg/m³, so the air is exceptionally clean right now.`,
           type: "success",
           icon: <Sparkles size={18} />,
@@ -309,6 +317,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
         points.push({
           text: language === "ko"
             ? `${regionLabel}의 미세먼지 농도는 ${pm10}µg/m³로 보통 수준입니다. 민감하다면 대기 상태를 한 번 더 확인하세요.`
+            : language === "zh"
+            ? `${regionLabel}的PM10浓度为${pm10}µg/m³，属于一般水平。敏感人群请再确认一下空气状态。`
+            : language === "ja"
+            ? `${regionLabel}のPM10濃度は${pm10}µg/m³で普通レベルです。敏感な方は大気の状態をもう一度ご確認ください。`
             : `PM10 in ${regionLabel} is ${pm10}µg/m³, which is moderate. Sensitive visitors should double-check the air conditions.`,
           type: "info",
           icon: <Info size={18} />,
@@ -317,6 +329,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
         points.push({
           text: language === "ko"
             ? `${regionLabel}의 미세먼지 농도는 ${pm10}µg/m³로 높습니다. 실외 체류 시간을 줄이고 마스크 착용을 권장합니다.`
+            : language === "zh"
+            ? `${regionLabel}的PM10浓度为${pm10}µg/m³，偏高。建议减少户外停留时间并佩戴口罩。`
+            : language === "ja"
+            ? `${regionLabel}のPM10濃度は${pm10}µg/m³で高いです。屋外の滞在時間を短くし、マスクの着用をおすすめします。`
             : `PM10 in ${regionLabel} is ${pm10}µg/m³, which is high. Shorter outdoor stays and a mask are recommended.`,
           type: "warning",
           icon: <AlertCircle size={18} />,
@@ -328,6 +344,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       points.push({
         text: language === "ko"
           ? `${regionLabel}의 초미세먼지 농도는 ${details.pm25}µg/m³로 높습니다. 짧은 외출이나 마스크 착용을 권장합니다.`
+          : language === "zh"
+          ? `${regionLabel}的PM2.5浓度为${details.pm25}µg/m³，偏高。建议短时外出并佩戴口罩。`
+          : language === "ja"
+          ? `${regionLabel}のPM2.5濃度は${details.pm25}µg/m³で高いです。短い外出やマスクの着用をおすすめします。`
           : `PM2.5 in ${regionLabel} is ${details.pm25}µg/m³, which is high. Shorter outdoor stays or a mask are recommended.`,
         type: "warning",
         icon: <AlertCircle size={18} />,
@@ -489,6 +509,10 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
       label: __l("지역 기준", "Region"),
       title: language === "ko"
         ? `${metadata?.region || "현재 지역"} · ${metadata?.station || t("station_dukjin")}`
+        : language === "zh"
+        ? `${metadata?.region || "当前地区"} · ${metadata?.station || t("station_dukjin")}`
+        : language === "ja"
+        ? `${metadata?.region || "現在地"} · ${metadata?.station || t("station_dukjin")}`
         : `${metadata?.regionEn || metadata?.region || "Current Area"} · ${metadata?.station || t("station_dukjin")}`,
       detail: isFallback
         ? (__l("전주 홈 기준으로 안전 대체 중", "Safely falling back to Jeonju home mode"))
