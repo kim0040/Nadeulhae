@@ -30,7 +30,7 @@
  * @route POST /api/weather/briefing?locale=ko
  */
 import { NextRequest, NextResponse } from "next/server"
-import { createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
+import { createGeneralChatCompletion } from "@/lib/llm/general-llm"
 import {
   reserveUserActionDailyRequest,
   recordGlobalLlmRequestOutcome,
@@ -393,7 +393,7 @@ async function handlePOST(request: NextRequest) {
   }
 
   try {
-    const result = await createNanoGptChatCompletion({
+    const result = await createGeneralChatCompletion({
       requestKind: "chat",
       messages: [
         { role: "system", content: systemPrompt },

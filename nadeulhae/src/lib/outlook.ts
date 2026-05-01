@@ -8,7 +8,7 @@
  * Rate limiting: max 30 LLM calls per language per day.
  */
 
-import { createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
+import { createGeneralChatCompletion } from "@/lib/llm/general-llm"
 
 const DAILY_LIMIT_PER_LOCALE = 30
 const _dailyCounts: Record<string, number> = {}
@@ -152,7 +152,7 @@ export async function generateOutlook(
 
   try {
     recordCall(locale)
-    const completion = await createNanoGptChatCompletion({
+    const completion = await createGeneralChatCompletion({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

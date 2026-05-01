@@ -94,18 +94,4 @@ export interface LabAiChatStateResponse extends LabAiChatStateCore {
   defaultModelId: string
 }
 
-export interface NanoGptUsage {
-  promptTokens: number
-  completionTokens: number
-  totalTokens: number
-  cachedPromptTokens: number
-}
-
-export interface NanoGptCompletionResult {
-  providerRequestId: string | null
-  requestedModel: string | null
-  resolvedModel: string | null
-  content: string
-  finishReason: string | null
-  usage: NanoGptUsage
-}
+export { type LlmUsage as NanoGptUsage, type LlmCompletionResult as NanoGptCompletionResult } from "@/lib/llm/types"

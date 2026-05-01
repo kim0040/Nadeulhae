@@ -45,7 +45,7 @@
 | **代码编辑器** | CodeMirror 6 (`@uiw/react-codemirror`) |
 | **实时通信** | WebSocket (`ws` v8) |
 | **数据库** | TiDB / MySQL 8 (`mysql2/promise`) |
-| **AI / LLM** | NanoGPT (主要), FactChat / SAIT 3 Pro (备用) |
+| **AI / LLM** | OpenAI 兼容 API（通用 + 实验室双配置） |
 | **网络搜索** | Tavily API |
 | **坐标转换** | proj4 (WGS84 ↔ TM) |
 | **认证与安全** | scrypt (N=16384) + 密钥加密, AES-256-GCM 字段级加密 |

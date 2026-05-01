@@ -4,7 +4,7 @@ import {
   type TavilyTimeRange,
   type TavilyTopic,
 } from "@/lib/tavily/client"
-import { createNanoGptChatCompletion } from "@/lib/chat/nanogpt"
+import { createGeneralChatCompletion } from "@/lib/llm/general-llm"
 import { saveJeonjuBriefing, getJeonjuBriefingByDateAndLocale, type JeonjuBriefingData } from "./repository"
 
 export type JeonjuBriefingLocale = "ko" | "en" | "zh" | "ja"
@@ -891,7 +891,7 @@ export async function fetchAndSummarize(
     totalTokens: 0,
   }
   try {
-    const completion = await createNanoGptChatCompletion({
+    const completion = await createGeneralChatCompletion({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: searchContext },
@@ -1013,7 +1013,7 @@ Return ONLY valid JSON with these fields:
   let tokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
 
   try {
-    const completion = await createNanoGptChatCompletion({
+    const completion = await createGeneralChatCompletion({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

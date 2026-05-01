@@ -45,7 +45,7 @@ Full-stack Next.js 16 web application. Real-time collaborative code editor, FSRS
 | **Code Editor** | CodeMirror 6 (`@uiw/react-codemirror`) |
 | **Real-time** | WebSocket (`ws` v8) |
 | **Database** | TiDB / MySQL 8 (`mysql2/promise`) |
-| **AI / LLM** | NanoGPT (primary), FactChat / SAIT 3 Pro (fallback) |
+| **AI / LLM** | OpenAI-compatible API (General + Lab dual config) |
 | **Web Search** | Tavily API |
 | **Coordinate Transform** | proj4 (WGS84 ↔ TM) |
 | **Auth & Security** | scrypt (N=16384) + pepper, AES-256-GCM field encryption |

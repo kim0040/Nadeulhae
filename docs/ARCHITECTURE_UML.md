@@ -6,7 +6,7 @@
 
 ## 1. Project Overview
 
-**Nadeulhae** (a portmanteau of "Nadeuri" meaning outing + "Hae" meaning sun/sea) is a **weather-based outdoor activity scoring service + AI Chat + code sharing platform**. Centered on Jeonju city, it combines real-time data from KMA, AirKorea, and APIHub to compute a 0-100 picnic score, along with NanoGPT/FactChat-based AI chat, FSRS-algorithm vocabulary learning (Lab), and a WebSocket-based real-time collaborative code editor.
+**Nadeulhae** (a portmanteau of "Nadeuri" meaning outing + "Hae" meaning sun/sea) is a **weather-based outdoor activity scoring service + AI Chat + code sharing platform**. Centered on Jeonju city, it combines real-time data from KMA, AirKorea, and APIHub to compute a 0-100 picnic score, along with OpenAI-compatible LLM-based AI chat, FSRS-algorithm vocabulary learning (Lab), and a WebSocket-based real-time collaborative code editor.
 
 ---
 
@@ -51,8 +51,8 @@ graph TB
         KMA["KMA<br/>Ultra-short / short / mid-range forecast"]
         AIR["AirKorea<br/>PM10 / PM2.5 / CAI index"]
         APIHUB["APIHub<br/>Weather warnings / satellite / radar / quake images"]
-        NANOGPT["NanoGPT API<br/>OpenAI-compatible LLM (Primary)"]
-        FACTCHAT["FactChat API<br/>SAIT 3 Pro (Fallback)"]
+        GENERAL_LLM["General LLM API<br/>OpenAI-compatible (범용)"]
+        LAB_LLM["Lab LLM API<br/>OpenAI-compatible (실험실)"]
         TAVILY["Tavily API (Web Search)"]
     end
 
@@ -63,10 +63,9 @@ graph TB
     API --> KMA
     API --> AIR
     API --> APIHUB
-    API --> NANOGPT
-    API --> FACTCHAT
-    API --> TAVILY
-    SCHEDULER --> NANOGPT
+    API --> GENERAL_LLM
+    API --> LAB_LLM
+    SCHEDULER --> GENERAL_LLM
     SCHEDULER --> TIDB
 ```
 
@@ -725,7 +724,7 @@ sequenceDiagram
     participant Quota as llm/quota.ts
     participant Memory as chat/repository.ts
     participant Prompt as chat/prompt.ts
-    participant LLM as NanoGPT / FactChat
+    participant LLM as General LLM / Lab LLM
     participant Tavily as Tavily API (Lab only)
     participant DB as TiDB
 
@@ -1021,7 +1020,7 @@ graph LR
     subgraph Infrastructure["Infrastructure"]
         DB_LIB["lib/db.ts (MySQL2 Pool)"]
         SECURITY_LIB["lib/security/ (AES-256-GCM + HKDF)"]
-        NANOGPT["lib/nanogpt/ (OpenAI-compatible)"]
+        LLM_CLIENT["lib/llm/ (OpenAI-compatible Core)"]
         TAVILY_LIB["lib/tavily/ (Web Search)"]
         WEATHER_UTILS["lib/weather-utils.ts, lib/coords-utils.ts"]
         FORECAST_GRID["lib/forecast-location/ (KMA Grid DB)"]
@@ -1036,7 +1035,7 @@ graph LR
     AUTH_LIB --> SECURITY_LIB
     CHAT_LIB --> DB_LIB
     CHAT_LIB --> AUTH_LIB
-    CHAT_LIB --> NANOGPT
+    CHAT_LIB --> LLM_CLIENT
     CHAT_LIB --> LLM_QUOTA
     LAB_LIB --> DB_LIB
     LAB_LIB --> LLM_QUOTA
@@ -1263,8 +1262,8 @@ graph TB
 
     subgraph External["External Services"]
         DB[("TiDB Cloud (MySQL 8 Compatible)")]
-        NANOGPT_EXT["NanoGPT API (LLM Completions)"]
-        FACTCHAT_EXT["FactChat API (Fallback LLM)"]
+        GENERAL_LLM_EXT["General LLM API<br/>OpenAI-compatible (범용)"]
+        LAB_LLM_EXT["Lab LLM API<br/>OpenAI-compatible (실험실)"]
         TAVILY_EXT["Tavily Search API"]
         KMA_EXT["KMA API"]
         AIR_EXT["AirKorea API"]
@@ -1275,10 +1274,10 @@ graph TB
     NGINX -- "HTTP:3000" --> NODE
     NEXT --> DB
     WS --> DB
-    SCHEDULER --> NANOGPT_EXT
+    SCHEDULER --> GENERAL_LLM_EXT
     SCHEDULER --> DB
-    NEXT --> NANOGPT_EXT
-    NEXT --> FACTCHAT_EXT
+    NEXT --> GENERAL_LLM_EXT
+    NEXT --> LAB_LLM_EXT
     NEXT --> TAVILY_EXT
     NEXT --> KMA_EXT
     NEXT --> AIR_EXT
@@ -1342,7 +1341,7 @@ flowchart TD
 sequenceDiagram
     participant Server as server.ts
     participant Scheduler as jeonju-scheduler.ts
-    participant LLM as NanoGPT API
+    participant LLM as General LLM / Lab LLM
     participant DB as TiDB
 
     Server->>Scheduler: startJeonjuBriefingScheduler()
@@ -1385,7 +1384,7 @@ sequenceDiagram
 | **Security** | AES-256-GCM (Field-level Encryption), scrypt(N=16384) + Pepper, HKDF, HMAC Blind Index | `src/lib/security/`, `src/lib/auth/` |
 | **Auth** | Cookie-based Session (7d TTL), SHA-256 Token Hash, In-Memory LRU Cache | `src/lib/auth/session.ts`, `src/lib/auth/repository.ts` |
 | **Database** | TiDB / MySQL 8, mysql2/promise, 20 Tables | `src/lib/db.ts`, domain `schema.ts` files |
-| **AI** | NanoGPT (Primary) + FactChat (Fallback), SSE Streaming, Prompt Injection with Weather Context | `src/lib/chat/`, `src/lib/nanogpt/`, `src/lib/lab-ai-chat/` |
+| **AI** | OpenAI-compatible LLM (General + Lab), SSE Streaming, Prompt Injection with Weather Context | `src/lib/llm/`, `src/lib/chat/`, `src/lib/lab-ai-chat/` |
 | **Rate Limit** | 3-Layer: In-Memory (proxy.ts), DB Attempt Buckets, LLM Quota (FOR UPDATE) | `src/proxy.ts`, `src/lib/llm/quota.ts`, `src/lib/auth/repository.ts` |
 | **WebSocket** | ws library, Room-based Pub/Sub, Presence Tracking, Heartbeat, Typing Indicators | `src/lib/websocket/` |
 | **Spaced Repetition** | FSRS v5 Algorithm (stability, difficulty, state machine) | `src/lib/lab/` |

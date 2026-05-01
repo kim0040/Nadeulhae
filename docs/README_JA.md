@@ -45,7 +45,7 @@ Next.js 16 フルスタックWebアプリケーション。リアルタイム共
 | **コードエディタ** | CodeMirror 6 (`@uiw/react-codemirror`) |
 | **リアルタイム通信** | WebSocket (`ws` v8) |
 | **データベース** | TiDB / MySQL 8 (`mysql2/promise`) |
-| **AI / LLM** | NanoGPT (メイン), FactChat / SAIT 3 Pro (フォールバック) |
+| **AI / LLM** | OpenAI互換API（汎用 + ラボの二重構成） |
 | **Web検索** | Tavily API |
 | **座標変換** | proj4 (WGS84 ↔ TM) |
 | **認証・セキュリティ** | scrypt (N=16384) + ペッパー, AES-256-GCM フィールド暗号化 |

@@ -13,7 +13,7 @@ import {
   getLabAiChatStateCore,
 } from "@/lib/lab-ai-chat/repository"
 import type { LabAiChatLocale, LabAiChatStateResponse } from "@/lib/lab-ai-chat/types"
-import { resolveAllowedNanoGptModels } from "@/lib/nanogpt/client"
+import { resolveAllowedLabModels } from "@/lib/llm/lab-llm"
 
 export const runtime = "nodejs"
 
@@ -89,7 +89,7 @@ async function buildStateResponse(input: {
   requestedSessionId?: string | null
 }): Promise<LabAiChatStateResponse> {
   const [models, coreState] = await Promise.all([
-    resolveAllowedNanoGptModels(),
+    resolveAllowedLabModels(),
     getLabAiChatStateCore(input),
   ])
 

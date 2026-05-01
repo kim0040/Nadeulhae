@@ -12,7 +12,7 @@ export const LAB_AI_CHAT_STREAMING_TIMEOUT_MS = 480_000
 export const LAB_AI_CHAT_SUMMARY_PROVIDER_TIMEOUT_MS = 90_000
 export const LAB_AI_CHAT_MEMORY_SUMMARY_MAX_CHARACTERS = 8000
 export const LAB_AI_CHAT_TIME_ZONE = "Asia/Seoul"
-export const NANOGPT_MODELS_CACHE_TTL_MS = 15 * 60 * 1000
+export const LAB_MODELS_CACHE_TTL_MS = 15 * 60 * 1000
 export const LAB_AI_CHAT_WEB_SEARCH_CACHE_MAX_CHARACTERS = 24000
 
 function parsePositiveIntEnv(raw: string | undefined, fallback: number) {
