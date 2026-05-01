@@ -6,7 +6,7 @@ import {
 } from "@/lib/lab-ai-chat/repository"
 import { LAB_AI_CHAT_WEB_SEARCH_RESULT_SCORE_THRESHOLD } from "@/lib/lab-ai-chat/constants"
 import type { LabAiChatLocale } from "@/lib/lab-ai-chat/types"
-import { createNanoGptCompletion } from "@/lib/nanogpt/client"
+import { createLabChatCompletion } from "@/lib/llm/lab-llm"
 import { createTavilySearch, TavilyError, type TavilySearchRequest, type TavilyTopic } from "@/lib/tavily/client"
 
 type SearchPlan = {
@@ -436,7 +436,7 @@ async function buildSearchPlan(input: {
   ].join("\n")
 
   try {
-    const completion = await createNanoGptCompletion({
+    const completion = await createLabChatCompletion({
       model: input.modelId,
       requestKind: "summary",
       messages: [

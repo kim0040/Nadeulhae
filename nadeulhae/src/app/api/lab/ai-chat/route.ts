@@ -29,12 +29,12 @@ import type { LabAiChatLocale, LabAiChatStateResponse } from "@/lib/lab-ai-chat/
 import { resolveLabAiChatWebSearchContext } from "@/lib/lab-ai-chat/web-search"
 import { sanitizeAssistantMarkdown } from "@/lib/markdown/sanitize-assistant-markdown"
 import {
-  NanoGptError,
-  createNanoGptCompletion,
-  createNanoGptCompletionStream,
-  resolveAllowedNanoGptModels,
-  resolveRequestedNanoGptModel,
-} from "@/lib/nanogpt/client"
+  LabChatError,
+  createLabChatCompletion,
+  createLabChatCompletionStream,
+  resolveAllowedLabModels,
+  resolveRequestedLabModel,
+} from "@/lib/llm/lab-llm"
 
 export const runtime = "nodejs"
 
@@ -438,7 +438,7 @@ async function buildStateResponse(input: {
   requestedSessionId?: string | null
 }): Promise<LabAiChatStateResponse> {
   const [models, coreState] = await Promise.all([
-    resolveAllowedNanoGptModels(),
+    resolveAllowedLabModels(),
     getLabAiChatStateCore(input),
   ])
 
@@ -578,7 +578,7 @@ async function compactLabAiChatMemory(input: {
   const summaryStartedAt = Date.now()
 
   try {
-    const summaryResult = await createNanoGptCompletion({
+    const summaryResult = await createLabChatCompletion({
       model: input.modelId,
       requestKind: "summary",
       messages: [
@@ -615,7 +615,7 @@ async function compactLabAiChatMemory(input: {
     input.onStatus?.(getLabAiChatStatusMessage(input.locale, "memory_compacted"))
   } catch (error) {
     console.error("Lab AI chat memory compaction failed:", error)
-    const providerError = error instanceof NanoGptError ? error : null
+    const providerError = error instanceof LabChatError ? error : null
     input.onStatus?.(getLabAiChatStatusMessage(input.locale, "memory_failed"))
     await logLabAiChatRequestEvent({
       userId: input.userId,
@@ -780,8 +780,8 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
-    const allowedModels = await resolveAllowedNanoGptModels()
-    const selectedModel = resolveRequestedNanoGptModel(allowedModels, requestedModelId)
+    const allowedModels = await resolveAllowedLabModels()
+    const selectedModel = resolveRequestedLabModel(allowedModels, requestedModelId)
     const isRequestedModelAllowed = !requestedModelId
       || selectedModel.id === requestedModelId
       || selectedModel.slug === requestedModelId
@@ -917,7 +917,7 @@ async function handlePOST(request: NextRequest) {
             )
 
             sendEvent("status", { message: getLabAiChatStatusMessage(locale, "response_generating") })
-            const completionResult = await createNanoGptCompletionStream({
+            const completionResult = await createLabChatCompletionStream({
               model: selectedModelId!,
               requestKind: "chat",
               messages: chatMessages,
@@ -985,7 +985,7 @@ async function handlePOST(request: NextRequest) {
 
             controller.close()
           } catch (streamError) {
-            const providerError = streamError instanceof NanoGptError ? streamError : null
+            const providerError = streamError instanceof LabChatError ? streamError : null
             const isGlobalLlmLimitError = providerError?.statusCode === 429
               && providerError.code === "global_daily_limit_reached"
             const errorMessage = isGlobalLlmLimitError
@@ -1055,7 +1055,7 @@ async function handlePOST(request: NextRequest) {
       message
     )
 
-    const completionResult = await createNanoGptCompletion({
+    const completionResult = await createLabChatCompletion({
       model: selectedModelId!,
       requestKind: "chat",
       messages: chatMessages,
@@ -1092,7 +1092,7 @@ async function handlePOST(request: NextRequest) {
     )
   } catch (error) {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request).catch(() => null)
-    const providerError = error instanceof NanoGptError ? error : null
+    const providerError = error instanceof LabChatError ? error : null
     const runtimeError = error instanceof Error ? error : null
     const runtimeErrorCode = runtimeError?.name
       ? `lab_ai_chat_${runtimeError.name}`.slice(0, 64)

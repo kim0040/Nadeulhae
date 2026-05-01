@@ -61,17 +61,4 @@ export interface ChatStateResponse {
   activeSessionId: string
 }
 
-export interface FactChatUsage {
-  promptTokens: number
-  completionTokens: number
-  totalTokens: number
-  cachedPromptTokens: number
-}
-
-export interface FactChatCompletionResult {
-  providerRequestId: string | null
-  requestedModel: string | null
-  resolvedModel: string | null
-  content: string
-  usage: FactChatUsage
-}
+export { type LlmUsage as FactChatUsage, type LlmCompletionResult as FactChatCompletionResult } from "@/lib/llm/types"

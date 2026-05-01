@@ -116,21 +116,23 @@ TM_Y=358250
 JEONJU_STN_ID=146
 NIER_STATION_NAME=전북권
 
-# ---- LLM Providers ----
-NANOGPT_API_KEY=your-nanogpt-api-key
-NANOGPT_BASE_URL=https://nano-gpt.com/api/v1
-FACTCHAT_API_KEY=your-factchat-api-key
-FACTCHAT_BASE_URL=https://factchat-cloud.mindlogic.ai/v1/gateway
-FACTCHAT_MODEL=SAIT 3 Pro
-FACTCHAT_FALLBACK_MODEL=solar-pro3
+# ---- 범용 LLM (대시보드 채팅, 날씨 브리핑, 단어장 생성 등) ----
+GENERAL_LLM_API_KEY=your-general-llm-api-key
+GENERAL_LLM_BASE_URL=https://nano-gpt.com/api/v1
+GENERAL_LLM_MODEL=deepseek/deepseek-v4-flash
+GENERAL_LLM_FALLBACK_MODEL=deepseek/deepseek-v4-pro
+
+# ---- 나들 실험실 LLM (실험실 AI 채팅, 웹검색) ----
+LAB_LLM_API_KEY=your-lab-llm-api-key
+LAB_LLM_BASE_URL=https://nano-gpt.com/api/v1
+
+# ---- 웹 검색 ----
 TAVILY_API_KEY=your-tavily-api-key
 TAVILY_BASE_URL=https://api.tavily.com
 
-# ---- Unified LLM (OpenAI-compatible, overrides above if set) ----
-# LLM_API_KEY=
-# LLM_BASE_URL=
-# LLM_MODEL=deepseek/deepseek-v4-flash
-# LLM_FALLBACK_MODEL=deepseek/deepseek-v4-pro
+# ---- 하위 호환 (이전 설정) ----
+# NANOGPT_API_KEY=
+# NANOGPT_BASE_URL=
 
 # ---- Security ----
 AUTH_PEPPER=generate-a-long-random-secret-here

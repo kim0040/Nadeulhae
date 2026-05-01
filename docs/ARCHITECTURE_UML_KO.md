@@ -6,7 +6,7 @@
 
 ## 1. 프로젝트 개요
 
-**나들해**("나들이" + "해")는 **날씨 기반 야외활동 점수 서비스 + AI 채팅 + 코드 공유 플랫폼**이다. 전주시를 중심으로 기상청(KMA), 한국환경공단(AirKorea), APIHub의 실시간 데이터를 결합해 0~100점의 피크닉 지수를 산출하고, NanoGPT/FactChat 기반의 AI 채팅, FSRS 알고리즘을 활용한 어휘 암기(랩), 그리고 WebSocket 기반 실시간 협업 코드 에디터를 제공한다.
+**나들해**("나들이" + "해")는 **날씨 기반 야외활동 점수 서비스 + AI 채팅 + 코드 공유 플랫폼**이다. 전주시를 중심으로 기상청(KMA), 한국환경공단(AirKorea), APIHub의 실시간 데이터를 결합해 0~100점의 피크닉 지수를 산출하고, OpenAI 호환 LLM 기반의 AI 채팅, FSRS 알고리즘을 활용한 어휘 암기(랩), 그리고 WebSocket 기반 실시간 협업 코드 에디터를 제공한다.
 
 ---
 
@@ -51,8 +51,8 @@ graph TB
         KMA["기상청 KMA<br/>초단기예보 / 단기예보 / 중기예보"]
         AIR["AirKorea<br/>PM10 / PM2.5 / 통합대기지수"]
         APIHUB["APIHub<br/>기상특보 / 위성·레이더·지진 이미지"]
-        NANOGPT["NanoGPT API<br/>OpenAI 호환 LLM (주사용)"]
-        FACTCHAT["FactChat API<br/>SAIT 3 Pro (예비용)"]
+        GENERAL_LLM["범용 LLM API<br/>OpenAI 호환 (범용)"]
+        LAB_LLM["실험실 LLM API<br/>OpenAI 호환 (실험실)"]
         TAVILY["Tavily API (웹 검색)"]
     end
 
@@ -725,7 +725,7 @@ sequenceDiagram
     participant Quota as llm/quota.ts
     participant Memory as chat/repository.ts
     participant Prompt as chat/prompt.ts
-    participant LLM as NanoGPT / FactChat
+    participant LLM as 범용 LLM / 실험실 LLM
     participant Tavily as Tavily API (랩 전용)
     participant DB as TiDB
 
@@ -1021,7 +1021,7 @@ graph LR
     subgraph Infrastructure["인프라스트럭처"]
         DB_LIB["lib/db.ts (MySQL2 풀)"]
         SECURITY_LIB["lib/security/ (AES-256-GCM + HKDF)"]
-        NANOGPT["lib/nanogpt/ (OpenAI 호환)"]
+        LLM_CLIENT["lib/llm/ (OpenAI 호환 코어)"]
         TAVILY_LIB["lib/tavily/ (웹 검색)"]
         WEATHER_UTILS["lib/weather-utils.ts, lib/coords-utils.ts"]
         FORECAST_GRID["lib/forecast-location/ (KMA 격자 DB)"]
@@ -1263,8 +1263,8 @@ graph TB
 
     subgraph External["외부 서비스"]
         DB[("TiDB Cloud (MySQL 8 호환)")]
-        NANOGPT_EXT["NanoGPT API (LLM 완성)"]
-        FACTCHAT_EXT["FactChat API (예비 LLM)"]
+        GENERAL_LLM_EXT["범용 LLM API<br/>OpenAI 호환 (범용)"]
+        LAB_LLM_EXT["실험실 LLM API<br/>OpenAI 호환 (실험실)"]
         TAVILY_EXT["Tavily 검색 API"]
         KMA_EXT["기상청 KMA API"]
         AIR_EXT["AirKorea API"]
@@ -1342,7 +1342,7 @@ flowchart TD
 sequenceDiagram
     participant Server as server.ts
     participant Scheduler as jeonju-scheduler.ts
-    participant LLM as NanoGPT API
+    participant LLM as 범용 LLM API
     participant DB as TiDB
 
     Server->>Scheduler: startJeonjuBriefingScheduler()
@@ -1385,7 +1385,7 @@ sequenceDiagram
 | **보안** | AES-256-GCM (필드 단위 암호화), scrypt(N=16384) + 페퍼, HKDF, HMAC 블라인드 인덱스 | `src/lib/security/`, `src/lib/auth/` |
 | **인증** | 쿠키 기반 세션 (7일 TTL), SHA-256 토큰 해시, 인메모리 LRU 캐시 | `src/lib/auth/session.ts`, `src/lib/auth/repository.ts` |
 | **데이터베이스** | TiDB / MySQL 8, mysql2/promise, 20개 테이블 | `src/lib/db.ts`, 각 도메인 `schema.ts` |
-| **AI** | NanoGPT (주사용) + FactChat (예비), SSE 스트리밍, 날씨 컨텍스트 프롬프트 주입 | `src/lib/chat/`, `src/lib/nanogpt/`, `src/lib/lab-ai-chat/` |
+| **AI** | OpenAI 호환 LLM (범용 + 실험실), SSE 스트리밍, 날씨 컨텍스트 프롬프트 주입 | `src/lib/llm/`, `src/lib/chat/`, `src/lib/lab-ai-chat/` |
 | **속도 제한** | 3계층: 인메모리 (proxy.ts) → DB 시도 버킷 → LLM 할당량 (FOR UPDATE) | `src/proxy.ts`, `src/lib/llm/quota.ts`, `src/lib/auth/repository.ts` |
 | **WebSocket** | ws 라이브러리, 방 기반 Pub/Sub, 접속현황 추적, 하트비트, 타이핑 표시 | `src/lib/websocket/` |
 | **간격 반복 학습** | FSRS v5 알고리즘 (안정도, 난이도, 상태 머신) | `src/lib/lab/` |
