@@ -513,7 +513,7 @@ export function JeonjuSafetyPanel({
               <div className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
                 {language === "ko" ? "오늘의 종합 안내" : language === "zh" ? "今日综合指南" : language === "ja" ? "今日の総合案内" : "Today's guidance"}
               </div>
-              <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-keep break-words">
+              <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-words">
                 {overallGuide.title}
               </div>
               <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-foreground/80 dark:text-current break-words">
@@ -543,8 +543,8 @@ export function JeonjuSafetyPanel({
               <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="text-4xl sm:text-5xl font-black tracking-tight text-foreground">{hazardSummary.count}</div>
-                  <p className="mt-2 text-lg sm:text-2xl font-black text-foreground break-keep break-words">{hazardSummary.title}</p>
-                  <p className="mt-3 max-w-2xl text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-keep break-words">
+                  <p className="mt-2 text-lg sm:text-2xl font-black text-foreground break-words">{hazardSummary.title}</p>
+                  <p className="mt-3 max-w-2xl text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-words">
                     {hazardSummary.text}
                   </p>
                 </div>
@@ -592,7 +592,7 @@ export function JeonjuSafetyPanel({
               <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="text-lg sm:text-2xl font-black tracking-tight text-foreground">{mobilitySummary.label}</div>
-                  <p className="mt-2 max-w-2xl text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-keep break-words">
+                  <p className="mt-2 max-w-2xl text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-words">
                     {mobilitySummary.text}
                   </p>
                 </div>
@@ -613,7 +613,7 @@ export function JeonjuSafetyPanel({
                 <div className="text-4xl sm:text-5xl font-black tracking-tight text-foreground">
                   {fireSummary?.overview.latestFireReceipt ?? "-"}
                 </div>
-                <p className="mt-2 text-sm sm:text-base font-bold text-foreground break-keep break-words">
+                <p className="mt-2 text-sm sm:text-base font-bold text-foreground break-words">
                   {fireSummary
                     ? (language === "ko"
                       ? `최근 평균 ${fireSummary.overview.sevenDayAverage}건 · ${formatDateLabel(fireSummary.metadata.latestDate)} 기준`
@@ -629,7 +629,7 @@ export function JeonjuSafetyPanel({
                 {fireFlowBadge.label}
               </span>
             </div>
-            <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-keep break-words">
+            <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-words">
               {fireSummary
                 ? (language === "ko" ? fireSummary.overview.shortMessageKo : language === "zh" ? fireSummary.overview.shortMessageZh : language === "ja" ? fireSummary.overview.shortMessageJa : fireSummary.overview.shortMessageEn)
                 : (language === "ko" ? "최근 화재 접수 흐름과 장소 패턴을 곧 반영합니다." : language === "zh" ? "最近的火灾接报趋势和场所模式将很快显示。" : language === "ja" ? "最近の火災受付の流れと場所パターンを間もなく反映します。" : "Recent fire flow and place patterns will appear here once loaded.")}
@@ -658,7 +658,7 @@ export function JeonjuSafetyPanel({
                 <div className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
                   {language === "ko" ? "가장 많이 보인 장소" : language === "zh" ? "最常见场所" : language === "ja" ? "最も多く見られた場所" : "Top place"}
                 </div>
-                <div className="mt-2 text-base sm:text-lg font-black text-foreground break-keep break-words">
+                <div className="mt-2 text-base sm:text-lg font-black text-foreground break-words">
                   {topFirePlace?.name || (language === "ko" ? "집계 없음" : language === "zh" ? "暂无数据" : language === "ja" ? "データなし" : "No data")}
                 </div>
                 <div className="mt-1 text-xs sm:text-sm font-bold text-muted-foreground">
@@ -672,10 +672,10 @@ export function JeonjuSafetyPanel({
               <div className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
                 {language === "ko" ? "장소 패턴 해석" : language === "zh" ? "场所模式解读" : language === "ja" ? "場所パターン解釈" : "Place pattern read"}
               </div>
-              <div className="mt-2 text-base sm:text-lg font-black text-foreground break-keep break-words">
+              <div className="mt-2 text-base sm:text-lg font-black text-foreground break-words">
                 {firePlaceNarrative.title}
               </div>
-              <p className="mt-2 text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-keep break-words">
+              <p className="mt-2 text-sm sm:text-base font-bold leading-relaxed text-muted-foreground break-words">
                 {firePlaceNarrative.text}
               </p>
               {firePlaceNarrative.chips.length ? (

@@ -140,9 +140,6 @@ body {
 
 
 @layer utilities {
-  .break-keep {
-    word-break: keep-all;
-  }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }

@@ -179,7 +179,7 @@ export function MermaidDiagram({
           {copied ? copiedLabel : copyLabel}
         </button>
       </div>
-      <div ref={containerRef} className="overflow-auto bg-card p-4">
+      <div ref={containerRef} className="overflow-auto bg-card p-4 min-w-0">
         {error ? (
           <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
@@ -187,7 +187,7 @@ export function MermaidDiagram({
           </div>
         ) : svg ? (
           <div
-            className="flex justify-center [&_svg]:h-auto [&_svg]:max-w-full"
+            className="flex justify-center min-w-0 [&_svg]:h-auto [&_svg]:max-w-full [&_svg]:overflow-visible"
             dangerouslySetInnerHTML={{ __html: svg }}
           />
         ) : (
