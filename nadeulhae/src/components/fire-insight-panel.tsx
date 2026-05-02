@@ -42,7 +42,7 @@ export function FireInsightPanel({
               <Flame size={14} className="text-orange-500" />
               {language === "ko" ? "지역 화재 흐름" : language === "zh" ? "区域火灾趋势" : language === "ja" ? "地域の火災状況" : "Regional fire flow"}
             </div>
-            <p className="mt-2 text-base sm:text-lg font-bold leading-relaxed text-foreground break-keep break-words">
+            <p className="mt-2 text-base sm:text-lg font-bold leading-relaxed text-foreground break-words">
               {language === "ko" ? data.overview.shortMessageKo : language === "zh" ? data.overview.shortMessageZh : language === "ja" ? data.overview.shortMessageJa : data.overview.shortMessageEn}
             </p>
           </div>
@@ -62,7 +62,7 @@ export function FireInsightPanel({
           <AnimatedGradientText className="text-3xl sm:text-5xl font-black tracking-tight">
             {language === "ko" ? "전북 화재 흐름 한눈에 보기" : language === "zh" ? "全北火灾趋势一览" : language === "ja" ? "全北の火災状況一覧" : "A quick look at Jeonbuk fire flow"}
           </AnimatedGradientText>
-          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep break-words">
+          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-words">
             {language === "ko"
               ? "전북에서 최근 어떤 곳의 화재가 많았는지, 요즘 흐름이 어떤지 가볍게 훑어보는 참고 구역입니다."
               : language === "zh"
@@ -138,7 +138,7 @@ export function FireInsightPanel({
               )}
               {language === "ko" ? "눈에 띈 장소" : language === "zh" ? "突出地点" : language === "ja" ? "目立った場所" : "Standout place"}
             </div>
-            <div className="mt-3 text-2xl sm:text-3xl font-black tracking-tight text-foreground break-keep break-words">
+            <div className="mt-3 text-2xl sm:text-3xl font-black tracking-tight text-foreground break-words">
               {topPlace?.name || (language === "ko" ? "데이터 없음" : language === "zh" ? "暂无数据" : language === "ja" ? "データなし" : "No data")}
             </div>
             <p className="mt-2 text-base sm:text-lg font-bold text-muted-foreground">
@@ -160,10 +160,10 @@ export function FireInsightPanel({
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
               {language === "ko" ? "이 기능은" : language === "zh" ? "功能介绍" : language === "ja" ? "この機能について" : "What this shows"}
             </div>
-            <p className="mt-3 text-base sm:text-lg font-bold leading-relaxed text-foreground break-keep break-words">
+            <p className="mt-3 text-base sm:text-lg font-bold leading-relaxed text-foreground break-words">
               {language === "ko" ? data.overview.shortMessageKo : language === "zh" ? (data.overview as any).shortMessageZh ?? data.overview.shortMessageEn : language === "ja" ? (data.overview as any).shortMessageJa ?? data.overview.shortMessageEn : data.overview.shortMessageEn}
             </p>
-            <p className="mt-4 text-base font-bold text-muted-foreground break-keep break-words">
+            <p className="mt-4 text-base font-bold text-muted-foreground break-words">
               {language === "ko"
                 ? `${formatDateLabel(data.overview.peakDate)}에 ${data.overview.peakFireReceipt}건으로 가장 높았습니다.`
                 : language === "zh"

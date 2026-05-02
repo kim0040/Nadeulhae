@@ -222,7 +222,7 @@ export default function JeonjuPage() {
             words={texts.heroTitle}
             className="mt-8 text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-foreground"
           />
-          <p className="mx-auto mt-8 max-w-4xl text-center text-base sm:text-xl font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep break-words">
+          <p className="mx-auto mt-8 max-w-4xl text-center text-base sm:text-xl font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-words">
             {texts.heroDesc}
           </p>
         </div>
@@ -255,7 +255,7 @@ export default function JeonjuPage() {
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">
               {texts.yesterdayTitle}
             </h2>
-            <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep break-words">
+            <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-words">
               {texts.yesterdayDesc}
           </p>
         </div>
@@ -265,7 +265,7 @@ export default function JeonjuPage() {
       <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <div className="mb-8 max-w-3xl">
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">{texts.fixedTitle}</h2>
-          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep break-words">
+          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-words">
             {texts.fixedDesc}
           </p>
         </div>

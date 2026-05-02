@@ -264,7 +264,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           </span>
         </div>
         <div className="rounded-[1.4rem] border border-sky-blue/15 bg-card px-4 py-4">
-          <p className="text-sm sm:text-base font-bold leading-relaxed text-foreground/90 break-keep break-words whitespace-pre-line">
+          <p className="text-sm sm:text-base font-bold leading-relaxed text-foreground/90 break-words whitespace-pre-line">
             {briefing.summary}
           </p>
         </div>
@@ -286,7 +286,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
               return (
                 <div key={idx} className="flex items-start gap-3 rounded-[1.4rem] border border-nature-green/15 bg-card px-4 py-3 min-w-0">
                   <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-nature-green" />
-                  <span className="text-sm sm:text-base font-bold leading-relaxed text-foreground break-keep break-words">{cleaned}</span>
+                  <span className="text-sm sm:text-base font-bold leading-relaxed text-foreground break-words">{cleaned}</span>
                 </div>
               )
             })}
@@ -305,7 +305,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                   {t.weather}
                 </span>
               </div>
-              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-keep break-words">
+              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-words">
                 {briefing.weatherNote}
               </div>
             </div>
@@ -318,7 +318,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                   {t.events}
                 </span>
               </div>
-              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-keep break-words">
+              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-words">
                 {briefing.festivalNote}
               </div>
             </div>
@@ -353,11 +353,11 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                   {i + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm sm:text-base font-black text-foreground break-keep break-words group-hover:text-sky-blue transition-colors">
+                  <p className="text-sm sm:text-base font-black text-foreground break-words group-hover:text-sky-blue transition-colors">
                     {item.title}
                   </p>
                   {item.snippet && (
-                    <p className="mt-1 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground break-keep break-words">
+                    <p className="mt-1 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground break-words">
                       {item.snippet}
                     </p>
                   )}

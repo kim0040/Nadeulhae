@@ -56,7 +56,7 @@ const POLICY_CONTENT: Record<
       {
         label: "AI 데이터 처리",
         value: "채팅내용 암호화 전송",
-        detail: "AI 챗봇 대화는 AES-256-GCM 암호화 저장, LLM 제공사(NanoGPT, FactChat)에 일시 전송 후 폐기, 학습에 미사용",
+        detail: "AI 챗봇 대화는 AES-256-GCM 암호화 저장, LLM API 제공사에 일시 전송 후 폐기, 학습에 미사용. 제공사는 변경될 수 있습니다.",
       },
       {
         label: "분석 기본값",
@@ -77,7 +77,7 @@ const POLICY_CONTENT: Record<
         items: [
           "나들해는 기상청(KMA), 에어코리아(AirKorea), APIHub 등 공공데이터를 취합하여 실시간 날씨·대기질·자외선·기상특보 정보 및 야외활동 적합도 점수(0-100)를 제공하고, AI 기반 대시보드 챗봇, 실험실(단어암기·AI웹검색챗·코드공유), 전주 지역 AI 일일 브리핑 및 커뮤니티 채팅을 통합 제공하는 종합 야외활동 플랫폼입니다.",
           "서비스 이용은 원칙적으로 무료이나, 사용자는 사실과 일치하는 정보를 입력해야 하며, 혐오 표현, 비속어, 무단 광고, AI 챗봇을 통한 악의적 프롬프트 주입, 트래픽 공격 등 서비스의 건전한 운영을 방해하는 행위를 할 수 없습니다. 약관 위반 시 사전 통보 없이 계정 이용이 정지되거나 AI 기능 이용이 제한될 수 있습니다.",
-          "불가항력적인 공공 API 장애, LLM 제공사(NanoGPT·FactChat) 서비스 중단, 시스템 유지 보수 등의 사유로 서비스가 일시 중단될 수 있으며, 운영자는 별도 공지가 불가피한 상황의 장애 및 이로 인한 직간접적 손해에 대하여 고의 또는 중과실이 없는 한 책임을 지지 않습니다.",
+          "불가항력적인 공공 API 장애, LLM API 제공사 서비스 중단·변경·종료, 시스템 유지 보수 등의 사유로 서비스가 일시 중단될 수 있으며, LLM API 제공사는 내부 사정에 따라 사전 고지 없이 변경되거나 대체될 수 있습니다. 운영자는 별도 공지가 불가피한 상황의 장애 및 이로 인한 직간접적 손해에 대하여 고의 또는 중과실이 없는 한 책임을 지지 않습니다.",
         ],
       },
       {
@@ -86,7 +86,7 @@ const POLICY_CONTENT: Record<
         title: "2. AI/LLM 기반 서비스 이용약관",
         items: [
           "나들해는 다음 AI·LLM 서비스를 제공합니다: (가) 대시보드 AI 챗봇 — 날씨 기반 야외활동 어시스턴트, (나) 실험실 AI 챗 — Tavily 웹검색 연동 지식 챗봇, (다) 실험실 단어 생성 — FSRS 단어장 AI 자동 생성·번역·예문 작성, (라) 전주 AI 데일리 브리핑 — 지역 뉴스·이벤트 AI 요약.",
-          "AI 서비스는 타사 LLM 제공사(NanoGPT 'deepseek-v4-flash/pro', FactChat 'SAIT 3 Pro') 및 웹검색 제공사(Tavily)의 API를 통해 처리됩니다. 사용자가 AI 챗봇에 입력한 대화 내용은 해당 제공사에 일시적으로 전송되어 응답 생성에만 사용되며, 제공사의 모델 학습 데이터로 활용되지 않습니다.",
+          "AI 서비스는 타사 LLM API 제공사를 통해 처리되며, 제공사는 서비스 품질·비용·가용성에 따라 사전 고지 없이 변경되거나 대체될 수 있습니다. 사용자가 AI 챗봇에 입력한 대화 내용은 해당 제공사에 일시적으로 전송되어 응답 생성에만 사용되며, 제공사의 모델 학습 데이터로 활용되지 않습니다.",
           "AI가 생성한 모든 응답(날씨 추천, 챗봇 답변, 단어 뜻·예문, 뉴스 요약)은 머신러닝 기반 추론 결과로, 사실과 다를 수 있습니다. 특히 전주 AI 브리핑의 뉴스 요약, 실험실 AI 챗의 웹검색 기반 답변은 참고용이며, 중요한 의사결정은 공식 출처를 직접 확인하시기 바랍니다.",
           "AI 서비스는 일일 사용량 제한(LLM 전역 5,000회/일, 사용자별 100~200회/일, 웹검색 월 800회)이 적용되며, 제한 초과 시 해당 기능이 일시 차단될 수 있습니다. 악의적 반복 호출은 AI 기능 영구 제한 사유가 됩니다.",
         ],
@@ -131,7 +131,7 @@ const POLICY_CONTENT: Record<
         title: "6. 개인정보 국외 이전 고지",
         items: [
           "나들해는 고가용성 데이터베이스 서비스(TiDB Cloud)와 AI API 제공사의 인프라가 국외에 위치함에 따라, 개인정보 보호법 제28조의8에 의거하여 다음과 같이 국외 이전 사항을 고지합니다.",
-          "① 이전받는 자: PingCAP Inc.(TiDB Cloud 데이터베이스), Vultr(클라우드 인프라), NanoGPT·FactChat(AI 모델 API), Tavily(웹검색 API).",
+          "① 이전받는 자: PingCAP Inc.(TiDB Cloud 데이터베이스), Vultr(클라우드 인프라), LLM API 제공사(AI 모델), Tavily(웹검색 API).",
           "② 이전 국가: 일본(AWS ap-northeast 리전, TiDB), 미국(Vultr·AI 제공사 인프라).",
           "③ 이전 항목: 이메일, 프로필 정보, 해시된 비밀번호, 암호화된 채팅 메시지, AI 챗봇 대화 내용(일시적), 단어장 데이터(암호화).",
           "④ 이전 목적: 글로벌 클라우드 기반 고가용성 데이터 저장 및 AI/LLM API 호출 처리.",
@@ -194,7 +194,7 @@ const POLICY_CONTENT: Record<
       {
         label: "AI data handling",
         value: "Chat encrypted in transit",
-        detail: "AI chatbot conversations are AES-256-GCM encrypted, sent to LLM providers (NanoGPT, FactChat) only for inference, never used for model training",
+        detail: "AI chatbot conversations are AES-256-GCM encrypted, sent to LLM API providers (subject to change) only for inference, never used for model training",
       },
       {
         label: "Default analytics",
@@ -215,7 +215,7 @@ const POLICY_CONTENT: Record<
         items: [
           "Nadeulhae is a comprehensive outdoor activity platform that aggregates public data (KMA, AirKorea, APIHub) to provide real-time weather, air quality, UV, weather alerts, and a 0-100 outdoor suitability score, together with an AI-powered dashboard chatbot, a Lab hub (vocabulary/FSRS, AI web-search chat, code sharing), and Jeonju AI daily briefing and community chat.",
           "Access is generally free, but users must register with true and accurate information. Disruption through hate speech, profanity, spam, malicious AI prompt injection, or traffic attacks is prohibited and may result in account suspension or AI feature restriction without warning.",
-          "Service downtime may occur due to public API instability, LLM provider (NanoGPT, FactChat) outages, or scheduled maintenance. The operator is not liable for indirect damages except in cases of gross negligence.",
+          "Service downtime may occur due to public API instability, LLM API provider outages, changes, or discontinuation, or scheduled maintenance. LLM API providers may be changed or replaced without prior notice at the operator's discretion. The operator is not liable for indirect damages except in cases of gross negligence.",
         ],
       },
       {
@@ -224,7 +224,7 @@ const POLICY_CONTENT: Record<
         title: "2. AI/LLM Services Terms",
         items: [
           "Nadeulhae provides these AI services: (a) Dashboard AI chatbot — weather-aware outdoor activity assistant, (b) Lab AI chat — Tavily web-search integrated knowledge chatbot, (c) Lab vocabulary generator — FSRS flashcard AI auto-generation with translations and examples, (d) Jeonju AI daily briefing — local news and event AI summary.",
-          "AI services are processed through third-party LLM providers (NanoGPT: 'deepseek-v4-flash/pro', FactChat: 'SAIT 3 Pro') and web-search provider (Tavily). User input to AI chatbots is temporarily transmitted to these providers solely for response generation and is never used for model training.",
+          "AI services are processed through third-party LLM API providers, which may be changed or replaced without prior notice based on service quality, cost, and availability. User input to AI chatbots is temporarily transmitted to these providers solely for response generation and is never used for model training.",
           "All AI-generated content (weather recommendations, chatbot answers, vocabulary definitions, news summaries) is machine learning inference output and may be inaccurate. The Jeonju briefing news summaries and Lab AI chat web-search results are for reference only; verify critical decisions with official sources.",
           "AI services have daily usage limits (LLM global: 5,000 req/day, per-user: 100-200 req/day, web-search: 800/month). Exceeding limits may temporarily block AI features. Malicious repetitive calls may result in permanent AI feature restriction.",
         ],
@@ -269,7 +269,7 @@ const POLICY_CONTENT: Record<
         title: "6. Cross-Border Data Transfer Notice",
         items: [
           "Due to cloud database (TiDB Cloud) and AI API provider infrastructure located overseas, Nadeulhae discloses the following per PIPA Article 28-8.",
-          "① Recipients: PingCAP Inc. (TiDB Cloud database), Vultr (cloud infrastructure), NanoGPT & FactChat (AI model APIs), Tavily (web-search API).",
+          "① Recipients: PingCAP Inc. (TiDB Cloud database), Vultr (cloud infrastructure), LLM API providers (AI model APIs), Tavily (web-search API).",
           "② Countries: Japan (AWS ap-northeast, TiDB), USA (Vultr & AI provider infrastructure).",
           "③ Data transferred: Email, profile info, hashed password, encrypted chat messages, temporary AI chatbot conversations, encrypted vocabulary data.",
           "④ Purpose: High-availability global cloud storage and AI/LLM API processing.",
@@ -327,11 +327,11 @@ const POLICY_CONTENT: Record<
       { id: "service", eyebrow: "服务条款", title: "1. Nadeulhae 服务条款", items: [
         "Nadeulhae 是一项综合性户外活动平台，汇总公共数据(KMA、AirKorea、APIHub)提供实时天气、空气质量、紫外线、天气警报和0-100户外适宜性评分，以及AI驱动的仪表板聊天机器人、实验室中心(词汇/FSRS、AI网络搜索聊天、代码共享)和全州AI每日简报及社区聊天。",
         "访问通常是免费的，但用户必须注册真实准确的信息。禁止通过仇恨言论、辱骂、垃圾邮件、恶意AI提示注入或流量攻击扰乱社区运营，违者可能导致账号暂停或AI功能限制。",
-        "服务可能因公共API不稳定、LLM提供商(NanoGPT、FactChat)故障或定期维护而停机。运营方不对不可预见的服务中断造成的间接损失承担责任，重大过失除外。",
+         "服务可能因公共API不稳定、LLM API提供商服务中断·变更·终止或定期维护而停机。LLM API提供商可能因内部原因未经事先通知而更改或替换。运营方不对不可预见的服务中断造成的间接损失承担责任，重大过失除外。",
       ]},
       { id: "ai-services", eyebrow: "AI & LLM", title: "2. AI/LLM 服务条款", items: [
         "Nadeulhae 提供以下AI服务: (a) 仪表板AI聊天机器人 — 天气感知户外活动助手，(b) 实验室AI聊天 — Tavily网络搜索集成知识聊天机器人，(c) 实验室词汇生成器 — FSRS闪卡AI自动生成含翻译和例句，(d) 全州AI每日简报 — 本地新闻和事件AI摘要。",
-        "AI服务通过第三方LLM提供商(NanoGPT: 'deepseek-v4-flash/pro', FactChat: 'SAIT 3 Pro')和网络搜索提供商(Tavily)处理。用户输入仅暂时传输用于响应生成，绝不用于模型训练。",
+         "AI服务通过第三方LLM API提供商处理，提供商可能根据服务质量·成本·可用性未经事先通知而更改或替换。用户输入仅暂时传输用于响应生成，绝不用于模型训练。",
         "所有AI生成内容(天气推荐、聊天机器人回答、词汇定义、新闻摘要)均为机器学习推理输出，可能不准确。全州简报新闻摘要和实验室AI聊天网络搜索结果仅供参考；关键决策请核实官方来源。",
         "AI服务设有每日使用限制(LLM全局: 5,000次/天，每用户: 100-200次/天，网络搜索: 800次/月)。超出限制可能导致AI功能暂时受限。恶意重复调用可能导致AI功能永久限制。",
       ]},
@@ -356,7 +356,7 @@ const POLICY_CONTENT: Record<
       ]},
       { id: "cross-border", eyebrow: "跨境传输", title: "6. 跨境数据传输通知", items: [
         "由于云数据库(TiDB Cloud)和AI API提供商基础设施位于海外，Nadeulhae 根据PIPA第28-8条披露以下信息。",
-        "① 接收方: PingCAP Inc.(TiDB Cloud数据库), Vultr(云基础设施), NanoGPT & FactChat(AI模型API), Tavily(网络搜索API)。",
+         "① 接收方: PingCAP Inc.(TiDB Cloud数据库), Vultr(云基础设施), LLM API提供商(AI模型API), Tavily(网络搜索API)。",
         "② 国家: 日本(AWS ap-northeast, TiDB), 美国(Vultr & AI提供商基础设施)。",
         "③ 传输数据: 电子邮件、个人资料信息、哈希密码、加密聊天消息、临时AI聊天对话、加密词汇数据。",
         "④ 目的: 高可用性全球云存储和AI/LLM API处理。",
@@ -398,11 +398,11 @@ const POLICY_CONTENT: Record<
       { id: "service", eyebrow: "利用規約", title: "1. Nadeulhae 利用規約", items: [
         "Nadeulhaeは、公共データ(KMA、AirKorea、APIHub)を集約してリアルタイムの天気、空気質、UV、気象警報、0-100の屋外適性スコアを提供し、AI搭載のダッシュボードチャットボット、ラボハブ(語彙/FSRS、AI Web検索チャット、コード共有)、全州AIデイリーブリーフィングとコミュニティチャットを統合した包括的なアウトドア活動プラットフォームです。",
         "アクセスは基本的に無料ですが、ユーザーは正確な情報で登録する必要があります。ヘイトスピーチ、悪用、スパム、悪意のあるAIプロンプト注入、トラフィック攻撃によるコミュニティ運営の妨害は禁止されており、アカウント停止やAI機能制限の対象となります。",
-        "公共APIの不安定性、LLMプロバイダー(NanoGPT、FactChat)の障害、または定期メンテナンスによりサービスが停止する場合があります。運営者は、重大な過失がない限り、予期せぬ中断による間接的な損害について責任を負いません。",
+        "公共APIの不安定性、LLM APIプロバイダーの障害·変更·終了、または定期メンテナンスによりサービスが停止する場合があります。LLM APIプロバイダーは内部事情により事前通知なく変更·代替されることがあります。運営者は、重大な過失がない限り、予期せぬ中断による間接的な損害について責任を負いません。",
       ]},
       { id: "ai-services", eyebrow: "AI & LLM", title: "2. AI/LLM サービス利用規約", items: [
         "Nadeulhaeは以下のAIサービスを提供します: (a) ダッシュボードAIチャットボット — 天気認識型アウトドアアシスタント、(b) ラボAIチャット — Tavily Web検索統合型知識チャットボット、(c) ラボ語彙ジェネレーター — 翻訳と例文付きFSRSフラッシュカードAI自動生成、(d) 全州AIデイリーブリーフィング — ローカルニュースとイベントのAIサマリー。",
-        "AIサービスはサードパーティLLMプロバイダー(NanoGPT: 'deepseek-v4-flash/pro', FactChat: 'SAIT 3 Pro')およびWeb検索プロバイダー(Tavily)を通じて処理されます。ユーザー入力は応答生成の目的でのみ一時的に送信され、モデル学習には一切使用されません。",
+        "AIサービスはサードパーティLLM APIプロバイダーを通じて処理され、プロバイダーはサービス品質·コスト·可用性に応じて事前通知なく変更·代替されることがあります。ユーザー入力は応答生成の目的でのみ一時的に送信され、モデル学習には一切使用されません。",
         "すべてのAI生成コンテンツ(天気推奨、チャットボット回答、語彙定義、ニュースサマリー)は機械学習推論の出力であり、不正確な場合があります。全州ブリーフィングのニュースサマリーとラボAIチャットのWeb検索結果は参考用です。重要な判断は公式ソースで確認してください。",
         "AIサービスには1日の使用制限があります(LLMグローバル: 5,000回/日、ユーザーあたり: 100-200回/日、Web検索: 800回/月)。制限を超えるとAI機能が一時的に制限される場合があります。悪意のある繰り返し呼び出しは、AI機能の永続的な制限につながる場合があります。",
       ]},
@@ -427,7 +427,7 @@ const POLICY_CONTENT: Record<
       ]},
       { id: "cross-border", eyebrow: "越境転送", title: "6. 越境データ転送に関する通知", items: [
         "クラウドデータベース(TiDB Cloud)とAI APIプロバイダーのインフラが海外にあるため、NadeulhaeはPIPA第28-8条に基づき以下を開示します。",
-        "① 受領者: PingCAP Inc.(TiDB Cloudデータベース)、Vultr(クラウドインフラ)、NanoGPT & FactChat(AIモデルAPI)、Tavily(Web検索API)。",
+        "① 受領者: PingCAP Inc.(TiDB Cloudデータベース)、Vultr(クラウドインフラ)、LLM APIプロバイダー(AIモデルAPI)、Tavily(Web検索API)。",
         "② 国: 日本(AWS ap-northeast、TiDB)、米国(Vultr & AIプロバイダーインフラ)。",
         "③ 転送データ: メールアドレス、プロフィール情報、ハッシュ化パスワード、暗号化チャットメッセージ、一時的なAIチャット会話、暗号化語彙データ。",
         "④ 目的: 高可用性グローバルクラウドストレージとAI/LLM API処理。",
@@ -504,7 +504,7 @@ export default function TermsPage() {
         </MagicCard>
 
         <MagicCard className="rounded-[2rem]" gradientSize={220} gradientOpacity={0.7}>
-          <div className="rounded-[inherit] border border-card-border/70 bg-card/85 p-5 backdrop-blur-xl sm:p-6">
+          <div className="rounded-[inherit] bg-card/85 p-5 backdrop-blur-xl sm:p-6">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
@@ -519,7 +519,7 @@ export default function TermsPage() {
                   <a
                     key={section.id}
                     href={`#${section.id}`}
-                    className="rounded-full border border-card-border max-w-[180px] truncate/70 bg-background/70 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
+                    className="rounded-full border border-card-border max-w-[180px] truncate bg-background/70 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
                   >
                     {section.title}
                   </a>
@@ -537,7 +537,7 @@ export default function TermsPage() {
               gradientSize={200}
               gradientOpacity={0.7}
             >
-              <div className="rounded-[inherit] border border-card-border/70 bg-card/85 p-5 backdrop-blur-xl">
+              <div className="rounded-[inherit] bg-card/85 p-5 backdrop-blur-xl">
                 <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
                   {item.label}
                 </p>
@@ -562,7 +562,7 @@ export default function TermsPage() {
             >
               <section
                 id={section.id}
-                className="scroll-mt-32 rounded-[inherit] border border-card-border/70 bg-card/85 p-5 backdrop-blur-xl sm:scroll-mt-36 sm:p-8"
+                className="scroll-mt-32 rounded-[inherit] bg-card/85 p-5 backdrop-blur-xl sm:scroll-mt-36 sm:p-8"
               >
                 <div className="grid gap-5 lg:grid-cols-[0.33fr_1fr] lg:gap-8">
                   <div className="space-y-3 lg:sticky lg:top-28 lg:self-start">
