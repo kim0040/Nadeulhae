@@ -40,7 +40,7 @@
 | 层级 | 技术 |
 |------|------|
 | **框架** | Next.js 16 (App Router) |
-| **语言** | TypeScript 6 (严格模式) |
+| **语言** | TypeScript (严格模式) |
 | **前端** | React 19, TailwindCSS 4, Framer Motion, Lucide Icons |
 | **代码编辑器** | CodeMirror 6 (`@uiw/react-codemirror`) |
 | **实时通信** | WebSocket (`ws` v8) |
@@ -77,9 +77,9 @@ Nadeulhae/
 │       │   ├── code-share/      # 实时协作编辑器
 │       │   ├── jeonju/          # 全州简报 + 聊天
 │       │   └── api/             # 50+ REST API 端点
-│       ├── components/          # 40+ React 组件
+│       ├── components/          # 39 React 组件
 │       ├── context/             # AuthContext, LanguageContext
-│       ├── lib/                 # 28 个模块, 60+ 业务逻辑文件
+│       ├── lib/                 # 25 个模块, 70+ 业务逻辑文件
 │       │   ├── auth/            # 认证 (10 个文件)
 │       │   ├── chat/            # AI 聊天 (7 个文件)
 │       │   ├── lab/             # FSRS 间隔重复 (7 个文件)

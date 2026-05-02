@@ -40,7 +40,7 @@ Next.js 16 フルスタックWebアプリケーション。リアルタイム共
 | 階層 | 技術 |
 |------|------|
 | **フレームワーク** | Next.js 16 (App Router) |
-| **言語** | TypeScript 6 (Strict) |
+| **言語** | TypeScript (Strict) |
 | **フロントエンド** | React 19, TailwindCSS 4, Framer Motion, Lucide Icons |
 | **コードエディタ** | CodeMirror 6 (`@uiw/react-codemirror`) |
 | **リアルタイム通信** | WebSocket (`ws` v8) |
@@ -77,9 +77,9 @@ Nadeulhae/
 │       │   ├── code-share/      # リアルタイム共同エディタ
 │       │   ├── jeonju/          # 全州ブリーフィング + チャット
 │       │   └── api/             # 50以上のREST APIエンドポイント
-│       ├── components/          # 40以上のReactコンポーネント
+│       ├── components/          # 39 Reactコンポーネント
 │       ├── context/             # AuthContext, LanguageContext
-│       ├── lib/                 # 28モジュール, 60以上のビジネスロジックファイル
+│       ├── lib/                 # 25モジュール, 70以上のビジネスロジックファイル
 │       │   ├── auth/            # 認証 (10ファイル)
 │       │   ├── chat/            # AIチャット (7ファイル)
 │       │   ├── lab/             # FSRS間隔反復 (7ファイル)

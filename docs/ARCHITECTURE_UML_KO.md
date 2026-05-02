@@ -63,10 +63,10 @@ graph TB
     API --> KMA
     API --> AIR
     API --> APIHUB
-    API --> NANOGPT
-    API --> FACTCHAT
+    API --> GENERAL_LLM
+    API --> LAB_LLM
     API --> TAVILY
-    SCHEDULER --> NANOGPT
+    SCHEDULER --> GENERAL_LLM
     SCHEDULER --> TIDB
 ```
 
@@ -1036,7 +1036,7 @@ graph LR
     AUTH_LIB --> SECURITY_LIB
     CHAT_LIB --> DB_LIB
     CHAT_LIB --> AUTH_LIB
-    CHAT_LIB --> NANOGPT
+    CHAT_LIB --> GENERAL_LLM
     CHAT_LIB --> LLM_QUOTA
     LAB_LIB --> DB_LIB
     LAB_LIB --> LLM_QUOTA
@@ -1275,10 +1275,10 @@ graph TB
     NGINX -- "HTTP:3000" --> NODE
     NEXT --> DB
     WS --> DB
-    SCHEDULER --> NANOGPT_EXT
+    SCHEDULER --> GENERAL_LLM_EXT
     SCHEDULER --> DB
-    NEXT --> NANOGPT_EXT
-    NEXT --> FACTCHAT_EXT
+    NEXT --> GENERAL_LLM_EXT
+    NEXT --> LAB_LLM_EXT
     NEXT --> TAVILY_EXT
     NEXT --> KMA_EXT
     NEXT --> AIR_EXT
