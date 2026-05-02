@@ -287,7 +287,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
               <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", bulletinHighlightTone.kicker)}>
                 {language === "ko" ? "핵심 공지" : language === "zh" ? "重要公告" : language === "ja" ? "重要なお知らせ" : "Key Notice"}
               </p>
-              <p className={cn("mt-1 text-sm font-semibold leading-6 sm:text-[15px]", bulletinHighlightTone.text)}>
+              <p className={cn("mt-1 text-sm font-semibold leading-6 sm:text-[15px] break-words", bulletinHighlightTone.text)}>
                 {bulletinHighlight}
               </p>
             </div>
@@ -336,14 +336,14 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
                       #{String(index + 1).padStart(2, "0")}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-foreground/95">{item.content}</p>
+                  <p className="mt-2 text-sm leading-6 text-foreground/95 break-words">{item.content}</p>
                 </div>
               </article>
             )
           })}
         </div>
       ) : !bulletinHighlight ? (
-        <p className="mt-4 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3 text-sm leading-7 text-muted-foreground">
+        <p className="mt-4 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3 text-sm leading-7 text-muted-foreground break-words">
           {copy.noBulletin}
         </p>
       ) : null}
@@ -412,7 +412,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
                     {user.displayName} · {copy.title}
                   </h1>
                 </div>
-                <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
+                <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg break-words">
                   {copy.heroDescription}
                 </p>
               </div>
@@ -455,7 +455,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
                 <h2 className="text-3xl font-black tracking-tight text-foreground">
                   {weatherData?.metadata?.region || weatherData?.metadata?.regionEn || copy.weatherTitle}
                 </h2>
-                <p className="text-sm leading-6 text-muted-foreground">{copy.weatherDescription}</p>
+                <p className="text-sm leading-6 text-muted-foreground break-words">{copy.weatherDescription}</p>
               </div>
 
               <button

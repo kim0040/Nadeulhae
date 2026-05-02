@@ -306,7 +306,7 @@ export default function Home() {
                 <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{item.label}</span>
                 <span className="font-black text-xl sm:text-3xl leading-tight text-center">{item.value}</span>
                 {"meta" in item && item.meta ? (
-                  <span className="mt-1 text-[10px] sm:text-[11px] font-bold leading-relaxed text-muted-foreground text-center break-keep">
+                  <span className="mt-1 text-[10px] sm:text-[11px] font-bold leading-relaxed text-muted-foreground text-center break-keep break-words">
                     {item.meta}
                   </span>
                 ) : null}

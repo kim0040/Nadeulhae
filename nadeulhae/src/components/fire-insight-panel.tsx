@@ -62,7 +62,7 @@ export function FireInsightPanel({
           <AnimatedGradientText className="text-3xl sm:text-5xl font-black tracking-tight">
             {language === "ko" ? "전북 화재 흐름 한눈에 보기" : language === "zh" ? "全北火灾趋势一览" : language === "ja" ? "全北の火災状況一覧" : "A quick look at Jeonbuk fire flow"}
           </AnimatedGradientText>
-          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
+          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-keep break-words">
             {language === "ko"
               ? "전북에서 최근 어떤 곳의 화재가 많았는지, 요즘 흐름이 어떤지 가볍게 훑어보는 참고 구역입니다."
               : language === "zh"

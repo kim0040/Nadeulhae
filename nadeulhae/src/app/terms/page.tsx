@@ -490,7 +490,7 @@ export default function TermsPage() {
                 <AnimatedGradientText className="text-3xl font-black tracking-tight sm:text-4xl">
                   {typedCopy.title}
                 </AnimatedGradientText>
-                <p className="max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
+                <p className="max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base break-words">
                   {typedCopy.description}
                 </p>
               </div>
