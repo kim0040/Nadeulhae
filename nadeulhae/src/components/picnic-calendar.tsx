@@ -269,7 +269,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                         {dayForecast.sky?.includes("맑음") ? <Sun size={36} strokeWidth={2.5} /> : dayForecast.sky?.includes("비") || dayForecast.sky?.includes("눈") ? <CloudRain size={36} strokeWidth={2.5} /> : <Cloud size={36} strokeWidth={2.5} />}
                       </div>
                     </div>
-                    <span className="text-2xl sm:text-3xl font-black mt-4 text-foreground text-center break-words line-clamp-2 min-h-[4rem]">
+                    <span className="text-2xl sm:text-3xl font-black mt-4 text-foreground text-center break-words line-clamp-3 min-h-[4rem]">
                       {localizedSky}
                     </span>
 

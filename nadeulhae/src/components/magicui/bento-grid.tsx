@@ -74,10 +74,10 @@ export const BentoCard = ({
     )}
     <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-2 p-6 sm:p-8 transition-all duration-300 group-hover:-translate-y-10">
       <Icon className="h-10 w-10 sm:h-14 sm:w-14 origin-left transform-gpu text-sky-blue transition-all duration-300 ease-in-out group-hover:scale-75 opacity-80" />
-      <h3 className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter mt-2">
+      <h3 className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter mt-2 break-keep break-words">
         {name}
       </h3>
-      <p className="max-w-sm text-foreground/60 text-base sm:text-lg font-medium leading-relaxed">{description}</p>
+      <p className="max-w-sm text-foreground/60 text-base sm:text-lg font-medium leading-relaxed break-keep break-words">{description}</p>
     </div>
 
     <div
