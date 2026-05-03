@@ -45,20 +45,41 @@ const JEONJU_BRIEFING_MEMORY_CACHE_MAX_ENTRIES = 24
 // KST Helpers
 // ------------------------------------------------------------------
 
+function parseKstParts(tsMs = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(tsMs))
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00"
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+    hour: Number(get("hour")),
+    minute: Number(get("minute")),
+    second: Number(get("second")),
+  }
+}
+
 function getYesterdayInKst(): string {
-  const now = new Date()
-  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  const p = parseKstParts()
   // Day boundary is 07:00 KST, not midnight.
   // Before 7 AM, "yesterday" means 2 calendar days ago.
-  const offset = kstNow.getHours() < 7 ? 2 : 1
-  kstNow.setDate(kstNow.getDate() - offset)
-  return kstNow.toISOString().slice(0, 10)
+  const offset = p.hour < 7 ? 2 : 1
+  const d = new Date(`${String(p.year)}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}T00:00:00+09:00`)
+  d.setUTCDate(d.getUTCDate() - offset)
+  return d.toISOString().slice(0, 10)
 }
 
 function getTodayInKst(): string {
-  const now = new Date()
-  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
-  return kstNow.toISOString().slice(0, 10)
+  const p = parseKstParts()
+  return `${String(p.year)}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`
 }
 
 function getFormattedDateLabel(dateStr: string, locale: JeonjuBriefingLocale): string {
@@ -140,14 +161,10 @@ function clearAutoGenerationFailures(cacheKey: string) {
   getAttemptMap().delete(cacheKey)
 }
 
-function getKstNow() {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000)
-}
-
 function getNextKstMidnightMs() {
-  const kstNow = getKstNow()
-  const next = new Date(kstNow)
-  next.setHours(24, 0, 0, 0)
+  const p = parseKstParts()
+  const todayMidnightKst = new Date(`${String(p.year)}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}T00:00:00+09:00`)
+  const next = new Date(todayMidnightKst.getTime() + 24 * 60 * 60 * 1000)
   return next.getTime()
 }
 

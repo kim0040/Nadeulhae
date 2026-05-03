@@ -18,7 +18,16 @@ const outlookCache = new Map<string, { expiresAt: number; data: string }>()
 const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutes
 
 function getToday() {
-  return new Date().toISOString().slice(0, 10)
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date())
+  const y = parts.find((p) => p.type === "year")?.value ?? "0000"
+  const m = parts.find((p) => p.type === "month")?.value ?? "00"
+  const d = parts.find((p) => p.type === "day")?.value ?? "00"
+  return `${y}-${m}-${d}`
 }
 
 function resetDailyIfNeeded() {

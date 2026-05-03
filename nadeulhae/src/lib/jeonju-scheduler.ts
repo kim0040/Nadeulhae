@@ -21,30 +21,47 @@ const SCHEDULE_HOUR_KST = 7
 const CHECK_INTERVAL_MS = 5 * 60 * 1000 // Check every 5 minutes
 const RETRY_COOLDOWN_MS = 30 * 60 * 1000 // 30 minutes between retries
 const MAX_RETRIES = 3
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 
 let _lastGeneratedDate = ""
 let _retryCount = 0
 let _retryAfterMs = 0
 let _schedulerStarted = false
 
+function parseKstParts(tsMs = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(tsMs))
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00"
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: Number(get("hour")),
+  }
+}
+
 function getKstDate(): string {
-  const kst = new Date(Date.now() + KST_OFFSET_MS)
-  return kst.toISOString().slice(0, 10)
+  const p = parseKstParts()
+  return `${p.year}-${p.month}-${p.day}`
 }
 
 function getKstHour(): number {
-  const kst = new Date(Date.now() + KST_OFFSET_MS)
-  return kst.getHours()
+  return parseKstParts().hour
 }
 
 async function generateForToday(): Promise<void> {
   const todayDate = getKstDate()
-  const yesterdayDate = new Date(Date.now() + KST_OFFSET_MS)
+  const p = parseKstParts()
   // Day boundary is 07:00 KST, not midnight
-  const offset = yesterdayDate.getHours() < 7 ? 2 : 1
-  yesterdayDate.setDate(yesterdayDate.getDate() - offset)
-  const dateStr = yesterdayDate.toISOString().slice(0, 10)
+  const offset = p.hour < 7 ? 2 : 1
+  const d = new Date(`${p.year}-${p.month}-${p.day}T00:00:00+09:00`)
+  d.setUTCDate(d.getUTCDate() - offset)
+  const dateStr = d.toISOString().slice(0, 10)
 
   try {
     console.log(`[jeonju-scheduler] Starting auto-generation for ${dateStr}...`)

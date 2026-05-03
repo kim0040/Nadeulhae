@@ -148,11 +148,21 @@ function createRateLimitResponse(locale: JeonjuBriefingLocale, retryAfterSeconds
 }
 
 function getYesterdayInKst(): string {
-  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date())
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00"
+  const hour = Number(get("hour"))
   // Day boundary is 07:00 KST, not midnight
-  const offset = kstNow.getHours() < 7 ? 2 : 1
-  kstNow.setDate(kstNow.getDate() - offset)
-  return kstNow.toISOString().slice(0, 10)
+  const offset = hour < 7 ? 2 : 1
+  const d = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00+09:00`)
+  d.setUTCDate(d.getUTCDate() - offset)
+  return d.toISOString().slice(0, 10)
 }
 
 function isRecentlyUpdated(updatedAt: string, nowMs: number, minIntervalMs: number) {
