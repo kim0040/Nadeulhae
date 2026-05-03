@@ -96,8 +96,14 @@ const USER_DAILY_QUOTA_LIMIT = 50
  * Used as a cache-key partition so cached results expire naturally at midnight KST.
  */
 function getKstDateStr() {
-  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000)
-  return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}-${String(kst.getDate()).padStart(2, "0")}`
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date())
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00"
+  return `${get("year")}-${get("month")}-${get("day")}`
 }
 
 /**
@@ -233,12 +239,18 @@ function sanitizeSnapshot(raw: unknown): WeatherSnapshot | null {
 }
 
 function getKstDateLabel() {
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000)
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, "0")
-  const d = String(now.getDate()).padStart(2, "0")
-  const wd = ["일", "월", "화", "수", "목", "금", "토"][now.getDay()]
-  return `${y}년 ${m}월 ${d}일 ${wd}요일`
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour12: false,
+  }).formatToParts(new Date())
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00"
+  const wdMap: Record<string, string> = { Sun: "일", Mon: "월", Tue: "화", Wed: "수", Thu: "목", Fri: "금", Sat: "토" }
+  const wd = wdMap[get("weekday")] ?? get("weekday")
+  return `${get("year")}년 ${get("month")}월 ${get("day")}일 ${wd}요일`
 }
 
 function toLocaleTemp(c: number | null, locale: BriefingLocale) {

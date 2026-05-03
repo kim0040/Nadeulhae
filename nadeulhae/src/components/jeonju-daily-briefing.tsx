@@ -47,8 +47,16 @@ type FetchStatus = "idle" | "loading" | "success" | "error"
 const CACHE_PREFIX = "nadeul:briefing:v5"
 
 function getKstDateKey() {
-  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
-  return kstNow.toISOString().slice(0, 10)
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date())
+  const y = parts.find((p) => p.type === "year")?.value ?? "0000"
+  const m = parts.find((p) => p.type === "month")?.value ?? "00"
+  const d = parts.find((p) => p.type === "day")?.value ?? "00"
+  return `${y}-${m}-${d}`
 }
 
 function getCacheKey(lang: string) {
@@ -73,9 +81,17 @@ function readCache(lang: string): BriefingData | null {
 
 function writeCache(lang: string, data: BriefingData) {
   if (typeof window === "undefined") return
-  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
-  const nextMidnight = new Date(kstNow)
-  nextMidnight.setHours(24, 0, 0, 0)
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date())
+  const y = parts.find((p) => p.type === "year")?.value ?? "0000"
+  const m = parts.find((p) => p.type === "month")?.value ?? "00"
+  const d = parts.find((p) => p.type === "day")?.value ?? "00"
+  const todayMidnight = new Date(`${y}-${m}-${d}T00:00:00+09:00`)
+  const nextMidnight = new Date(todayMidnight.getTime() + 24 * 60 * 60 * 1000)
   const exp = Math.max(Date.now() + 10 * 60 * 1000, nextMidnight.getTime())
   localStorage.setItem(getCacheKey(lang), JSON.stringify({ data, exp }))
 }
