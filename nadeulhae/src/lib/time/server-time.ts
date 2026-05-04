@@ -1,7 +1,29 @@
+/**
+ * @fileoverview Server time utilities with KST (Asia/Seoul) handling and
+ * i18n-aware formatting.
+ *
+ * Parses timestamps from various server-side formats (Date, epoch ms/s,
+ * compact `yyyyMMdd`, ISO-like strings), then formats them as clock time,
+ * date-time, or relative ("3분 전") strings in Korean, English, Chinese,
+ * or Japanese. Also exports `getServerNowMs` to compute an approximated
+ * server clock via a known offset.
+ *
+ * @module server-time
+ */
+
+/**
+ * Supported display languages for formatted date/time strings.
+ * Accepts standard two-letter codes or a custom string (falls back to `en-US`).
+ */
 export type SupportedLocale = "ko" | "en" | "zh" | "ja" | string
 
+/** IANA time zone identifier for the server (KST). */
 export const SERVER_TIME_ZONE = "Asia/Seoul"
 
+/**
+ * Creates a Date from KST date parts by adjusting for the UTC-9 offset
+ * (KST = UTC+9, so subtract 9 hours when constructing the UTC Date).
+ */
 function createDateFromKstParts(
   year: number,
   month: number,
@@ -13,6 +35,10 @@ function createDateFromKstParts(
   return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, second))
 }
 
+/**
+ * Parses a compact date string (`yyyyMMdd` or `yyyyMMddHHmm` or `yyyyMMddHHmmss`).
+ * Strips all non-digit characters first, then extracts date parts by position.
+ */
 function parseCompactDateString(input: string) {
   const compact = input.replace(/\D/g, "")
   if (!/^\d{8}(\d{4}(\d{2})?)?$/.test(compact)) {
@@ -29,6 +55,15 @@ function parseCompactDateString(input: string) {
   return createDateFromKstParts(year, month, day, hour, minute, second)
 }
 
+/**
+ * Parses a server timestamp of unknown shape into a `Date` (or `null`).
+ *
+ * Accepts:
+ * - `Date` instances (validated against `NaN`)
+ * - Numbers (epoch ms > 1e12, or epoch seconds ≤ 1e12 auto-converted)
+ * - Strings: compact `yyyyMMdd[HHmm[ss]]`, ISO-like (missing TZ → assumes KST),
+ *   or special sentinels like `"--:--"` → `null`
+ */
 export function parseServerTimestamp(value: unknown): Date | null {
   if (value == null) {
     return null
@@ -39,6 +74,7 @@ export function parseServerTimestamp(value: unknown): Date | null {
   }
 
   if (typeof value === "number") {
+    // Values ≤ 1e12 are likely Unix epoch seconds; multiply to ms.
     const normalized = value > 1_000_000_000_000 ? value : value * 1000
     const parsed = new Date(normalized)
     return Number.isNaN(parsed.getTime()) ? null : parsed
@@ -49,6 +85,7 @@ export function parseServerTimestamp(value: unknown): Date | null {
   }
 
   const trimmed = value.trim()
+  // "--:--" is a sentinel from the weather API indicating unavailable time.
   if (!trimmed || trimmed === "--:--") {
     return null
   }
@@ -58,6 +95,7 @@ export function parseServerTimestamp(value: unknown): Date | null {
     return compactParsed
   }
 
+  // If the string lacks an explicit timezone, assume KST (+09:00).
   const hasExplicitTimeZone = /(?:z|[+-]\d{2}:\d{2})$/i.test(trimmed)
   const normalized = trimmed.includes("T") ? trimmed : trimmed.replace(" ", "T")
   const parsed = new Date(hasExplicitTimeZone ? normalized : `${normalized}+09:00`)
@@ -68,11 +106,16 @@ export function parseServerTimestamp(value: unknown): Date | null {
   return parsed
 }
 
+/** Maps a short language code to its full BCP 47 locale tag. */
 function getLocaleCode(language: SupportedLocale) {
   const localeMap: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" }
   return localeMap[language] ?? "en-US"
 }
 
+/**
+ * Formats a server timestamp as a short clock time (HH:MM) in KST.
+ * Returns empty string for unparseable input.
+ */
 export function formatServerClockTime(value: unknown, language: SupportedLocale) {
   const parsed = parseServerTimestamp(value)
   if (!parsed) {
@@ -86,6 +129,10 @@ export function formatServerClockTime(value: unknown, language: SupportedLocale)
   })
 }
 
+/**
+ * Formats a server timestamp as a full date-time string (e.g. "2025-05-04 14:30")
+ * in KST. Returns `"-"` for unparseable input.
+ */
 export function formatServerDateTime(value: unknown, language: SupportedLocale) {
   const parsed = parseServerTimestamp(value)
   if (!parsed) {
@@ -102,6 +149,11 @@ export function formatServerDateTime(value: unknown, language: SupportedLocale) 
   })
 }
 
+/**
+ * Computes the difference (in ms) between the server's clock and the local
+ * clock. Returns `null` if the server timestamp cannot be parsed.
+ * Positive means the server is ahead of local time.
+ */
 export function computeServerClockOffsetMs(serverNow: unknown) {
   const parsed = parseServerTimestamp(serverNow)
   if (!parsed) {
@@ -111,6 +163,11 @@ export function computeServerClockOffsetMs(serverNow: unknown) {
   return parsed.getTime() - Date.now()
 }
 
+/**
+ * Returns an approximate server timestamp (ms) by applying the pre-computed
+ * clock offset to `Date.now()`. Falls back to local time when offset is
+ * null/undefined/infinite.
+ */
 export function getServerNowMs(offsetMs: number | null | undefined) {
   if (typeof offsetMs === "number" && Number.isFinite(offsetMs)) {
     return Date.now() + offsetMs
@@ -119,12 +176,23 @@ export function getServerNowMs(offsetMs: number | null | undefined) {
   return Date.now()
 }
 
+/**
+ * Formats a timestamp as a human-readable relative time string
+ * (e.g. "방금", "3분 전", "2h ago", "May 4 14:30") in the given language.
+ *
+ * Thresholds:
+ * - < 1 min   → "Just now" (localised)
+ * - < 1 hour  → "Xm ago" (localised)
+ * - < 1 day   → "Xh ago" (localised)
+ * - ≥ 1 day   → absolute date-time (no fallback to relative)
+ */
 export function formatServerRelativeTime(value: unknown, nowMs: number, language: SupportedLocale) {
   const parsed = parseServerTimestamp(value)
   if (!parsed) {
     return ""
   }
 
+  // Clamp diff to 0 to avoid showing negative time for future timestamps.
   const diff = Math.max(0, nowMs - parsed.getTime())
 
   if (diff < 60_000) {
@@ -141,6 +209,7 @@ export function formatServerRelativeTime(value: unknown, nowMs: number, language
     return language === "ko" ? `${hours}시간 전` : language === "zh" ? `${hours}小时前` : language === "ja" ? `${hours}時間前` : `${hours}h ago`
   }
 
+  // Older than 1 day: fall back to localised absolute date-time in KST.
   return parsed.toLocaleString(getLocaleCode(language), {
     timeZone: SERVER_TIME_ZONE,
     month: "short",

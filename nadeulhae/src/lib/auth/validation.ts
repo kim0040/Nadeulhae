@@ -1,3 +1,8 @@
+/**
+ * Input validation for auth API payloads.
+ * Sanitizes, normalizes, and validates login / register / profile-update payloads
+ * against allowed options, length constraints, and format rules.
+ */
 import {
   AGE_BAND_OPTIONS,
   INTEREST_OPTIONS,
@@ -19,6 +24,7 @@ import type {
   UpdateProfilePayload,
 } from "@/lib/auth/types"
 
+// Coerces input to a trimmed string; strips control characters for safety.
 function asTrimmedString(value: unknown) {
   if (typeof value !== "string") {
     return ""
@@ -41,16 +47,19 @@ const MAX_EMAIL_LENGTH = 254
 const MAX_PASSWORD_LENGTH = 256
 const MAX_INTEREST_OTHER_LENGTH = 120
 
+// Basic email format check (presence of local-part, @, domain).
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+// Requires minimum length + at least one letter and one digit.
 function hasPasswordStrength(value: string) {
   return value.length >= MIN_PASSWORD_LENGTH
     && /[A-Za-z]/.test(value)
     && /\d/.test(value)
 }
 
+/** Validates a login payload: email format and password presence/length. */
 export function validateLoginPayload(payload: unknown, locale: AuthLocale = "ko") {
   if (!payload || typeof payload !== "object") {
     return { error: getAuthMessage(locale, "loginInvalidRequest") }
@@ -85,6 +94,7 @@ export function validateLoginPayload(payload: unknown, locale: AuthLocale = "ko"
   }
 }
 
+/** Validates a registration payload: all required fields, format constraints, and consent checks. */
 export function validateRegisterPayload(payload: unknown, locale: AuthLocale = "ko") {
   if (!payload || typeof payload !== "object") {
     return { error: getAuthMessage(locale, "registerInvalidRequest") }
@@ -216,6 +226,7 @@ export function validateRegisterPayload(payload: unknown, locale: AuthLocale = "
   }
 }
 
+/** Validates a profile update payload: same field checks as register (excludes email/password/consents). */
 export function validateUpdateProfilePayload(payload: unknown, locale: AuthLocale = "ko") {
   if (!payload || typeof payload !== "object") {
     return { error: getAuthMessage(locale, "profileInvalidRequest") }

@@ -1,6 +1,12 @@
+/**
+ * Jeonju briefing data-access layer.
+ * Provides CRUD operations for the jeonju_daily_briefings table
+ * with JSON deserialisation and mysql2 ResultSetHeader helpers.
+ */
 import { executeStatement, queryRows } from "@/lib/db"
 import type { JeonjuDailyBriefingRow } from "./schema"
 
+/** Structured briefing object returned to callers after DB row deserialisation. */
 export interface JeonjuBriefingData {
   briefingDate: string
   locale: string
@@ -22,6 +28,7 @@ export interface JeonjuBriefingData {
   updatedAt: string
 }
 
+/** Fetch a single briefing row by date + locale. Returns null when no row exists. */
 export async function getJeonjuBriefingByDateAndLocale(
   briefingDate: string,
   locale: string
@@ -45,6 +52,7 @@ export async function getJeonjuBriefingByDateAndLocale(
   return rowToBriefingData(row)
 }
 
+/** Insert or replace a briefing row (UPSERT on duplicate briefing_date + locale). */
 export async function saveJeonjuBriefing(data: {
   briefingDate: string
   locale: string
@@ -102,7 +110,9 @@ export async function saveJeonjuBriefing(data: {
   )
 }
 
+/** Deserialise a raw DB row into a typed briefing object (JSON columns parsed safely). */
 function rowToBriefingData(row: JeonjuDailyBriefingRow): JeonjuBriefingData {
+  // Safely parse JSON news_items — malformed data yields an empty list instead of crashing
   let newsItems: JeonjuBriefingData["newsItems"] = []
   try {
     const parsed = JSON.parse(row.news_items)
@@ -113,9 +123,10 @@ function rowToBriefingData(row: JeonjuDailyBriefingRow): JeonjuBriefingData {
       )
     }
   } catch {
-    // ignore
+    // ignore parse errors; fall through to empty array
   }
 
+  // Safely parse JSON keyword_tags — same defensive approach as news_items
   let keywordTags: string[] = []
   try {
     const parsed = JSON.parse(row.keyword_tags)
@@ -123,7 +134,7 @@ function rowToBriefingData(row: JeonjuDailyBriefingRow): JeonjuBriefingData {
       keywordTags = parsed.filter((t): t is string => typeof t === "string")
     }
   } catch {
-    // ignore
+    // ignore parse errors; fall through to empty array
   }
 
   return {
@@ -142,6 +153,7 @@ function rowToBriefingData(row: JeonjuDailyBriefingRow): JeonjuBriefingData {
   }
 }
 
+/** Delete briefing(s) for a given date, optionally scoped to one locale. Returns deleted row count. */
 export async function deleteJeonjuBriefingsForDate(
   briefingDate: string,
   locale?: string

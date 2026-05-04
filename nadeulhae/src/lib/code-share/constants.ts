@@ -29,13 +29,19 @@ export const CODE_SHARE_DEFAULT_LANGUAGE = "plaintext"
 
 export const CODE_SHARE_ROOM_PREFIX = "code_share:"
 
-// Base64url id generated on create (randomBytes -> base64url) and validated across API + WS.
+/**
+ * Pattern for validating session IDs.
+ * Generated as base64url (randomBytes) on create,
+ * validated across both REST API and WebSocket gateways.
+ */
 const CODE_SHARE_SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{10,40}$/
 
+/** Returns `true` when the value matches a valid base64url session ID pattern. */
 export function isValidCodeShareSessionId(value: string) {
   return CODE_SHARE_SESSION_ID_PATTERN.test(value)
 }
 
+/** Converts a session ID into its corresponding WebSocket room name. */
 export function toCodeShareRoomName(sessionId: string) {
   return `${CODE_SHARE_ROOM_PREFIX}${sessionId}`
 }

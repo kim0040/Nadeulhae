@@ -1,3 +1,12 @@
+/**
+ * GET /api/weather/forecast
+ * Fetches village (3-hourly), ultra-short-term, and mid-range (10-day) forecasts from KMA.
+ * Query: lat, lon (optional, defaults to HOME_REGION).
+ * Returns: { location, daily[11], todayHourly[18], metadata }.
+ * Daily aggregates combine village + mid data; hourly timeline uses village + ultra data.
+ * Missing days are filled with stable pseudo-random fallback forecasts.
+ */
+
 import { NextResponse } from "next/server"
 import {
   HOME_REGION,
@@ -177,6 +186,7 @@ async function fetchJsonSafely(url: string) {
   }
 }
 
+/** Compute a 10-100 outdoor score based on temperature and sky description. */
 function calculateScore(temp: number, sky: string) {
   let score = 100
 
@@ -224,6 +234,7 @@ function getKstTimeLabel(date: Date) {
 }
 
 async function handleGET(request: Request) {
+  // === 1. INIT — parse params, resolve region & grid ===
   runMaintenanceSweepIfNeeded()
   const url = new URL(request.url)
   const lat = url.searchParams.get("lat")
@@ -295,11 +306,13 @@ async function handleGET(request: Request) {
     }
   }
 
+  // === 2. VALIDATION — API key check ===
   const kmaKey = process.env.KMA_API_KEY
   if (!kmaKey) {
     return NextResponse.json({ error: "KMA Key Missing" }, { status: 500 })
   }
 
+  // === 3. DATA FETCHING — village, ultra-short-term, and mid-range in parallel ===
   const kstToday = getKstCompactDate()
   
   const [villageData, ultraForecastData, midForecast] = await Promise.all([
@@ -310,6 +323,7 @@ async function handleGET(request: Request) {
 
   const { midLand: midLandData, midTemp: midTempData, tmFc } = midForecast
 
+  // === 4. PROCESSING — village forecast into daily buckets + hourly timeline ===
   const dailyForecastMap = new Map<string, {
     date: string
     tempMin: number
@@ -414,6 +428,7 @@ async function handleGET(request: Request) {
     }
   }
 
+  // 4a. Merge mid-range forecast for days 3-10 (fills gaps village doesn't cover)
   const midLandItems = midLandData?.response?.body?.items?.item
   const midTempItems = midTempData?.response?.body?.items?.item
   const midLand = Array.isArray(midLandItems) ? midLandItems[0] : midLandItems
@@ -456,7 +471,7 @@ async function handleGET(request: Request) {
     }
   }
 
-  // Ensure 11 days (today + 10) starting from kstToday
+  // 4b. Ensure 11 days (today + 10), fill gaps with stable fallback
   const finalDaily: Array<{
     date: string
     tempMin: number
@@ -488,6 +503,7 @@ async function handleGET(request: Request) {
     }
   }
 
+  // 4c. Merge ultra-short-term forecast into hourly timeline
   const ultraItems = ultraForecastData?.response?.body?.items?.item
   if (Array.isArray(ultraItems)) {
     for (const item of ultraItems) {
@@ -516,6 +532,7 @@ async function handleGET(request: Request) {
     }
   }
 
+  // 4d. Sort, filter past hours, limit to 18 entries, map sky code to label
   const hourlyEntries = Array.from(hourlyTimelineMap.values())
     .filter((entry) => `${entry.date}${entry.time}` >= currentDateTimeLabel || hourlyTimelineMap.size <= 4)
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))

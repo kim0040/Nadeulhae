@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * About Page — introduces the Nadeulhae service, its feature roadmap, tech stack,
+ * environmental metric guide, live Jeonju features, future pipeline, and contributors.
+ * Fully i18n — supports ko/en/zh/ja via the shared LanguageContext.
+ */
+
 import { useCallback, useMemo } from "react"
 import { 
   AlertTriangle,
@@ -31,6 +37,8 @@ import { BorderBeam } from "@/components/magicui/border-beam"
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text"
 import { CalendarClock, Route } from "lucide-react"
 import { getParticleCount, shouldRunRichAnimation } from "@/lib/performance"
+
+// ---- Static content data: feature cards, contributors, pipelines ----
 
 const features = [
   {
@@ -95,6 +103,8 @@ const algorithmCards = [
   { icon: Database, titleKey: "about_algo_data_title", descKey: "about_algo_data_desc" },
 ]
 
+// ---- Component ----
+
 export default function AboutPage() {
   const { resolvedTheme } = useTheme()
   const { t, language } = useLanguage()
@@ -104,6 +114,7 @@ export default function AboutPage() {
 
   const devSteps = ["01", "02", "03", "04", "05"]
 
+  /** Inline locale helper: returns the first match in priority order ko > zh > ja > en */
   const locale = useCallback((ko: string, en = ko, zh = en, ja = zh) => {
     if (language === "ko") return ko
     if (language === "zh") return zh
@@ -252,7 +263,7 @@ export default function AboutPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground transition-colors overflow-x-hidden">
-      {/* Hero Section */}
+      {/* Hero — particles + tagline + animated title */}
       <section className="relative px-4 pb-20 pt-24 text-center overflow-hidden sm:pt-28">
         {particleQuantity > 0 ? (
           <Particles
@@ -275,7 +286,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Tech Stack Section */}
+      {/* Tech stack marquee — scrolls horizontally through project technologies */}
       <section className="py-24 relative overflow-hidden">
         <Marquee pauseOnHover className="[--duration:40s]">
           {[
@@ -293,7 +304,7 @@ export default function AboutPage() {
         </Marquee>
       </section>
 
-      {/* Feature Section */}
+      {/* Core features — bento grid with data-driven badge */}
       <section id="features" className="container mx-auto py-32 px-4">
         <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
           <div className="max-w-xl">
@@ -441,7 +452,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Environmental Metric Guide */}
+      {/* Metric guide — explains each environmental factor used in scoring */}
       <section id="guide" className="container mx-auto py-20 px-4">
         <div className="max-w-4xl mx-auto text-center mb-12">
           <AnimatedGradientText className="text-3xl md:text-5xl font-black tracking-tight">
@@ -570,7 +581,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Contributors Section */}
+      {/* Team contributors — person cards with BorderBeam on capable devices */}
       <section id="contributors" className="container mx-auto py-32 px-4 border-y border-sky-blue/10 dark:border-white/5 relative overflow-hidden">
         <div className="hidden xl:block absolute top-0 right-0 px-8 py-2 bg-sky-blue/10 border-l border-b border-sky-blue/20 rounded-bl-3xl text-[10px] font-black uppercase tracking-[0.3em] text-sky-blue">
           The Engineering Team

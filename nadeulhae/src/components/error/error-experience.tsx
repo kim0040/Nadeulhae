@@ -1,5 +1,12 @@
 "use client"
 
+/**
+ * ErrorExperience — unified error recovery surface for 404, route errors,
+ * and global errors. Displays contextual actions (retry, home, dashboard, back),
+ * a theme/language control panel, and dev-only error detail in non-production.
+ * Fully i18n via LanguageContext.
+ */
+
 import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -268,7 +275,7 @@ const COPY = {
   },
 } as const
 
-function getThemeLabel(
+/** Map a theme value to its localized label string */ function getThemeLabel(
   theme: string | undefined,
   labels: {
     themeLight: string
@@ -281,7 +288,7 @@ function getThemeLabel(
   return labels.themeSystem
 }
 
-function InfoLine({
+/** Single row inside the status info panel: label + value */ function InfoLine({
   label,
   value,
 }: {
@@ -300,6 +307,8 @@ function InfoLine({
   )
 }
 
+// ---- Component ----
+
 export function ErrorExperience({
   variant,
   error,
@@ -313,10 +322,13 @@ export function ErrorExperience({
   const copy = ((COPY as any)[language] ?? COPY.ko)
   const mode = copy.modes[variant]
   const activeTheme = theme === "system" ? resolvedTheme ?? "system" : theme
+
+  // Derived: particle tint matches the active resolved theme
   const particleColor = activeTheme === "dark" ? "#dff4ff" : "#2f6fe4"
   const heroCodeClass = variant === "notFound"
     ? "text-[4.5rem] sm:text-[6rem] lg:text-[8rem]"
     : "text-[3.6rem] sm:text-[5rem] lg:text-[6.5rem]"
+  // Dev-only: show first 200 chars of error message (never in production)
   const errorDetail = useMemo(() => {
     if (process.env.NODE_ENV === "production") {
       return null
@@ -326,6 +338,7 @@ export function ErrorExperience({
     return message ? message.slice(0, 200) : null
   }, [error?.message])
 
+  /** Rotate through light → dark → system theme on each click */
   const cycleTheme = () => {
     const modes: Array<"light" | "dark" | "system"> = ["light", "dark", "system"]
     const currentIndex = modes.indexOf((theme as "light" | "dark" | "system") ?? "system")
@@ -340,7 +353,7 @@ export function ErrorExperience({
         hasExternalNav ? "pt-28 sm:pt-32" : "pt-6 sm:pt-8"
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(47,111,228,0.18),transparent_32%),radial-gradient(circle_at_80%_14%,rgba(11,125,113,0.16),transparent_28%),radial-gradient(circle_at_70%_82%,rgba(255,255,255,0.06),transparent_24%)]" />
+      {/* Ambient glow gradients — decorative only, no interaction */}      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(47,111,228,0.18),transparent_32%),radial-gradient(circle_at_80%_14%,rgba(11,125,113,0.16),transparent_28%),radial-gradient(circle_at_70%_82%,rgba(255,255,255,0.06),transparent_24%)]" />
       <Particles
         className="absolute inset-0"
         quantity={42}

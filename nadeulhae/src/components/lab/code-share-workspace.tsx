@@ -1,5 +1,12 @@
 "use client"
 
+/**
+ * CodeShareWorkspace — real-time collaborative code editor.
+ * Manages session CRUD, WebSocket-based presence, code patching/saving,
+ * and a shareable link model.  Supports auto-close on inactivity and
+ * read-only mode for closed sessions.  Fully i18n via LanguageContext.
+ */
+
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -412,6 +419,8 @@ async function parseApiError(response: Response, fallback: string) {
 
   return fallback
 }
+
+// ---- Component ----
 
 export function CodeShareWorkspace({
   initialSessionId = null,

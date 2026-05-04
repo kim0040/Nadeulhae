@@ -1,3 +1,11 @@
+/**
+ * Data-access layer for the Code Share module.
+ *
+ * Provides CRUD operations for collaborative code-editing sessions,
+ * including optimistic-lock updates, inactivity auto-close, and
+ * owner-scoped listing/deletion. All public functions lazily
+ * bootstrap the schema on first invocation.
+ */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise"
 
 import {
@@ -19,6 +27,7 @@ import type {
 } from "@/lib/code-share/types"
 import { executeStatement, queryRows } from "@/lib/db"
 
+/** Database row shape for the `code_share_sessions` table. Snake_case columns are mapped to camelCase API types. */
 interface CodeShareSessionRow extends RowDataPacket {
   session_id: string
   owner_actor_id: string
@@ -34,12 +43,17 @@ interface CodeShareSessionRow extends RowDataPacket {
   closed_at: Date | string | null
 }
 
+/** Minimal row projection used for ownership checks — avoids fetching the full session body. */
 interface CodeShareOwnerRow extends RowDataPacket {
   owner_actor_id: string
   owner_user_id: string | null
 }
 
-// Normalize database timestamps into stable ISO strings for API responses.
+/**
+ * Normalizes database timestamps (Date or string) into stable ISO-8601 strings.
+ * Falls back to the current time on parse failure;
+ * returns `null` for falsy inputs.
+ */
 function toIsoString(value: Date | string | null) {
   if (!value) {
     return null
@@ -53,7 +67,11 @@ function toIsoString(value: Date | string | null) {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
 }
 
-// Normalizers are shared by create/update paths so server-side constraints stay consistent.
+/**
+ * Strips control characters, collapses whitespace, and truncates
+ * to max title length. Falls back to the default title when empty.
+ * Normalizers are shared by create/update paths for consistent constraints.
+ */
 function normalizeTitle(value: string) {
   const normalized = value
     .replace(/[\u0000-\u001F\u007F]/g, "")
@@ -64,6 +82,7 @@ function normalizeTitle(value: string) {
   return normalized || CODE_SHARE_DEFAULT_TITLE
 }
 
+/** Lowercases, strips special characters except common delimiters, truncates. Falls back to `plaintext` when empty. */
 function normalizeLanguage(value: string) {
   const normalized = value
     .toLowerCase()
@@ -74,16 +93,19 @@ function normalizeLanguage(value: string) {
   return normalized || CODE_SHARE_DEFAULT_LANGUAGE
 }
 
+/** Removes null bytes and truncates to the configured max code length. */
 function normalizeCode(value: string) {
   return value
     .replace(/\u0000/g, "")
     .slice(0, CODE_SHARE_MAX_CODE_LENGTH)
 }
 
+/** Coerces a raw status string to the union type; any value other than `"closed"` becomes `"active"`. */
 function normalizeStatus(value: string): CodeShareSessionStatus {
   return value === "closed" ? "closed" : "active"
 }
 
+/** Maps a database row to the summary shape used by list/index endpoints. */
 function toSummary(row: CodeShareSessionRow): CodeShareSessionSummary {
   return {
     sessionId: row.session_id,
@@ -99,6 +121,7 @@ function toSummary(row: CodeShareSessionRow): CodeShareSessionSummary {
   }
 }
 
+/** Maps a database row to the full snapshot shape (summary + code body). */
 function toSnapshot(row: CodeShareSessionRow): CodeShareSessionSnapshot {
   return {
     ...toSummary(row),
@@ -106,7 +129,10 @@ function toSnapshot(row: CodeShareSessionRow): CodeShareSessionSnapshot {
   }
 }
 
-// Centralized column list keeps all row projections aligned with mapper helpers.
+/**
+ * Centralised column list used by all SELECT queries.
+ * Keeps row projections aligned with `CodeShareSessionRow` and mapper helpers.
+ */
 const CODE_SHARE_SELECT_COLUMNS = `
   session_id,
   owner_actor_id,
@@ -122,6 +148,7 @@ const CODE_SHARE_SELECT_COLUMNS = `
   closed_at
 `
 
+/** Fetches a single session row by ID, or `null` when not found. Lazily bootstraps schema. */
 async function getSessionRowById(sessionId: string) {
   await ensureCodeShareSchema()
 
@@ -136,6 +163,11 @@ async function getSessionRowById(sessionId: string) {
   return rows[0] ?? null
 }
 
+/**
+ * Closes all active sessions whose `last_activity_at` exceeds the inactivity threshold.
+ * Returns the list of closed session IDs. Evaluated synchronously on read/write
+ * entrypoints to avoid needing a separate cron-based cleanup job.
+ */
 export async function closeInactiveCodeShareSessions() {
   await ensureCodeShareSchema()
 
@@ -167,6 +199,11 @@ export async function closeInactiveCodeShareSessions() {
   return staleRows.map((row) => row.session_id)
 }
 
+/**
+ * Creates a new code-share session with the given input.
+ * Normalizes title, language, and code before persisting.
+ * Returns the created snapshot, or `null` if insertion failed.
+ */
 export async function createCodeShareSession(input: CodeShareCreateInput) {
   await ensureCodeShareSchema()
 
@@ -196,6 +233,11 @@ export async function createCodeShareSession(input: CodeShareCreateInput) {
   return row ? toSnapshot(row) : null
 }
 
+/**
+ * Lists sessions owned by a given actor (or user). When `userId` is provided,
+ * matches both `owner_actor_id` and `owner_user_id` for broader scope.
+ * Results are ordered by most-recently-updated, capped at 300 entries.
+ */
 export async function listCodeShareSessionsByOwner(params: {
   actorId: string
   userId?: string | null
@@ -229,11 +271,13 @@ export async function listCodeShareSessionsByOwner(params: {
   return rows.map(toSummary)
 }
 
+/** Fetches the full session snapshot by ID. Returns `null` when the session does not exist. */
 export async function getCodeShareSessionById(sessionId: string) {
   const row = await getSessionRowById(sessionId)
   return row ? toSnapshot(row) : null
 }
 
+/** Touches `last_activity_at` and `updated_at` for an active session to prevent premature inactivity auto-close. */
 export async function touchCodeShareSessionActivity(sessionId: string) {
   await ensureCodeShareSchema()
 
@@ -247,6 +291,11 @@ export async function touchCodeShareSessionActivity(sessionId: string) {
   )
 }
 
+/**
+ * Updates a session with an optimistic-lock check (`version = expectedVersion`).
+ * On mismatch, inspects the current row to determine whether the cause is
+ * a version conflict, a closed session, or a missing session.
+ */
 export async function updateCodeShareSession(input: CodeShareUpdateInput): Promise<CodeShareUpdateResult> {
   await ensureCodeShareSchema()
 
@@ -299,6 +348,7 @@ export async function updateCodeShareSession(input: CodeShareUpdateInput): Promi
   }
 }
 
+/** Returns `true` when the given actor/user matches the session owner. Prefers `owner_user_id` when available (authenticated owner). */
 function isOwner(owner: CodeShareOwnerRow, actorId: string, userId: string | null) {
   if (owner.owner_user_id) {
     return Boolean(userId && owner.owner_user_id === userId)
@@ -307,6 +357,10 @@ function isOwner(owner: CodeShareOwnerRow, actorId: string, userId: string | nul
   return owner.owner_actor_id === actorId
 }
 
+/**
+ * Deletes a session by ID, but only when the requester is the session owner.
+ * Non-owners receive a `forbidden` result; missing sessions return `not_found`.
+ */
 export async function deleteCodeShareSessionById(params: {
   sessionId: string
   actorId: string
@@ -346,6 +400,10 @@ export async function deleteCodeShareSessionById(params: {
   return { ok: true as const }
 }
 
+/**
+ * Checks whether the given actor (or user) is the owner of a session.
+ * Returns `false` when the session does not exist.
+ */
 export async function isCodeShareSessionOwner(params: {
   sessionId: string
   actorId: string

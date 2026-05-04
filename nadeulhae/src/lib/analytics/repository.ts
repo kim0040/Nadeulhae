@@ -1,3 +1,22 @@
+/**
+ * @fileoverview
+ * Analytics data-access layer.
+ * Handles page-view logging, API-request tracking, session-based visitor
+ * identity resolution, daily-rollup metric recording, and consent-decision
+ * persistence. All writes use INSERT … ON DUPLICATE KEY UPDATE within
+ * transactions so that concurrent requests produce correct aggregated counts.
+ *
+ * Architecture decisions
+ * -----------------------
+ * - Dimension keys are SHA-256 hashes of the composite dimension tuple,
+ *   which keeps the primary-key column fixed-width and index-friendly.
+ * - Unique entity tracking uses a dedicated table (analytics_daily_unique_entities)
+ *   with INSERT IGNORE; a separate UPDATE increments the counter only when a
+ *   new row was actually inserted. This avoids SELECT-before-upsert races.
+ * - KST (Korea Standard Time) is used for the metric date so that daily
+ *   rollups align to Seoul midnight regardless of the server's locale.
+ */
+
 import { createHash } from "node:crypto"
 
 import type { PoolConnection, ResultSetHeader } from "mysql2/promise"
@@ -11,17 +30,31 @@ import {
 import { ensureAnalyticsSchema } from "@/lib/analytics/schema"
 import { getDbPool } from "@/lib/db"
 
+// ---------------------------------------------------------------------------
+// Environment-dependent constants
+// ---------------------------------------------------------------------------
+
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const REQUEST_SESSION_COOKIE_NAME = "nadeulhae_sid"
 const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
   process.env.TRUST_PROXY_HEADERS ?? ""
 )
 
+/** Discriminates a request as either a page navigation or an API call. */
 type RouteKind = "page" | "api"
+/** Whether the requesting actor has an authenticated user session. */
 type AuthState = "guest" | "authenticated"
+/** Device classification derived from the User-Agent header. */
 type DeviceType = "desktop" | "mobile" | "tablet" | "bot" | "unknown"
+/** Normalised theme preference, defaulting to "unknown". */
 type ThemePreference = "light" | "dark" | "system" | "unknown"
+/** Viewport-width bucket used for responsive-analytics grouping. */
 type ViewportBucket = "mobile" | "tablet" | "desktop" | "wide" | "unknown"
+/**
+ * Union of unique-counter columns across the three metric tables.
+ * Each variant maps to a specific (table, column) pair so that the generic
+ * incrementUniqueCount helper can target the right counter.
+ */
 type UniqueCountTarget =
   | "routeVisitors"
   | "routeUsers"
@@ -30,34 +63,69 @@ type UniqueCountTarget =
   | "consentVisitors"
   | "consentUsers"
 
+/** Where a consent decision was made: banner widget, sign-up flow, or profile settings. */
 export type ConsentDecisionSource = "banner" | "signup" | "profile"
 
+/**
+ * Input shape for recordDailyUsageEvent.
+ * Carries everything needed to write one row (or increment an existing row) in
+ * the route-metrics, page-context-metrics, and actor-activity tables.
+ */
 export interface DailyUsageEventInput {
+  /** The incoming Fetch API Request (used to extract cookies, user-agent, IP). */
   request: Request
+  /** "page" for navigations, "api" for fetch/XHR calls. */
   routeKind: RouteKind
+  /** Normalised URL path (e.g. "/products/[id]"). */
   routePath: string
+  /** HTTP method (GET, POST, PUT, …). */
   method: string
+  /** HTTP response status code. */
   statusCode: number
+  /** Request duration in milliseconds (clamped to [0, 120_000]). */
   durationMs: number
+  /** Optional locale override; falls back to Accept-Language if omitted. */
   locale?: string | null
+  /** Optional session ID used for visitor fingerprinting when no auth cookie is present. */
   sessionId?: string | null
+  /** UI theme at the time of the event (light / dark / system). */
   theme?: string | null
+  /** Viewport-width bucket (mobile / tablet / desktop / wide). */
   viewportBucket?: string | null
+  /** Client time-zone IANA identifier. */
   timeZone?: string | null
+  /** Referrer hostname, used for acquisition-channel attribution. */
   referrerHost?: string | null
+  /** UTM source tag value. */
   utmSource?: string | null
+  /** UTM medium tag value. */
   utmMedium?: string | null
+  /** UTM campaign tag value. */
   utmCampaign?: string | null
 }
 
+/**
+ * Input shape for recordDailyConsentDecision.
+ * Records one consent-decision event and, when the actor is authenticated,
+ * persists the preference to the user's account.
+ */
 export interface DailyConsentDecisionInput {
+  /** The incoming Fetch API Request. */
   request: Request
+  /** The consent preference the user chose. */
   preference: AnalyticsConsentPreference
+  /** Surface on which the choice was made. */
   decisionSource: ConsentDecisionSource
+  /** Optional locale override. */
   locale?: string | null
+  /** Optional session ID for visitor fingerprinting. */
   sessionId?: string | null
 }
 
+/**
+ * Parses a raw Cookie header into a Map of name-value pairs.
+ * Handles URL-decoded values, entries without '=', and empty headers gracefully.
+ */
 function parseCookies(cookieHeader: string | null) {
   if (!cookieHeader) {
     return new Map<string, string>()
@@ -82,10 +150,16 @@ function parseCookies(cookieHeader: string | null) {
   )
 }
 
+/** SHA-256 hex digest used for dimension keys and entity hashes. */
 function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex")
 }
 
+/**
+ * Returns today's date in YYYY-MM-DD format (ISO 8601) according to
+ * Korea Standard Time (Asia/Seoul). All daily rollups are aligned to
+ * Seoul midnight for consistency.
+ */
 function getKstMetricDate() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -95,6 +169,13 @@ function getKstMetricDate() {
   }).format(new Date())
 }
 
+/**
+ * Normalises a BCP 47 locale string.
+ * - Empty / null → "und" (undetermined)
+ * - "ko-*"       → "ko"
+ * - "en-*"       → "en"
+ * - Otherwise    → first 8 chars, or "und"
+ */
 function normalizeLocale(value: string | null | undefined) {
   const raw = (value ?? "").trim().toLowerCase()
   if (!raw) {
@@ -112,6 +193,10 @@ function normalizeLocale(value: string | null | undefined) {
   return raw.slice(0, 8) || "und"
 }
 
+/**
+ * Extracts the preferred locale from the Accept-Language header.
+ * Only the first language tag is considered; falls back to "und".
+ */
 function getLocaleFromRequest(request: Request) {
   const header = request.headers.get("accept-language")
   if (!header) {
@@ -121,6 +206,7 @@ function getLocaleFromRequest(request: Request) {
   return normalizeLocale(header.split(",")[0]?.trim())
 }
 
+/** Trims and truncates a route path (max 191 chars), defaulting to "/" on invalid input. */
 function normalizeRoutePath(value: string) {
   const trimmed = value.trim()
   if (!trimmed.startsWith("/")) {
@@ -130,11 +216,18 @@ function normalizeRoutePath(value: string) {
   return trimmed.slice(0, 191)
 }
 
+/** Converts a status code to its "x"x group (e.g. 200 → "2xx", 503 → "5xx"). */
 function getStatusGroup(statusCode: number) {
   const safeCode = Number.isFinite(statusCode) ? Math.max(100, Math.min(599, statusCode)) : 500
   return `${Math.floor(safeCode / 100)}xx`
 }
 
+/**
+ * Resolves the client IP address from proxy-aware headers.
+ * Respects the TRUST_PROXY_HEADERS env-var — when falsy, always returns
+ * "anonymous" to avoid ingesting untrusted header values.
+ * Resolution order: cf-connecting-ip → x-real-ip → x-forwarded-for (first) → "anonymous"
+ */
 function getClientIp(request: Request) {
   if (!TRUST_PROXY_HEADERS) {
     return "anonymous"
@@ -148,6 +241,11 @@ function getClientIp(request: Request) {
   ).slice(0, 64)
 }
 
+/**
+ * Classifies the user-agent into a DeviceType by pattern matching.
+ * Bot/crawler checks come first so that headless browsers used by search
+ * engines are not misclassified as desktop.
+ */
 function getDeviceType(userAgent: string | null): DeviceType {
   const ua = (userAgent ?? "").toLowerCase()
   if (!ua) return "unknown"
@@ -157,6 +255,7 @@ function getDeviceType(userAgent: string | null): DeviceType {
   return "desktop"
 }
 
+/** Normalises a theme string (light / dark / system) into a ThemePreference. */
 function normalizeTheme(value: string | null | undefined): ThemePreference {
   const normalized = (value ?? "").trim().toLowerCase()
   if (normalized === "light" || normalized === "dark" || normalized === "system") {
@@ -166,6 +265,7 @@ function normalizeTheme(value: string | null | undefined): ThemePreference {
   return "unknown"
 }
 
+/** Normalises a viewport-bucket string into a ViewportBucket, defaulting to "unknown". */
 function normalizeViewportBucket(value: string | null | undefined): ViewportBucket {
   const normalized = (value ?? "").trim().toLowerCase()
   if (
@@ -180,6 +280,7 @@ function normalizeViewportBucket(value: string | null | undefined): ViewportBuck
   return "unknown"
 }
 
+/** Trims and truncates an IANA time-zone identifier (max 48 chars). */
 function normalizeTimeZone(value: string | null | undefined) {
   const normalized = (value ?? "").trim()
   if (!normalized) {
@@ -189,6 +290,11 @@ function normalizeTimeZone(value: string | null | undefined) {
   return normalized.slice(0, 48)
 }
 
+/**
+ * Normalises a referrer hostname.
+ * Recognises "direct" (no referrer) and "internal" (same-site navigation);
+ * otherwise attempts URL parsing and falls back to splitting on /, ?, #.
+ */
 function normalizeReferrerHost(value: string | null | undefined) {
   const raw = (value ?? "").trim().toLowerCase()
   if (!raw) {
@@ -206,17 +312,25 @@ function normalizeReferrerHost(value: string | null | undefined) {
   }
 }
 
+/** Normalises a UTM parameter value: trims, lowercases, collapses whitespace, and truncates. */
 function normalizeCampaignValue(value: string | null | undefined, maxLength: number) {
   const normalized = (value ?? "").trim().toLowerCase().replace(/\s+/g, "-")
   return normalized ? normalized.slice(0, maxLength) : "none"
 }
 
+/** Clamps a duration value to [0, 120_000] ms, rounding to the nearest integer. */
 function normalizeDurationMs(value: number) {
   return Number.isFinite(value)
     ? Math.max(0, Math.min(120_000, Math.round(value)))
     : 0
 }
 
+/**
+ * Derives a high-level acquisition channel from referrer/UTM data.
+ * Priority order: email → paid → social (UTM-based) → campaign → direct → internal → search → social (referrer) → referral.
+ * UTM-tagged traffic is classified before raw referrer-based classification so
+ * that marketing campaigns always take precedence over organic referrers.
+ */
 function deriveAcquisitionChannel(input: {
   referrerHost: string
   utmSource: string
@@ -261,6 +375,12 @@ function deriveAcquisitionChannel(input: {
   return "referral"
 }
 
+/**
+ * Resolves the actor's identity from the request: auth token → user ID,
+ * session cookie → visitor hash, IP+UA → visitor hash.
+ * Also returns the user's analytics-consent flag from the account record
+ * when an authenticated session is present.
+ */
 async function resolveIdentity(request: Request, fallbackSessionId?: string | null) {
   const cookies = parseCookies(request.headers.get("cookie"))
   const sessionId = fallbackSessionId || cookies.get(REQUEST_SESSION_COOKIE_NAME) || null
@@ -281,6 +401,8 @@ async function resolveIdentity(request: Request, fallbackSessionId?: string | nu
     }
   }
 
+  // Visitor fingerprint: session ID is preferred; fall back to auth token hash,
+  // then to IP|UA composite for anonymous / non-session-tracked requests.
   const visitorSource = sessionId
     ? `sid:${sessionId}`
     : authToken
@@ -296,6 +418,12 @@ async function resolveIdentity(request: Request, fallbackSessionId?: string | nu
   }
 }
 
+/**
+ * Builds a deterministic SHA-256 hash from the route-metrics dimension tuple.
+ * Used as the primary key in analytics_daily_route_metrics.
+ * The "route" prefix prevents cross-table collisions with other dimension-key
+ * namespaces.
+ */
 function buildRouteDimensionKey(input: {
   routeKind: RouteKind
   routePath: string
@@ -317,6 +445,11 @@ function buildRouteDimensionKey(input: {
   ].join("|"))
 }
 
+/**
+ * Builds a deterministic SHA-256 hash from the page-context dimension tuple
+ * (includes theme, viewport, time-zone, referrer, UTM params and the derived
+ * acquisition channel).
+ */
 function buildPageContextDimensionKey(input: {
   routePath: string
   authState: AuthState
@@ -348,6 +481,9 @@ function buildPageContextDimensionKey(input: {
   ].join("|"))
 }
 
+/**
+ * Builds a deterministic SHA-256 hash from the consent-decision dimension tuple.
+ */
 function buildConsentDimensionKey(input: {
   decisionSource: ConsentDecisionSource
   preference: AnalyticsConsentPreference
@@ -365,6 +501,12 @@ function buildConsentDimensionKey(input: {
   ].join("|"))
 }
 
+/**
+ * Attempts to insert a unique-entity row (INSERT IGNORE).
+ * Returns true when the row was actually inserted (i.e. this entity+dimension
+ * combination was seen for the first time today), which the caller uses to
+ * decide whether to increment the corresponding counter.
+ */
 async function insertUniqueEntity(
   connection: PoolConnection,
   metricDate: string,
@@ -387,6 +529,7 @@ async function insertUniqueEntity(
   return result.affectedRows > 0
 }
 
+/** Maps a UniqueCountTarget variant to the (table_name, column_name) pair it affects. */
 function getUniqueCountTargetSql(target: UniqueCountTarget) {
   switch (target) {
     case "routeVisitors":
@@ -422,6 +565,7 @@ function getUniqueCountTargetSql(target: UniqueCountTarget) {
   }
 }
 
+/** Increments a single unique-counter column on the target metric table. */
 async function incrementUniqueCount(
   connection: PoolConnection,
   target: UniqueCountTarget,
@@ -441,6 +585,11 @@ async function incrementUniqueCount(
   )
 }
 
+/**
+ * Upserts one row in analytics_daily_route_metrics.
+ * On duplicate key: increments request_count, accumulates total_duration_ms,
+ * tracks the peak duration, and updates last_seen_at.
+ */
 async function insertRouteMetrics(
   connection: PoolConnection,
   input: {
@@ -499,6 +648,11 @@ async function insertRouteMetrics(
   )
 }
 
+/**
+ * Upserts one row in analytics_daily_page_context_metrics.
+ * On duplicate key: increments page_view_count, accumulates total_load_ms,
+ * tracks the peak load duration, and updates last_seen_at.
+ */
 async function insertPageContextMetrics(
   connection: PoolConnection,
   input: {
@@ -569,6 +723,11 @@ async function insertPageContextMetrics(
   )
 }
 
+/**
+ * Upserts one row in analytics_daily_actor_activity.
+ * On duplicate key: coalesces user_id (first-seen wins), updates auth/device/locale,
+ * accumulates counters, and refreshes last_seen_at.
+ */
 async function insertActorActivity(
   connection: PoolConnection,
   input: {
@@ -627,15 +786,31 @@ async function insertActorActivity(
   )
 }
 
+/**
+ * Records a daily usage event (page view or API request) inside a database
+ * transaction. Writes or increments rows in:
+ *   - analytics_daily_route_metrics
+ *   - analytics_daily_page_context_metrics  (page events only, when consent = "allow")
+ *   - analytics_daily_actor_activity         (when consent = "allow")
+ *   - analytics_daily_unique_entities        (when consent = "allow")
+ *
+ * Consent-gated detailed analytics (unique counters, page context, actor
+ * activity) are skipped when the resolved preference is "essential".
+ */
 export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
+  // Ensure tables exist before any writes.
   await ensureAnalyticsSchema()
 
   const metricDate = getKstMetricDate()
   const routePath = normalizeRoutePath(input.routePath)
+
+  // Normalise HTTP method: uppercase, max 16 chars, default to GET.
   const method = input.method.trim().toUpperCase().slice(0, 16) || "GET"
   const safeStatusCode = Number.isFinite(input.statusCode)
     ? Math.max(100, Math.min(599, Math.floor(input.statusCode)))
     : 500
+  // Resolve locale (explicit input wins over Accept-Language), identity, device
+  // type, and consent preference in a single pass.
   const locale = normalizeLocale(input.locale ?? getLocaleFromRequest(input.request))
   const identity = await resolveIdentity(input.request, input.sessionId)
   const deviceType = getDeviceType(identity.userAgent)
@@ -644,6 +819,7 @@ export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
     input.request,
     identity.analyticsAccepted
   )
+  // Detailed (non-essential) analytics are gated on "allow".
   const allowDetailedAnalytics = consentPreference === "allow"
   const durationMs = normalizeDurationMs(input.durationMs)
   const routeDimensionKey = buildRouteDimensionKey({
@@ -655,19 +831,29 @@ export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
     deviceType,
     locale,
   })
+  // Actor key: authenticated users get a deterministic hash scoped to their
+  // user ID; anonymous visitors are identified by their session/IP fingerprint.
   const actorKey = identity.userId
     ? hashValue(`user:${identity.userId}`)
     : identity.visitorHash
   const actorType = identity.userId ? "user" : "visitor"
+  // Derive per-event counters from the route kind, method, and status code.
   const pageViewCount = input.routeKind === "page" ? 1 : 0
   const apiRequestCount = input.routeKind === "api" ? 1 : 0
+  // Non-GET API calls are treated as mutations (POST, PUT, PATCH, DELETE, …).
   const mutationCount = input.routeKind === "api" && method !== "GET" ? 1 : 0
+  // HTTP 4xx/5xx responses increment the error counter.
   const errorCount = safeStatusCode >= 400 ? 1 : 0
 
+  // -----------------------------------------------------------------------
+  // Transaction: all metric writes happen atomically so that a partial
+  // failure does not leave orphaned or inconsistent rows.
+  // -----------------------------------------------------------------------
   const connection = await getDbPool().getConnection()
   try {
     await connection.beginTransaction()
 
+    // 1. Route metrics — always written (even for "essential" consent level).
     await insertRouteMetrics(connection, {
       metricDate,
       dimensionKey: routeDimensionKey,
@@ -682,6 +868,7 @@ export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
       durationMs,
     })
 
+    // 2. Unique-entity tracking — only with "allow" consent.
     if (allowDetailedAnalytics) {
       const insertedVisitor = await insertUniqueEntity(
         connection,
@@ -720,6 +907,8 @@ export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
       }
     }
 
+    // 3. Page-context metrics — page views only, and only with "allow" consent.
+    //    Includes theme, viewport, time-zone, referrer, and UTM-derived channel.
     if (input.routeKind === "page" && allowDetailedAnalytics) {
       const theme = normalizeTheme(input.theme)
       const viewportBucket = normalizeViewportBucket(input.viewportBucket)
@@ -748,6 +937,7 @@ export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
         utmCampaign,
       })
 
+      // Upsert the page-context aggregate row.
       await insertPageContextMetrics(connection, {
         metricDate,
         dimensionKey: pageContextDimensionKey,
@@ -766,6 +956,7 @@ export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
         loadMs: durationMs,
       })
 
+      // Track unique visitor per page-context dimension.
       const insertedContextVisitor = await insertUniqueEntity(
         connection,
         metricDate,
@@ -803,6 +994,7 @@ export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
       }
     }
 
+    // 4. Actor-activity rollup — per-actor daily counters, consent-gated.
     if (allowDetailedAnalytics) {
       await insertActorActivity(connection, {
         metricDate,
@@ -828,6 +1020,11 @@ export async function recordDailyUsageEvent(input: DailyUsageEventInput) {
   }
 }
 
+/**
+ * Wraps recordDailyUsageEvent in a try-catch that logs the error instead of
+ * propagating it. Safe for use in fire-and-forget contexts (e.g. middleware)
+ * where analytics should never crash the request.
+ */
 export async function recordDailyUsageEventSafely(input: DailyUsageEventInput) {
   try {
     await recordDailyUsageEvent(input)
@@ -836,6 +1033,12 @@ export async function recordDailyUsageEventSafely(input: DailyUsageEventInput) {
   }
 }
 
+/**
+ * Records a consent-decision event and, for authenticated users, persists
+ * the preference to the user account. Writes one row (or increments an
+ * existing row) in analytics_daily_consent_metrics and tracks unique
+ * visitors/users per consent dimension.
+ */
 export async function recordDailyConsentDecision(input: DailyConsentDecisionInput) {
   await ensureAnalyticsSchema()
 
@@ -851,6 +1054,8 @@ export async function recordDailyConsentDecision(input: DailyConsentDecisionInpu
     locale,
   })
 
+  // Persist the consent choice to the user's account when authenticated,
+  // so that it survives cookie clearance.
   if (identity.userId) {
     await updateUserAnalyticsConsent({
       userId: identity.userId,
@@ -858,10 +1063,14 @@ export async function recordDailyConsentDecision(input: DailyConsentDecisionInpu
     })
   }
 
+  // -----------------------------------------------------------------------
+  // Transaction: consent metric + unique entities
+  // -----------------------------------------------------------------------
   const connection = await getDbPool().getConnection()
   try {
     await connection.beginTransaction()
 
+    // 1. Consent-metric row — upsert increments the decision counter.
     await connection.execute(
       `
         INSERT INTO analytics_daily_consent_metrics (
@@ -891,6 +1100,7 @@ export async function recordDailyConsentDecision(input: DailyConsentDecisionInpu
       ]
     )
 
+    // 2. Unique visitor tracking per consent dimension.
     const insertedVisitor = await insertUniqueEntity(
       connection,
       metricDate,
@@ -926,6 +1136,11 @@ export async function recordDailyConsentDecision(input: DailyConsentDecisionInpu
   }
 }
 
+/**
+ * Wraps recordDailyConsentDecision in a try-catch that logs the error instead
+ * of propagating it. Safe for fire-and-forget contexts where a consent-logging
+ * failure must not interrupt the response.
+ */
 export async function recordDailyConsentDecisionSafely(
   input: DailyConsentDecisionInput
 ) {

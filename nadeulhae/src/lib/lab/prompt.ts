@@ -1,24 +1,30 @@
+/** Lab LLM prompt templates — builds system/user prompts for card generation and card autofill. */
+
 import type { AuthUser } from "@/lib/auth/types"
 import type { LabLocale } from "@/lib/lab/types"
 
+/** Build prompts for generating a full deck of study cards from a topic. Returns system and user prompt strings. */
 export function buildLabGenerationPrompts(input: {
   locale: LabLocale
   user: AuthUser
   topic: string
   cardCount: number
 }) {
+  // Locale-specific language instruction for the LLM
   const languageGuide = input.locale === "ko"
     ? "설명(meaning)은 한국어로 작성하고, 단어(term)는 학습하기 좋은 원문 형태로 간결하게 작성해. 그리고 반드시 exampleTranslation 필드에 예문에 대한 한국어 해설(번역)을 적어줘."
     : "Write meanings in English, keep term as a concise practical word, and MUST include the explanation of the example in the exampleTranslation field."
 
+  // Current time in KST for context-aware card generation
   const now = new Date()
-  const systemNowKst = new Intl.DateTimeFormat("ko-KR", { 
-    timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "long", hour: "numeric", minute: "numeric" 
+  const systemNowKst = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "long", hour: "numeric", minute: "numeric"
   }).format(now)
   const systemNowKstIso = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(now)
 
+  // System prompt: instructs the model on output format, constraints, and language rules
   const systemPrompt = [
     "You are Nadeul Lab, an assistant that creates practical mini study cards.",
     "Return ONLY valid JSON. No markdown, no code fences, no extra prose.",
@@ -68,12 +74,14 @@ export function buildLabGenerationPrompts(input: {
   }
 }
 
+/** Build prompts for autofilling a single existing card (meaning, example, POS). Returns system and user prompt strings. */
 export function buildLabCardAutofillPrompts(input: {
   locale: LabLocale
   user: AuthUser
   term: string
   exampleLanguage?: "ko" | "en" | "ja"
 }) {
+  // Default example language follows the card locale
   const exampleLanguage = input.exampleLanguage ?? (input.locale === "en" ? "en" : "ko")
   const meaningLanguageInstruction =
     input.locale === "ko"

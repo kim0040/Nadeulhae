@@ -1,3 +1,10 @@
+/**
+ * Code Share schema management.
+ *
+ * Lazily bootstraps the DDL for `code_share_sessions` on first data
+ * access. Uses a process-global singleton promise so concurrent
+ * requests do not race on table creation.
+ */
 import { getDbPool } from "@/lib/db"
 
 declare global {
@@ -28,6 +35,13 @@ const createCodeShareSessionsTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/**
+ * Ensures the `code_share_sessions` table exists.
+ *
+ * Idempotent across concurrent calls — reuses the in-flight
+ * bootstrap promise. Resets the promise on failure so the
+ * next caller retries schema creation.
+ */
 export async function ensureCodeShareSchema() {
   // Reuse the in-flight bootstrap promise for all callers.
   if (globalThis.__nadeulhaeCodeShareSchemaPromise) {

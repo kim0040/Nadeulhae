@@ -1,9 +1,12 @@
+/** Lab DB schema: defines the MySQL tables and migration statements for the Lab module (decks, cards, daily usage). */
+
 import { getDbPool } from "@/lib/db"
 
 declare global {
   var __nadeulhaeLabSchemaPromise: Promise<void> | undefined
 }
 
+// --- DDL: Lab decks table ---
 const createLabDecksTableSql = `
   CREATE TABLE IF NOT EXISTS lab_decks (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -21,6 +24,7 @@ const createLabDecksTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+// --- DDL: Lab cards table ---
 const createLabCardsTableSql = `
   CREATE TABLE IF NOT EXISTS lab_cards (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -48,6 +52,7 @@ const createLabCardsTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+// --- Migration columns (additive, safe to re-run) ---
 const addLabCardsLearningStateColumnSql = `
   ALTER TABLE lab_cards
     ADD COLUMN IF NOT EXISTS learning_state VARCHAR(16) NOT NULL DEFAULT 'new' AFTER tip_text
@@ -93,6 +98,7 @@ const addLabCardsExampleTranslationColumnSql = `
     ADD COLUMN IF NOT EXISTS example_translation_text LONGTEXT NULL AFTER example_text
 `
 
+// --- Backfill: derive learning_state from existing stage values ---
 const backfillLabCardsLearningStateSql = `
   UPDATE lab_cards
   SET learning_state = CASE
@@ -104,6 +110,7 @@ const backfillLabCardsLearningStateSql = `
   WHERE learning_state = 'new'
 `
 
+// --- Backfill: set stability_days from legacy stage values ---
 const backfillLabCardsStabilitySql = `
   UPDATE lab_cards
   SET stability_days = CASE
@@ -119,6 +126,7 @@ const backfillLabCardsStabilitySql = `
   WHERE stability_days <= 0.2
 `
 
+// --- DDL: Daily usage tracking table ---
 const createLabDailyUsageTableSql = `
   CREATE TABLE IF NOT EXISTS lab_daily_usage (
     metric_date DATE NOT NULL,
@@ -132,15 +140,19 @@ const createLabDailyUsageTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/** Ensure all Lab tables, columns, and backfills have been applied. Idempotent — uses a global promise singleton to avoid concurrent schema init. */
 export async function ensureLabSchema() {
+  // Return in-flight promise to prevent concurrent schema setup
   if (globalThis.__nadeulhaeLabSchemaPromise) {
     return globalThis.__nadeulhaeLabSchemaPromise
   }
 
   const bootstrapPromise = (async () => {
     const pool = getDbPool()
+    // Core tables
     await pool.query(createLabDecksTableSql)
     await pool.query(createLabCardsTableSql)
+    // Additive column migrations (safe to re-run)
     await pool.query(addLabCardsLearningStateColumnSql)
     await pool.query(addLabCardsConsecutiveCorrectColumnSql)
     await pool.query(addLabCardsStabilityColumnSql)
@@ -150,8 +162,10 @@ export async function ensureLabSchema() {
     await pool.query(addLabCardsLastOutcomeColumnSql)
     await pool.query(addLabCardsPosColumnSql)
     await pool.query(addLabCardsExampleTranslationColumnSql)
+    // Data backfills for new columns
     await pool.query(backfillLabCardsLearningStateSql)
     await pool.query(backfillLabCardsStabilitySql)
+    // Usage tracking
     await pool.query(createLabDailyUsageTableSql)
   })()
 

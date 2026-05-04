@@ -1,3 +1,12 @@
+/**
+ * GET /api/fire/summary
+ * Returns fire incident summary for a region using National Fire Agency data.
+ * Query: regionKey or lat/lon (optional), days (3-10, default 7).
+ * Returns: { regionKey, regionName, fireSidoName, metadata, overview (cautionLevel, shortMessages),
+ *   dailyTrend[], topPlaces[] }.
+ * Caution level is derived from fire receipt volume vs 7-day average.
+ */
+
 import { NextResponse } from "next/server"
 
 import { withApiAnalytics } from "@/lib/analytics/route"
@@ -126,11 +135,13 @@ function getKstDateOffsetLabel(offset: number) {
   return date.toISOString().slice(0, 10).replace(/-/g, "")
 }
 
+/** Safe number parser: returns 0 if value is not a finite number. */
 function toNumber(value: unknown) {
   const num = Number(value)
   return Number.isFinite(num) ? num : 0
 }
 
+/** Check if a fire location description matches outdoor-related keywords. */
 function isOutdoorPlace(name: string) {
   return OUTDOOR_PLACE_KEYWORDS.some((keyword) => name.includes(keyword))
 }
@@ -242,6 +253,7 @@ function createFireNotice(
 }
 
 async function handleGET(request: Request) {
+  // === 1. PARAMETER PARSING & REGION RESOLUTION ===
   const url = new URL(request.url)
   const regionKey = url.searchParams.get("regionKey")
   const lat = url.searchParams.get("lat")
@@ -287,11 +299,13 @@ async function handleGET(request: Request) {
     return attachSessionCookie(response, sessionId, shouldSetCookie)
   }
 
+  // === 2. VALIDATION ===
   const serviceKey = process.env.AIRKOREA_API_KEY
   if (!serviceKey) {
     return NextResponse.json({ error: "Public service key missing" }, { status: 500 })
   }
 
+  // === 3. DATA FETCHING — daily summaries for each date ===
   const summaryDates = Array.from({ length: days }, (_, index) => getKstDateOffsetLabel(-index))
 
   const summaryResults = await Promise.all(
@@ -328,6 +342,7 @@ async function handleGET(request: Request) {
   const sevenDayAverage = Math.round((sevenDayTotal / dailyTrend.length) * 10) / 10
   const peakDay = dailyTrend.reduce((peak, current) => current.fireReceipt > peak.fireReceipt ? current : peak, dailyTrend[0])
 
+  // === 4. PROCESSING — place-level breakdown & caution level ===
   const placeData = await getDailyPlaceItems(latest.date, serviceKey)
   const placeItems: FireTopPlace[] = placeData
     .filter((item: FirePlaceItem) => item?.SIDO_NM === fireSidoName)
@@ -351,6 +366,7 @@ async function handleGET(request: Request) {
 
   const notice = createFireNotice(cautionLevel, fireSidoName, placeItems)
 
+  // === 5. RESPONSE BUILDING ===
   const payload: FireSummaryResponse = {
     regionKey: profile.key,
     regionName: profile.displayName,

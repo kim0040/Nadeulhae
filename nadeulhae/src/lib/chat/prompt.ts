@@ -30,10 +30,15 @@ import {
 import type { AuthUser } from "@/lib/auth/types"
 import type { ChatConversationMessage, ChatLocale } from "@/lib/chat/types"
 
+/**
+ * Joins an array of values into a comma-separated string, or "-" if empty.
+ * Used throughout the profile builder to render multi-value fields cleanly.
+ */
 function formatList(values: string[]) {
   return values.length > 0 ? values.join(", ") : "-"
 }
 
+/** Live weather snapshot injected into the system prompt for context-aware recommendations */
 export interface ChatWeatherContext {
   region: string | null
   score: number | null
@@ -52,6 +57,13 @@ export interface ChatWeatherContext {
   observedAt: string | null
 }
 
+/**
+ * Build a locale-specific user profile block for the system prompt.
+ *
+ * Renders display name, age band, region, time slot, interests, weather
+ * sensitivities, and marketing consent as a structured key-value text block.
+ * Falls through locale label maps before using English defaults.
+ */
 function buildUserProfileSummary(user: AuthUser, locale: ChatLocale) {
   const interests = user.interestTags.map((value) => getOptionLabel(INTEREST_OPTIONS, value, locale))
   if (user.interestOther) {
@@ -62,12 +74,14 @@ function buildUserProfileSummary(user: AuthUser, locale: ChatLocale) {
     getOptionLabel(WEATHER_SENSITIVITY_OPTIONS, value, locale)
   )
 
+  // Locale-aware yes/no helper shared by profile and weather builders
   const yesNo = (b: boolean) => {
     if (locale === "zh") return b ? "是" : "否"
     if (locale === "ja") return b ? "はい" : "いいえ"
     return locale === "ko" ? (b ? "예" : "아니오") : (b ? "yes" : "no")
   }
 
+  // Korean branch uses natural sentence fragments; other locales use key-value labels
   if (locale === "ko") {
     return [
       `이름: ${user.displayName}`,
@@ -80,6 +94,7 @@ function buildUserProfileSummary(user: AuthUser, locale: ChatLocale) {
     ].join("\n")
   }
 
+  // Fallback label map: if a locale is not explicitly in the map, English defaults apply
   const labelMap: Record<string, Record<string, string>> = {
     zh: {
       name: "姓名",
@@ -156,6 +171,7 @@ export function buildChatSystemPrompt(input: {
     assessment: input.profileAssessment,
   })
 
+  // Format current KST time in three forms: long locale string, ISO date (for Today:), and 24h time
   const now = new Date()
   const systemNowKst = new Intl.DateTimeFormat("ko-KR", { 
     timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "long", hour: "numeric", minute: "numeric" 
@@ -195,9 +211,11 @@ export function buildChatSystemPrompt(input: {
       "[실시간 날씨 컨텍스트]",
       weatherSummary,
       "",
+      // Long-term profile memory (summary + assessment from previous profile refreshes)
       "[사용자 장기 메모리(내부용)]",
       profileMemory,
       "",
+      // Session-level compacted memory from previous summary runs
       "[저장된 메모리]",
       input.memorySummary || "아직 저장된 대화 메모리가 없습니다.",
     ].join("\n")
@@ -231,9 +249,11 @@ export function buildChatSystemPrompt(input: {
       "[实时天气]",
       weatherSummary,
       "",
+      // Long-term profile memory (summary + assessment)
       "[长期用户记忆(内部)]",
       profileMemory,
       "",
+      // Session-level compacted memory from previous summary runs
       "[存储的记忆]",
       input.memorySummary || "暂无存储的对话记忆。",
     ].join("\n")
@@ -267,9 +287,11 @@ export function buildChatSystemPrompt(input: {
       "[リアルタイム天気]",
       weatherSummary,
       "",
+      // Long-term profile memory (summary + assessment)
       "[長期ユーザー記憶(内部)]",
       profileMemory,
       "",
+      // Session-level compacted memory from previous summary runs
       "[保存された記憶]",
       input.memorySummary || "まだ保存された会話の記憶はありません。",
     ].join("\n")
@@ -302,14 +324,23 @@ export function buildChatSystemPrompt(input: {
     "[Live weather context]",
     weatherSummary,
     "",
+    // Long-term profile memory (summary + assessment)
     "[Long-term user memory (internal)]",
-    profileMemory,
-    "",
-    "[Saved memory]",
-    input.memorySummary || "No summarized memory has been saved yet.",
+      profileMemory,
+      "",
+      // Session-level compacted memory from previous summary runs
+      "[Saved memory]",
+      input.memorySummary || "No summarized memory has been saved yet.",
   ].join("\n")
 }
 
+/**
+ * Build a locale-specific long-term memory block for the system prompt.
+ *
+ * Renders the user's durable preference summary and internal assessment
+ * as a labelled text block. Returns a "no memory" placeholder when both
+ * values are absent.
+ */
 function buildProfileMemoryContext(input: {
   locale: ChatLocale
   summary: string | null
@@ -338,10 +369,18 @@ function buildProfileMemoryContext(input: {
   return [`Summary: ${summary || "-"}`, `Assessment: ${assessment || "-"}`].join("\n")
 }
 
+/**
+ * Build a locale-specific weather context block for the system prompt.
+ *
+ * Renders region, picnic score, status, temperature, humidity, air quality,
+ * UV, precipitation, alerts, and a bulletin. Returns a locale-appropriate
+ * "no data" message when weather is null.
+ */
 function buildWeatherSummary(
   weather: ChatWeatherContext | null,
   locale: ChatLocale
 ) {
+  // No weather data available — return a locale-appropriate fallback message
   if (!weather) {
     if (locale === "ko") return "사용 가능한 실시간 날씨 컨텍스트 없음"
     if (locale === "zh") return "暂无实时天气信息"
@@ -349,6 +388,7 @@ function buildWeatherSummary(
     return "No live weather context available"
   }
 
+  // Locale-aware boolean helpers for "raining now" and "severe alert" fields
   const raining = (b: boolean) => {
     if (locale === "zh") return b ? "是" : "否"
     if (locale === "ja") return b ? "はい" : "いいえ"
@@ -378,6 +418,12 @@ function buildWeatherSummary(
   ].join("\n")
 }
 
+/**
+ * Return translated weather-field labels for the given locale.
+ *
+ * Each locale returns a flat map of label keys (region, score, status, etc.)
+ * that are interpolated into the weather summary block.
+ */
 function getWeatherLabels(locale: ChatLocale) {
   if (locale === "ko") return {
     region: "지역", score: "피크닉 지수", status: "현재 상태",

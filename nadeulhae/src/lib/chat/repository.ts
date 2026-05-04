@@ -1,3 +1,21 @@
+/**
+ * Chat data-access layer: session & memory CRUD, usage tracking, compaction.
+ *
+ * Provides the repository functions backing the `/api/chat` routes. All read
+ * operations (chat state, session list) are cached in-memory with a short TTL
+ * and deduplicated via an in-flight promise map to avoid redundant DB queries
+ * under concurrent load. Write operations use transactions and invalidate
+ * affected cache entries on completion.
+ *
+ * ## Key responsibilities
+ * - Session lifecycle: create, resolve, list, delete
+ * - Message persistence & retrieval
+ * - Daily usage reservation & tracking (with row-level locking)
+ * - Session-level memory compaction (summarise old messages)
+ * - Long-term profile memory refresh
+ * - Chat data deletion for account removal
+ */
+
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise"
 
 import {
@@ -30,6 +48,7 @@ import {
   encryptDatabaseValue,
 } from "@/lib/security/data-protection"
 
+/** Raw DB row shape for the user_chat_messages table */
 interface ChatMessageRow extends RowDataPacket {
   id: number
   user_id: string
@@ -42,6 +61,7 @@ interface ChatMessageRow extends RowDataPacket {
   created_at: Date | string
 }
 
+/** Raw DB row shape for the user_chat_memory table */
 interface ChatMemoryRow extends RowDataPacket {
   user_id: string
   summary_text: string
@@ -55,6 +75,7 @@ interface ChatMemoryRow extends RowDataPacket {
   updated_at: Date | string
 }
 
+/** Raw DB row shape for the user_chat_sessions table */
 interface ChatSessionRow extends RowDataPacket {
   id: number
   user_id: string
@@ -71,10 +92,12 @@ interface ChatSessionRow extends RowDataPacket {
   updated_at: Date | string
 }
 
+/** Chat session row with a joined message_count from the subquery */
 interface ChatSessionWithCountRow extends ChatSessionRow {
   message_count: number
 }
 
+/** Raw DB row shape for the user_chat_usage_daily table */
 interface ChatUsageRow extends RowDataPacket {
   metric_date: Date | string
   user_id: string
@@ -91,35 +114,61 @@ interface ChatUsageRow extends RowDataPacket {
   summary_total_tokens: number
 }
 
+/** Minimal row type carrying only a message id */
 interface ChatMessageIdRow extends RowDataPacket {
   id: number
 }
 
+/**
+ * ── Local constants ──────────────────────────────────────────────
+ */
+
+// Soft cap on auto-generated session titles (first message excerpt)
 const CHAT_SESSION_TITLE_MAX_LENGTH = 60
+// Minimum new user messages before triggering a profile-memory refresh
 const CHAT_PROFILE_MEMORY_MIN_NEW_MESSAGES = 4
+// Lower threshold for the very first profile build (no existing summary)
 const CHAT_PROFILE_MEMORY_INITIAL_MIN_MESSAGES = 3
+// Maximum user messages to consider for a single profile refresh
 const CHAT_PROFILE_MEMORY_CANDIDATE_LIMIT = 24
 const CHAT_PROFILE_SUMMARY_MAX_CHARACTERS = 1400
 const CHAT_PROFILE_ASSESSMENT_MAX_CHARACTERS = 900
+// In-memory cache TTL: keeps repeated state reads off the DB
 const CHAT_STATE_CACHE_TTL_MS = 8_000
 const CHAT_SESSIONS_CACHE_TTL_MS = 8_000
 const CHAT_STATE_CACHE_MAX_KEYS = 1200
 
+/**
+ * ── In-memory cache types ────────────────────────────────────────
+ */
+
+/** Cached chat-state entry with an absolute expiry timestamp */
 interface ChatStateCacheEntry {
   data: ChatStateResponse
   expiresAt: number
 }
 
+/** Cached session-list entry with an absolute expiry timestamp */
 interface ChatSessionsCacheEntry {
   data: ChatSessionSnapshot[]
   expiresAt: number
 }
 
+/**
+ * Module-level global singletons for in-memory caching.
+ * Using globalThis ensures the caches survive HMR in dev without re-fetching.
+ */
 declare global {
   var __nadeulhaeChatStateCache: Map<string, ChatStateCacheEntry> | undefined
   var __nadeulhaeChatStateInFlight: Map<string, Promise<ChatStateResponse>> | undefined
   var __nadeulhaeChatSessionsCache: Map<string, ChatSessionsCacheEntry> | undefined
 }
+
+/**
+ * ── Cache helpers ────────────────────────────────────────────────
+ * Lazily initialised global Map instances. In-flight promises prevent
+ * redundant concurrent DB queries for the same cache key.
+ */
 
 function getChatStateCache() {
   if (!globalThis.__nadeulhaeChatStateCache) {
@@ -142,6 +191,13 @@ function getChatSessionsCache() {
   return globalThis.__nadeulhaeChatSessionsCache
 }
 
+/**
+ * Evict expired entries from a cache map, then trim to maxKeys.
+ *
+ * First pass removes stale entries by comparing expiresAt to Date.now().
+ * If the map is still over maxKeys, oldest-inserted entries are dropped
+ * (Map iterates in insertion order).
+ */
 function pruneChatCacheMap<T extends { expiresAt: number }>(map: Map<string, T>, maxKeys: number) {
   const now = Date.now()
   for (const [key, entry] of map.entries()) {
@@ -165,6 +221,7 @@ function pruneChatCacheMap<T extends { expiresAt: number }>(map: Map<string, T>,
   }
 }
 
+/** Deep-clone a ChatMemorySnapshot so cached objects are not mutated by callers */
 function cloneChatMemorySnapshot(memory: ChatMemorySnapshot | null): ChatMemorySnapshot | null {
   if (!memory) {
     return null
@@ -178,6 +235,7 @@ function cloneChatMemorySnapshot(memory: ChatMemorySnapshot | null): ChatMemoryS
   }
 }
 
+/** Deep-clone a ChatStateResponse so cached objects are not mutated by callers */
 function cloneChatStateSnapshot(state: ChatStateResponse): ChatStateResponse {
   return {
     messages: state.messages.map((message) => ({ ...message })),
@@ -189,6 +247,10 @@ function cloneChatStateSnapshot(state: ChatStateResponse): ChatStateResponse {
   }
 }
 
+/**
+ * Build a deterministic cache key from the state query parameters.
+ * Format: "{userId}:{locale}:{sessionId|'auto'}"
+ */
 function buildChatStateCacheKey(input: {
   userId: string
   locale: ChatLocale
@@ -197,6 +259,13 @@ function buildChatStateCacheKey(input: {
   return `${input.userId}:${input.locale}:${input.requestedSessionId ?? "auto"}`
 }
 
+/**
+ * Invalidate all cached data for a given user.
+ *
+ * Called after every state-mutating operation (message persist, session
+ * create/delete, compaction, usage update) so the next read fetches fresh
+ * data. Clears state cache, in-flight promises, and session list cache.
+ */
 export function invalidateChatCacheForUser(userId: string) {
   const stateCache = getChatStateCache()
   for (const key of stateCache.keys()) {
@@ -215,6 +284,12 @@ export function invalidateChatCacheForUser(userId: string) {
   getChatSessionsCache().delete(userId)
 }
 
+/**
+ * ── Conversion helpers ───────────────────────────────────────────
+ * Transform raw DB rows into the domain types consumed by the API layer.
+ */
+
+/** Normalise a Date or date-string to ISO 8601, falling back to current time on parse failure */
 function toIsoString(value: Date | string) {
   if (value instanceof Date) {
     return value.toISOString()
@@ -224,6 +299,7 @@ function toIsoString(value: Date | string) {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
 }
 
+/** Format today's date as "YYYY-MM-DD" in KST for daily usage partitioning */
 function getKstMetricDate() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: CHAT_TIME_ZONE,
@@ -252,6 +328,7 @@ function createEmptyUsage(metricDate: string): ChatUsageSnapshot {
   }
 }
 
+/** Convert a DB usage row (or null) into a ChatUsageSnapshot with safe defaults */
 function toUsageSnapshot(row: ChatUsageRow | null, metricDate: string) {
   if (!row) {
     return createEmptyUsage(metricDate)
@@ -276,6 +353,12 @@ function toUsageSnapshot(row: ChatUsageRow | null, metricDate: string) {
   } satisfies ChatUsageSnapshot
 }
 
+/**
+ * Decrypt a database value with a safe fallback on failure.
+ *
+ * Decryption errors are logged but never propagate — the caller always
+ * receives either the plaintext, the provided fallback, or null.
+ */
 function decryptChatValueSafely(
   value: string,
   context: string,
@@ -290,6 +373,7 @@ function decryptChatValueSafely(
   }
 }
 
+/** Decrypt and map a user_chat_messages row to a ChatConversationMessage */
 function toConversationMessage(row: ChatMessageRow): ChatConversationMessage {
   const content = decryptChatValueSafely(
     row.content,
@@ -307,6 +391,7 @@ function toConversationMessage(row: ChatMessageRow): ChatConversationMessage {
   }
 }
 
+/** Decrypt and map a session row to a session-level ChatMemorySnapshot, or null if empty */
 function toSessionMemorySnapshot(row: ChatSessionRow | null): ChatMemorySnapshot | null {
   if (!row || !row.memory_summary_text) {
     return null
@@ -330,6 +415,7 @@ function toSessionMemorySnapshot(row: ChatSessionRow | null): ChatMemorySnapshot
   }
 }
 
+/** Decrypt and map a user_chat_memory row to a profile-level memory snapshot, or null */
 function toProfileMemorySnapshot(row: ChatMemoryRow | null) {
   if (!row) {
     return null
@@ -363,6 +449,7 @@ function toProfileMemorySnapshot(row: ChatMemoryRow | null) {
   }
 }
 
+/** Map a session-with-count DB row to a ChatSessionSnapshot (decrypting the title) */
 function toSessionSnapshot(row: ChatSessionWithCountRow): ChatSessionSnapshot {
   return {
     id: String(row.id),
@@ -381,6 +468,7 @@ function toSessionSnapshot(row: ChatSessionWithCountRow): ChatSessionSnapshot {
   }
 }
 
+/** Normalise a session title: trim, collapse whitespace, and cap at CHAT_SESSION_TITLE_MAX_LENGTH */
 function normalizeSessionTitle(value: string, fallback: string) {
   const normalized = value.trim().replace(/\s+/g, " ").slice(0, CHAT_SESSION_TITLE_MAX_LENGTH)
   return normalized || fallback
@@ -390,6 +478,19 @@ function buildDefaultSessionTitle(locale: ChatLocale) {
   return locale === "ko" ? "새 대화" : "New chat"
 }
 
+/**
+ * ── Usage & rate limiting ────────────────────────────────────────
+ */
+
+/**
+ * Acquire a row-level lock on the user's daily usage row and run a callback.
+ *
+ * Steps:
+ * 1. Upserts a usage row for the current KST date (ensures the row exists)
+ * 2. SELECT … FOR UPDATE to lock the row
+ * 3. Runs the callback with the locked connection
+ * 4. Commits (or rolls back on error) and releases the connection
+ */
 async function withLockedDailyUsage<T>(
   userId: string,
   callback: (
@@ -458,6 +559,13 @@ async function withLockedDailyUsage<T>(
   }
 }
 
+/**
+ * Reserve one chat request against the user's daily quota.
+ *
+ * Uses a row-level lock to atomically check-and-increment. Returns
+ * `{ allowed, usage }` so the caller can refuse the request immediately
+ * if the daily limit has been reached.
+ */
 export async function reserveDailyChatRequest(userId: string) {
   const result = await withLockedDailyUsage(userId, async (connection, metricDate, row) => {
     if (row.request_count >= CHAT_DAILY_REQUEST_LIMIT) {
@@ -497,6 +605,7 @@ export async function reserveDailyChatRequest(userId: string) {
   return result
 }
 
+/** Fetch the user's current daily usage snapshot without acquiring a lock */
 export async function getChatUsageSnapshot(userId: string) {
   await ensureChatSchema()
 
@@ -528,6 +637,14 @@ export async function getChatUsageSnapshot(userId: string) {
   return toUsageSnapshot(rows[0] ?? null, metricDate)
 }
 
+/**
+ * ── Session operations ───────────────────────────────────────────
+ */
+
+/**
+ * Safely parse a session id from a string, number, or null.
+ * Returns null for invalid / non-positive values.
+ */
 function parseSessionId(value: string | number | null | undefined) {
   if (typeof value === "number" && Number.isInteger(value) && value > 0) {
     return value
@@ -543,6 +660,7 @@ function parseSessionId(value: string | number | null | undefined) {
   return null
 }
 
+/** Fetch all chat sessions for a user with a joined message count, ordered by recency */
 async function listChatSessionRows(userId: string) {
   await ensureChatSchema()
 
@@ -581,6 +699,7 @@ async function listChatSessionRows(userId: string) {
   return rows
 }
 
+/** Insert a new chat session row with an encrypted title, returning the new id */
 async function insertChatSession(input: {
   connection: PoolConnection
   userId: string
@@ -604,6 +723,12 @@ async function insertChatSession(input: {
   return Number(result.insertId)
 }
 
+/**
+ * Backfill: assign any orphan messages (session_id IS NULL) to the oldest session.
+ *
+ * This handles the migration period where messages were created before the
+ * session feature was introduced.
+ */
 async function ensureLegacyMessagesAssignedToSession(userId: string) {
   const rows = await queryRows<ChatSessionRow[]>(
     `
@@ -636,6 +761,7 @@ async function ensureLegacyMessagesAssignedToSession(userId: string) {
   }
 }
 
+/** List all chat sessions for a user, served from TTL cache when available */
 export async function listChatSessions(userId: string) {
   const cache = getChatSessionsCache()
   const now = Date.now()
@@ -658,6 +784,7 @@ export async function listChatSessions(userId: string) {
   return sessions.map((session) => ({ ...session }))
 }
 
+/** Create a new chat session with the given title (or auto-title). Clears cache on success. */
 export async function createChatSession(input: {
   userId: string
   locale: ChatLocale
@@ -689,6 +816,14 @@ export async function createChatSession(input: {
   }
 }
 
+/**
+ * Delete a chat session and all associated messages/events.
+ *
+ * Safety checks:
+ * 1. Verifies ownership of the session (FOR UPDATE lock)
+ * 2. Refuses to delete the last remaining session
+ * Returns the id of the next session to navigate to, or null.
+ */
 export async function deleteChatSession(input: {
   userId: string
   sessionId: string
@@ -728,6 +863,7 @@ export async function deleteChatSession(input: {
       [input.userId]
     )
 
+    // Never delete the last remaining session — user must have at least one
     if ((countRows[0]?.total ?? 0) <= 1) {
       await connection.rollback()
       return null
@@ -773,6 +909,14 @@ export async function deleteChatSession(input: {
   return remaining[0]?.id ?? null
 }
 
+/**
+ * Resolve the active session for a user.
+ *
+ * If the user has zero sessions, one is auto-created and orphan messages
+ * are backfilled into it. If a requestedSessionId is given, that session
+ * is used (falling back to the most recent). Returns the resolved session,
+ * the full session list, and the active session id.
+ */
 export async function resolveChatSession(input: {
   userId: string
   locale: ChatLocale
@@ -826,6 +970,11 @@ export async function resolveChatSession(input: {
   }
 }
 
+/**
+ * ── Memory snapshots ─────────────────────────────────────────────
+ */
+
+/** Fetch the user's long-term profile memory from user_chat_memory */
 export async function getChatMemorySnapshot(userId: string) {
   await ensureChatSchema()
 
@@ -852,6 +1001,7 @@ export async function getChatMemorySnapshot(userId: string) {
   return toProfileMemorySnapshot(rows[0] ?? null)
 }
 
+/** Fetch the compacted memory of a specific session from user_chat_sessions */
 export async function getChatSessionMemorySnapshot(input: {
   userId: string
   sessionId: number
@@ -885,6 +1035,11 @@ export async function getChatSessionMemorySnapshot(input: {
   return toSessionMemorySnapshot(rows[0] ?? null)
 }
 
+/**
+ * ── Message retrieval ────────────────────────────────────────────
+ */
+
+/** Fetch the most recent N messages in a session, newest-first from the DB then reversed to chronological */
 export async function getRecentConversationMessages(
   userId: string,
   sessionId: number,
@@ -916,6 +1071,7 @@ export async function getRecentConversationMessages(
   return rows.reverse().map(toConversationMessage)
 }
 
+/** Fetch recent messages NOT yet included in memory (i.e., not yet compacted) */
 export async function getRecentContextMessages(
   userId: string,
   sessionId: number,
@@ -948,6 +1104,15 @@ export async function getRecentContextMessages(
   return rows.reverse().map(toConversationMessage)
 }
 
+/**
+ * Fetch the full chat state for the UI: messages, memory, usage, policy, sessions.
+ *
+ * Backed by a two-level dedup strategy:
+ * 1. **TTL cache**: served from memory if the entry has not expired
+ * 2. **In-flight promise**: concurrent requests for the same key share one DB query
+ *
+ * All returned objects are deep-cloned to prevent caller-side mutation of cache entries.
+ */
 export async function getChatState(input: {
   userId: string
   locale: ChatLocale
@@ -957,20 +1122,25 @@ export async function getChatState(input: {
   const now = Date.now()
   const cache = getChatStateCache()
   const cached = cache.get(cacheKey)
+
+  // Cache hit — return a clone to prevent mutation
   if (cached && cached.expiresAt > now) {
     return cloneChatStateSnapshot(cached.data)
   }
 
+  // Stale entry — remove before re-fetch
   if (cached) {
     cache.delete(cacheKey)
   }
 
+  // In-flight promise hit — another request is already fetching this key
   const inFlightMap = getChatStateInFlight()
   const inFlight = inFlightMap.get(cacheKey)
   if (inFlight) {
     return cloneChatStateSnapshot(await inFlight)
   }
 
+  // Cache miss + no in-flight — start a new fetch, store the promise, and cache the result
   const pending = (async () => {
     const resolved = await resolveChatSession({
       userId: input.userId,
@@ -978,6 +1148,7 @@ export async function getChatState(input: {
       requestedSessionId: input.requestedSessionId,
     })
 
+    // Fetch messages, session memory, and usage in parallel
     const [messages, memory, usage] = await Promise.all([
       getRecentConversationMessages(input.userId, resolved.activeSessionId),
       Promise.resolve(toSessionMemorySnapshot(resolved.activeSession)),
@@ -1010,6 +1181,7 @@ export async function getChatState(input: {
   }
 }
 
+/** Return the current policy snapshot (daily limit, input cap, time zone) */
 export function getChatPolicySnapshot(): ChatPolicySnapshot {
   return {
     dailyLimit: CHAT_DAILY_REQUEST_LIMIT,
@@ -1018,6 +1190,18 @@ export function getChatPolicySnapshot(): ChatPolicySnapshot {
   }
 }
 
+/**
+ * ── Memory compaction ────────────────────────────────────────────
+ */
+
+/**
+ * Find messages eligible for compaction in a session.
+ *
+ * Returns null if the session does not yet meet the compaction threshold
+ * (message count or estimated tokens). When triggered, all messages
+ * EXCEPT the last CHAT_COMPACTION_KEEP_MESSAGE_COUNT are returned as
+ * the compaction candidate, ready for the summary prompt.
+ */
 export async function getCompactionCandidate(userId: string, sessionId: number) {
   await ensureChatSchema()
 
@@ -1042,6 +1226,7 @@ export async function getCompactionCandidate(userId: string, sessionId: number) 
     [userId, sessionId]
   )
 
+  // Not enough uncompacted messages to bother compacting
   if (rows.length <= CHAT_COMPACTION_KEEP_MESSAGE_COUNT) {
     return null
   }
@@ -1061,6 +1246,7 @@ export async function getCompactionCandidate(userId: string, sessionId: number) 
     0
   )
 
+  // Trigger compaction if either message count OR estimated tokens exceeds threshold
   const shouldCompact = resolvedMessages.length >= CHAT_COMPACTION_TRIGGER_MESSAGE_COUNT
     || estimatedTokens >= CHAT_COMPACTION_TRIGGER_ESTIMATED_TOKENS
 
@@ -1068,6 +1254,7 @@ export async function getCompactionCandidate(userId: string, sessionId: number) 
     return null
   }
 
+  // Keep the most recent messages for context; the rest go into the summary
   const compactRows = resolvedMessages.slice(0, -CHAT_COMPACTION_KEEP_MESSAGE_COUNT)
   return {
     estimatedTokens: Math.max(0, estimatedTokens),
@@ -1082,6 +1269,11 @@ export async function getCompactionCandidate(userId: string, sessionId: number) 
   }
 }
 
+/**
+ * ── Request event logging ────────────────────────────────────────
+ */
+
+/** Insert a row into user_chat_request_events within an existing transaction */
 async function insertRequestEvent(
   connection: PoolConnection,
   input: {
@@ -1148,6 +1340,7 @@ async function insertRequestEvent(
   )
 }
 
+/** Log a chat request event (success or failure) to the events table */
 export async function logChatRequestEvent(input: {
   userId: string
   sessionId?: number | null
@@ -1174,6 +1367,23 @@ export async function logChatRequestEvent(input: {
   }
 }
 
+/**
+ * ── Message persistence ──────────────────────────────────────────
+ */
+
+/**
+ * Persist a complete user+assistant exchange in a single transaction.
+ *
+ * Steps inside the transaction:
+ * 1. Locks and validates the session row (FOR UPDATE)
+ * 2. Counts existing messages for auto-title logic
+ * 3. Inserts the user message with estimated prompt tokens
+ * 4. Inserts the assistant message with real usage data
+ * 5. Auto-titles the session if this is the first message
+ * 6. Updates session last_message_at
+ * 7. Accumulates token usage into the daily rollup
+ * 8. Inserts a success request event
+ */
 export async function persistChatExchange(input: {
   userId: string
   sessionId: number
@@ -1282,6 +1492,7 @@ export async function persistChatExchange(input: {
       ]
     )
 
+    // Auto-title: first message in the session becomes the title
     if (sessionRows[0].is_auto_title === 1 && (existingRows[0]?.total ?? 0) === 0) {
       const nextTitle = normalizeSessionTitle(
         input.userMessage.slice(0, 48),
@@ -1362,6 +1573,11 @@ export async function persistChatExchange(input: {
   }
 }
 
+/**
+ * ── Failure tracking ─────────────────────────────────────────────
+ */
+
+/** Increment the daily failure count and log the error event */
 export async function markDailyChatFailure(input: {
   userId: string
   sessionId?: number | null
@@ -1417,6 +1633,18 @@ export async function markDailyChatFailure(input: {
   }
 }
 
+/**
+ * ── Profile memory refresh ─────────────────────────────────────────────
+ */
+
+/**
+ * Get candidate messages for refreshing the user's long-term profile memory.
+ *
+ * Returns the last N user messages (since the last profile refresh) along
+ * with the existing summary/assessment. The caller uses these to produce
+ * an updated profile via buildProfileMemoryPrompt. Returns null if there
+ * are too few new messages since the last refresh.
+ */
 export async function getProfileMemoryRefreshCandidate(userId: string) {
   const profileMemory = await getChatMemorySnapshot(userId)
   const lastMessageId = profileMemory?.lastProfileMessageId ?? 0
@@ -1443,6 +1671,7 @@ export async function getProfileMemoryRefreshCandidate(userId: string) {
     [userId, lastMessageId, CHAT_PROFILE_MEMORY_CANDIDATE_LIMIT]
   )
 
+  // Require more new messages for a refresh than for the initial build
   const minimumMessages = profileMemory?.summary
     ? CHAT_PROFILE_MEMORY_MIN_NEW_MESSAGES
     : CHAT_PROFILE_MEMORY_INITIAL_MIN_MESSAGES
@@ -1459,6 +1688,7 @@ export async function getProfileMemoryRefreshCandidate(userId: string) {
   }
 }
 
+/** Save an updated profile memory summary+assessment to user_chat_memory (upsert) */
 export async function persistUserProfileMemory(input: {
   userId: string
   summary: string
@@ -1508,6 +1738,19 @@ export async function persistUserProfileMemory(input: {
   )
 }
 
+/**
+ * ── Compaction persistence ─────────────────────────────────────────────
+ */
+
+/**
+ * Persist a compacted session memory summary.
+ *
+ * Steps:
+ * 1. Updates the session row with the new summary, token estimate, and model
+ * 2. Marks compacted messages as included_in_memory_at = NOW()
+ * 3. Accumulates summary token usage in the daily rollup
+ * 4. Logs a "summary" request event
+ */
 export async function persistCompactedMemory(input: {
   userId: string
   sessionId: number
@@ -1556,6 +1799,7 @@ export async function persistCompactedMemory(input: {
       ]
     )
 
+    // Build dynamic placeholder string for the IN (...) clause
     const placeholders = input.summarizedMessageIds.map(() => "?").join(", ")
     await connection.execute(
       `
@@ -1616,6 +1860,11 @@ export async function persistCompactedMemory(input: {
   }
 }
 
+/**
+ * ── Account data deletion ────────────────────────────────────────
+ */
+
+/** Wipe all chat data for a user (events, messages, sessions, memory, usage) */
 export async function deleteChatDataForUser(userId: string) {
   await ensureChatSchema()
 

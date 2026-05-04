@@ -1,3 +1,15 @@
+/**
+ * Lab AI Chat — data-access layer.
+ *
+ * Session management: list, create, delete, resolve.
+ * Messaging: insert user/assistant exchanges, retrieve visible/context messages.
+ * Usage tracking: daily-rate reservation with row-level locking.
+ * Web-search: quota reservation, outcome recording, cache persistence.
+ * Compaction: candidate detection and memory-summary persistence.
+ *
+ * All sensitive text is encrypted at rest via encryptDatabaseValue / decryptDatabaseValueSafely.
+ */
+
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise"
 
 import {
@@ -37,6 +49,7 @@ import {
   encryptDatabaseValue,
 } from "@/lib/security/data-protection"
 
+/** Raw row shape for lab_ai_chat_messages. */
 interface LabAiChatMessageRow extends RowDataPacket {
   id: number
   user_id: string
@@ -49,6 +62,7 @@ interface LabAiChatMessageRow extends RowDataPacket {
   created_at: Date | string
 }
 
+/** Raw row shape for lab_ai_chat_sessions. */
 interface LabAiChatSessionRow extends RowDataPacket {
   id: number
   user_id: string
@@ -64,10 +78,12 @@ interface LabAiChatSessionRow extends RowDataPacket {
   updated_at: Date | string
 }
 
+/** Session row joined with a message-count subquery. */
 interface LabAiChatSessionWithCountRow extends LabAiChatSessionRow {
   message_count: number
 }
 
+/** Raw row shape for lab_ai_chat_usage_daily. */
 interface LabAiChatUsageRow extends RowDataPacket {
   metric_date: Date | string
   user_id: string
@@ -84,6 +100,7 @@ interface LabAiChatUsageRow extends RowDataPacket {
   summary_total_tokens: number
 }
 
+/** Raw row shape for lab_ai_chat_web_search_state. */
 interface LabAiChatWebSearchStateRow extends RowDataPacket {
   user_id: string
   session_id: number
@@ -99,6 +116,7 @@ interface LabAiChatWebSearchStateRow extends RowDataPacket {
   cache_updated_at: Date | string | null
 }
 
+/** Raw row shape for lab_ai_chat_web_search_usage_monthly. */
 interface LabAiChatWebSearchMonthlyUsageRow extends RowDataPacket {
   metric_month: string
   request_count: number
@@ -108,6 +126,7 @@ interface LabAiChatWebSearchMonthlyUsageRow extends RowDataPacket {
 
 const LAB_AI_CHAT_SESSION_TITLE_MAX_LENGTH = 60
 
+/** Normalise a Date or ISO-like string to a consistent ISO-8601 string. */
 function toIsoString(value: Date | string) {
   if (value instanceof Date) {
     return value.toISOString()
@@ -117,6 +136,7 @@ function toIsoString(value: Date | string) {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
 }
 
+/** Parse and validate a session-id value; returns null for invalid input. */
 function parseSessionId(value: string | number | null | undefined) {
   if (typeof value === "number" && Number.isInteger(value) && value > 0) {
     return value
@@ -132,6 +152,7 @@ function parseSessionId(value: string | number | null | undefined) {
   return null
 }
 
+/** Today's date as YYYY-MM-DD in KST. */
 function getKstMetricDate() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: LAB_AI_CHAT_TIME_ZONE,
@@ -141,6 +162,7 @@ function getKstMetricDate() {
   }).format(new Date())
 }
 
+/** Current month as YYYY-MM in KST. */
 function getKstMetricMonth() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: LAB_AI_CHAT_TIME_ZONE,
@@ -149,15 +171,18 @@ function getKstMetricMonth() {
   }).format(new Date())
 }
 
+/** Return the locale-appropriate placeholder title for new sessions. */
 function buildDefaultSessionTitle(locale: LabAiChatLocale) {
   return locale === "en" ? "New chat" : "새 대화"
 }
 
+/** Trim, collapse whitespace, and truncate a session title. Returns fallback if empty. */
 function normalizeSessionTitle(value: string, fallback: string) {
   const normalized = value.trim().replace(/\s+/g, " ").slice(0, LAB_AI_CHAT_SESSION_TITLE_MAX_LENGTH)
   return normalized || fallback
 }
 
+/** Map a DB message row to a frontend-safe conversation message (content decrypted). */
 function toConversationMessage(row: LabAiChatMessageRow): LabAiChatConversationMessage {
   return {
     id: String(row.id),
@@ -168,6 +193,7 @@ function toConversationMessage(row: LabAiChatMessageRow): LabAiChatConversationM
   }
 }
 
+/** Build a memory snapshot from the session row, or null if no summary exists. */
 function toMemorySnapshot(row: LabAiChatSessionRow | null): LabAiChatMemorySnapshot | null {
   if (!row?.memory_summary_text) {
     return null
@@ -186,6 +212,7 @@ function toMemorySnapshot(row: LabAiChatSessionRow | null): LabAiChatMemorySnaps
   }
 }
 
+/** Map a session row (with message count) to the public session-snapshot shape. */
 function toSessionSnapshot(row: LabAiChatSessionWithCountRow): LabAiChatSessionSnapshot {
   return {
     id: String(row.id),
@@ -199,6 +226,7 @@ function toSessionSnapshot(row: LabAiChatSessionWithCountRow): LabAiChatSessionS
   }
 }
 
+/** Return a zeroed usage snapshot (e.g. when no row exists for today yet). */
 function createEmptyUsage(metricDate: string): LabAiChatUsageSnapshot {
   return {
     metricDate,
@@ -218,6 +246,7 @@ function createEmptyUsage(metricDate: string): LabAiChatUsageSnapshot {
   }
 }
 
+/** Map a DB usage row (or null) to the public usage-snapshot shape. */
 function toUsageSnapshot(row: LabAiChatUsageRow | null, metricDate: string) {
   if (!row) {
     return createEmptyUsage(metricDate)
@@ -242,10 +271,12 @@ function toUsageSnapshot(row: LabAiChatUsageRow | null, metricDate: string) {
   } satisfies LabAiChatUsageSnapshot
 }
 
+/** Map web-search state + monthly rows into a single quota/cache snapshot. */
 function toWebSearchSnapshot(input: {
   stateRow: LabAiChatWebSearchStateRow | null
   monthRow: LabAiChatWebSearchMonthlyUsageRow | null
 }): LabAiChatWebSearchSnapshot {
+  // Derive primary vs. fallback: fallback calls are a subset of total session calls.
   const sessionUsed = Math.max(0, input.stateRow?.session_call_count ?? 0)
   const fallbackUsed = Math.min(
     sessionUsed,
@@ -279,6 +310,7 @@ function toWebSearchSnapshot(input: {
   }
 }
 
+/** Ensure a web-search state row exists for the given user + session. */
 async function upsertLabAiChatWebSearchStateRow(connection: PoolConnection, userId: string, sessionId: number) {
   await connection.execute(
     `
@@ -292,6 +324,7 @@ async function upsertLabAiChatWebSearchStateRow(connection: PoolConnection, user
   )
 }
 
+/** Ensure a web-search monthly usage row exists for the given month. */
 async function upsertLabAiChatWebSearchMonthlyRow(connection: PoolConnection, metricMonth: string) {
   await connection.execute(
     `
@@ -304,6 +337,7 @@ async function upsertLabAiChatWebSearchMonthlyRow(connection: PoolConnection, me
   )
 }
 
+/** Fetch all sessions for a user, each with its message count via a LEFT JOIN. */
 async function listLabAiChatSessionRows(userId: string) {
   await ensureLabAiChatSchema()
 
@@ -338,6 +372,7 @@ async function listLabAiChatSessionRows(userId: string) {
   )
 }
 
+/** Insert a new session row on the given connection. Returns the auto-generated id. */
 async function insertLabAiChatSession(input: {
   connection: PoolConnection
   userId: string
@@ -362,6 +397,10 @@ async function insertLabAiChatSession(input: {
   return Number(result.insertId)
 }
 
+/**
+ * Acquire a row-level lock on today's usage row, run the callback,
+ * then commit. The callback receives the locked row and can safely mutate it.
+ */
 async function withLockedDailyUsage<T>(
   userId: string,
   callback: (
@@ -377,6 +416,7 @@ async function withLockedDailyUsage<T>(
     await connection.beginTransaction()
     const metricDate = getKstMetricDate()
 
+    // Ensure a row exists for today, then lock it with FOR UPDATE.
     await connection.execute(
       `
         INSERT INTO lab_ai_chat_usage_daily (
@@ -430,6 +470,7 @@ async function withLockedDailyUsage<T>(
   }
 }
 
+/** Insert an audit event row on the given connection. */
 async function insertRequestEvent(
   connection: PoolConnection,
   input: {
@@ -496,11 +537,13 @@ async function insertRequestEvent(
   )
 }
 
+/** List all chat sessions for the user, most-recently-updated first. */
 export async function listLabAiChatSessions(userId: string) {
   const rows = await listLabAiChatSessionRows(userId)
   return rows.map(toSessionSnapshot)
 }
 
+/** Create a new empty session. Returns the session id as a string. */
 export async function createLabAiChatSession(input: {
   userId: string
   locale: LabAiChatLocale
@@ -526,6 +569,10 @@ export async function createLabAiChatSession(input: {
   }
 }
 
+/**
+ * Delete a session and all its related data (messages, events, web-search state).
+ * Refuses to delete the user's last remaining session. Returns the next session id, or null.
+ */
 export async function deleteLabAiChatSession(input: {
   userId: string
   sessionId: string
@@ -539,6 +586,7 @@ export async function deleteLabAiChatSession(input: {
   const connection = await getDbPool().getConnection()
   try {
     await connection.beginTransaction()
+    // Lock the session row to verify ownership before deleting.
     const [ownedRows] = await connection.query<Array<RowDataPacket & { id: number }>>(
       `
         SELECT id
@@ -556,6 +604,7 @@ export async function deleteLabAiChatSession(input: {
       return null
     }
 
+    // Prevent deleting the last session.
     const [countRows] = await connection.query<Array<RowDataPacket & { total: number }>>(
       `
         SELECT COUNT(*) AS total
@@ -618,6 +667,11 @@ export async function deleteLabAiChatSession(input: {
   return remaining[0]?.id ?? null
 }
 
+/**
+ * Resolve the active session for the user.
+ * If no sessions exist, auto-create one. Optionally targets a requested session id.
+ * Returns the active session + full session list.
+ */
 export async function resolveLabAiChatSession(input: {
   userId: string
   locale: LabAiChatLocale
@@ -640,6 +694,7 @@ export async function resolveLabAiChatSession(input: {
   }
 
   const requestedSessionId = parseSessionId(input.requestedSessionId)
+  // Pick the requested session if valid and owned by the user, otherwise fall back to the most recent.
   const active = requestedSessionId
     ? sessionRows.find((row) => row.id === requestedSessionId) ?? sessionRows[0]
     : sessionRows[0]
@@ -651,6 +706,7 @@ export async function resolveLabAiChatSession(input: {
   }
 }
 
+/** Get today's usage snapshot for the user (no row lock — read-only). */
 export async function getLabAiChatUsageSnapshot(userId: string) {
   await ensureLabAiChatSchema()
 
@@ -682,6 +738,7 @@ export async function getLabAiChatUsageSnapshot(userId: string) {
   return toUsageSnapshot(rows[0] ?? null, metricDate)
 }
 
+/** Get the web-search quota + cache snapshot for a session (read-only, no lock). */
 export async function getLabAiChatWebSearchSnapshot(input: {
   userId: string
   sessionId: number
@@ -740,6 +797,7 @@ export async function getLabAiChatWebSearchSnapshot(input: {
   }
 }
 
+/** Retrieve the cached web-search result for a session, or null if no cache exists. */
 export async function getLabAiChatWebSearchCache(input: {
   userId: string
   sessionId: number
@@ -793,6 +851,11 @@ export async function getLabAiChatWebSearchCache(input: {
   }
 }
 
+/**
+ * Reserve a web-search API call for the session+month.
+ * Returns whether the call is allowed and the current snapshot.
+ * Uses row-level locking so concurrent requests are serialised.
+ */
 export async function reserveLabAiChatWebSearchCall(input: {
   userId: string
   sessionId: number
@@ -856,6 +919,7 @@ export async function reserveLabAiChatWebSearchCall(input: {
     const monthUsed = Math.max(0, monthRow?.request_count ?? 0)
     const isFallback = Boolean(input.isFallback)
 
+    // Check each limit in order: primary session, fallback session, monthly.
     if (!isFallback && primaryUsed >= LAB_AI_CHAT_WEB_SEARCH_SESSION_CALL_LIMIT) {
       await connection.commit()
       return {
@@ -886,6 +950,7 @@ export async function reserveLabAiChatWebSearchCall(input: {
       }
     }
 
+    // Atomically increment counters.
     await connection.execute(
       `
         UPDATE lab_ai_chat_web_search_state
@@ -908,6 +973,7 @@ export async function reserveLabAiChatWebSearchCall(input: {
       [metricMonth]
     )
 
+    // Build a post-increment snapshot mirroring what the DB will reflect.
     const nextSnapshot = toWebSearchSnapshot({
       stateRow: stateRow
         ? {
@@ -934,6 +1000,7 @@ export async function reserveLabAiChatWebSearchCall(input: {
   }
 }
 
+/** Record a web-search call as success or failure in the monthly rollup. */
 export async function recordLabAiChatWebSearchOutcome(input: {
   metricMonth: string
   success: boolean
@@ -952,6 +1019,7 @@ export async function recordLabAiChatWebSearchOutcome(input: {
   )
 }
 
+/** Save or update the web-search cache for a session. */
 export async function persistLabAiChatWebSearchCache(input: {
   userId: string
   sessionId: number
@@ -965,6 +1033,7 @@ export async function persistLabAiChatWebSearchCache(input: {
 }) {
   await ensureLabAiChatSchema()
 
+  // Validate date format before persisting.
   const startDate = input.startDate && /^\d{4}-\d{2}-\d{2}$/.test(input.startDate) ? input.startDate : null
   const endDate = input.endDate && /^\d{4}-\d{2}-\d{2}$/.test(input.endDate) ? input.endDate : null
 
@@ -1010,6 +1079,7 @@ export async function persistLabAiChatWebSearchCache(input: {
   )
 }
 
+/** Reserve a daily chat request — checks the limit and increments the counter atomically. */
 export async function reserveDailyLabAiChatRequest(userId: string) {
   return withLockedDailyUsage(userId, async (connection, metricDate, row) => {
     if (row.request_count >= LAB_AI_CHAT_DAILY_REQUEST_LIMIT) {
@@ -1043,6 +1113,7 @@ export async function reserveDailyLabAiChatRequest(userId: string) {
   })
 }
 
+/** Return the static policy limits as a snapshot (no DB call). */
 export function getLabAiChatPolicySnapshot(): LabAiChatPolicySnapshot {
   return {
     dailyLimit: LAB_AI_CHAT_DAILY_REQUEST_LIMIT,
@@ -1051,6 +1122,7 @@ export function getLabAiChatPolicySnapshot(): LabAiChatPolicySnapshot {
   }
 }
 
+/** Get the memory summary for a session (used to hydrate the system prompt). */
 export async function getLabAiChatSessionMemorySnapshot(input: {
   userId: string
   sessionId: number
@@ -1083,6 +1155,7 @@ export async function getLabAiChatSessionMemorySnapshot(input: {
   return toMemorySnapshot(rows[0] ?? null)
 }
 
+/** Fetch the most recent messages for display in the UI (includes both compacted and un-compacted). */
 export async function getRecentLabAiChatConversationMessages(
   userId: string,
   sessionId: number,
@@ -1111,9 +1184,11 @@ export async function getRecentLabAiChatConversationMessages(
     [userId, sessionId, limit]
   )
 
+  // Reverse to chronological order.
   return rows.reverse().map(toConversationMessage)
 }
 
+/** Fetch the most recent un-compacted messages to include in the LLM context window. */
 export async function getRecentLabAiChatContextMessages(
   userId: string,
   sessionId: number,
@@ -1146,6 +1221,7 @@ export async function getRecentLabAiChatContextMessages(
   return rows.reverse().map(toConversationMessage)
 }
 
+/** Assemble the full core state: resolved session, messages, usage, web-search, policy, memory, all session list. */
 export async function getLabAiChatStateCore(input: {
   userId: string
   locale: LabAiChatLocale
@@ -1157,6 +1233,7 @@ export async function getLabAiChatStateCore(input: {
     requestedSessionId: input.requestedSessionId,
   })
 
+  // Fetch all independent data sources in parallel.
   const [messages, usage, webSearch] = await Promise.all([
     getRecentLabAiChatConversationMessages(input.userId, resolved.activeSessionId),
     getLabAiChatUsageSnapshot(input.userId),
@@ -1177,6 +1254,7 @@ export async function getLabAiChatStateCore(input: {
   }
 }
 
+/** Find messages eligible for compaction. Returns null if thresholds are not met. */
 export async function getLabAiChatCompactionCandidate(userId: string, sessionId: number) {
   await ensureLabAiChatSchema()
 
@@ -1201,10 +1279,12 @@ export async function getLabAiChatCompactionCandidate(userId: string, sessionId:
     [userId, sessionId]
   )
 
+  // Not enough messages to justify compaction.
   if (rows.length <= LAB_AI_CHAT_COMPACTION_KEEP_MESSAGE_COUNT) {
     return null
   }
 
+  // Decrypt content for token estimation.
   const resolvedMessages = rows.map((row) => ({
     row,
     decryptedContent: decryptDatabaseValueSafely(row.content, `lab.ai.chat.message.${row.role}`) ?? "[Unavailable history]",
@@ -1215,6 +1295,7 @@ export async function getLabAiChatCompactionCandidate(userId: string, sessionId:
     0
   )
 
+  // Trigger compaction if message count or estimated token budget is exceeded.
   const shouldCompact = resolvedMessages.length >= LAB_AI_CHAT_COMPACTION_TRIGGER_MESSAGE_COUNT
     || estimatedTokens >= LAB_AI_CHAT_COMPACTION_TRIGGER_ESTIMATED_TOKENS
 
@@ -1222,6 +1303,7 @@ export async function getLabAiChatCompactionCandidate(userId: string, sessionId:
     return null
   }
 
+  // Messages to compact = everything except the N most recent.
   const compactRows = resolvedMessages.slice(0, -LAB_AI_CHAT_COMPACTION_KEEP_MESSAGE_COUNT)
   return {
     estimatedTokens,
@@ -1236,6 +1318,7 @@ export async function getLabAiChatCompactionCandidate(userId: string, sessionId:
   }
 }
 
+/** Log a request event without modifying usage counters (e.g. for rate-limit errors). */
 export async function logLabAiChatRequestEvent(input: {
   userId: string
   sessionId?: number | null
@@ -1263,6 +1346,7 @@ export async function logLabAiChatRequestEvent(input: {
   }
 }
 
+/** Persist a complete user↔assistant exchange: messages, title (if first), usage rollup, and audit event. */
 export async function persistLabAiChatExchange(input: {
   userId: string
   sessionId: number
@@ -1281,8 +1365,10 @@ export async function persistLabAiChatExchange(input: {
   const connection = await getDbPool().getConnection()
   try {
     await connection.beginTransaction()
+    // Estimate user token count since the actual usage from the provider only covers the assistant turn.
     const userTokenEstimate = estimateLabAiChatTokens(input.userMessage)
 
+    // Count existing messages to decide if this is the first exchange (→ set session title).
     const [existingRows] = await connection.query<Array<RowDataPacket & { total: number }>>(
       `
         SELECT COUNT(*) AS total
@@ -1354,6 +1440,7 @@ export async function persistLabAiChatExchange(input: {
       ]
     )
 
+    // First message in session → derive the session title from the user's first message.
     if ((existingRows[0]?.total ?? 0) === 0) {
       const nextTitle = normalizeSessionTitle(
         input.userMessage.slice(0, 48),
@@ -1375,6 +1462,7 @@ export async function persistLabAiChatExchange(input: {
       )
     }
 
+    // Touch session timestamps.
     await connection.execute(
       `
         UPDATE lab_ai_chat_sessions
@@ -1386,6 +1474,7 @@ export async function persistLabAiChatExchange(input: {
       [input.userId, input.sessionId]
     )
 
+    // Roll up usage into the daily counter.
     await connection.execute(
       `
         UPDATE lab_ai_chat_usage_daily
@@ -1408,6 +1497,7 @@ export async function persistLabAiChatExchange(input: {
       ]
     )
 
+    // Log the audit event.
     await insertRequestEvent(connection, {
       userId: input.userId,
       sessionId: input.sessionId,
@@ -1433,6 +1523,7 @@ export async function persistLabAiChatExchange(input: {
   }
 }
 
+/** Record a failed chat request: increment failure count and log an audit event. */
 export async function markDailyLabAiChatFailure(input: {
   userId: string
   sessionId?: number | null
@@ -1451,6 +1542,7 @@ export async function markDailyLabAiChatFailure(input: {
   const connection = await getDbPool().getConnection()
   try {
     await connection.beginTransaction()
+    // Increment failure counter in the daily usage row.
     await connection.execute(
       `
         UPDATE lab_ai_chat_usage_daily
@@ -1462,6 +1554,7 @@ export async function markDailyLabAiChatFailure(input: {
       [getKstMetricDate(), input.userId]
     )
 
+    // Log the provider_error event.
     await insertRequestEvent(connection, {
       userId: input.userId,
       sessionId: input.sessionId,
@@ -1487,6 +1580,7 @@ export async function markDailyLabAiChatFailure(input: {
   }
 }
 
+/** Persist a compaction result: update session memory, mark messages as compacted, roll up summary usage. */
 export async function persistLabAiChatCompactedMemory(input: {
   userId: string
   sessionId: number
@@ -1502,6 +1596,7 @@ export async function persistLabAiChatCompactedMemory(input: {
 }) {
   await ensureLabAiChatSchema()
 
+  // Nothing to compact.
   if (input.summarizedMessageIds.length === 0) {
     return
   }
@@ -1535,6 +1630,7 @@ export async function persistLabAiChatCompactedMemory(input: {
       ]
     )
 
+    // Mark the compacted messages as having been included_in_memory_at.
     const placeholders = input.summarizedMessageIds.map(() => "?").join(", ")
     await connection.execute(
       `
@@ -1547,6 +1643,7 @@ export async function persistLabAiChatCompactedMemory(input: {
       [input.userId, input.sessionId, ...input.summarizedMessageIds]
     )
 
+    // Roll up summary usage into the daily counter (separate from chat usage).
     await connection.execute(
       `
         UPDATE lab_ai_chat_usage_daily
@@ -1569,6 +1666,7 @@ export async function persistLabAiChatCompactedMemory(input: {
       ]
     )
 
+    // Log the summary audit event.
     await insertRequestEvent(connection, {
       userId: input.userId,
       sessionId: input.sessionId,

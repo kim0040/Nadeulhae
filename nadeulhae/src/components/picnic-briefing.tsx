@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * PicnicBriefing — rich weather briefing card combining rule-based guidance,
+ * AI-generated natural-language summary, bulletin parsing, and a technical
+ * data grid.  Fully i18n via LanguageContext.
+ */
+
 import { useEffect, useState } from "react"
 import { useLanguage } from "@/context/LanguageContext"
 import { WeatherData } from "@/services/dataService"
@@ -34,6 +40,7 @@ interface BriefingPoint {
 
 export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   const { t, language } = useLanguage()
+  /** Inline locale helper: returns first match in priority order ko > zh > ja > en */
   const __l = (ko: string, en: string, zh?: string, ja?: string) => {
     if (language === "ko") return ko
     if (language === "zh") return zh || en || ko
@@ -46,7 +53,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     ? metadata?.region || "현재 지역"
     : metadata?.regionEn || metadata?.region || "your area"
 
-  const formatBriefing = (key: string, values: Record<string, string | number>) => {
+  /** Template-based i18n: look up key, interpolate {placeholder} values */  const formatBriefing = (key: string, values: Record<string, string | number>) => {
     const template = t(key)
     if (template === key) return "" // Key not found
     let text = template
@@ -56,7 +63,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     return text
   }
 
-  const getScoreNarrative = () => {
+  /** Build a score-breakdown narrative: knock-out rules vs. normal component scores */  const getScoreNarrative = () => {
     const breakdown = metadata?.scoreBreakdown
     if (!breakdown) return null
 
@@ -268,7 +275,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     }
   }
 
-  // 1. 풍부한 상황별 나들이 멘트 (Enhanced Logic)
+  // ---- Rule-based briefing points (temp, PM, wind, humidity, bulletin keywords) ----
   const getBriefingQuotes = (): BriefingPoint[] => {
     const points: BriefingPoint[] = []
     const scoreNarrative = getScoreNarrative()
@@ -412,7 +419,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     return points.filter(p => p.text !== "")
   }
 
-  // 2. 상세 환경 수치 (Technical Data View)
+  // ---- Technical data grid ----
   const getTechnicalPoints = () => [
     { label: t("hero_temp"), value: `${details.temp ?? "--"}°C`, icon: <Thermometer size={14} /> },
     { label: t("hero_humidity"), value: `${details.humidity ?? "--"}%`, icon: <Droplets size={14} /> },
@@ -430,21 +437,8 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   const integratedGuide = getIntegratedGuide()
   const techData = getTechnicalPoints()
 
-  /**
-   * AI-generated natural-language briefing text.
-   *
-   * Fetched asynchronously from `/api/weather/briefing` on mount and whenever
-   * key weather conditions change (score, temp, humidity, wind, PM, rain,
-   * weather warnings, bulletin text). The API has its own 15-min result cache
-   * plus per-user daily quota, so repeated re-renders are cheap.
-   *
-   * On failure (network error, LLM timeout, quota exhausted), the value stays
-   * null and the UI falls back to the rule-based {@link integratedGuide.text}.
-   * The 18-second `AbortSignal.timeout` gives the LLM generous room while
-   * preventing stale loading states.
-   *
-   * @see /api/weather/briefing
-   */
+  // ---- AI briefing (async, fetched from /api/weather/briefing) ----
+
   const [aiBriefingText, setAiBriefingText] = useState<string | null>(null)
 
   useEffect(() => {
@@ -486,6 +480,8 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     fetchBriefing()
     return () => { cancelled = true }
   }, [language, weatherData.score, weatherData.status, details.temp, details.humidity, details.wind, details.pm10, details.pm25, details.rn1, metadata?.region, eventData?.isRain, eventData?.isWeatherWarning, eventData?.isEarthquake, eventData?.isTyphoon, eventData?.isTsunami, eventData?.isVolcano, metadata?.bulletin?.summary, metadata?.alertSummary?.warningTitle])
+
+  // ---- Derived: bulletin parsing, source labels, meta info ----
 
   const bulletinSummary = metadata?.bulletin?.summary || (
     __l("현재 공식 통보문에 특이사항이 없습니다.", "No notable official bulletin right now.")

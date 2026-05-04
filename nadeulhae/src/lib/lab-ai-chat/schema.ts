@@ -1,3 +1,9 @@
+/**
+ * Lab AI Chat — database schema bootstrap.
+ * Creates all required tables (sessions, messages, usage, events, web-search state)
+ * and applies any necessary migration patches on first access.
+ */
+
 import { getDbPool } from "@/lib/db"
 import type { RowDataPacket } from "mysql2/promise"
 
@@ -5,6 +11,7 @@ declare global {
   var __nadeulhaeLabAiChatSchemaPromise: Promise<void> | undefined
 }
 
+/** Core messages table: stores every user/assistant exchange with token-usage columns. */
 const createLabAiChatMessagesTableSql = `
   CREATE TABLE IF NOT EXISTS lab_ai_chat_messages (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -28,6 +35,7 @@ const createLabAiChatMessagesTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/** Sessions table: groups messages into named conversations with optional memory summary. */
 const createLabAiChatSessionsTableSql = `
   CREATE TABLE IF NOT EXISTS lab_ai_chat_sessions (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -48,6 +56,7 @@ const createLabAiChatSessionsTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/** Daily usage rollup: per-user request counts and token consumption. */
 const createLabAiChatUsageDailyTableSql = `
   CREATE TABLE IF NOT EXISTS lab_ai_chat_usage_daily (
     metric_date DATE NOT NULL,
@@ -71,6 +80,7 @@ const createLabAiChatUsageDailyTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/** Audit-log table: records every provider request (success or failure) with timing and error details. */
 const createLabAiChatRequestEventsTableSql = `
   CREATE TABLE IF NOT EXISTS lab_ai_chat_request_events (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -100,6 +110,7 @@ const createLabAiChatRequestEventsTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/** Per-session web-search quota and cache state. */
 const createLabAiChatWebSearchStateTableSql = `
   CREATE TABLE IF NOT EXISTS lab_ai_chat_web_search_state (
     user_id CHAR(36) NOT NULL,
@@ -122,6 +133,7 @@ const createLabAiChatWebSearchStateTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/** Migration: add the `fallback_call_count` column if it does not yet exist. */
 async function ensureWebSearchStateColumns() {
   const pool = getDbPool()
   const [fallbackColumnRows] = await pool.query<RowDataPacket[]>(
@@ -134,6 +146,7 @@ async function ensureWebSearchStateColumns() {
   }
 }
 
+/** Monthly web-search usage rollup for the entire deployment. */
 const createLabAiChatWebSearchUsageMonthlyTableSql = `
   CREATE TABLE IF NOT EXISTS lab_ai_chat_web_search_usage_monthly (
     metric_month CHAR(7) NOT NULL PRIMARY KEY,
@@ -146,7 +159,12 @@ const createLabAiChatWebSearchUsageMonthlyTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/**
+ * Ensure all lab-ai-chat tables exist.
+ * Idempotent: caches the promise globally so concurrent calls share a single bootstrap.
+ */
 export async function ensureLabAiChatSchema() {
+  // Deduplicate: return the in-flight promise if bootstrap is already running.
   if (globalThis.__nadeulhaeLabAiChatSchemaPromise) {
     return globalThis.__nadeulhaeLabAiChatSchemaPromise
   }
@@ -162,6 +180,7 @@ export async function ensureLabAiChatSchema() {
     await ensureWebSearchStateColumns()
   })()
 
+  // Reset on failure so the next caller retries instead of getting a rejected promise.
   globalThis.__nadeulhaeLabAiChatSchemaPromise = bootstrapPromise.catch((error) => {
     globalThis.__nadeulhaeLabAiChatSchemaPromise = undefined
     throw error

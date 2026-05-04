@@ -1,18 +1,34 @@
+/**
+ * Forecast location grid data access layer.
+ *
+ * Manages a MySQL table of administrative-division → forecast-grid mappings
+ * for Korea's meteorological forecast system. On first use the table is
+ * bootstrapped from a bundled JSON dataset. Subsequent lookups query the DB
+ * with a Euclidean-distance ORDER BY, falling back to an in-memory scan of
+ * the bundled data when the DB is unavailable.
+ *
+ * Lookup results are cached in a global LRU-like Map (max 700 entries) keyed
+ * by rounded lat/lon coordinates to avoid redundant DB hits.
+ */
+
 import type { RowDataPacket } from "mysql2/promise"
 
 import forecastLocationGridRaw from "@/data/forecast-location-grid.json"
 import { getDbPool } from "@/lib/db"
 import type { ForecastLocationPoint } from "@/lib/weather-utils"
 
+// Global singletons for lazy bootstrap and nearest-point cache.
 declare global {
   var __nadeulhaeForecastLocationBootstrapPromise: Promise<void> | undefined
   var __nadeulhaeForecastLocationNearestCache: Map<string, ForecastLocationPoint | null> | undefined
 }
 
+/** Row shape returned by the COUNT query. */
 interface ForecastLocationCountRow extends RowDataPacket {
   count: number
 }
 
+/** Row shape returned by the nearest-point query with aliased column names. */
 interface ForecastLocationDbRow extends RowDataPacket {
   adminCode: string
   level1: string
@@ -24,6 +40,7 @@ interface ForecastLocationDbRow extends RowDataPacket {
   lat: number | string
 }
 
+// Bundled JSON dataset used as the bootstrap source and DB-fallback.
 const FORECAST_LOCATION_POINTS = forecastLocationGridRaw as ForecastLocationPoint[]
 const INSERT_CHUNK_SIZE = 300
 const CACHE_MAX_SIZE = 700
@@ -65,6 +82,7 @@ const selectNearestForecastLocationSql = `
   LIMIT 1
 `
 
+/** Converts a DB row to the common ForecastLocationPoint shape, returning null if coordinates are invalid. */
 function normalizePointFromDb(row: ForecastLocationDbRow): ForecastLocationPoint | null {
   const lon = Number(row.lon)
   const lat = Number(row.lat)
@@ -84,10 +102,12 @@ function normalizePointFromDb(row: ForecastLocationDbRow): ForecastLocationPoint
   }
 }
 
+/** Brute-force nearest-neighbor search over the in-memory JSON dataset using squared Euclidean distance. */
 function findNearestInMemory(lat: number, lon: number) {
   let minDistanceSq = Infinity
   let nearest: ForecastLocationPoint | null = null
 
+  // Linear scan — dataset is small enough that an index is unnecessary.
   for (const point of FORECAST_LOCATION_POINTS) {
     const dLat = lat - point.lat
     const dLon = lon - point.lon
@@ -101,6 +121,7 @@ function findNearestInMemory(lat: number, lon: number) {
   return nearest
 }
 
+/** Lazily initializes and returns the global nearest-point LRU cache. */
 function getCache() {
   if (!globalThis.__nadeulhaeForecastLocationNearestCache) {
     globalThis.__nadeulhaeForecastLocationNearestCache = new Map()
@@ -108,10 +129,12 @@ function getCache() {
   return globalThis.__nadeulhaeForecastLocationNearestCache
 }
 
+/** Produces a stable cache key from lat/lon rounded to 3 decimal places (~111 m resolution). */
 function makeCacheKey(lat: number, lon: number) {
   return `${Math.round(lat * 1000)}:${Math.round(lon * 1000)}`
 }
 
+/** Truncates and re-populates the forecast_location_points table from the bundled JSON dataset. */
 async function refillForecastLocationTable() {
   const pool = getDbPool()
   const conn = await pool.getConnection()
@@ -119,6 +142,7 @@ async function refillForecastLocationTable() {
     await conn.beginTransaction()
     await conn.query("DELETE FROM forecast_location_points")
 
+    // Batched INSERT to avoid oversized query packets (~300 rows per batch).
     for (let offset = 0; offset < FORECAST_LOCATION_POINTS.length; offset += INSERT_CHUNK_SIZE) {
       const chunk = FORECAST_LOCATION_POINTS.slice(offset, offset + INSERT_CHUNK_SIZE)
       const placeholders = chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ")
@@ -160,6 +184,13 @@ async function refillForecastLocationTable() {
   }
 }
 
+/**
+ * Ensures the forecast_location_points table exists and is populated.
+ *
+ * Uses a global promise singleton so concurrent callers share the same
+ * bootstrap operation. If the row count doesn't match the bundled dataset,
+ * the table is truncated and refilled.
+ */
 export async function ensureForecastLocationRepositoryReady() {
   if (globalThis.__nadeulhaeForecastLocationBootstrapPromise) {
     return globalThis.__nadeulhaeForecastLocationBootstrapPromise
@@ -182,6 +213,14 @@ export async function ensureForecastLocationRepositoryReady() {
   return globalThis.__nadeulhaeForecastLocationBootstrapPromise
 }
 
+/**
+ * Resolves the closest forecast grid point for the given coordinates.
+ *
+ * Checks the LRU cache first, then queries the DB via Euclidean-distance
+ * ORDER BY. Falls back to an in-memory scan over the bundled JSON on
+ * DB failure. Results are cached and the cache is evicted (oldest-first)
+ * when it exceeds CACHE_MAX_SIZE.
+ */
 export async function resolveNearestForecastLocationPoint(lat?: number | null, lon?: number | null) {
   if (lat == null || lon == null) {
     return null
@@ -214,6 +253,7 @@ export async function resolveNearestForecastLocationPoint(lat?: number | null, l
   }
 
   cache.set(cacheKey, nearest)
+  // LRU-style eviction: delete the oldest entries when the cache overflows.
   while (cache.size > CACHE_MAX_SIZE) {
     const firstKey = cache.keys().next().value as string | undefined
     if (!firstKey) break

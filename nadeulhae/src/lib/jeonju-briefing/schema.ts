@@ -1,3 +1,8 @@
+/**
+ * Jeonju briefing DB schema management.
+ * Handles table creation and backward-compatible migrations
+ * (composite primary key, locale index) for jeonju_daily_briefings.
+ */
 import { getDbPool } from "@/lib/db"
 import type { RowDataPacket } from "mysql2/promise"
 
@@ -41,6 +46,7 @@ const addLocaleIndexSql = `
   ADD KEY idx_jeonju_briefing_locale (locale)
 `
 
+/** Bootstrap the jeonju_daily_briefings table with idempotent migrations. Safe to call on every startup. */
 export async function ensureJeonjuBriefingSchema() {
   if (globalThis.__nadeulhaeJeonjuBriefingSchemaPromise) {
     return globalThis.__nadeulhaeJeonjuBriefingSchemaPromise
@@ -64,6 +70,7 @@ export async function ensureJeonjuBriefingSchema() {
     }
   })()
 
+  // Reset global on failure so subsequent calls retry schema bootstrap
   globalThis.__nadeulhaeJeonjuBriefingSchemaPromise = bootstrapPromise.catch((error) => {
     globalThis.__nadeulhaeJeonjuBriefingSchemaPromise = undefined
     throw error
@@ -72,6 +79,7 @@ export async function ensureJeonjuBriefingSchema() {
   return globalThis.__nadeulhaeJeonjuBriefingSchemaPromise
 }
 
+/** Raw row shape returned by mysql2 for jeonju_daily_briefings queries. JSON columns are typed as strings. */
 export interface JeonjuDailyBriefingRow extends RowDataPacket {
   briefing_date: string
   locale: string

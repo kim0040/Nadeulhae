@@ -1,3 +1,12 @@
+/**
+ * GET /api/weather/current
+ * Fetches current weather observations + air quality + alerts + picnic score.
+ * Query: lat, lon (optional, defaults to HOME_REGION).
+ * Returns: { score, status, details (temp, humidity, wind, pty, sky, air quality, uv, feelslike), metadata, eventData }.
+ * Aggregates data from KMA (nowcast + ultra-srt forecast), AirKorea, UV index, regional bulletin/warning,
+ * earthquake, tsunami, and volcano APIs. All results are cached with smart TTL aligned to KMA update schedules.
+ */
+
 import { NextResponse } from "next/server"
 import {
   HOME_REGION,
@@ -187,6 +196,7 @@ const BULLETIN_FALLBACK_STATION_IDS: Partial<Record<string, string>> = {
   gwangyang: "156",
 }
 
+/** Squared distance between two lat/lon pairs (avoids sqrt for sorting). */
 function getDistanceSq(latA: number, lonA: number, latB: number, lonB: number) {
   const dLat = latA - latB
   const dLon = lonA - lonB
@@ -425,6 +435,7 @@ function releaseAirQuotaSlot(succeeded: boolean) {
   }
 }
 
+/** Safe number parser: returns fallback if value is not a finite number. */
 function parseNumber(value: unknown, fallback = 0) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -436,6 +447,7 @@ function isInvalidAirFlag(flag: unknown) {
   return normalized.length > 0 && normalized !== "-"
 }
 
+/** Map PM10 concentration to Korean air grade label. */
 function getKrAirGrade(pm10: number) {
   if (pm10 <= 30) return "좋음"
   if (pm10 <= 80) return "보통"
@@ -443,6 +455,7 @@ function getKrAirGrade(pm10: number) {
   return "매우나쁨"
 }
 
+/** Map PM2.5 concentration to WHO air grade label. */
 function getWhoAirGrade(pm25: number) {
   if (pm25 <= 15) return "좋음"
   if (pm25 <= 35) return "보통"
@@ -691,6 +704,11 @@ function isRecentIssue(timestamp: string, hours = 72) {
   return diff >= 0 && diff <= hours * 60 * 60 * 1000
 }
 
+/**
+ * Fetch current weather observations (nowcast) and nearest ultra-short-term forecast from KMA.
+ * Returns { temp, humidity, wind, pty, rn1, forecastPty, forecastRn1, sky, vec } snapshot.
+ * Caches per grid + base_date + base_time.
+ */
 async function fetchCurrentWeather(nx: number, ny: number, apiKey: string) {
   const { baseDate, baseTime } = getCurrentNowcastBase()
   const cacheKey = `${nx}_${ny}_${baseDate}_${baseTime}`
@@ -758,6 +776,11 @@ async function fetchCurrentWeather(nx: number, ny: number, apiKey: string) {
   return snapshot
 }
 
+/**
+ * Fetch real-time air quality (PM10, PM25, O3, NO2, CO, SO2, KHAI) from AirKorea.
+ * Tries: exact station name -> backup station names -> province-level -> home region fallback -> defaults.
+ * Uses daily quota tracking to avoid exceeding AirKorea daily limits.
+ */
 async function fetchAirQuality(profile: RegionProfile, serviceKey: string, dynamicStationName?: string, backupStationNames?: string[]) {
   const explicitProfile = profile
   const normalizedStationName = dynamicStationName?.trim()
@@ -1088,6 +1111,7 @@ async function fetchVolcanoInfo(apiHubKey: string) {
 }
 
 async function handleGET(req: Request) {
+  // === 1. CACHE & RATE LIMIT MAINTENANCE ===
   runMaintenanceSweepIfNeeded()
   const url = new URL(req.url)
   const lat = url.searchParams.get("lat")
@@ -1156,6 +1180,7 @@ async function handleGET(req: Request) {
     }
   }
 
+  // === 2. VALIDATION — API keys & rate limit ===
   const kmaKey = process.env.KMA_API_KEY
   const publicServiceKey = process.env.AIRKOREA_API_KEY
 
@@ -1164,7 +1189,8 @@ async function handleGET(req: Request) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 
-  // 1. Dynamic Nearest Station Lookup (runs in parallel with other fetches)
+  // === 3. DATA FETCHING ===
+  // 3a. Dynamic nearest station lookup (runs in parallel with other fetches)
   let dynamicStationName = ""
   let stationLookupSource: "profile" | "cache" | "live_api" = "profile"
   let nearbyStationCandidates: NearbyStationCandidate[] = []
@@ -1212,6 +1238,7 @@ async function handleGET(req: Request) {
     }
   })()
 
+  // 3b. Fetch weather, UV, alerts, and hazard data in parallel
   const kmaAvailable = canCallKmaApi()
   const [weatherData, uvIndex, bulletin, warning, earthquake, tsunami, volcano] = await Promise.all([
     kmaAvailable ? fetchCurrentWeather(grid.nx, grid.ny, kmaKey) : Promise.resolve(null),
@@ -1223,13 +1250,14 @@ async function handleGET(req: Request) {
     kmaAvailable ? fetchVolcanoInfo(kmaKey) : Promise.resolve(null),
   ])
 
-  // Wait for station lookup to complete before fetching air quality
+  // 3c. Wait for station lookup to complete before fetching air quality (needs station name)
   await stationPromise
   const airResponse = await fetchAirQuality(
     profile, publicServiceKey, dynamicStationName,
     nearbyStationCandidates.slice(1).map(c => c.name).filter(Boolean)
   )
 
+  // === 4. PROCESSING ===
   // Use safe defaults when KMA calls were skipped due to daily quota
   const safeTsunami = tsunami ?? { active: false, title: "", issuedAt: "" }
   const safeVolcano = volcano ?? { active: false, title: "", issuedAt: "" }
@@ -1344,6 +1372,7 @@ async function handleGET(req: Request) {
     ...((isVolcano || hazardFlags.volcano) ? ["volcano"] : []),
   ]
 
+  // === 5. RESPONSE BUILDING ===
   const locationLabel = isFallback ? HOME_REGION.displayName : profile.displayName
   const locationLabelEn = isFallback ? HOME_REGION.englishName : profile.englishName
   const feelsLike = calculateFeelsLike(weatherData.temp, weatherData.humidity, weatherData.wind)
@@ -1443,6 +1472,7 @@ async function handleGET(req: Request) {
     },
   }
 
+  // Cache the full response per user so repeated requests within USER_RESPONSE_CACHE_DURATION are served instantly
   currentResponseCache.set(userCacheKey, {
     data: responsePayload,
     expiry: Date.now() + USER_RESPONSE_CACHE_DURATION,

@@ -1,3 +1,5 @@
+/** Lab deck management layer: create, update, delete decks and cards, with encryption, deduplication, and transactional safety. */
+
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise"
 
 import {
@@ -15,6 +17,7 @@ import {
   encryptDatabaseValueSafely,
 } from "@/lib/security/data-protection"
 
+/** Raw deck row from the lab_decks table. */
 interface LabDeckRow extends RowDataPacket {
   id: number
   user_id: string
@@ -27,6 +30,7 @@ interface LabDeckRow extends RowDataPacket {
   created_at: Date | string
 }
 
+/** Raw card row from the lab_cards table. */
 interface LabCardRow extends RowDataPacket {
   id: number
   deck_id: number
@@ -48,17 +52,22 @@ interface LabCardRow extends RowDataPacket {
   created_at: Date | string
 }
 
+/** Subset row used for deduplication key lookup (term + meaning only). */
 interface LabCardKeyRow extends RowDataPacket {
   term_text: string
   meaning_text: string
 }
 
+/** Subset row with id, used for dedup check excluding the current card. */
 interface LabCardKeyWithIdRow extends RowDataPacket {
   id: number
   term_text: string
   meaning_text: string
 }
 
+// --- Internal helpers ---
+
+/** Safely convert Date or date string to ISO-8601, falling back to current time on parse failure. */
 function toIsoString(value: Date | string) {
   if (value instanceof Date) {
     return value.toISOString()
@@ -68,6 +77,7 @@ function toIsoString(value: Date | string) {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
 }
 
+/** Strip control characters, collapse whitespace, trim, and truncate to maxLength. */
 function normalizeText(value: string, maxLength: number) {
   return value
     .replace(/[\u0000-\u001F\u007F]/g, "")
@@ -76,6 +86,7 @@ function normalizeText(value: string, maxLength: number) {
     .slice(0, maxLength)
 }
 
+/** Same as normalizeText but returns null for falsy or empty input. */
 function normalizeOptionalText(value: string | null | undefined, maxLength: number) {
   if (!value) {
     return null
@@ -85,6 +96,7 @@ function normalizeOptionalText(value: string | null | undefined, maxLength: numb
   return normalized.length > 0 ? normalized : null
 }
 
+/** Decrypt an encrypted text field; returns the fallback value if the input is not a string. */
 function decryptLabText(value: string | null, context: string, fallback: string | null = null) {
   if (typeof value !== "string") {
     return fallback
@@ -93,6 +105,7 @@ function decryptLabText(value: string | null, context: string, fallback: string 
   return decryptDatabaseValueSafely(value, context) ?? value
 }
 
+/** Map a raw deck database row to a LabDeckSnapshot, decrypting text fields. */
 function mapDeckRow(row: LabDeckRow): LabDeckSnapshot {
   return {
     id: String(row.id),
@@ -106,6 +119,7 @@ function mapDeckRow(row: LabDeckRow): LabDeckSnapshot {
   }
 }
 
+/** Map a raw card database row to a LabCardSnapshot, decrypting text fields and clamping numeric values. */
 function mapCardRow(row: LabCardRow): LabCardSnapshot {
   return {
     id: String(row.id),
@@ -134,10 +148,12 @@ function mapCardRow(row: LabCardRow): LabCardSnapshot {
   }
 }
 
+/** Build a case-insensitive, whitespace-normalized dedup key from term and meaning. */
 function toDeckDedupKey(term: string, meaning: string) {
   return `${term.toLowerCase().replace(/\s+/g, "")}|${meaning.toLowerCase().replace(/\s+/g, "")}`
 }
 
+/** Normalize an array of card inputs: truncate fields, skip cards without term/meaning. */
 function normalizeCards(cards: LabGeneratedCardInput[]) {
   const safeCards: LabGeneratedCardInput[] = []
 
@@ -163,6 +179,7 @@ function normalizeCards(cards: LabGeneratedCardInput[]) {
   return safeCards
 }
 
+/** Fetch a deck row with a row-level lock (FOR UPDATE) within an existing transaction. */
 async function getDeckById(connection: PoolConnection, userId: string, deckId: number) {
   const [rows] = await connection.query<LabDeckRow[]>(
     `
@@ -188,6 +205,7 @@ async function getDeckById(connection: PoolConnection, userId: string, deckId: n
   return rows[0] ?? null
 }
 
+/** Fetch a card row with a row-level lock (FOR UPDATE) within an existing transaction. */
 async function getCardById(connection: PoolConnection, userId: string, cardId: number) {
   const [rows] = await connection.query<LabCardRow[]>(
     `
@@ -222,6 +240,7 @@ async function getCardById(connection: PoolConnection, userId: string, cardId: n
   return rows[0] ?? null
 }
 
+/** Recalculate card_count on a deck by counting its cards. Called after inserts/deletes. */
 async function refreshDeckCardCount(connection: PoolConnection, userId: string, deckId: number) {
   await connection.execute(
     `
@@ -241,6 +260,9 @@ async function refreshDeckCardCount(connection: PoolConnection, userId: string, 
   )
 }
 
+// --- Exported deck operations ---
+
+/** List a user's decks, most recent first. Returns up to `limit` (clamped to 300). */
 export async function listLabDecksForUser(userId: string, limit = 80) {
   await ensureLabSchema()
 
@@ -268,6 +290,7 @@ export async function listLabDecksForUser(userId: string, limit = 80) {
   return rows.map(mapDeckRow)
 }
 
+/** Create an empty deck with the given title and topic. Uses a transaction with encrypted text fields. */
 export async function createEmptyLabDeck(input: {
   userId: string
   locale: LabLocale
@@ -322,6 +345,7 @@ export async function createEmptyLabDeck(input: {
   }
 }
 
+/** Update a deck's title and/or topic. Returns null if the deck is not found or the new title is empty. */
 export async function updateLabDeckForUser(input: {
   userId: string
   deckId: number
@@ -382,6 +406,7 @@ export async function updateLabDeckForUser(input: {
   }
 }
 
+/** Resolve a deck for a write operation: use existing deck if deckId > 0, otherwise create a new one. */
 async function resolveDeckForWrite(input: {
   connection: PoolConnection
   userId: string
@@ -422,6 +447,7 @@ async function resolveDeckForWrite(input: {
   return getDeckById(input.connection, input.userId, deckId)
 }
 
+/** Add cards to a deck (existing or auto-created). Deduplicates by term+meaning. Returns added/skipped counts. */
 export async function addLabCardsToDeck(input: {
   userId: string
   locale: LabLocale
@@ -466,6 +492,7 @@ export async function addLabCardsToDeck(input: {
 
     const deckId = Number(deckRow.id)
 
+    // Load existing card keys to build dedup set
     const [existingRows] = await connection.query<LabCardKeyRow[]>(
       `
         SELECT
@@ -490,6 +517,7 @@ export async function addLabCardsToDeck(input: {
 
     let addedCount = 0
 
+    // Insert each card if its term+meaning is not already in the deck
     for (const card of cards) {
       const key = toDeckDedupKey(card.term, card.meaning)
       if (dedupeKeys.has(key)) {
@@ -555,6 +583,7 @@ export async function addLabCardsToDeck(input: {
   }
 }
 
+/** Get a deck and its cards. Returns null if the deck does not exist. */
 export async function getLabDeckCardsForUser(input: {
   userId: string
   deckId: number
@@ -629,6 +658,7 @@ export async function getLabDeckCardsForUser(input: {
   }
 }
 
+/** Update a single card's fields. Checks for duplicates within the same deck (excluding the card itself). Returns status: "updated" | "invalid" | "not_found" | "duplicate". */
 export async function updateLabCardForUser(input: {
   userId: string
   cardId: number
@@ -672,6 +702,7 @@ export async function updateLabCardForUser(input: {
     const deckId = Number(currentCard.deck_id)
     const nextDedupKey = toDeckDedupKey(term, meaning)
 
+    // Check that the new term+meaning doesn't conflict with another card in the deck
     const [existingRows] = await connection.query<LabCardKeyWithIdRow[]>(
       `
         SELECT
@@ -692,6 +723,7 @@ export async function updateLabCardForUser(input: {
       if (!rowTerm || !rowMeaning) {
         continue
       }
+      // If a matching dedup key is found, reject the update as a duplicate
       if (toDeckDedupKey(rowTerm, rowMeaning) === nextDedupKey) {
         await connection.rollback()
         return {
@@ -754,6 +786,7 @@ export async function updateLabCardForUser(input: {
   }
 }
 
+/** Delete a single card by id. Also refreshes the parent deck's card_count. */
 export async function deleteLabCardForUser(input: {
   userId: string
   cardId: number
@@ -801,6 +834,7 @@ export async function deleteLabCardForUser(input: {
   }
 }
 
+/** Get a deck and all its cards for export. Returns null if the deck does not exist. */
 export async function getLabDeckExportData(input: {
   userId: string
   deckId: number
@@ -869,6 +903,7 @@ export async function getLabDeckExportData(input: {
   }
 }
 
+/** Delete a deck and all its cards in a single transaction. Returns true on success. */
 export async function deleteLabDeckForUser(input: {
   userId: string
   deckId: number

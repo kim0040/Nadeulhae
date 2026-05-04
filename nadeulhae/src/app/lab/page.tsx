@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * Lab Hub Page — gateway to experimental features (AI Chat, Vocab, Code Share).
+ * Handles authentication gate, lab-enabled guard, and viewport/device capability
+ * detection to tone down heavy visual effects on low-end devices.
+ */
+
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -103,17 +109,21 @@ const LAB_HUB_COPY = {
   },
 } as const
 
+// ---- Component ----
+
 export default function LabHubPage() {
   const router = useRouter()
   const { user, status } = useAuth()
   const { language } = useLanguage()
   const copy = ((LAB_HUB_COPY as any)[language] ?? LAB_HUB_COPY.ko)
+
+  // Device/accessibility flags used to reduce heavy visual effects on constrained devices
   const [isCompactViewport, setIsCompactViewport] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const [isLowPowerDevice, setIsLowPowerDevice] = useState(false)
 
+  // Redirect guests to login after a brief UX-friendly delay (not instant, so the page flash is readable)
   useEffect(() => {
-    // Lab is account-scoped; unauthenticated users are redirected after a short UX-friendly delay.
     if (status === "guest") {
       const timeout = window.setTimeout(() => {
         router.replace("/login")
@@ -122,6 +132,7 @@ export default function LabHubPage() {
     }
   }, [router, status])
 
+  // Detect viewport width, reduced-motion preference, and device CPU/memory on mount
   useEffect(() => {
     if (typeof window === "undefined") {
       return
@@ -154,8 +165,12 @@ export default function LabHubPage() {
     }
   }, [])
 
+  // True when visual effects should be toned down
   const reduceVisualEffects = prefersReducedMotion || isCompactViewport || isLowPowerDevice
 
+  // ---- Render guards ----
+
+  // Auth loading state
   if (status === "loading") {
     return (
       <main className="flex min-h-screen items-center justify-center px-4 pt-24 text-center text-base font-bold text-sky-blue">
@@ -164,6 +179,7 @@ export default function LabHubPage() {
     )
   }
 
+  // Guest / unauthenticated — show message while redirect fires
   if (status === "guest" || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4 pt-24 text-center text-base font-bold text-sky-blue">
@@ -172,6 +188,7 @@ export default function LabHubPage() {
     )
   }
 
+  // Lab not enabled — prompt user to toggle in dashboard settings
   if (!user.labEnabled) {
     return (
       <main className="min-h-screen bg-background px-4 pb-14 pt-24 sm:px-6 sm:pt-28 lg:px-8">
@@ -196,6 +213,8 @@ export default function LabHubPage() {
       </main>
     )
   }
+
+  // ---- Main content: lab hub with feature cards ----
 
   return (
     <main className="min-h-screen bg-background px-4 pb-14 pt-24 sm:px-6 sm:pt-28 lg:px-8">
