@@ -1,3 +1,12 @@
+/**
+ * GET /api/jeonju/briefing
+ * Returns AI-generated daily briefing for Jeonju (ko/en/zh/ja).
+ * Query: locale (ko/en/zh/ja), force (boolean), warm_all (boolean), refresh (boolean), purge (boolean).
+ * Returns: { success, data (locale-specific briefing), fromCache?, warmed?, throttledForceRefresh? }.
+ * Force refresh is rate-limited per client (window + daily + cooldown).
+ * Purge clears DB + memory cache before regeneration.
+ */
+
 import { NextRequest, NextResponse } from "next/server"
 import { withApiAnalytics } from "@/lib/analytics/route"
 import { ensureJeonjuBriefingSchema } from "@/lib/jeonju-briefing/schema"
@@ -99,6 +108,7 @@ function getClientKey(request: NextRequest) {
   return `ip:${ip}`
 }
 
+/** Fixed-window rate limiter with retry-after calculation. */
 function checkFixedWindow(
   map: Map<string, RateLimitEntry>,
   key: string,
@@ -172,6 +182,7 @@ function isRecentlyUpdated(updatedAt: string, nowMs: number, minIntervalMs: numb
 }
 
 export const GET = withApiAnalytics(async (request: NextRequest) => {
+  // === 1. SCHEMA & PARAMS ===
   try {
     await ensureJeonjuBriefingSchema()
   } catch (schemaError) {
@@ -210,6 +221,7 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
     }
   }
 
+  // === 2. THROTTLE CHECK (throttledForceRefresh guard) ===
   if (forceRequested) {
     try {
       if (warmAll) {
@@ -259,6 +271,7 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
     }
   }
 
+  // === 3. RATE LIMIT CHECK for force/warmAll ===
   const force = forceRequested || purgeRequested
 
   if (force || warmAll) {
@@ -307,6 +320,7 @@ export const GET = withApiAnalytics(async (request: NextRequest) => {
     })
   }
 
+  // === 4. GENERATION ===
   try {
     if (warmAll) {
       const [ko, en, zh, ja] = await Promise.all([

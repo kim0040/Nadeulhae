@@ -1,3 +1,12 @@
+/**
+ * POST /api/auth/register
+ * Creates a new user account. Validates payload, checks IP/email rate limits and active blocks,
+ * hashes password, inserts user with generated nickname tag, starts session, sets auth + analytics cookies.
+ * Body: { email, password, displayName, nickname, ageBand, primaryRegion, interestTags, ... }
+ * Returns: { user } with Set-Cookie headers (auth + analytics consent).
+ * Rate-limited per IP and per email; handles duplicate email/nickname gracefully.
+ */
+
 import { NextRequest } from "next/server"
 
 import {
@@ -50,6 +59,7 @@ function getDuplicateErrorContext(error: unknown) {
 }
 
 async function handlePOST(request: NextRequest) {
+  // === 1. INIT ===
   const locale = resolveAuthLocale(request.headers.get("accept-language"))
   const ipAddress = getClientIp(request)
   const userAgent = getUserAgent(request)
@@ -117,6 +127,7 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
+    // === 2. PAYLOAD VALIDATION ===
     const validation = validateRegisterPayload(payload, locale)
 
     if ("error" in validation) {
@@ -219,6 +230,7 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
+    // === 3. CREATE USER & START SESSION ===
     const password = await hashPassword(validation.data.password)
     const createdUser = await createUser({
       id: crypto.randomUUID(),
@@ -289,6 +301,7 @@ async function handlePOST(request: NextRequest) {
     )
     return response
   } catch (error) {
+    // === 4. ERROR HANDLING — duplicate nickname/email or internal error ===
     const duplicateContext = getDuplicateErrorContext(error)
     const duplicateNickname = error instanceof NicknameTagExhaustedError
       || (duplicateContext.isDuplicate && /uq_users_nickname_hash_tag|nickname_tag/i.test(duplicateContext.message))

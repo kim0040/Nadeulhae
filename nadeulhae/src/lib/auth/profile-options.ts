@@ -1,3 +1,8 @@
+/**
+ * Predefined profile field options (age bands, interests, regions, etc.)
+ * with multi-language labels and optional descriptions.
+ */
+
 export interface LocalizedOption {
   value: string
   label: {
@@ -14,7 +19,9 @@ export interface LocalizedOption {
   }
 }
 
+/** Minimum required password length. */
 export const MIN_PASSWORD_LENGTH = 10
+/** Maximum number of interest tags a user can select. */
 export const MAX_INTEREST_SELECTIONS = 5
 
 export const AGE_BAND_OPTIONS: LocalizedOption[] = [
@@ -101,6 +108,7 @@ export const WEATHER_SENSITIVITY_OPTIONS: LocalizedOption[] = [
   { value: "uv", label: { ko: "강한 햇빛", en: "Strong UV", zh: "强紫外线", ja: "強い日差し" } },
 ]
 
+/** Returns the localized label for a given option value, falling back to Korean. */
 export function getOptionLabel(
   options: LocalizedOption[],
   value: string,
@@ -112,6 +120,7 @@ export function getOptionLabel(
   return label[language] ?? label["ko"] ?? value
 }
 
+/** Filters an input array to only include values present in the allowed options set, deduplicating. */
 export function filterAllowedValues(
   values: string[],
   options: LocalizedOption[]
@@ -122,6 +131,7 @@ export function filterAllowedValues(
   )
 }
 
+/** Checks whether a single value is among the allowed options. */
 export function isAllowedValue(value: string, options: LocalizedOption[]) {
   return options.some((option) => option.value === value)
 }

@@ -1,3 +1,11 @@
+/**
+ * Actor identity management for the Code Share module.
+ *
+ * Anonymous (guest) collaborators are assigned a persistent actor ID
+ * (UUID stored in an httpOnly cookie) and a human-readable alias
+ * (adjective-noun-number) for in-editor presence display.
+ * Actor identity is stable per browser session across requests.
+ */
 import { randomInt, randomUUID } from "node:crypto"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -42,6 +50,7 @@ const ALIAS_NOUNS = [
   "Hawk",
 ]
 
+/** Type guard — returns `true` when `value` matches the expected UUID v4 hex pattern. */
 function isValidActorId(value: string | null | undefined): value is string {
   if (!value) {
     return false
@@ -50,6 +59,7 @@ function isValidActorId(value: string | null | undefined): value is string {
   return ACTOR_ID_PATTERN.test(value)
 }
 
+/** Type guard — returns `true` when `value` matches the alias charset and length constraints. */
 function isValidAlias(value: string | null | undefined): value is string {
   if (!value) {
     return false
@@ -59,7 +69,11 @@ function isValidAlias(value: string | null | undefined): value is string {
   return ALIAS_PATTERN.test(normalized)
 }
 
-// Human-readable guest aliases keep collaboration UX understandable without auth.
+/**
+ * Generates a random human-readable alias in the form `Adjective-Noun-Number`.
+ * Used for unauthenticated guests so the collaborative editor can
+ * show readable participant names instead of opaque UUIDs.
+ */
 function generateRandomAlias() {
   const adjective = ALIAS_ADJECTIVES[randomInt(ALIAS_ADJECTIVES.length)]
   const noun = ALIAS_NOUNS[randomInt(ALIAS_NOUNS.length)]
@@ -67,25 +81,34 @@ function generateRandomAlias() {
   return `${adjective}-${noun}-${suffix}`
 }
 
+/** Reads the actor ID from the request cookie. Returns `null` when the cookie is missing or invalid. */
 export function getCodeShareActorIdFromRequest(request: NextRequest) {
   const actorId = request.cookies.get(CODE_SHARE_ACTOR_COOKIE_NAME)?.value ?? null
   return isValidActorId(actorId) ? actorId : null
 }
 
+/** Reads the display alias from the request cookie. Returns `null` when the cookie is missing or invalid. */
 export function getCodeShareAliasFromRequest(request: NextRequest) {
   const alias = request.cookies.get(CODE_SHARE_ALIAS_COOKIE_NAME)?.value ?? null
   return isValidAlias(alias) ? alias.trim() : null
 }
 
+/**
+ * Returns the existing actor ID from cookies, or generates a fresh UUID.
+ * Used at request boundaries where an identity must exist
+ * for downstream owner checks and presence tracking.
+ */
 export function getOrCreateCodeShareActorId(request: NextRequest) {
   // Stable actor identity per browser session via cookie; used for owner checks and presence.
   return getCodeShareActorIdFromRequest(request) ?? randomUUID()
 }
 
+/** Returns the existing alias from cookies, or generates a new random one for display. */
 export function getOrCreateCodeShareAlias(request: NextRequest) {
   return getCodeShareAliasFromRequest(request) ?? generateRandomAlias()
 }
 
+/** Attaches an httpOnly actor-ID cookie to the response. The cookie lives for 1 year. */
 export function attachCodeShareActorCookie(response: NextResponse, actorId: string) {
   response.cookies.set({
     name: CODE_SHARE_ACTOR_COOKIE_NAME,
@@ -101,6 +124,7 @@ export function attachCodeShareActorCookie(response: NextResponse, actorId: stri
   return response
 }
 
+/** Attaches an httpOnly alias cookie to the response. The cookie lives for 1 year. */
 export function attachCodeShareAliasCookie(response: NextResponse, alias: string) {
   response.cookies.set({
     name: CODE_SHARE_ALIAS_COOKIE_NAME,
@@ -115,6 +139,12 @@ export function attachCodeShareAliasCookie(response: NextResponse, alias: string
   return response
 }
 
+/**
+ * Ensures both actor-ID and alias cookies are set on the response.
+ * Optionally accepts pre-generated identity values to keep them
+ * consistent across multiple server-side operations within one
+ * request lifecycle.
+ */
 export function ensureCodeShareIdentityCookies(
   request: NextRequest,
   response: NextResponse,

@@ -1,3 +1,9 @@
+/**
+ * Auth data access layer.
+ * Provides CRUD operations for users, sessions, rate-limit buckets,
+ * and security event logging. All PII fields are encrypted at rest
+ * with blind-index support for lookups.
+ */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise"
 
 import { MAX_ACTIVE_SESSIONS_PER_USER } from "@/lib/auth/guardrails"
@@ -10,6 +16,10 @@ import {
   encryptDatabaseValue,
   encryptDatabaseValueSafely,
 } from "@/lib/security/data-protection"
+
+// ──────────────────────────────────────────
+// Internal row types
+// ──────────────────────────────────────────
 
 interface UserRow extends RowDataPacket {
   id: string
@@ -49,12 +59,14 @@ interface AttemptBucketRow extends RowDataPacket {
   blocked_until: Date | string | null
 }
 
+/** Result of a rate-limit consumption check. */
 export interface AuthRateLimitDecision {
   blocked: boolean
   attemptCount: number
   retryAfterSeconds: number
 }
 
+/** Input payload for recording an auth security event (audit log). */
 export interface AuthSecurityEventInput {
   eventType: string
   action: string
@@ -66,6 +78,7 @@ export interface AuthSecurityEventInput {
   metadata?: Record<string, unknown> | null
 }
 
+/** Thrown when all 10000 possible 4-digit tags for a nickname are taken. */
 export class NicknameTagExhaustedError extends Error {
   constructor() {
     super("All nickname tags are exhausted for this nickname.")
@@ -73,6 +86,11 @@ export class NicknameTagExhaustedError extends Error {
   }
 }
 
+// ──────────────────────────────────────────
+// Helper utilities
+// ──────────────────────────────────────────
+
+// Safely parses a JSON-encoded string array, accepting both pre-parsed arrays and strings.
 function parseJsonArray(value: unknown) {
   if (Array.isArray(value)) {
     return value.filter((item): item is string => typeof item === "string")
@@ -100,6 +118,7 @@ function normalizeNickname(value: string) {
   return value.trim().normalize("NFKC")
 }
 
+// Decrypts an encrypted JSON array value and parses it into a string array.
 function parseEncryptedJsonArray(value: unknown, context: string) {
   if (Array.isArray(value)) {
     return value.filter((item): item is string => typeof item === "string")
@@ -130,6 +149,7 @@ function toDate(value: Date | string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+/** Converts a raw user DB row into a public AuthUser object, decrypting encrypted fields. */
 export function toPublicUser(row: Pick<
   UserRow,
   | "id"
@@ -175,6 +195,7 @@ export function toPublicUser(row: Pick<
   }
 }
 
+/** Full user record including password credentials (not exposed to clients). */
 export interface StoredUserRecord extends AuthUser {
   passwordHash: string
   passwordSalt: string
@@ -190,6 +211,7 @@ function toStoredUser(row: UserRow): StoredUserRecord {
   }
 }
 
+/** Looks up a user by email (via blind index, with plaintext fallback for legacy data). */
 export async function findUserByEmail(email: string) {
   await ensureAuthSchema()
   const normalizedEmail = normalizeEmail(email)
@@ -229,6 +251,7 @@ export async function findUserByEmail(email: string) {
   return rows[0] ? toStoredUser(rows[0]) : null
 }
 
+/** Looks up a user by primary key (UUID). */
 export async function findUserById(userId: string) {
   await ensureAuthSchema()
 
@@ -265,6 +288,9 @@ export async function findUserById(userId: string) {
   return rows[0] ? toStoredUser(rows[0]) : null
 }
 
+// Attempts to find an unused 4-digit tag for a nickname.
+// First tries random assignment (up to 20 attempts), then falls back
+// to scanning all 0000–9999 sequential tags.
 async function generateUniqueNicknameTag(nickname: string): Promise<string> {
   const normalizedNickname = normalizeNickname(nickname)
   const nicknameHash = createBlindIndex(normalizedNickname, "users.nickname")
@@ -293,6 +319,7 @@ async function generateUniqueNicknameTag(nickname: string): Promise<string> {
   throw new NicknameTagExhaustedError()
 }
 
+/** Creates a new user record with encrypted PII and a unique nickname tag. */
 export async function createUser(input: {
   id: string
   email: string
@@ -390,6 +417,7 @@ export async function createUser(input: {
   return created
 }
 
+/** Creates a new session record, prunes expired sessions, and enforces the per-user session cap. */
 export async function createSessionRecord(input: {
   id: string
   userId: string
@@ -445,6 +473,7 @@ export async function createSessionRecord(input: {
   )
 }
 
+/** Finds a user by session token hash, joining user_sessions + users, and checking expiration. */
 export async function findUserBySessionTokenHash(tokenHash: string) {
   await ensureAuthSchema()
 
@@ -492,6 +521,7 @@ export async function findUserBySessionTokenHash(tokenHash: string) {
   }
 }
 
+/** Updates last_used_at to keep the session alive. */
 export async function touchSession(sessionId: string) {
   await ensureAuthSchema()
   await executeStatement(
@@ -500,6 +530,7 @@ export async function touchSession(sessionId: string) {
   )
 }
 
+/** Extends a session's expiration date (sliding expiration). */
 export async function refreshSessionExpiration(sessionId: string, expiresAt: Date) {
   await ensureAuthSchema()
   await executeStatement(
@@ -514,11 +545,13 @@ export async function refreshSessionExpiration(sessionId: string, expiresAt: Dat
   )
 }
 
+/** Deletes a single session record by its token hash. */
 export async function deleteSessionByTokenHash(tokenHash: string) {
   await ensureAuthSchema()
   await executeStatement("DELETE FROM user_sessions WHERE token_hash = ?", [tokenHash])
 }
 
+/** Updates a user's profile fields in a transaction. Invalidates all existing sessions for the user. */
 export async function updateUserProfile(input: {
   userId: string
   displayName: string
@@ -613,6 +646,7 @@ export async function updateUserProfile(input: {
   return findUserById(input.userId)
 }
 
+/** Toggles analytics consent for a user. */
 export async function updateUserAnalyticsConsent(input: {
   userId: string
   analyticsAccepted: boolean
@@ -640,6 +674,7 @@ export async function updateUserAnalyticsConsent(input: {
   return findUserById(input.userId)
 }
 
+/** Permanently deletes a user and all associated data across related tables, in a transaction. */
 export async function deleteUserAccount(userId: string) {
   await ensureAuthSchema()
 
@@ -675,6 +710,7 @@ export async function deleteUserAccount(userId: string) {
 
 const MAX_AUTH_SCOPE_KEYS = 10
 
+/** Checks whether any of the given scope keys has an active block (rate-limit lockout). */
 export async function findActiveAuthBlock(action: string, scopeKeys: string[]) {
   await ensureAuthSchema()
 
@@ -724,6 +760,8 @@ export async function findActiveAuthBlock(action: string, scopeKeys: string[]) {
   }
 }
 
+// Acquires a row-level lock on the attempt bucket for the given action + scope,
+// then executes the callback within a transaction.
 async function withLockedAttemptBucket<T>(
   action: string,
   scopeKey: string,
@@ -764,6 +802,7 @@ async function withLockedAttemptBucket<T>(
   }
 }
 
+/** Atomically consumes one attempt from the rate-limit bucket. Creates the bucket if it doesn't exist. */
 export async function consumeAuthRateLimit(input: {
   action: string
   scopeKey: string
@@ -856,6 +895,7 @@ export async function consumeAuthRateLimit(input: {
   )
 }
 
+/** Clears all rate-limit tracking for given action and scope keys. */
 export async function clearAuthRateLimits(action: string, scopeKeys: string[]) {
   await ensureAuthSchema()
 
@@ -875,6 +915,7 @@ export async function clearAuthRateLimits(action: string, scopeKeys: string[]) {
   )
 }
 
+/** Records a security event in the audit log (login success/failure, registration, etc.). */
 export async function recordAuthSecurityEvent(input: AuthSecurityEventInput) {
   await ensureAuthSchema()
   const normalizedEmail = input.email?.trim().toLowerCase() || null
@@ -907,6 +948,7 @@ export async function recordAuthSecurityEvent(input: AuthSecurityEventInput) {
   )
 }
 
+/** Wrapper around recordAuthSecurityEvent that swallows errors (fire-and-forget). */
 export async function recordAuthSecurityEventSafely(input: AuthSecurityEventInput) {
   try {
     await recordAuthSecurityEvent(input)

@@ -1,3 +1,11 @@
+/**
+ * GET /api/weather/images
+ * Proxies weather imagery from KMA (radar, satellite) and hazard maps (fog, dust, earthquake, typhoon, tsunami, volcano).
+ * Query: extras (comma-separated keys for additional image types), hazard hint params.
+ * Returns: { radar, satellite, extras?, metadata } with reachability-checked image URLs.
+ * Caches fetched image metadata with per-type TTL (2-10 minutes).
+ */
+
 import { NextRequest, NextResponse } from "next/server"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
@@ -65,6 +73,7 @@ const extraImageCaches: Record<ExtraImageKey, ImageCacheEntry | null> = {
   volcano: null,
 }
 
+/** Resolve a possibly-relative KMA image URL to an absolute https URL. */
 function resolveImageUrl(url: string) {
   if (!url) return ""
   if (url.startsWith("http://") || url.startsWith("https://")) return url
@@ -141,6 +150,7 @@ async function fetchText(url: string) {
   }
 }
 
+/** Pick the latest item by TM field (assumes ascending order). */
 function pickLatestItem(items: KmaImageItem[]): WeatherImageSnapshot | null {
   if (!Array.isArray(items) || items.length === 0) return null
   const sorted = [...items].sort((a, b) => String(a.tm || "").localeCompare(String(b.tm || "")))
@@ -581,10 +591,12 @@ function parseRequestedExtras(request: NextRequest): ExtraImageKey[] {
 }
 
 async function handleGET(request: NextRequest) {
+  // === 1. PARSE REQUEST ===
   const now = Date.now()
   const requestedExtras = parseRequestedExtras(request)
   const hazardHints = parseHazardHints(request)
 
+  // === 2. CORE IMAGES — radar (prefer QPF, fallback CMP) ===
   if (!radarCache || radarCache.expiry <= now) {
     const latest = await fetchRadarImage()
     if (latest || !radarCache) {
@@ -601,6 +613,7 @@ async function handleGET(request: NextRequest) {
     }
   }
 
+  // === 3. SATELLITE IMAGE ===
   if (!satelliteCache || satelliteCache.expiry <= now) {
     const latest = await fetchSatelliteImage()
     if (latest || !satelliteCache) {
@@ -617,6 +630,7 @@ async function handleGET(request: NextRequest) {
     }
   }
 
+  // === 4. EXTRA IMAGES (fog, dust, earthquake, typhoon, tsunami, volcano) ===
   const extras: Partial<Record<ExtraImageKey, WeatherImageSnapshot | null>> = {}
   const extraCacheMinutes: Partial<Record<ExtraImageKey, number>> = {}
   const extraFetchedAt: Partial<Record<ExtraImageKey, string>> = {}
@@ -675,6 +689,7 @@ async function handleGET(request: NextRequest) {
     extraFetchedAt[key] = extraImageCaches[key]?.fetchedAt ?? new Date(0).toISOString()
   }
 
+  // === 5. RESPONSE BUILDING ===
   const payload: ImagesPayload = {
     radar: radarCache?.data ?? null,
     satellite: satelliteCache?.data ?? null,

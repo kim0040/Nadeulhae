@@ -1,5 +1,12 @@
 "use client"
 
+/**
+ * Dashboard Page — authenticated user hub showing weather metrics, bulletin
+ * alerts, hourly forecast, chat panel, and settings. The heavy rendering is
+ * delegated to DashboardWorkspace (memoized), while DashboardPage handles
+ * auth gating and workspace key derivation.
+ */
+
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -43,7 +50,7 @@ import { DASHBOARD_COPY } from "./constants"
 import { SectionCard, StatusMetric } from "@/components/dashboard/ui"
 import { SettingsModal } from "@/components/dashboard/settings-modal"
 
-function formatLastUpdate(
+/** Format a raw last-update value (string or record) into a locale-aware display string */ function formatLastUpdate(
   value: WeatherData["metadata"] extends { lastUpdate: infer T } ? T : unknown,
   language: SupportedLocale
 ) {
@@ -65,6 +72,8 @@ function formatLastUpdate(
   return "-"
 }
 
+// ---- Memoized workspace (re-render only when derived key changes) ----
+
 const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: AuthUser }) {
   const { language, t } = useLanguage()
   const { resolvedTheme } = useTheme()
@@ -81,6 +90,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
   const meteorCount = useMemo(() => getMeteorCount(4), [])
   const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
+  // Fetch weather details + hourly forecast in parallel for the given (or default) coords
   const loadWeather = useCallback(async (lat?: number, lon?: number) => {
     const query = lat != null && lon != null ? `?lat=${lat}&lon=${lon}` : ""
     const [detail, response] = await Promise.all([
@@ -101,6 +111,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
     setHourlyForecast(Array.isArray(data?.todayHourly) ? data.todayHourly : [])
   }, [])
 
+  // Full weather refresh with geolocation attempt + fallback
   const refreshWeather = useCallback(async () => {
     setIsWeatherRefreshing(true)
     setWeatherError(null)
@@ -565,6 +576,8 @@ export default function DashboardPage() {
     }
   }, [router, status])
 
+  // ---- Render guards ----
+
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center px-4 text-center text-sm font-bold text-sky-blue">
@@ -577,6 +590,8 @@ export default function DashboardPage() {
     return <div className="flex min-h-screen items-center justify-center px-4 text-center text-sm font-semibold text-muted-foreground">{copy.redirecting}</div>
   }
 
+  // Derive a stable string key from user profile so the memoized workspace
+  // only re-mounts when relevant profile fields change.
   const workspaceKey = JSON.stringify([
     language,
     user.id,

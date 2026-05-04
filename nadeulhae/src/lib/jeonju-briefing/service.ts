@@ -1,3 +1,14 @@
+/**
+ * Jeonju briefing service — core business logic.
+ *
+ * Orchestrates multi-source Tavily search, LLM summarisation (Korean + translation),
+ * in-memory/DB caching, auto-generation back-off, and fallback content assembly.
+ *
+ * Exported entry points:
+ *   - generateJeonjuBriefing   (main API)
+ *   - fetchAndSummarise        (core pipeline — search + LLM)
+ *   - purgeJeonjuBriefingCache (manual cache invalidation)
+ */
 import {
   createTavilySearch,
   type TavilySearchDepth,
@@ -7,8 +18,10 @@ import {
 import { createGeneralChatCompletion } from "@/lib/llm/general-llm"
 import { saveJeonjuBriefing, getJeonjuBriefingByDateAndLocale, type JeonjuBriefingData } from "./repository"
 
+/** Supported briefing locales. Korean is the primary; others are LLM-translated from the Korean source. */
 export type JeonjuBriefingLocale = "ko" | "en" | "zh" | "ja"
 
+/** Options to control briefing generation behaviour (cache bypass, locale override, etc.). */
 interface GenerateBriefingOptions {
   locale?: JeonjuBriefingLocale
   forceRefresh?: boolean
@@ -16,19 +29,25 @@ interface GenerateBriefingOptions {
   koreanBriefing?: JeonjuBriefingData
 }
 
+/** Result wrapper indicating whether the data came from a cache hit or a fresh generation. */
 interface BriefingGenerationResult {
   fromCache: boolean
   data: JeonjuBriefingData
 }
 
+/** Per-key attempt tracking: how many times auto-generation failed and when it is unblocked. */
 type AttemptState = {
   attempts: number
+  /** Millis epoch until which auto-generation for this key is suppressed */
   blockedUntilMs: number
 }
 
+/** In-memory cache entry with TTL and LRU eviction metadata. */
 type BriefingMemoryCacheEntry = {
   data: JeonjuBriefingData
+  /** Millis epoch after which this entry is considered stale */
   expiresAtMs: number
+  /** Millis of most recent read — used for LRU eviction */
   lastAccessMs: number
 }
 
@@ -45,6 +64,7 @@ const JEONJU_BRIEFING_MEMORY_CACHE_MAX_ENTRIES = 24
 // KST Helpers
 // ------------------------------------------------------------------
 
+/** Parse the current (or given) timestamp into KST date-time parts using Intl. */
 function parseKstParts(tsMs = Date.now()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -67,6 +87,7 @@ function parseKstParts(tsMs = Date.now()) {
   }
 }
 
+/** Return "yesterday" in KST (YYYY-MM-DD), using a 07:00 KST day boundary. */
 function getYesterdayInKst(): string {
   const p = parseKstParts()
   // Day boundary is 07:00 KST, not midnight.
@@ -77,11 +98,13 @@ function getYesterdayInKst(): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** Return today's date in KST (YYYY-MM-DD). */
 function getTodayInKst(): string {
   const p = parseKstParts()
   return `${String(p.year)}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`
 }
 
+/** Format a YYYY-MM-DD date as a locale-appropriate label (e.g. "2025년 5월 4일"). */
 function getFormattedDateLabel(dateStr: string, locale: JeonjuBriefingLocale): string {
   if (locale === "ko") {
     const [year, month, day] = dateStr.split("-")
@@ -99,6 +122,7 @@ function getFormattedDateLabel(dateStr: string, locale: JeonjuBriefingLocale): s
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 }
 
+/** Return "today"/"yesterday" in the given locale, falling back to formatted date when the date is neither. */
 function getRelativeDayLabel(dateStr: string, locale: JeonjuBriefingLocale): string {
   const today = getTodayInKst()
   if (dateStr === today) {
@@ -139,6 +163,7 @@ function getBriefingMemoryCacheMap() {
   return globalThis.__nadeulhaeJeonjuBriefingMemoryCache
 }
 
+/** Check whether auto-generation for this cache key is in cooldown after repeated failures. */
 function isAutoGenerationBlocked(cacheKey: string) {
   const attemptMap = getAttemptMap()
   const state = attemptMap.get(cacheKey)
@@ -146,6 +171,7 @@ function isAutoGenerationBlocked(cacheKey: string) {
   return state.blockedUntilMs > Date.now()
 }
 
+/** Increment attempt counter and block further auto-generation when the threshold is reached. */
 function markAutoGenerationFailure(cacheKey: string) {
   const attemptMap = getAttemptMap()
   const current = attemptMap.get(cacheKey)
@@ -161,6 +187,7 @@ function clearAutoGenerationFailures(cacheKey: string) {
   getAttemptMap().delete(cacheKey)
 }
 
+/** Return millis epoch of the next KST midnight (used as cooldown/reset boundary). */
 function getNextKstMidnightMs() {
   const p = parseKstParts()
   const todayMidnightKst = new Date(`${String(p.year)}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}T00:00:00+09:00`)
@@ -168,6 +195,7 @@ function getNextKstMidnightMs() {
   return next.getTime()
 }
 
+/** Evict expired entries and trim the in-memory cache to JEONJU_BRIEFING_MEMORY_CACHE_MAX_ENTRIES (LRU). */
 function cleanupBriefingMemoryCache(nowMs: number) {
   const cache = getBriefingMemoryCacheMap()
   for (const [key, value] of cache.entries()) {
@@ -221,6 +249,7 @@ function clearAutoGenerationBlock(cacheKey: string) {
   getAttemptMap().delete(cacheKey)
 }
 
+/** Purge both in-memory cache and auto-generation block for a given date+locale pair. */
 export function purgeJeonjuBriefingCache(dateStr: string, locale: JeonjuBriefingLocale) {
   const cacheKey = getBriefingCacheKey(dateStr, locale)
   clearCachedBriefingFromMemory(cacheKey)
@@ -254,6 +283,7 @@ type SearchTrack = {
   country?: string
 }
 
+// Domains that are guaranteed authoritative sources for Jeonju city information
 const OFFICIAL_JEONJU_DOMAINS = [
   "jeonju.go.kr",
   "tour.jeonju.go.kr",
@@ -301,6 +331,7 @@ const LOCAL_UTILITY_DOMAINS = [
   "news1.kr",
 ]
 
+// User-generated / blog / video domains that rarely contain actionable Jeonju local news
 const NOISE_DOMAINS = [
   "namu.wiki",
   "kin.naver.com",
@@ -335,16 +366,19 @@ const LOW_VALUE_URL_PATTERNS = [
 const UTILITY_SIGNAL_PATTERN = /(교통|통제|우회|안전|주의|행사|축제|공연|전시|개최|운영|마감|신청|접수|점검|단속|공지|보도자료|시정|호우|폭염|미세먼지|개방|휴관|개장|버스|주차|도로)/i
 const LOW_UTILITY_PATTERN = /(연예가|가십|트럼프|해외연예)/i
 
+/** Check whether text contains any Jeonju-related keyword to confirm local relevance. */
 function hasJeonjuSignal(text: string) {
   return /(전주|jeonju|완산|덕진|한옥마을|전주천|전주시청|전주국제영화제)/i.test(text)
 }
 
+/** Extract a clean YYYY-MM-DD date from a raw Tavily publishedDate string. */
 function normalizePublishedDate(raw: string | null): string | null {
   if (!raw) return null
   const match = raw.match(/(\d{4}-\d{2}-\d{2})/)
   return match ? match[1] : null
 }
 
+/** Normalise a URL by keeping only a whitelist of query params to enable cross-source dedup. */
 function normalizeUrlForDedup(raw: string): string {
   try {
     const url = new URL(raw)
@@ -381,6 +415,7 @@ function calcDateDiffDays(baseDateYmd: string, targetDateYmd: string) {
   return Math.floor(diffMs / 86_400_000)
 }
 
+/** Compute a bespoke relevance score by combining Tavily score, domain reputation, recency, and content signals. */
 function calcWeightedScore(item: {
   score: number
   url: string
@@ -428,6 +463,7 @@ function calcWeightedScore(item: {
   return weighted
 }
 
+/** Pick up to `limit` results while ensuring track diversity (max 4 per track) and prioritising certain tracks. */
 function pickDiverseTopResults(items: SearchResultItem[], limit: number) {
   const prioritizedTracks = ["city-hall", "local-news", "events", "culture", "safety", "governance", "fallback-news", "fallback-general"]
   const picked: SearchResultItem[] = []
@@ -627,6 +663,7 @@ async function executeMultiSearch(dateStr: string, locale: JeonjuBriefingLocale)
         combinedAnswer = response.answer
       }
 
+      // Multi-stage filter pipeline: relevance, recency, dedup, and utility scoring
       for (const item of response.results) {
         if (!item.url || item.score < 0.2) continue
         const normalizedDate = normalizePublishedDate(item.publishedDate)
@@ -659,6 +696,7 @@ async function executeMultiSearch(dateStr: string, locale: JeonjuBriefingLocale)
           trackKey: track.key,
         }
 
+        // Keep the highest-weighted version when the same URL appears from multiple tracks
         const existing = selectedByUrl.get(normalizedUrl)
         if (!existing || mapped.weightedScore > existing.weightedScore) {
           selectedByUrl.set(normalizedUrl, mapped)
@@ -667,6 +705,7 @@ async function executeMultiSearch(dateStr: string, locale: JeonjuBriefingLocale)
     }
   }
 
+  // Phase 1: primary targeted searches; Phase 2: broader fallback only if primary results are scarce
   await collectTracks(buildPrimarySearchTracks(dateStr, locale))
   if (selectedByUrl.size < 5) {
     await collectTracks(buildFallbackSearchTracks(dateStr, locale))
@@ -730,6 +769,13 @@ function extractJsonFromResponse(content: string): string | null {
 // Main Public API
 // ------------------------------------------------------------------
 
+/**
+ * Main entry point: retrieve or generate yesterday's Jeonju briefing for the given locale.
+ *
+ * Cache layers (in order): in-memory → DB → auto-generation.
+ * On generation failure, falls back to stale DB cache → static fallback content.
+ * Concurrent requests for the same key are de-duplicated via an in-flight map.
+ */
 export async function generateJeonjuBriefing(
   options: GenerateBriefingOptions = {}
 ): Promise<BriefingGenerationResult> {
@@ -864,6 +910,12 @@ export async function generateJeonjuBriefing(
 // Core: Fetch + Summarize
 // ------------------------------------------------------------------
 
+/**
+ * Core pipeline: search Tavily → build context → call LLM → parse JSON → assemble final briefing.
+ *
+ * For non-Korean locales, this first attempts a Korean-source translation path.
+ * On LLM failure it falls back to a search-only partial briefing.
+ */
 export async function fetchAndSummarize(
   dateStr: string,
   locale: JeonjuBriefingLocale,
@@ -927,6 +979,7 @@ export async function fetchAndSummarize(
     }
     console.log(`[jeonju-briefing] LLM response: ${completionContent.slice(0, 100)}... (tokens: ${tokenUsage.totalTokens})`)
   } catch (llmError) {
+    // Classify LLM failures into connection errors, rate limits, or generic errors for clearer diagnostics
     const msg = llmError instanceof Error ? llmError.message : String(llmError)
     const cause = (llmError as any)?.cause?.code ?? (llmError as any)?.cause?.message ?? ""
     const prefix = msg.includes("AbortError") || cause.includes("ETIMEDOUT") || cause.includes("ECONNREFUSED")
@@ -1121,6 +1174,7 @@ Return ONLY valid JSON with these fields:
 // Context Building
 // ------------------------------------------------------------------
 
+/** Format Tavily results and optional search answer into a structured text block for the LLM prompt. */
 function buildSearchContext(
   results: SearchResultItem[],
   searchAnswer: string | null,
@@ -1154,6 +1208,7 @@ function buildSearchContext(
 // System Prompt
 // ------------------------------------------------------------------
 
+/** Build the locale-specific system prompt instructing the LLM on output format, tone, and rules. */
 function buildSystemPrompt(
   dateLabel: string,
   relativeLabel: string,
@@ -1226,6 +1281,7 @@ interface ParsedBriefing {
   keywordTags: string[]
 }
 
+/** Prepend the standard NadeulAI greeting if the summary does not already start with one. */
 function ensureFriendlyIntro(summary: string, locale: JeonjuBriefingLocale) {
   const trimmed = summary.trim()
   if (!trimmed) return trimmed
@@ -1243,6 +1299,7 @@ function ensureFriendlyIntro(summary: string, locale: JeonjuBriefingLocale) {
   return `${intro} ${trimmed}`
 }
 
+/** Parse and validate the LLM's JSON output into a typed ParsedBriefing object. */
 function parseBriefingJson(jsonText: string): ParsedBriefing {
   const parsed = JSON.parse(jsonText) as Record<string, unknown>
 
@@ -1296,6 +1353,7 @@ function parseBriefingJson(jsonText: string): ParsedBriefing {
 // Final Assembly
 // ------------------------------------------------------------------
 
+/** Extract a valid YYYY-MM-DD date from any free-text string via regex. */
 function extractYmd(value: string | null | undefined): string | null {
   if (!value) return null
   const match = value.match(/(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})/)
@@ -1366,6 +1424,7 @@ function normalizeNewsItemsForBriefing(
 
 
 
+/** Generate a natural-language narrative summary from news items when the LLM output has no summary. */
 function buildNarrativeSummary(
   locale: JeonjuBriefingLocale,
   dateLabel: string,
@@ -1419,6 +1478,7 @@ function buildNarrativeSummary(
   return ensureFriendlyIntro(body, locale)
 }
 
+/** Generate locale-aware practical tips (bullet points) from the top news items. */
 function buildInsightFromItems(
   locale: JeonjuBriefingLocale,
   items: JeonjuBriefingData["newsItems"]
@@ -1491,6 +1551,7 @@ function buildInsightFromItems(
   return bullets.slice(0, 4).join("\n")
 }
 
+/** Derive relevant hashtag keywords from news item titles/snippets. */
 function deriveKeywordTags(
   locale: JeonjuBriefingLocale,
   items: JeonjuBriefingData["newsItems"]
@@ -1515,6 +1576,7 @@ function deriveKeywordTags(
   return [...new Set(tagsEn)].slice(0, 5)
 }
 
+/** Assemble the final JeonjuBriefingData from parsed LLM output and search results, with defensive sanitisation. */
 function buildFinalBriefing(
   dateStr: string,
   locale: JeonjuBriefingLocale,
@@ -1619,7 +1681,7 @@ function buildFinalBriefing(
     newsItems = []
   }
 
-  // Filter out non-Jeonju items when we have LLM items
+  // Cross-reference LLM items with real search results to replace hallucinated URLs
   if (parsed.newsItems.length > 0) {
     // Items from LLM are already Jeonju-filtered
   } else if (searchResults.length > 0) {
@@ -1705,6 +1767,7 @@ function getLocalizedTags(locale: JeonjuBriefingLocale): string[] {
   return ["#Jeonju", "#Nadeulhae", "#JeonjuTravel"]
 }
 
+/** Build a minimal briefing from search results alone (no LLM). Used when LLM call fails. */
 function buildPartialBriefing(
   dateStr: string,
   locale: JeonjuBriefingLocale,

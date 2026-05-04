@@ -1,5 +1,12 @@
 "use client"
 
+/**
+ * JeonjuSafetyPanel — comprehensive safety overview for Jeonju.
+ * Combines real-time hazard signals, weather-derived mobility notes,
+ * and Jeonbuk fire-flow data into one scrollable summary panel.
+ * Fully i18n via the `language` prop.
+ */
+
 import {
   CloudRain,
   Flame,
@@ -24,27 +31,28 @@ interface JeonjuSafetyPanelProps {
 
 type Tone = "safe" | "info" | "caution" | "danger"
 
+// Regex patterns to filter out non-actionable bulletin messages
 const NON_BULLETIN_MESSAGE_PATTERN = /(전주 기준 대기질 데이터를 표시 중입니다|showing fallback air quality data)/i
 const EMPTY_BULLETIN_PATTERN = /^(?:[oO○◯●□■▪︎ㆍ·\-\*\s]*)?(?:없음|없\s*음|none|no\s*alerts?|n\/a)(?:[\s.)\]]*)$/i
 
-function formatDateLabel(date: string) {
+/** Format YYYYMMDD → YYYY.MM.DD */ function formatDateLabel(date: string) {
   if (!date || date.length !== 8) return date
   return `${date.slice(0, 4)}.${date.slice(4, 6)}.${date.slice(6, 8)}`
 }
 
-function formatShortDateLabel(date: string, language: string) {
+/** Format YYYYMMDD → locale-aware short label (M.D / M月D日 / M/D) */ function formatShortDateLabel(date: string, language: string) {
   if (!date || date.length !== 8) return date
   const month = Number(date.slice(4, 6))
   const day = Number(date.slice(6, 8))
   return language === "ko" ? `${month}.${day}` : language === "zh" ? `${month}月${day}日` : language === "ja" ? `${month}月${day}日` : `${month}/${day}`
 }
 
-function formatUpdateLabel(value?: string) {
+/** Clean an ISO timestamp for display: strip T, truncate to 16 chars, replace - with . */ function formatUpdateLabel(value?: string) {
   if (!value) return ""
   return value.replace("T", " ").slice(0, 16).replace(/-/g, ".")
 }
 
-function toneClasses(tone: Tone) {
+/** Map a Tone to border/bg/text utility classes */ function toneClasses(tone: Tone) {
   switch (tone) {
     case "danger":
       return "border-red-500/20 bg-red-500/8 text-red-600 dark:text-red-300"
@@ -57,7 +65,9 @@ function toneClasses(tone: Tone) {
   }
 }
 
-function selectOfficialAlertText(weatherData: WeatherData) {
+// ---- Safety data helpers ----
+
+/** Walk the alert pipeline and return the first meaningful non-fallback alert text */ function selectOfficialAlertText(weatherData: WeatherData) {
   const { metadata, eventData } = weatherData
 
   return [
@@ -446,11 +456,14 @@ function getOverallSafetyGuide(weatherData: WeatherData, fireSummary: FireSummar
   }
 }
 
+// ---- Component ----
+
 export function JeonjuSafetyPanel({
   weatherData,
   fireSummary,
   language,
 }: JeonjuSafetyPanelProps) {
+  // Derive all sub-section data from weather + fire sources
   const hazardSummary = getHazardSummary(weatherData, language)
   const hazardChips = getHazardChips(weatherData, language)
   const mobilitySummary = getMobilitySummary(weatherData, language)

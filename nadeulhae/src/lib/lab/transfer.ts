@@ -1,7 +1,13 @@
+/** Lab import/export module: parses CSV/JSON payloads and builds export CSV/JSON strings for Anki-compatible transfer. */
+
 import type { LabCardSnapshot, LabGeneratedCardInput } from "@/lib/lab/types"
 
+/** Regex matching ASCII control characters. */
 const CONTROL_CHARACTERS_REGEX = /[\u0000-\u001F\u007F]/g
 
+// --- Internal parsing helpers ---
+
+/** Trim whitespace and strip control characters from a cell value. */
 function normalizeCell(value: unknown) {
   if (typeof value !== "string") {
     return ""
@@ -13,10 +19,12 @@ function normalizeCell(value: unknown) {
     .trim()
 }
 
+/** Truncate a string to maxLength. */
 function trimTo(value: string, maxLength: number) {
   return value.slice(0, maxLength)
 }
 
+/** Map a raw record (from CSV row or JSON object) into a LabGeneratedCardInput. Supports multiple key aliases. */
 function normalizeCardDraft(input: Record<string, unknown>): LabGeneratedCardInput | null {
   const term = trimTo(normalizeCell(input.term ?? input.word ?? input.spell ?? input.단어), 80)
   const meaning = trimTo(normalizeCell(input.meaning ?? input.translation ?? input.뜻 ?? input.의미), 220)
@@ -37,10 +45,12 @@ function normalizeCardDraft(input: Record<string, unknown>): LabGeneratedCardInp
   }
 }
 
+/** Build a case-insensitive dedup key for a card. */
 function toDedupKey(card: LabGeneratedCardInput) {
   return `${card.term.toLowerCase().replace(/\s+/g, "")}|${card.meaning.toLowerCase().replace(/\s+/g, "")}`
 }
 
+/** Deduplicate cards by term+meaning key, preserving first occurrence order. */
 function dedupeCards(cards: LabGeneratedCardInput[]) {
   const normalized: LabGeneratedCardInput[] = []
   const seen = new Set<string>()
@@ -58,6 +68,7 @@ function dedupeCards(cards: LabGeneratedCardInput[]) {
   return normalized
 }
 
+/** Sanitize raw import source: strip BOM, zero-width spaces, null bytes. */
 function sanitizeImportSourceRaw(value: unknown) {
   if (typeof value !== "string") {
     return ""
@@ -70,6 +81,9 @@ function sanitizeImportSourceRaw(value: unknown) {
     .trim()
 }
 
+// --- JSON parsing helpers ---
+
+/** Normalize smart quotes and trailing commas for lenient JSON parsing. */
 function normalizeJsonLikeSource(value: string) {
   return value
     .replace(/[""]/g, "\"")
@@ -78,11 +92,13 @@ function normalizeJsonLikeSource(value: string) {
     .trim()
 }
 
+/** Extract JSON content from a markdown code fence block. */
 function extractCodeBlockJson(value: string) {
   const match = value.match(/```(?:json)?\s*([\s\S]*?)```/i)
   return match?.[1]?.trim() ?? null
 }
 
+/** Extract the outermost bracket-delimited JSON substring ({} or []). */
 function extractBracketedJson(value: string, open: "{" | "[", close: "}" | "]") {
   const start = value.indexOf(open)
   const end = value.lastIndexOf(close)
@@ -92,6 +108,7 @@ function extractBracketedJson(value: string, open: "{" | "[", close: "}" | "]") 
   return value.slice(start, end + 1).trim()
 }
 
+/** Attempt strict JSON parsing on a string; returns null on failure. */
 function tryParseJsonCandidate(value: string) {
   try {
     return JSON.parse(value) as unknown
@@ -100,6 +117,7 @@ function tryParseJsonCandidate(value: string) {
   }
 }
 
+/** Parse JSON with leniency: tries raw source, code block, bracketed content, and normalizes smart quotes/trailing commas. */
 function parseJsonLoosely(source: string) {
   const candidates = [
     source,
@@ -126,6 +144,9 @@ function parseJsonLoosely(source: string) {
   return null
 }
 
+// --- CSV parsing helpers ---
+
+/** Count occurrences of a delimiter character that are outside of double-quoted strings. */
 function countDelimiterOutsideQuotes(value: string, delimiter: string) {
   let inQuotes = false
   let count = 0
@@ -150,6 +171,7 @@ function countDelimiterOutsideQuotes(value: string, delimiter: string) {
   return count
 }
 
+/** Auto-detect CSV delimiter by sampling the first 5 non-empty lines and picking the delimiter with the most occurrences outside quotes. */
 function detectCsvDelimiter(source: string) {
   const candidates = [",", ";", "\t"] as const
   const sampleLines = source
@@ -176,6 +198,7 @@ function detectCsvDelimiter(source: string) {
   return bestDelimiter
 }
 
+/** Parse CSV rows with quoted-field support. Handles escaped quotes (""). Returns an array of field arrays. */
 function parseCsvRows(source: string, delimiter: "," | ";" | "\t" = ",") {
   const rows: string[][] = []
   let currentRow: string[] = []
@@ -254,6 +277,7 @@ function parseCsvRows(source: string, delimiter: "," | ";" | "\t" = ",") {
   return rows
 }
 
+/** Attempt to split a single-cell value into term and meaning using various delimiters (tab, pipe, dash, colon). */
 function splitLooseTermMeaning(value: string) {
   const normalized = normalizeCell(value)
   if (!normalized) {
@@ -286,6 +310,7 @@ function splitLooseTermMeaning(value: string) {
   return { term: "", meaning: "" }
 }
 
+/** Normalize a CSV header key: lowercase, strip BOM, remove whitespace. */
 function normalizeHeaderKey(value: string) {
   return value
     .replace(/^\uFEFF/, "")
@@ -294,6 +319,7 @@ function normalizeHeaderKey(value: string) {
     .replace(/\s+/g, "")
 }
 
+/** Build a map from normalized header keys to column indices. */
 function getHeaderIndexMap(headerRow: string[]) {
   const map = new Map<string, number>()
 
@@ -304,6 +330,7 @@ function getHeaderIndexMap(headerRow: string[]) {
   return map
 }
 
+/** Find the first matching header key from a list of candidates, returning its index or null. */
 function pickIndex(headerMap: Map<string, number>, keys: string[]) {
   for (const key of keys) {
     const index = headerMap.get(key)
@@ -315,6 +342,9 @@ function pickIndex(headerMap: Map<string, number>, keys: string[]) {
   return null
 }
 
+// --- CSV export helpers ---
+
+/** Encode a value for CSV output, wrapping in quotes if it contains commas, quotes, or newlines. */
 function toCsvCell(value: unknown) {
   const base = String(value ?? "")
   if (/[",\n\r]/.test(base)) {
@@ -323,6 +353,9 @@ function toCsvCell(value: unknown) {
   return base
 }
 
+// --- Exported types & functions ---
+
+/** Result of parsing a Lab import payload — includes parsed cards, row counts, and detected deck metadata. */
 export interface ParsedLabImportResult {
   cards: LabGeneratedCardInput[]
   totalParsedRows: number
@@ -333,6 +366,7 @@ export interface ParsedLabImportResult {
   deckTopic: string | null
 }
 
+/** Parse a raw import payload (CSV or JSON) into normalized, deduplicated cards. Handles multiple key aliases and loose formats. */
 export function parseLabImportPayload(input: {
   format: "csv" | "json"
   source: string
@@ -350,6 +384,7 @@ export function parseLabImportPayload(input: {
     }
   }
 
+  // --- JSON import path ---
   if (input.format === "json") {
     const parsed = parseJsonLoosely(source)
     if (!parsed) {
@@ -364,6 +399,7 @@ export function parseLabImportPayload(input: {
       }
     }
 
+    // Accept either a top-level array or { cards: [...] } / { deck: { ... }, cards: [...] }
     const objectLike = parsed && typeof parsed === "object"
       ? parsed as Record<string, unknown>
       : null
@@ -406,6 +442,8 @@ export function parseLabImportPayload(input: {
     }
   }
 
+  // --- CSV import path ---
+
   const delimiter = detectCsvDelimiter(source)
   const rows = parseCsvRows(source, delimiter)
   if (rows.length === 0) {
@@ -420,6 +458,7 @@ export function parseLabImportPayload(input: {
     }
   }
 
+  // Detect header row by looking for known column names
   const headerMap = getHeaderIndexMap(rows[0])
   const headerTermIndex = pickIndex(headerMap, ["term", "word", "spell", "단어", "표현"])
   const headerMeaningIndex = pickIndex(headerMap, ["meaning", "translation", "뜻", "의미"])
@@ -450,6 +489,7 @@ export function parseLabImportPayload(input: {
     }
     let draft = normalizeCardDraft(baseDraft)
 
+    // Fallback: single-cell row — try to split "term - meaning" format
     if (!draft && row.length === 1) {
       const loose = splitLooseTermMeaning(row[0] ?? "")
       if (loose.term && loose.meaning) {
@@ -481,6 +521,7 @@ export function parseLabImportPayload(input: {
   }
 }
 
+/** Build a sample CSV template with BOM, headers, and example rows. */
 export function buildLabTemplateCsv() {
   const rows = [
     ["term", "meaning", "partOfSpeech", "example", "exampleTranslation"],
@@ -492,6 +533,7 @@ export function buildLabTemplateCsv() {
   return `\uFEFF${rows.map((row) => row.map(toCsvCell).join(",")).join("\n")}`
 }
 
+/** Build a sample JSON template with deck metadata and example cards. */
 export function buildLabTemplateJson() {
   return JSON.stringify(
     {
@@ -528,11 +570,13 @@ export function buildLabTemplateJson() {
   )
 }
 
+/** Build a full CSV export string from a deck and its cards, including SRS metadata columns. */
 export function buildLabExportCsv(input: {
   deckTitle: string
   deckTopic: string
   cards: LabCardSnapshot[]
 }) {
+  // Header row followed by one row per card
   const rows: Array<Array<string | number>> = [
     [
       "deckTitle",
@@ -578,6 +622,7 @@ export function buildLabExportCsv(input: {
   return `\uFEFF${rows.map((row) => row.map(toCsvCell).join(",")).join("\n")}`
 }
 
+/** Sanitize a string for use as a filename: lowercase, replace non-alphanumeric chars with hyphens. */
 export function sanitizeLabFilename(value: string) {
   const normalized = value
     .trim()

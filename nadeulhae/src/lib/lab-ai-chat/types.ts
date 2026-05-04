@@ -1,8 +1,11 @@
+/** Lab AI Chat — type definitions for session state, usage, web search, and model options. */
+
 export type LabAiChatLocale = "ko" | "en" | "zh" | "ja"
 export type LabAiChatMessageRole = "user" | "assistant"
 export type LabAiChatRequestKind = "chat" | "summary"
 export type LabAiChatRequestStatus = "success" | "provider_error" | "rate_limited" | "validation_error"
 
+/** A single message in the conversation visible to the user. */
 export interface LabAiChatConversationMessage {
   id: string
   role: LabAiChatMessageRole
@@ -11,6 +14,7 @@ export interface LabAiChatConversationMessage {
   resolvedModel: string | null
 }
 
+/** Summarised memory snapshot for a session — used to inject into the system prompt. */
 export interface LabAiChatMemorySnapshot {
   summary: string
   updatedAt: string
@@ -18,6 +22,7 @@ export interface LabAiChatMemorySnapshot {
   modelUsed: string | null
 }
 
+/** Summary of a single session for the session-list sidebar. */
 export interface LabAiChatSessionSnapshot {
   id: string
   title: string
@@ -28,6 +33,7 @@ export interface LabAiChatSessionSnapshot {
   updatedAt: string
 }
 
+/** Daily usage snapshot: how many requests used / remaining against the daily limit. */
 export interface LabAiChatUsageSnapshot {
   metricDate: string
   requestCount: number
@@ -45,12 +51,14 @@ export interface LabAiChatUsageSnapshot {
   summaryTotalTokens: number
 }
 
+/** Read-only policy limits exposed to the client for UI hints. */
 export interface LabAiChatPolicySnapshot {
   dailyLimit: number
   maxInputCharacters: number
   resetTimeZone: string
 }
 
+/** Web-search quota + cache availability for the current session/month. */
 export interface LabAiChatWebSearchSnapshot {
   sessionLimit: number
   sessionUsed: number
@@ -69,6 +77,7 @@ export interface LabAiChatWebSearchSnapshot {
   cacheUpdatedAt: string | null
 }
 
+/** A model choice the user can pick from in the chat UI. */
 export interface LabAiChatModelOption {
   id: string
   slug: string
@@ -79,6 +88,7 @@ export interface LabAiChatModelOption {
   thinkingWarning?: string
 }
 
+/** The minimum server-side state needed to render the chat page. */
 export interface LabAiChatStateCore {
   messages: LabAiChatConversationMessage[]
   memory: LabAiChatMemorySnapshot | null
@@ -89,6 +99,7 @@ export interface LabAiChatStateCore {
   activeSessionId: string
 }
 
+/** Full chat-page response: core state + model list. */
 export interface LabAiChatStateResponse extends LabAiChatStateCore {
   models: LabAiChatModelOption[]
   defaultModelId: string

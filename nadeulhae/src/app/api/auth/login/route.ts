@@ -1,3 +1,12 @@
+/**
+ * POST /api/auth/login
+ * Authenticates user by email + password. Validates request, checks IP/email rate limits and active blocks,
+ * verifies password against stored hash, starts a session, and returns user profile + auth cookie.
+ * Body: { email, password }
+ * Returns: { user } with Set-Cookie header.
+ * Rate-limited per IP and per email; delayed failure response to prevent enumeration.
+ */
+
 import { NextRequest } from "next/server"
 
 import {
@@ -37,6 +46,7 @@ import { withApiAnalytics } from "@/lib/analytics/route"
 export const runtime = "nodejs"
 
 async function handlePOST(request: NextRequest) {
+  // === 1. INIT ===
   const locale = resolveAuthLocale(request.headers.get("accept-language"))
   const ipAddress = getClientIp(request)
   const userAgent = getUserAgent(request)
@@ -104,6 +114,7 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
+    // === 2. PAYLOAD VALIDATION ===
     const validation = validateLoginPayload(payload, locale)
 
     if ("error" in validation) {
@@ -146,6 +157,7 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
+    // === 3. PASSWORD VERIFICATION ===
     const user = await findUserByEmail(validation.data.email)
     if (!user) {
       await verifyPasswordAgainstDummy(validation.data.password)
@@ -213,6 +225,7 @@ async function handlePOST(request: NextRequest) {
       throw new Error("User resolved to null after successful password verification")
     }
 
+    // === 4. SUCCESS — clear rate limits, start session, build response ===
     const authenticatedUser = user
     await clearAuthRateLimits("login", [ipScopeKey, emailScopeKey])
 

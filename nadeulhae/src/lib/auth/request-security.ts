@@ -1,3 +1,8 @@
+/**
+ * Request security validators for auth endpoints.
+ * Provides CSRF protection via origin/referer checks, IP extraction
+ * from proxy headers, and mutation request validation (content-type, body size).
+ */
 import { NextRequest, NextResponse } from "next/server"
 
 import { AUTH_BODY_LIMIT_BYTES } from "@/lib/auth/guardrails"
@@ -11,6 +16,7 @@ const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
   process.env.TRUST_PROXY_HEADERS ?? ""
 )
 
+/** Extracts the client IP from proxy headers (Cloudflare, X-Real-IP, X-Forwarded-For). Falls back to "anonymous". */
 export function getClientIp(request: NextRequest) {
   if (!TRUST_PROXY_HEADERS) {
     return "anonymous"
@@ -24,10 +30,15 @@ export function getClientIp(request: NextRequest) {
   ).slice(0, 64)
 }
 
+/** Extracts the User-Agent header, truncated to 255 characters. */
 export function getUserAgent(request: NextRequest) {
   return request.headers.get("user-agent")?.slice(0, 255) ?? null
 }
 
+/**
+ * Creates a JSON response with security headers (no-cache, no-sniff, same-origin referrer).
+ * Optionally attaches a Retry-After header for rate-limit responses.
+ */
 export function createAuthJsonResponse(
   body: unknown,
   init?: {
@@ -51,6 +62,7 @@ export function createAuthJsonResponse(
   return response
 }
 
+// Builds a set of allowed origins from request URL, app config, and host headers.
 function getAllowedOrigins(request: NextRequest) {
   const allowedOrigins = new Set<string>()
 
@@ -92,6 +104,12 @@ function getAllowedOrigins(request: NextRequest) {
   return allowedOrigins
 }
 
+/**
+ * Validates that the request originates from an allowed origin.
+ * Checks Origin header against known allowed origins, handles "null" origins
+ * via Referer fallback, and inspects Sec-Fetch-Site for cross-site detection.
+ * Returns a 403 response on mismatch, or null if valid.
+ */
 export function validateSameOriginRequest(request: NextRequest, locale?: AuthLocale) {
   const resolvedLocale = locale ?? resolveAuthLocale(request.headers.get("accept-language"))
   const originHeader = request.headers.get("origin")
@@ -147,6 +165,10 @@ export function validateSameOriginRequest(request: NextRequest, locale?: AuthLoc
   return null
 }
 
+/**
+ * Full validation for auth mutation endpoints: origin check + content-type + body size guard.
+ * Returns a response on violation or null if everything passes.
+ */
 export function validateAuthMutationRequest(request: NextRequest, locale?: AuthLocale) {
   const resolvedLocale = locale ?? resolveAuthLocale(request.headers.get("accept-language"))
   const sameOriginViolation = validateSameOriginRequest(request, resolvedLocale)

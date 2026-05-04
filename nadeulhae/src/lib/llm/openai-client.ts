@@ -1,5 +1,17 @@
+/**
+ * OpenAI-compatible API Client
+ *
+ * Thin HTTP client for communicating with OpenAI-compatible LLM APIs.
+ * Supports model listing, non-streaming completions, and SSE streaming
+ * completions. All responses are normalised into the project's
+ * LlmCompletionResult shape with consistent error handling.
+ */
 import type { LlmCompletionResult, LlmConfig } from "@/lib/llm/types"
 
+/**
+ * Custom error for OpenAI API failures. Carries the HTTP status code and
+ * an optional error code from the API response body.
+ */
 export class OpenAiClientError extends Error {
   statusCode: number
   code: string | null
@@ -12,6 +24,7 @@ export class OpenAiClientError extends Error {
   }
 }
 
+/** Shape of an OpenAI-compatible error response body. */
 interface OpenAiErrorPayload {
   error?: {
     code?: string | number
@@ -19,10 +32,12 @@ interface OpenAiErrorPayload {
   }
 }
 
+/** Shape of the OpenAI /models endpoint response. */
 interface OpenAiModelPayload {
   data?: Array<{ id?: string }>
 }
 
+/** Shape of the OpenAI /chat/completions response. Supports both streaming (delta) and non-streaming (message) modes. */
 interface OpenAiCompletionPayload {
   id?: string
   model?: string
@@ -40,6 +55,10 @@ interface OpenAiCompletionPayload {
   }
 }
 
+/**
+ * Extracts plain text from an assistant message content field. Handles
+ * both plain strings and structured content (array of text parts).
+ */
 function extractAssistantText(content: unknown) {
   if (typeof content === "string") {
     return content.trim()
@@ -59,22 +78,30 @@ function extractAssistantText(content: unknown) {
   return ""
 }
 
+/** Normalises a finish_reason value. Returns trimmed string or null. */
 function normalizeFinishReason(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
 }
 
+/** Roughly estimates token count using 1 token ≈ 4 characters heuristic. Minimum result is 1. */
 export function estimateTokens(text: string) {
   return Math.max(1, Math.ceil(text.trim().length / 4))
 }
 
+/** Normalises a model ID for fuzzy matching: lowercases and strips non-alphanumeric characters. */
 function normalizeModelId(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "")
 }
 
+/** Joins a base URL and a path, ensuring exactly one slash between them. */
 function buildUrl(baseUrl: string, path: string) {
   return `${baseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`
 }
 
+/**
+ * Fetches a URL and parses the response as JSON with an abort timeout.
+ * Returns both the Response and parsed JSON body.
+ */
 async function fetchJson<T>(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
@@ -87,6 +114,11 @@ async function fetchJson<T>(input: RequestInfo | URL, init: RequestInit, timeout
   }
 }
 
+/**
+ * Finds the best match for a preferred model ID within available models.
+ * Tries exact match → normalised match → substring inclusion (both directions).
+ * Returns null if no match is found.
+ */
 export function pickModelCandidate(preferred: string | null, available: string[]) {
   if (!preferred) return null
   const exact = available.find((modelId) => modelId === preferred)
@@ -94,6 +126,7 @@ export function pickModelCandidate(preferred: string | null, available: string[]
   const normalizedPreferred = normalizeModelId(preferred)
   const normalizedExact = available.find((modelId) => normalizeModelId(modelId) === normalizedPreferred)
   if (normalizedExact) return normalizedExact
+  // Mutual substring inclusion — matches both "gpt-4" against "gpt-4-turbo" and vice versa
   return (
     available.find((modelId) => normalizeModelId(modelId).includes(normalizedPreferred))
     || available.find((modelId) => normalizedPreferred.includes(normalizeModelId(modelId)))
@@ -101,6 +134,10 @@ export function pickModelCandidate(preferred: string | null, available: string[]
   )
 }
 
+/**
+ * Fetches available models from an OpenAI-compatible API. Filters out
+ * entries with empty or whitespace-only IDs.
+ */
 export async function fetchModels(config: LlmConfig, timeoutMs: number): Promise<string[]> {
   const { response, json } = await fetchJson<OpenAiModelPayload>(
     buildUrl(config.baseUrl, "models"),
@@ -129,6 +166,11 @@ export async function fetchModels(config: LlmConfig, timeoutMs: number): Promise
     .filter((value): value is string => Boolean(value))
 }
 
+/**
+ * Sends a non-streaming chat completion request. Parses the response into
+ * LlmCompletionResult shape. Throws OpenAiClientError on non-OK responses
+ * or empty responses.
+ */
 export async function requestCompletion(
   config: LlmConfig,
   input: {
@@ -188,6 +230,12 @@ export async function requestCompletion(
   }
 }
 
+/**
+ * Sends a streaming chat completion request. Parses SSE events from the
+ * response body, invoking onToken for each content delta. Returns the
+ * accumulated result with estimated token counts, since streaming
+ * responses typically omit usage metadata.
+ */
 export async function requestCompletionStream(
   config: LlmConfig,
   input: {
@@ -254,6 +302,7 @@ export async function requestCompletionStream(
         for (const part of parts) {
           for (const rawLine of part.split("\n")) {
             const trimmed = rawLine.trim()
+            // SSE lines start with "data: " — skip non-data lines and the [DONE] signal
             if (!trimmed.startsWith("data: ")) continue
             const data = trimmed.slice(6)
             if (data === "[DONE]") continue
@@ -262,11 +311,13 @@ export async function requestCompletionStream(
               const parsed = JSON.parse(data) as OpenAiCompletionPayload
               providerRequestId = parsed.id ?? providerRequestId
               resolvedModel = parsed.model ?? resolvedModel
+              // Streaming payloads carry finish_reason on the last delta only
               finishReason = normalizeFinishReason(parsed.choices?.[0]?.finish_reason) ?? finishReason
 
               const token = typeof parsed.choices?.[0]?.delta?.content === "string"
                 ? parsed.choices[0].delta.content
                 : ""
+              // Skip empty tokens — some providers emit heartbeat deltas with no content
               if (!token) continue
               accumulated += token
               input.onToken(token)

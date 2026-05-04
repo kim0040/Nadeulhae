@@ -104,8 +104,11 @@ const createLlmUserActionUsageTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
-// Produces YYYY-MM-DD strings in Asia/Seoul timezone ("en-CA" locale produces
-// ISO 8601 date format). Used as the `metric_date` partition key throughout the quota system.
+/**
+ * Produces YYYY-MM-DD strings in Asia/Seoul timezone. The "en-CA" locale
+ * produces ISO 8601 date format. Used as the `metric_date` partition key
+ * throughout the quota system.
+ */
 const KST_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul",
   year: "numeric",
@@ -140,16 +143,20 @@ export interface DailyQuotaReservation {
   usage: DailyQuotaUsage
 }
 
-// Returns today's date string in KST (Asia/Seoul), e.g. "2026-04-29".
-// All quota partitions are keyed by this date to align with the Korean business day.
+/**
+ * Returns today's date string in KST (Asia/Seoul), e.g. "2026-04-29".
+ * All quota partitions are keyed by this date to align with the Korean business day.
+ */
 function getKstMetricDate() {
   return KST_DATE_FORMATTER.format(new Date())
 }
 
-// Coerces a limit value to a safe positive integer.
-// - `undefined`, `NaN`, `Infinity`, and non-number types fall back to `fallback`.
-// - Negative values are clamped to 1 (minimum quota) via `Math.max(1, ...)`.
-// - Fractional values are floored to integers.
+/**
+ * Coerces a limit value to a safe positive integer.
+ * - `undefined`, `NaN`, `Infinity`, and non-number types fall back to `fallback`.
+ * - Negative values are clamped to 1 (minimum quota).
+ * - Fractional values are floored to integers.
+ */
 function normalizeLimit(input: number | undefined, fallback: number) {
   if (typeof input !== "number" || !Number.isFinite(input)) {
     return fallback
@@ -158,12 +165,11 @@ function normalizeLimit(input: number | undefined, fallback: number) {
   return Math.max(1, Math.floor(input))
 }
 
-// Validates and normalizes a quota_key string for safe use in SQL and as a URL/slug identifier.
-// - Trims whitespace and lowercases.
-// - Rejects empty strings, strings longer than 64 characters (VARCHAR(64) column limit),
-//   and strings containing characters outside `[a-z0-9_:-]`.
-// - Throws an `Error` on invalid input — the caller should treat this as a programmer error
-//   (invalid action slug), not a runtime rate-limit condition.
+/**
+ * Validates and normalises a quota_key string for safe use in SQL and as a
+ * URL/slug identifier. Trims whitespace, lowercases, and validates against
+ * the allowed character set `[a-z0-9_:-]`. Throws on invalid input.
+ */
 function normalizeQuotaKey(input: string) {
   const normalized = input.trim().toLowerCase()
   if (!normalized || normalized.length > 64 || !/^[a-z0-9_:-]+$/.test(normalized)) {
@@ -173,10 +179,11 @@ function normalizeQuotaKey(input: string) {
   return normalized
 }
 
-// Builds a `DailyQuotaUsage` snapshot from raw row data.
-// Clamps `requestCount`, `successCount`, and `failureCount` to ≥0 defensively
-// (the DB columns are UNSIGNED, but this guards against client errors).
-// `remaining` is computed as `limit - requestCount`, floored at 0.
+/**
+ * Builds a DailyQuotaUsage snapshot from raw row data. Clamps counts to
+ * ≥0 defensively. `remaining` is computed as `limit - requestCount`,
+ * floored at 0.
+ */
 function toUsageSnapshot(input: {
   metricDate: string
   requestCount: number
@@ -194,10 +201,12 @@ function toUsageSnapshot(input: {
   }
 }
 
-// Idempotently ensures a row exists for `metricDate` in the global usage table.
-// Uses `INSERT ... ON DUPLICATE KEY UPDATE metric_date = metric_date` (a no-op update)
-// so the row is guaranteed to exist before the caller locks it with `SELECT ... FOR UPDATE`.
-// Must run inside an active transaction on `connection`.
+/**
+ * Idempotently ensures a row exists for `metricDate` in the global usage table.
+ * Uses INSERT ... ON DUPLICATE KEY UPDATE with a no-op update so the row is
+ * guaranteed to exist before the caller locks it with SELECT ... FOR UPDATE.
+ * Must run inside an active transaction on `connection`.
+ */
 async function upsertGlobalUsageRow(connection: PoolConnection, metricDate: string) {
   await connection.execute(
     `
@@ -213,10 +222,11 @@ async function upsertGlobalUsageRow(connection: PoolConnection, metricDate: stri
   )
 }
 
-// Idempotently ensures a row exists for the (metricDate, userId, quotaKey) triple
-// in the user-action usage table.  Same no-op upsert pattern as `upsertGlobalUsageRow`
-// (`ON DUPLICATE KEY UPDATE user_id = user_id`) — relies on the composite PRIMARY KEY.
-// Must run inside an active transaction on `connection`.
+/**
+ * Idempotently ensures a row exists for the (metricDate, userId, quotaKey)
+ * triple in the user-action usage table. Same no-op upsert pattern as
+ * upsertGlobalUsageRow. Must run inside an active transaction.
+ */
 async function upsertUserActionUsageRow(
   connection: PoolConnection,
   metricDate: string,

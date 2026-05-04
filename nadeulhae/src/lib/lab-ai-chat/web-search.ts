@@ -1,3 +1,16 @@
+/**
+ * Lab AI Chat — web search integration via Tavily API.
+ *
+ * Orchestrates the full search lifecycle:
+ *  1. Plan – LLM decides whether & how to search.
+ *  2. Reserve – quota check with row-level locking.
+ *  3. Fetch – call Tavily with high-signal result filtering.
+ *  4. Cache – persist results for reuse within the same session.
+ *
+ * Fallback logic: if the primary query returns weak/no results, a fallback query
+ * is retried (uses the separate fallback quota pool).
+ */
+
 import {
   getLabAiChatWebSearchCache,
   recordLabAiChatWebSearchOutcome,
@@ -9,6 +22,7 @@ import type { LabAiChatLocale } from "@/lib/lab-ai-chat/types"
 import { createLabChatCompletion } from "@/lib/llm/lab-llm"
 import { createTavilySearch, TavilyError, type TavilySearchRequest, type TavilyTopic } from "@/lib/tavily/client"
 
+/** Internal plan produced by the planner LLM — determines whether and how to search. */
 type SearchPlan = {
   needSearch: boolean
   useCacheFirst: boolean
@@ -24,13 +38,16 @@ type SearchPlan = {
   excludeDomains: string[]
 }
 
+/** Callback to push status updates to the UI (e.g. "Searching the web..."). */
 type WebSearchStatusFn = (message: string) => void
 
+/** Final result of web search resolution: the context string and where it came from. */
 export type LabAiChatWebSearchResolution = {
   context: string | null
   source: "none" | "cache" | "live"
 }
 
+/** Map a status kind to a human-readable string in the user's locale. */
 function toLocaleStatus(locale: LabAiChatLocale, kind:
   | "planning"
   | "check_cache"
@@ -96,6 +113,7 @@ function toLocaleStatus(locale: LabAiChatLocale, kind:
   }
 }
 
+/** Today's date as YYYY-MM-DD in KST. */
 function getTodayInKst() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -105,12 +123,14 @@ function getTodayInKst() {
   }).format(new Date())
 }
 
+/** Current year in KST. */
 function getCurrentKstYear() {
   const today = getTodayInKst()
   const parsed = Number(today.slice(0, 4))
   return Number.isFinite(parsed) ? parsed : new Date().getFullYear()
 }
 
+/** Extract the first 4-digit year from text, or null if none found. */
 function extractYearFromText(text: string | null | undefined) {
   if (!text) return null
   const match = text.match(/(?:19|20)\d{2}/)
@@ -122,10 +142,12 @@ function extractYearFromText(text: string | null | undefined) {
   return year
 }
 
+/** Check if the text contains phrases implying the current year (e.g. "this year", "올해"). */
 function hasCurrentYearCue(text: string) {
   return /(이번|올해|금년|this year|current year|this season)/i.test(text)
 }
 
+/** Resolve which year the user is asking about: explicit, current-year cue, or from conversation history. */
 function resolveRequestedYear(input: {
   question: string
   conversationHint: string | null
@@ -159,6 +181,7 @@ function resolveRequestedYear(input: {
   return null
 }
 
+/** Extract the first JSON object `{...}` from a text string (ignores surrounding prose/markdown). */
 function extractJsonObject(text: string) {
   const first = text.indexOf("{")
   const last = text.lastIndexOf("}")
@@ -168,6 +191,7 @@ function extractJsonObject(text: string) {
   return text.slice(first, last + 1)
 }
 
+/** Type-safe boolean parser from an unknown value. */
 function safeBool(value: unknown, fallback = false) {
   if (typeof value === "boolean") return value
   if (typeof value === "string") {
@@ -178,17 +202,20 @@ function safeBool(value: unknown, fallback = false) {
   return fallback
 }
 
+/** Type-safe YYYY-MM-DD date parser from an unknown value. */
 function safeDate(value: unknown) {
   if (typeof value !== "string") return null
   const normalized = value.trim()
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null
 }
 
+/** Sanitise an unknown topic value to a valid TavilyTopic. */
 function safeTopic(value: unknown): TavilyTopic {
   if (value === "news" || value === "finance") return value
   return "general"
 }
 
+/** Sanitise an unknown time-range value to a valid Tavily timeRange. */
 function safeTimeRange(value: unknown): TavilySearchRequest["timeRange"] {
   if (
     value === "day" || value === "week" || value === "month" || value === "year"
@@ -199,6 +226,7 @@ function safeTimeRange(value: unknown): TavilySearchRequest["timeRange"] {
   return undefined
 }
 
+/** Sanitise a search-query value: collapse whitespace, truncate to 200 chars. */
 function safeQuery(value: unknown, fallback: string) {
   if (typeof value !== "string") return fallback
   const normalized = value.replace(/\s+/g, " ").trim()
@@ -206,6 +234,7 @@ function safeQuery(value: unknown, fallback: string) {
   return normalized.slice(0, 200)
 }
 
+/** Sanitise a domain list: filter strings, trim, lowercase, limit count. */
 function safeDomainList(value: unknown, max: number) {
   if (!Array.isArray(value)) return []
   return value
@@ -215,6 +244,7 @@ function safeDomainList(value: unknown, max: number) {
     .slice(0, max)
 }
 
+/** Sanitise a country-code/value from an unknown input. */
 function safeCountry(value: unknown) {
   if (typeof value !== "string") return null
   const normalized = value.trim()
@@ -225,6 +255,7 @@ function safeCountry(value: unknown) {
   return null
 }
 
+/** Tokenize a string for overlap comparison: lowercase, strip punctuation, filter short tokens. */
 function normalizeSearchTokens(value: string) {
   return value
     .toLowerCase()
@@ -233,6 +264,7 @@ function normalizeSearchTokens(value: string) {
     .filter((token) => token.length >= 2)
 }
 
+/** Jaccard-like overlap ratio between two token arrays (used for cache-relevance scoring). */
 function calcTokenOverlap(a: string[], b: string[]) {
   if (a.length === 0 || b.length === 0) return 0
   const aSet = new Set(a)
@@ -246,10 +278,12 @@ function calcTokenOverlap(a: string[], b: string[]) {
   return common / Math.max(aSet.size, bSet.size)
 }
 
+/** Detect if the user's question is a follow-up/continuation (e.g. "again", "that", "방금"). */
 function isFollowUpCue(question: string) {
   return /(다시|재검색|이어서|그거|그것|방금|방금거|위에|이전|same|again|that|those|it|previous)/i.test(question)
 }
 
+/** Heuristic: is the cached search likely still relevant to the user's current question? */
 function isCacheLikelyRelevant(question: string, cachedQuery: string, requestedYear: number | null) {
   if (!question.trim() || !cachedQuery.trim()) return false
   if (requestedYear !== null) {
@@ -270,6 +304,7 @@ function isCacheLikelyRelevant(question: string, cachedQuery: string, requestedY
   return normalizedQuestion.includes(normalizedCached) || normalizedCached.includes(normalizedQuestion)
 }
 
+/** Filter results by signal score threshold; ensure at least 2 results if available. */
 function pickHighSignalResults<T extends { score: number }>(results: T[]) {
   if (results.length <= 1) return results
   const threshold = LAB_AI_CHAT_WEB_SEARCH_RESULT_SCORE_THRESHOLD
@@ -280,6 +315,7 @@ function pickHighSignalResults<T extends { score: number }>(results: T[]) {
   return results.slice(0, Math.min(3, results.length))
 }
 
+/** Replace any existing year in the query with the given year, or append it. */
 function forceYearInQuery(query: string, year: number) {
   const yearText = String(year)
   if (/(?:19|20)\d{2}/.test(query)) {
@@ -288,6 +324,7 @@ function forceYearInQuery(query: string, year: number) {
   return `${query} ${yearText}`.trim()
 }
 
+/** Override a plan with an explicit year: force year in query, set date range, clear time range. */
 function applyRequestedYearToPlan(plan: SearchPlan, requestedYear: number | null): SearchPlan {
   if (requestedYear === null) {
     return plan
@@ -303,16 +340,19 @@ function applyRequestedYearToPlan(plan: SearchPlan, requestedYear: number | null
   }
 }
 
+/** Does the user's message explicitly ask for a search? (Korean/English keywords). */
 function isExplicitSearchRequest(question: string) {
   return /(검색|찾아|찾아줘|알려줘|알려 줘|search|look ?up|find|현재|최신|속보|실시간|뉴스)/i.test(question)
 }
 
+/** Simple greeting detection — short messages matching common hello/greeting patterns. */
 function isGreeting(question: string) {
   const normalized = question.trim()
   if (normalized.length > 30) return false
   return /^(안녕|안녕하세요|반가워|하이|ㅎㅇ|hi|hello|hey|thanks|감사|고마워|ㄱㅅ)[\s!.?~]*$/i.test(normalized)
 }
 
+/** Build a truncated conversation snippet for the planner LLM to use as context. */
 function buildConversationHint(
   recentMessages: Array<{ role: string; content: string }> | undefined
 ) {
@@ -323,6 +363,7 @@ function buildConversationHint(
     .join("\n")
 }
 
+/** Build a search plan without calling the planner LLM (used when planner fails or is skipped). */
 function buildFallbackPlan(question: string, conversationHint?: string | null, requestedYear?: number | null): SearchPlan {
   const asksLatest = /(latest|today|current|now|news|breaking|최신|오늘|현재|실시간|속보)/i.test(question)
   const asksFinance = /(stock|shares|market|price|forex|crypto|주가|증시|환율|코인|금리)/i.test(question)
@@ -362,6 +403,7 @@ function buildFallbackPlan(question: string, conversationHint?: string | null, r
   }, requestedYear ?? null)
 }
 
+/** Call a planner LLM to decide whether / how / what to search. Falls back to buildFallbackPlan on error. */
 async function buildSearchPlan(input: {
   locale: LabAiChatLocale
   modelId: string
@@ -479,6 +521,7 @@ async function buildSearchPlan(input: {
   }
 }
 
+/** Format live search results into a labelled context block for the chat system prompt. */
 function buildSearchContextText(input: {
   locale: LabAiChatLocale
   query: string
@@ -541,6 +584,7 @@ function buildSearchContextText(input: {
   ].filter(Boolean).join("\n\n")
 }
 
+/** Format a cached search result into a labelled context block for the chat system prompt. */
 function buildCachedContextText(input: {
   locale: LabAiChatLocale
   cachedQuery: string
@@ -560,6 +604,18 @@ function buildCachedContextText(input: {
   ].filter(Boolean).join("\n\n")
 }
 
+/**
+ * Main entry point: resolve the web-search context for a user message.
+ *
+ * Steps:
+ *  1. Resolve requested year from question + conversation history.
+ *  2. Check cache relevance.
+ *  3. Build a search plan (via LLM planner or fallback).
+ *  4. If cache is valid and planner agrees, return cached context.
+ *  5. If planner says search is needed, try the primary query.
+ *  6. If primary yields nothing and a fallback query exists, retry.
+ *  7. Fall back to cache or null.
+ */
 export async function resolveLabAiChatWebSearchContext(input: {
   userId: string
   sessionId: number
@@ -608,6 +664,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
     requestedYear,
   })
 
+  // Planner agrees cache is usable → skip live search.
   if (cacheRelevant && cachedQuery && cachedResult && plan.useCacheFirst && plan.cacheUsable) {
     input.onStatus?.(toLocaleStatus(input.locale, "using_cache"))
     return {
@@ -621,6 +678,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
     }
   }
 
+  // Planner says no search needed → return null context.
   if (!plan.needSearch) {
     input.onStatus?.(toLocaleStatus(input.locale, "search_skipped"))
     return { context: null, source: "none" }
@@ -628,7 +686,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
 
   const forcedTopic: TavilyTopic = "general"
 
-
+  // First attempt: primary query. Second attempt (if triggered): fallback query.
   const runSearch = async (query: string, isFallback = false) => {
     const reservation = await reserveLabAiChatWebSearchCall({
       userId: input.userId,
@@ -649,7 +707,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
 
     try {
       input.onStatus?.(toLocaleStatus(input.locale, "searching"))
-      // Tavily 권장사항: 상대 기간(time_range)과 절대 기간(start/end)은 동시 사용하지 않는다.
+      // Tavily recommendation: relative (timeRange) and absolute (startDate/endDate) filters are mutually exclusive.
       const hasAbsoluteRange = Boolean(plan.startDate || plan.endDate)
       const response = await createTavilySearch({
         query,
@@ -720,6 +778,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
     return { context: first.context, source: "live" }
   }
 
+  // Primary search yielded nothing; try the fallback query (uses the fallback quota pool).
   if (!first.blocked && plan.fallbackQuery && plan.fallbackQuery !== plan.query) {
     input.onStatus?.(toLocaleStatus(input.locale, "retrying"))
     const second = await runSearch(plan.fallbackQuery, true)
@@ -728,6 +787,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
     }
   }
 
+  // Neither primary nor fallback search returned results → fall back to cache.
   if (cacheRelevant && cachedQuery && cachedResult) {
     input.onStatus?.(toLocaleStatus(input.locale, "using_cache"))
     return {

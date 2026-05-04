@@ -1,5 +1,12 @@
 "use client"
 
+/**
+ * DashboardChatPanel — AI outing mate chat for the dashboard.
+ * Manages multi-session conversations, SSE streaming for real-time assistant
+ * replies, markdown/code/mermaid rendering, optimistic UI, and per-user
+ * daily usage limits. Fully i18n via LanguageContext.
+ */
+
 import { Children, isValidElement, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { Check, Copy, LoaderCircle, Plus, SendHorizonal, Sparkles, Trash2 } from "lucide-react"
 
@@ -187,11 +194,11 @@ const CHAT_SUGGESTIONS = {
   ],
 } as const
 
-function formatTimestamp(value: string, language: string) {
+/** Locale-aware timestamp formatting using server-time utilities */ function formatTimestamp(value: string, language: string) {
   return formatServerClockTime(value, language)
 }
 
-function TypingIndicator() {
+/** Three bouncing dots shown while assistant response is streaming */ function TypingIndicator() {
   return (
     <div className="flex items-center gap-1.5 px-2 py-2">
       <span className="size-[6px] animate-bounce rounded-full bg-foreground/50 [animation-delay:-0.3s]" />
@@ -201,7 +208,7 @@ function TypingIndicator() {
   )
 }
 
-async function copyTextToClipboard(text: string) {
+/** Copy text to clipboard with fallback for older browsers */ async function copyTextToClipboard(text: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text)
     return
@@ -218,7 +225,7 @@ async function copyTextToClipboard(text: string) {
   document.body.removeChild(textarea)
 }
 
-function DashboardMarkdownCodeBlock({
+/** Renders a syntax-highlighted code block with a copy-to-clipboard button */ function DashboardMarkdownCodeBlock({
   code,
   language,
   copyLabel,
@@ -279,7 +286,7 @@ type MessageGroup = {
   messages: UiChatMessage[]
 }
 
-function groupMessages(messages: UiChatMessage[]): MessageGroup[] {
+/** Group consecutive same-role messages into clusters (for bubble styling) */ function groupMessages(messages: UiChatMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = []
   for (const message of messages) {
     const lastGroup = groups[groups.length - 1]
@@ -292,7 +299,7 @@ function groupMessages(messages: UiChatMessage[]): MessageGroup[] {
   return groups
 }
 
-function ChatBubble({
+/** Single message bubble — user (right-aligned, blue) or assistant (left, with avatar + markdown) */ function ChatBubble({
   message,
   language,
   isLastAssistant,
@@ -420,6 +427,8 @@ function ChatBubble({
     </div>
   )
 }
+
+// ---- Component ----
 
 export function DashboardChatPanel({
   user,

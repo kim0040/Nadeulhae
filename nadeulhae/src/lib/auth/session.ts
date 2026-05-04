@@ -1,3 +1,8 @@
+/**
+ * Session token management: creation, verification, cache, and refresh.
+ * Uses SHA-256 hashed tokens stored in the DB with an in-memory LRU cache
+ * to reduce database load on frequent auth checks.
+ */
 import { createHash, randomBytes } from "node:crypto"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -12,6 +17,7 @@ import {
 } from "@/lib/auth/repository"
 import type { AuthUser } from "@/lib/auth/types"
 
+// Cookie and session duration configuration (env-overridable).
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const SESSION_DURATION_DAYS = parsePositiveInt(
   process.env.AUTH_SESSION_DAYS,
@@ -103,7 +109,7 @@ function pruneAuthSessionCache(cache: Map<string, AuthSessionCacheEntry>) {
     return
   }
 
-  // Evict least recently touched entries first (LRU)
+  // Evict least recently touched entries first (LRU) to stay under the cap.
   const overflow = cache.size - AUTH_SESSION_CACHE_MAX_ENTRIES
   const entries = [...cache.entries()].sort(
     (a, b) => a[1].lastTouchedAt - b[1].lastTouchedAt
@@ -135,6 +141,7 @@ function deleteAuthSessionCache(tokenHash: string) {
   getAuthSessionCache().delete(tokenHash)
 }
 
+/** Removes a session from the in-memory cache by its raw token value. */
 export function clearAuthSessionCacheByToken(token: string | null | undefined) {
   if (!token) {
     return
@@ -143,14 +150,17 @@ export function clearAuthSessionCacheByToken(token: string | null | undefined) {
   deleteAuthSessionCache(getSessionTokenHash(token))
 }
 
+/** Returns the SHA-256 hex hash of a raw session token (used as DB lookup key). */
 export function getSessionTokenHash(token: string) {
   return createHash("sha256").update(token).digest("hex")
 }
 
+/** Reads the session token from the auth cookie. */
 export function getSessionTokenFromRequest(request: NextRequest) {
   return request.cookies.get(AUTH_COOKIE_NAME)?.value ?? null
 }
 
+/** Clears the auth cookie by setting an expired value. */
 export function clearAuthCookie(response: NextResponse) {
   response.cookies.set({
     name: AUTH_COOKIE_NAME,
@@ -165,6 +175,7 @@ export function clearAuthCookie(response: NextResponse) {
   return response
 }
 
+/** Creates a new session in the DB and returns the raw token + expiration. */
 export async function startAuthenticatedSession(
   request: NextRequest,
   userId: string
@@ -187,6 +198,7 @@ export async function startAuthenticatedSession(
   }
 }
 
+/** Sets the httpOnly auth cookie on the response. */
 export function attachAuthCookie(
   response: NextResponse,
   token: string,
@@ -205,11 +217,17 @@ export function attachAuthCookie(
   return response
 }
 
+/** Returns the authenticated user or null. Convenience wrapper around getAuthenticatedSessionFromRequest. */
 export async function getAuthenticatedUserFromRequest(request: NextRequest) {
   const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
   return authenticatedSession?.user ?? null
 }
 
+/**
+ * Resolves the authenticated session from the request cookie.
+ * Checks the in-memory cache first; on cache hit, optionally refreshes or touches
+ * the DB session. On cache miss, queries the DB and populates the cache.
+ */
 export async function getAuthenticatedSessionFromRequest(request: NextRequest) {
   const token = getSessionTokenFromRequest(request)
   if (!token) {
@@ -284,6 +302,7 @@ export async function getAuthenticatedSessionFromRequest(request: NextRequest) {
   }
 }
 
+/** Updates the auth cookie only if the session was refreshed (extends expiration). */
 export function attachRefreshedAuthCookie(
   response: NextResponse,
   session: {
@@ -299,6 +318,7 @@ export function attachRefreshedAuthCookie(
   return attachAuthCookie(response, session.token, session.expiresAt)
 }
 
+/** Deletes the session from the DB and removes it from the in-memory cache. */
 export async function destroyAuthenticatedSession(request: NextRequest) {
   const token = getSessionTokenFromRequest(request)
   if (!token) {

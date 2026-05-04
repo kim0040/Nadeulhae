@@ -1,7 +1,24 @@
+/**
+ * Chat database schema management and data migration.
+ *
+ * Creates / migrates the five user_chat_* tables (messages, sessions, memory,
+ * usage_daily, request_events) on first access via {@link ensureChatSchema}.
+ * Also runs one-shot content-encryption migrations that re-encrypt plaintext
+ * columns with the application-level encryption layer.
+ *
+ * All migrations are idempotent — safe to call on every server start.
+ */
+
 import { getDbPool } from "@/lib/db"
 import { decryptDatabaseValueSafely, encryptDatabaseValue, isEncryptedDatabaseValue } from "@/lib/security/data-protection"
 import type { RowDataPacket } from "mysql2/promise"
 
+/**
+ * Module-level singleton guard.
+ * Once the schema bootstrap promise settles (success or failure), subsequent
+ * calls return the cached promise so concurrent requests share the same
+ * bootstrap cycle.
+ */
 declare global {
   var __nadeulhaeChatSchemaPromise: Promise<void> | undefined
 }
@@ -164,29 +181,41 @@ const addChatMemoryProfileRefreshedAtColumnSql = `
     ADD COLUMN IF NOT EXISTS profile_refreshed_at DATETIME NULL AFTER last_compacted_at
 `
 
+/** Row shape for the chat-message-content encryption migration */
 interface ChatMessageMigrationRow extends RowDataPacket {
   id: number
   role: "user" | "assistant"
   content: string
 }
 
+/** Row shape for the memory-summary encryption migration */
 interface ChatMemoryMigrationRow extends RowDataPacket {
   user_id: string
   summary_text: string
 }
 
+/** Row shape for the memory-assessment encryption migration */
 interface ChatMemoryAssessmentMigrationRow extends RowDataPacket {
   user_id: string
   assessment_text: string | null
 }
 
+/** Row shape for the session-memory-summary encryption migration */
 interface ChatSessionMemoryMigrationRow extends RowDataPacket {
   id: number
   memory_summary_text: string | null
 }
 
+/** Safety cap: at most 200 batches (40 000 rows) per migration to avoid runaway loops */
 const MAX_MIGRATION_BATCHES = 200
 
+/**
+ * Execute a DDL statement, ignoring MySQL "duplicate key name" errors.
+ *
+ * Some ALTER TABLE ADD KEY statements may fail on replicas or concurrent
+ * schema changes. This helper silences those expected errors while still
+ * propagating unexpected failures.
+ */
 async function runIgnoreDuplicateKey(sql: string) {
   try {
     await getDbPool().query(sql)
@@ -203,9 +232,17 @@ async function runIgnoreDuplicateKey(sql: string) {
   }
 }
 
+/**
+ * One-shot migration: encrypt all user_chat_messages.content values.
+ *
+ * Reads rows whose content does NOT already start with "enc:v1:", decrypts
+ * (in case of partial migration), and re-encrypts under the app key.
+ * Processes 200 rows per batch, up to MAX_MIGRATION_BATCHES batches.
+ */
 async function migrateChatMessageContents() {
   const pool = getDbPool()
 
+  // Process up to 200 batches of 200 rows each to avoid long-running transactions
   for (let i = 0; i < MAX_MIGRATION_BATCHES; i++) {
     const [rows] = await pool.query<ChatMessageMigrationRow[]>(
       `
@@ -216,11 +253,13 @@ async function migrateChatMessageContents() {
       `
     )
 
+    // All remaining rows are already encrypted — migration complete
     if (rows.length === 0) {
       return
     }
 
     for (const row of rows) {
+      // Safely attempt decryption; if it fails, treat raw value as plaintext
       const plain = decryptDatabaseValueSafely(row.content, `chat.message.${row.role}`) ?? row.content
       await pool.execute(
         `
@@ -229,6 +268,7 @@ async function migrateChatMessageContents() {
           WHERE id = ?
         `,
         [
+          // Idempotent: if already encrypted, keep as-is; otherwise encrypt
           isEncryptedDatabaseValue(row.content)
             ? row.content
             : encryptDatabaseValue(plain, `chat.message.${row.role}`),
@@ -239,6 +279,12 @@ async function migrateChatMessageContents() {
   }
 }
 
+/**
+ * One-shot migration: encrypt user_chat_memory.summary_text.
+ *
+ * Same batch pattern as migrateChatMessageContents. Targets rows where
+ * summary_text does not already carry the "enc:v1:" prefix.
+ */
 async function migrateChatMemorySummaries() {
   const pool = getDbPool()
 
@@ -275,6 +321,11 @@ async function migrateChatMemorySummaries() {
   }
 }
 
+/**
+ * One-shot migration: encrypt user_chat_memory.assessment_text.
+ *
+ * Only processes non-null, non-empty, non-encrypted rows.
+ */
 async function migrateChatMemoryAssessments() {
   const pool = getDbPool()
 
@@ -313,6 +364,11 @@ async function migrateChatMemoryAssessments() {
   }
 }
 
+/**
+ * One-shot migration: encrypt user_chat_sessions.memory_summary_text.
+ *
+ * Only processes non-null, non-empty, non-encrypted session memory rows.
+ */
 async function migrateChatSessionMemorySummaries() {
   const pool = getDbPool()
 
@@ -351,6 +407,13 @@ async function migrateChatSessionMemorySummaries() {
   }
 }
 
+/**
+ * Ensure all chat tables exist and run any pending data migrations.
+ *
+ * Idempotent — safe to call on every request. Uses a module-level global
+ * promise singleton so concurrent requests coalesce into a single
+ * bootstrap cycle.
+ */
 export async function ensureChatSchema() {
   if (globalThis.__nadeulhaeChatSchemaPromise) {
     return globalThis.__nadeulhaeChatSchemaPromise
@@ -358,12 +421,15 @@ export async function ensureChatSchema() {
 
   const bootstrapPromise = (async () => {
     const pool = getDbPool()
+
+    // Create core tables (IF NOT EXISTS)
     await pool.query(createChatMessagesTableSql)
     await pool.query(createChatSessionsTableSql)
     await pool.query(createChatMemoryTableSql)
     await pool.query(createChatUsageDailyTableSql)
     await pool.query(createChatRequestEventsTableSql)
 
+    // Migrate schema: add columns and indexes that were introduced after v1
     await pool.query(addChatMessagesSessionIdColumnSql)
     await runIgnoreDuplicateKey(addChatMessagesSessionCreatedIndexSql)
     await runIgnoreDuplicateKey(addChatMessagesSessionMemoryIndexSql)
@@ -376,6 +442,7 @@ export async function ensureChatSchema() {
     await pool.query(addChatMemoryProfileModelUsedColumnSql)
     await pool.query(addChatMemoryProfileRefreshedAtColumnSql)
 
+    // One-shot encryption migrations for existing plaintext data
     await migrateChatMessageContents()
     await migrateChatMemorySummaries()
     await migrateChatMemoryAssessments()

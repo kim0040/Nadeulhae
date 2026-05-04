@@ -1,3 +1,5 @@
+/** Lab data access layer: SRS review logic, deck/card CRUD, daily usage tracking, and report generation. */
+
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise"
 
 import {
@@ -40,6 +42,7 @@ import {
   encryptDatabaseValueSafely,
 } from "@/lib/security/data-protection"
 
+/** Raw deck row from the lab_decks table. */
 interface LabDeckRow extends RowDataPacket {
   id: number
   user_id: string
@@ -52,6 +55,7 @@ interface LabDeckRow extends RowDataPacket {
   created_at: Date | string
 }
 
+/** Raw card row from the lab_cards table (includes all SRS fields). */
 interface LabCardRow extends RowDataPacket {
   id: number
   deck_id: number
@@ -75,6 +79,7 @@ interface LabCardRow extends RowDataPacket {
   created_at: Date | string
 }
 
+/** Raw daily usage row from lab_daily_usage. */
 interface LabUsageRow extends RowDataPacket {
   metric_date: Date | string
   user_id: string
@@ -82,6 +87,7 @@ interface LabUsageRow extends RowDataPacket {
   review_count: number
 }
 
+/** Aggregate totals query result for reports. */
 interface LabReportTotalsRow extends RowDataPacket {
   deck_count: number
   card_count: number
@@ -94,17 +100,20 @@ interface LabReportTotalsRow extends RowDataPacket {
   total_lapses: number
 }
 
+/** Daily trend data point from lab_daily_usage. */
 interface LabTrendRow extends RowDataPacket {
   metric_date: Date | string
   generation_count: number
   review_count: number
 }
 
+/** Card count grouped by learning state. */
 interface LabStateCountRow extends RowDataPacket {
   learning_state: string
   count: number
 }
 
+/** Deck-level summary row for the report leaderboard. */
 interface LabDeckSummaryRow extends RowDataPacket {
   deck_id: number
   title_text: string
@@ -115,6 +124,7 @@ interface LabDeckSummaryRow extends RowDataPacket {
   avg_stability_days: number | null
 }
 
+/** Highest-difficulty card row for the report outlier list. */
 interface LabDifficultCardRow extends RowDataPacket {
   card_id: number
   deck_id: number
@@ -126,6 +136,7 @@ interface LabDifficultCardRow extends RowDataPacket {
   next_review_at: Date | string
 }
 
+/** Input parameters for computing an SRS state transition after a card review. */
 interface LabReviewTransitionInput {
   state: LabLearningState
   grade: LabReviewGrade
@@ -136,6 +147,7 @@ interface LabReviewTransitionInput {
   now: Date
 }
 
+/** Output of an SRS state transition: new state, stage, stability, difficulty, and next review time. */
 interface LabReviewTransitionResult {
   nextState: LabLearningState
   nextStage: number
@@ -146,10 +158,17 @@ interface LabReviewTransitionResult {
   lapsesIncrement: number
 }
 
+// --- SRS constants ---
+
 const DAY_MS = 24 * 60 * 60 * 1000
+/** Target retention probability used in the retrievability formula. */
 const REVIEW_TARGET_RETENTION = 0.9
+/** Stage intervals converted from milliseconds to days. */
 const STAGE_ANCHOR_DAYS = LAB_SRS_INTERVAL_MS.map((value) => value / DAY_MS)
 
+// --- Internal helpers ---
+
+/** Safely convert Date or date string to ISO-8601. Falls back to current time. */
 function toIsoString(value: Date | string) {
   if (value instanceof Date) {
     return value.toISOString()
@@ -159,6 +178,7 @@ function toIsoString(value: Date | string) {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
 }
 
+/** Safely parse a Date/string/null to a Date object, returning null for invalid inputs. */
 function toDate(value: Date | string | null | undefined) {
   if (!value) {
     return null
@@ -172,6 +192,7 @@ function toDate(value: Date | string | null | undefined) {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+/** Strip control characters, collapse whitespace, trim, and truncate. */
 function normalizeText(value: string, maxLength: number) {
   return value
     .replace(/[\u0000-\u001F\u007F]/g, "")
@@ -180,6 +201,7 @@ function normalizeText(value: string, maxLength: number) {
     .slice(0, maxLength)
 }
 
+/** Same as normalizeText but returns null for falsy/empty values. */
 function normalizeOptionalText(value: string | null | undefined, maxLength: number) {
   if (!value) {
     return null
@@ -189,10 +211,12 @@ function normalizeOptionalText(value: string | null | undefined, maxLength: numb
   return normalized.length > 0 ? normalized : null
 }
 
+/** Build a case-insensitive, whitespace-free dedup key for term+meaning. */
 function toCardTermDedupKey(term: string, meaning: string) {
   return `${term.toLowerCase().replace(/\s+/g, "")}|${meaning.toLowerCase().replace(/\s+/g, "")}`
 }
 
+/** Decrypt an encrypted text field; returns the fallback value if input is not a string. */
 function decryptLabText(value: string | null, context: string, fallback: string | null = null) {
   if (typeof value !== "string") {
     return fallback
@@ -201,6 +225,9 @@ function decryptLabText(value: string | null, context: string, fallback: string 
   return decryptDatabaseValueSafely(value, context) ?? value
 }
 
+// --- SRS computation helpers ---
+
+/** Clamp a number to [min, max]; returns min for NaN/Infinity. */
 function clampNumber(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) {
     return min
@@ -209,10 +236,12 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
 
+/** Clamp stage to valid range [0, LAB_SRS_MAX_STAGE]. */
 function clampStage(value: number) {
   return Math.max(0, Math.min(LAB_SRS_MAX_STAGE, Math.floor(value)))
 }
 
+/** Parse a raw learning_state string into a valid LabLearningState; defaults to "new". */
 function normalizeLearningState(value: unknown): LabLearningState {
   if (value === "learning" || value === "review" || value === "relearning") {
     return value
@@ -221,6 +250,7 @@ function normalizeLearningState(value: unknown): LabLearningState {
   return "new"
 }
 
+/** Normalize a raw grade number to the valid grade range [AGAIN, EASY]. */
 function normalizeReviewGrade(value: number): LabReviewGrade {
   const normalized = Math.floor(value)
   if (normalized <= LAB_REVIEW_GRADE_AGAIN) {
@@ -234,14 +264,17 @@ function normalizeReviewGrade(value: number): LabReviewGrade {
   return normalized as LabReviewGrade
 }
 
+/** Add minutes to a Date (minimum 1 minute). */
 function addMinutes(base: Date, minutes: number) {
   return new Date(base.getTime() + Math.max(1, minutes) * 60 * 1000)
 }
 
+/** Add days to a Date (minimum 0.01 days). */
 function addDays(base: Date, days: number) {
   return new Date(base.getTime() + Math.max(0.01, days) * DAY_MS)
 }
 
+/** Map a continuous stability value back to the nearest stage anchor (legacy rendering). */
 function deriveStageFromStabilityDays(stabilityDays: number) {
   let stage = 0
   for (let i = STAGE_ANCHOR_DAYS.length - 1; i >= 0; i -= 1) {
@@ -253,6 +286,7 @@ function deriveStageFromStabilityDays(stabilityDays: number) {
   return clampStage(stage)
 }
 
+/** Calculate retrievability (R) using exponential decay: R = exp(ln(target) * elapsed / stability). */
 function calculateRetrievability(stabilityDays: number, elapsedDays: number) {
   const safeStability = clampNumber(stabilityDays, LAB_MIN_STABILITY_DAYS, LAB_MAX_STABILITY_DAYS)
   const safeElapsed = Math.max(0, elapsedDays)
@@ -260,6 +294,7 @@ function calculateRetrievability(stabilityDays: number, elapsedDays: number) {
   return clampNumber(value, 0, 1)
 }
 
+/** Adjust difficulty with reversion toward the default. Positive delta = harder, negative = easier. */
 function adjustDifficulty(currentDifficulty: number, delta: number) {
   const reversion = (LAB_DEFAULT_DIFFICULTY - currentDifficulty) * 0.03
   return clampNumber(
@@ -269,6 +304,7 @@ function adjustDifficulty(currentDifficulty: number, delta: number) {
   )
 }
 
+/** Compute SRS transition for cards in "new", "learning", or "relearning" state. */
 function computeLearningTransition(input: LabReviewTransitionInput): LabReviewTransitionResult {
   const now = input.now
   const isRelearning = input.state === "relearning"
@@ -276,6 +312,7 @@ function computeLearningTransition(input: LabReviewTransitionInput): LabReviewTr
     ? LAB_RELEARNING_STEPS_MINUTES
     : LAB_LEARNING_STEPS_MINUTES
 
+  // Again: reset to step 0, increase difficulty
   if (input.grade === LAB_REVIEW_GRADE_AGAIN) {
     return {
       nextState: input.state === "new" ? "learning" : input.state,
@@ -288,6 +325,7 @@ function computeLearningTransition(input: LabReviewTransitionInput): LabReviewTr
     }
   }
 
+  // Hard: stay at step 0, slightly longer interval
   if (input.grade === LAB_REVIEW_GRADE_HARD) {
     return {
       nextState: input.state === "new" ? "learning" : input.state,
@@ -300,7 +338,9 @@ function computeLearningTransition(input: LabReviewTransitionInput): LabReviewTr
     }
   }
 
+  // Good or Easy: advance consecutive counter
   const nextConsecutive = Math.max(0, input.currentConsecutiveCorrect) + 1
+  // Graduation: consecutive correct exceeds step count, move to "review" state
   if (nextConsecutive >= steps.length + 1) {
     const nextStabilityDays = clampNumber(
       Math.max(input.currentStabilityDays, input.grade === LAB_REVIEW_GRADE_EASY ? 3 : 2),
@@ -319,6 +359,7 @@ function computeLearningTransition(input: LabReviewTransitionInput): LabReviewTr
     }
   }
 
+  // Still in learning: advance to next step
   const stepIndex = Math.min(nextConsecutive - 1, steps.length - 1)
   const stepMinutes = input.grade === LAB_REVIEW_GRADE_EASY
     ? Math.max(5, Math.floor(steps[stepIndex] * 0.7))
@@ -335,10 +376,12 @@ function computeLearningTransition(input: LabReviewTransitionInput): LabReviewTr
   }
 }
 
+/** Compute SRS transition for cards already in the "review" state. */
 function computeReviewTransition(input: LabReviewTransitionInput): LabReviewTransitionResult {
   const now = input.now
   const retrievability = calculateRetrievability(input.currentStabilityDays, input.elapsedDays)
 
+  // Again: lapse into relearning, stability severely cut, difficulty spikes
   if (input.grade === LAB_REVIEW_GRADE_AGAIN) {
     return {
       nextState: "relearning",
@@ -355,6 +398,7 @@ function computeReviewTransition(input: LabReviewTransitionInput): LabReviewTran
     }
   }
 
+  // Weight factors used by Hard/Good/Easy growth formulas
   const difficultyWeight = (11 - input.currentDifficulty) / 10
   const recallPenalty = 1 - retrievability
 
@@ -396,6 +440,7 @@ function computeReviewTransition(input: LabReviewTransitionInput): LabReviewTran
     }
   }
 
+  // Good (default): moderate growth, slight difficulty decrease
   const growth = 1 + 0.45 * difficultyWeight * (0.8 + 0.7 * recallPenalty)
   const nextStabilityDays = clampNumber(
     input.currentStabilityDays * growth,
@@ -414,6 +459,7 @@ function computeReviewTransition(input: LabReviewTransitionInput): LabReviewTran
   }
 }
 
+/** Route a transition to either the learning or review path based on current state. */
 function computeTransition(input: LabReviewTransitionInput) {
   const normalizedState = input.state === "new" || input.state === "learning" || input.state === "relearning"
     ? input.state
@@ -426,6 +472,7 @@ function computeTransition(input: LabReviewTransitionInput) {
   return computeLearningTransition(input)
 }
 
+/** Map a raw card DB row to a LabCardSnapshot, computing retrievability for review-state cards. */
 function mapCardRow(row: LabCardRow, referenceDate: Date = new Date()): LabCardSnapshot {
   const learningState = normalizeLearningState(row.learning_state)
   const stabilityDays = clampNumber(Number(row.stability_days ?? LAB_DEFAULT_STABILITY_DAYS), LAB_MIN_STABILITY_DAYS, LAB_MAX_STABILITY_DAYS)
@@ -458,6 +505,7 @@ function mapCardRow(row: LabCardRow, referenceDate: Date = new Date()): LabCardS
   }
 }
 
+/** Map a raw deck DB row to a LabDeckSnapshot, decrypting text fields. */
 function mapDeckRow(row: LabDeckRow): LabDeckSnapshot {
   return {
     id: String(row.id),
@@ -471,6 +519,9 @@ function mapDeckRow(row: LabDeckRow): LabDeckSnapshot {
   }
 }
 
+// --- KST date helpers ---
+
+/** Get today's date formatted as YYYY-MM-DD in KST timezone for usage metrics. */
 function getKstMetricDate() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -480,6 +531,7 @@ function getKstMetricDate() {
   }).format(new Date())
 }
 
+/** Get an array of KST date strings covering the last N days, plus start/end boundaries. */
 function getKstMetricDateRange(days: number) {
   const safeDays = Math.min(90, Math.max(1, Math.floor(days)))
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -504,6 +556,7 @@ function getKstMetricDateRange(days: number) {
   }
 }
 
+/** Build a LabUsageSnapshot from raw counters, computing remainingGenerations. */
 function createUsageSnapshot(metricDate: string, generationCount: number, reviewCount: number): LabUsageSnapshot {
   const safeGeneration = Math.max(0, generationCount)
   const safeReview = Math.max(0, reviewCount)
@@ -516,6 +569,7 @@ function createUsageSnapshot(metricDate: string, generationCount: number, review
   }
 }
 
+/** Ensure a lab_daily_usage row exists for the given user + date. Uses INSERT ... ON DUPLICATE KEY. */
 async function upsertDailyUsageRow(connection: PoolConnection, metricDate: string, userId: string) {
   await connection.execute(
     `
@@ -531,6 +585,9 @@ async function upsertDailyUsageRow(connection: PoolConnection, metricDate: strin
   )
 }
 
+// --- Exported functions ---
+
+/** Reserve one daily generation slot for a user. Returns { allowed, usage } — denied if the daily limit is already reached. */
 export async function reserveDailyLabGeneration(userId: string) {
   await ensureLabSchema()
 
@@ -541,6 +598,7 @@ export async function reserveDailyLabGeneration(userId: string) {
     await connection.beginTransaction()
     await upsertDailyUsageRow(connection, metricDate, userId)
 
+    // Lock the daily usage row and check the current generation count
     const [rows] = await connection.query<LabUsageRow[]>(
       `
         SELECT
@@ -565,6 +623,7 @@ export async function reserveDailyLabGeneration(userId: string) {
     }
 
     if (usage.generation_count >= LAB_DAILY_GENERATION_LIMIT) {
+      // Daily limit reached — commit (no changes made) and return denied
       await connection.commit()
       return {
         allowed: false,
@@ -599,6 +658,7 @@ export async function reserveDailyLabGeneration(userId: string) {
   }
 }
 
+/** Refund a previously reserved generation slot (used when generation fails after reservation). */
 export async function refundDailyLabGeneration(userId: string) {
   await ensureLabSchema()
   const metricDate = getKstMetricDate()
@@ -616,6 +676,7 @@ export async function refundDailyLabGeneration(userId: string) {
   )
 }
 
+/** Create a new deck with its cards in a single transaction. Normalizes, deduplicates, and batch-inserts cards. Returns the deck and card snapshots. */
 export async function createLabDeckWithCards(input: {
   userId: string
   locale: LabLocale
@@ -629,6 +690,7 @@ export async function createLabDeckWithCards(input: {
 
   const normalizedTitle = normalizeText(input.title, 120) || "Nadeul Lab"
   const normalizedTopic = normalizeText(input.topic, 200)
+  // Normalize and deduplicate input cards by term+meaning
   const normalizedCards: Array<{
     term: string
     meaning: string
@@ -696,6 +758,7 @@ export async function createLabDeckWithCards(input: {
     const deckId = Number(deckInsert.insertId)
     const snapshots: LabCardSnapshot[] = []
 
+    // Batch insert all cards in a single multi-row INSERT statement
     const batchPlaceholders = normalizedCards.map(() =>
       `(?, ?, ?, ?, ?, ?, ?, 'new', 0, 0, ?, ?, 0, 0, NULL, NOW(), NULL)`
     ).join(', ')
@@ -787,6 +850,7 @@ export async function createLabDeckWithCards(input: {
   }
 }
 
+/** Get the full Lab home state: due cards, recent decks, and today's usage. */
 export async function getLabState(userId: string): Promise<LabStateSnapshot> {
   await ensureLabSchema()
 
@@ -873,6 +937,7 @@ export async function getLabState(userId: string): Promise<LabStateSnapshot> {
   }
 }
 
+/** Generate a comprehensive Lab report: totals, insights, trend, state breakdown, deck summaries, and difficult cards. */
 export async function getLabReportSnapshot(input: {
   userId: string
   periodDays?: number
@@ -1142,6 +1207,7 @@ export async function getLabReportSnapshot(input: {
   }
 }
 
+/** Apply a single card review: computes SRS transition, updates the card, and increments the daily review counter. Returns the updated card and usage snapshot, or null if the card is not due. */
 export async function applyLabCardReview(input: {
   userId: string
   cardId: number
@@ -1329,6 +1395,7 @@ export async function applyLabCardReview(input: {
   }
 }
 
+/** Delete all Lab data for a user (cards, decks, usage). Used for account deletion. */
 export async function deleteLabDataForUser(userId: string) {
   await ensureLabSchema()
 
@@ -1336,6 +1403,7 @@ export async function deleteLabDataForUser(userId: string) {
   await executeStatement("DELETE FROM lab_decks WHERE user_id = ?", [userId])
   await executeStatement("DELETE FROM lab_daily_usage WHERE user_id = ?", [userId])
 }
+/** Apply a batch of card reviews in a single transaction. Fetches all due cards with a single query, processes each review, and bulk-updates the daily usage counter. */
 export async function applyLabCardReviewBatch(input: {
   userId: string
   reviews: { cardId: number; grade: number }[]

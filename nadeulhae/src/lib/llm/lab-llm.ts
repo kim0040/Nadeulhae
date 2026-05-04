@@ -1,3 +1,11 @@
+/**
+ * Lab-specific LLM Chat Wrapper
+ *
+ * Study-assistant-oriented LLM client with curated model selection,
+ * thinking/reasoning mode support, and daily quota enforcement.
+ * Unlike general-llm, this exposes a fixed set of allowed models with
+ * user-facing labels, descriptions, and optional thinking variants.
+ */
 import type { LlmCompletionResult, LlmRequestKind, LlmConfig, LlmModelOption } from "@/lib/llm/types"
 import {
   OpenAiClientError,
@@ -24,6 +32,7 @@ const SUMMARY_PROVIDER_TIMEOUT_MS = 90_000
 const COMPLETION_MAX_TOKENS = 8000
 const SUMMARY_MAX_TOKENS = 1600
 
+/** Internal spec for an allowed lab model. Defines slug, display info, candidate model IDs, and optional thinking mode variants. */
 type AllowedModelSpec = {
   slug: string
   label: string
@@ -103,6 +112,7 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   },
 ]
 
+/** Error class for lab chat LLM failures. Distinguishes lab errors from general chat or other OpenAI client errors. */
 export class LabChatError extends OpenAiClientError {
   constructor(message: string, statusCode: number, code?: string | null) {
     super(message, statusCode, code)
@@ -110,6 +120,7 @@ export class LabChatError extends OpenAiClientError {
   }
 }
 
+/** Resolves the API key from LAB_LLM_* env vars, falling back to LLM_* and legacy NANOGPT_* keys. */
 function resolveApiKey(): string {
   return (
     process.env.LAB_LLM_API_KEY
@@ -119,6 +130,7 @@ function resolveApiKey(): string {
   )
 }
 
+/** Resolves the base URL. Defaults to the Nano-GPT API v1 endpoint. */
 function resolveBaseUrl(): string {
   return (
     process.env.LAB_LLM_BASE_URL
@@ -128,6 +140,7 @@ function resolveBaseUrl(): string {
   ).replace(/\/$/, "")
 }
 
+/** Reads the global daily request limit from the environment. Defaults to 5000. */
 function getGlobalDailyLimit() {
   const raw = Number(
     process.env.LAB_LLM_GLOBAL_DAILY_LIMIT
@@ -137,6 +150,7 @@ function getGlobalDailyLimit() {
   return Number.isFinite(raw) ? Math.max(1, Math.floor(raw)) : 5000
 }
 
+/** Builds an LlmConfig from environment variables. Model is left empty because lab-llm resolves models dynamically. */
 function getConfig(): LlmConfig {
   return {
     apiKey: resolveApiKey(),
@@ -145,6 +159,7 @@ function getConfig(): LlmConfig {
   }
 }
 
+/** Fetches and caches available model IDs from the API. Cache TTL is 15 minutes. */
 async function listModelIds() {
   const cache = globalThis.__nadeulhaeLabLlmModelsCache
   if (cache && Date.now() - cache.fetchedAt < MODELS_CACHE_TTL_MS) {
@@ -155,6 +170,11 @@ async function listModelIds() {
   return ids
 }
 
+/**
+ * Resolves the list of allowed lab models by matching curated model specs
+ * against models available from the API. Only specs with at least one
+ * matching candidate are included. Results are cached globally.
+ */
 export async function resolveAllowedLabModels(): Promise<LlmModelOption[]> {
   const cache = globalThis.__nadeulhaeLabLlmModelsCache
   if (cache && Date.now() - cache.fetchedAt < MODELS_CACHE_TTL_MS && cache.allowed.length > 0) {
@@ -162,6 +182,7 @@ export async function resolveAllowedLabModels(): Promise<LlmModelOption[]> {
   }
 
   const available = await listModelIds()
+  // Match each spec's candidates against available models; pick the first match per spec
   const allowed = ALLOWED_MODEL_SPECS.flatMap((spec): LlmModelOption[] => {
     const matched = spec.candidates
       .map((candidate) => pickModelCandidate(candidate, available))
@@ -191,17 +212,27 @@ export async function resolveAllowedLabModels(): Promise<LlmModelOption[]> {
   return allowed
 }
 
+/**
+ * Resolves a user-requested model to an allowed LlmModelOption. Matches by
+ * exact model ID, slug, or thinkingId. Falls back to the first available
+ * model if no match is found or the input is empty.
+ */
 export function resolveRequestedLabModel(
   allowedModels: LlmModelOption[],
   requestedModel: string | null | undefined
 ): LlmModelOption {
   const normalized = typeof requestedModel === "string" ? requestedModel.trim() : ""
   if (!normalized) return allowedModels[0]
+  // Match by exact id, display slug, or thinking mode id; first-allowed is the default fallback
   return allowedModels.find((item) =>
     item.id === normalized || item.slug === normalized || item.thinkingId === normalized
   ) ?? allowedModels[0]
 }
 
+/**
+ * Executes a non-streaming lab LLM completion with daily quota reservation.
+ * Reserves a global quota slot before the API call and records outcome after.
+ */
 async function doCompletion(input: {
   model: string
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
@@ -226,6 +257,10 @@ async function doCompletion(input: {
   }
 }
 
+/**
+ * Executes a streaming lab LLM completion with daily quota reservation.
+ * Same quota flow as doCompletion but uses the streaming API path.
+ */
 async function doCompletionStream(input: {
   model: string
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
@@ -251,11 +286,16 @@ async function doCompletionStream(input: {
   }
 }
 
+/**
+ * Creates a lab chat completion using the specified model. Adjusts timeouts,
+ * max tokens, and temperature based on request kind.
+ */
 export async function createLabChatCompletion(input: {
   model: string
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
   requestKind: LlmRequestKind
 }): Promise<LlmCompletionResult> {
+  // Summary requests: shorter timeout, fewer tokens, lower temperature for deterministic output
   const timeoutMs = input.requestKind === "summary" ? SUMMARY_PROVIDER_TIMEOUT_MS : PROVIDER_TIMEOUT_MS
   const maxTokens = input.requestKind === "summary" ? SUMMARY_MAX_TOKENS : COMPLETION_MAX_TOKENS
   const temperature = input.requestKind === "summary" ? 0.2 : 0.55
@@ -264,6 +304,10 @@ export async function createLabChatCompletion(input: {
   return { ...result, requestedModel: input.model }
 }
 
+/**
+ * Creates a streaming lab chat completion using the specified model.
+ * Same parameter selection as createLabChatCompletion but uses SSE streaming.
+ */
 export async function createLabChatCompletionStream(input: {
   model: string
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>

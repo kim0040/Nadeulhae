@@ -1,3 +1,9 @@
+/**
+ * Auth module i18n message definitions.
+ * Provides Korean, English, Chinese, and Japanese translations for
+ * all auth-related user-facing messages (errors, confirmations, etc.).
+ */
+
 export type AuthLocale = "ko" | "en" | "zh" | "ja"
 
 type AuthMessageKey =
@@ -42,6 +48,10 @@ type AuthMessageKey =
   | "sessionCheckError"
   | "logoutInternalError"
 
+/**
+ * Maps an Accept-Language header to the closest supported locale.
+ * Defaults to Korean when no match is found.
+ */
 export function resolveAuthLocale(acceptLanguageHeader: string | null | undefined): AuthLocale {
   const header = (acceptLanguageHeader ?? "").trim().toLowerCase()
   if (header.startsWith("zh")) return "zh"
@@ -49,6 +59,7 @@ export function resolveAuthLocale(acceptLanguageHeader: string | null | undefine
   return header.startsWith("en") ? "en" : "ko"
 }
 
+/** Looks up a localized message by key, optionally interpolating parameters. */
 export function getAuthMessage(
   locale: AuthLocale,
   key: AuthMessageKey,

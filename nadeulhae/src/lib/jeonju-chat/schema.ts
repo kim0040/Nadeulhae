@@ -1,3 +1,8 @@
+/**
+ * Jeonju chat DB schema management.
+ * Creates the jeonju_chat_messages table, migrates plaintext content to
+ * encrypted storage, and enforces 7-day retention on startup.
+ */
 import { getDbPool } from "@/lib/db"
 import { decryptDatabaseValueSafely, encryptDatabaseValue, isEncryptedDatabaseValue } from "@/lib/security/data-protection"
 import type { RowDataPacket } from "mysql2/promise"
@@ -40,6 +45,8 @@ const MAX_MIGRATION_BATCHES = 200
 async function migrateJeonjuChatContents() {
   const pool = getDbPool()
 
+  // Batch-migrate rows whose content is still plaintext to encrypted format
+  // Uses 200-row batches with a safety cap (MAX_MIGRATION_BATCHES) to prevent runaway loops
   for (let i = 0; i < MAX_MIGRATION_BATCHES; i++) {
     const [rows] = await pool.query<JeonjuChatMigrationRow[]>(
       `
@@ -55,6 +62,7 @@ async function migrateJeonjuChatContents() {
     }
 
     for (const row of rows) {
+      // Decrypt if already encrypted (idempotent safety), or use raw text
       const plain = decryptDatabaseValueSafely(row.content, "jeonju.chat.content") ?? row.content
       await pool.execute(
         `
@@ -63,6 +71,7 @@ async function migrateJeonjuChatContents() {
           WHERE id = ?
         `,
         [
+          // Skip re-encryption if already encrypted; otherwise encrypt now
           isEncryptedDatabaseValue(row.content)
             ? row.content
             : encryptDatabaseValue(plain, "jeonju.chat.content"),
@@ -73,6 +82,7 @@ async function migrateJeonjuChatContents() {
   }
 }
 
+/** Bootstrap the jeonju_chat_messages table + run encryption migration + 7-day retention. Idempotent. */
 export async function ensureJeonjuChatSchema() {
   if (globalThis.__nadeulhaeJeonjuChatSchemaPromise) {
     return globalThis.__nadeulhaeJeonjuChatSchemaPromise

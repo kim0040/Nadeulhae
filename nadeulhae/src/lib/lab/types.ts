@@ -1,7 +1,13 @@
+/** Lab module type definitions — shared domain types for cards, decks, usage, and reports. */
+
+/** Supported UI locales in the Lab. */
 export type LabLocale = "ko" | "en" | "zh" | "ja"
+/** SRS learning state machine: new → learning → review, or review → relearning → review. */
 export type LabLearningState = "new" | "learning" | "review" | "relearning"
+/** Review button grades: 1=Again, 2=Hard, 3=Good, 4=Easy. */
 export type LabReviewGrade = 1 | 2 | 3 | 4
 
+/** Read-only snapshot of a Lab deck returned to consumers. */
 export interface LabDeckSnapshot {
   id: string
   locale: LabLocale
@@ -13,6 +19,7 @@ export interface LabDeckSnapshot {
   createdAt: string
 }
 
+/** Read-only snapshot of a Lab card including SRS state and computed retrievability. */
 export interface LabCardSnapshot {
   id: string
   deckId: string
@@ -33,6 +40,7 @@ export interface LabCardSnapshot {
   createdAt: string
 }
 
+/** Daily usage quota and counters for a user. */
 export interface LabUsageSnapshot {
   metricDate: string
   generationCount: number
@@ -41,12 +49,14 @@ export interface LabUsageSnapshot {
   reviewCount: number
 }
 
+/** Full Lab state returned on the home screen: due cards, recent decks, and daily usage. */
 export interface LabStateSnapshot {
   dueCards: LabCardSnapshot[]
   recentDecks: LabDeckSnapshot[]
   usage: LabUsageSnapshot
 }
 
+/** Raw card input from LLM generation or import — before normalization and encryption. */
 export interface LabGeneratedCardInput {
   term: string
   meaning: string
@@ -55,6 +65,7 @@ export interface LabGeneratedCardInput {
   partOfSpeech?: string | null
 }
 
+/** Aggregate totals for the Lab report snapshot. */
 export interface LabReportTotals {
   deckCount: number
   cardCount: number
@@ -69,17 +80,20 @@ export interface LabReportTotals {
   totalLapses: number
 }
 
+/** One data point in a daily usage trend series. */
 export interface LabReportTrendPoint {
   metricDate: string
   generationCount: number
   reviewCount: number
 }
 
+/** Count of cards in each learning state. */
 export interface LabReportStateBreakdown {
   state: LabLearningState
   count: number
 }
 
+/** Per-deck summary used in the report's deck leaderboard. */
 export interface LabReportDeckSummary {
   deckId: string
   title: string
@@ -90,6 +104,7 @@ export interface LabReportDeckSummary {
   avgStabilityDays: number
 }
 
+/** Highest-difficulty cards for the user, surfaced in the report. */
 export interface LabReportDifficultCard {
   cardId: string
   deckId: string
@@ -116,6 +131,7 @@ export interface LabReportInsights {
   estimatedClearDays: number | null
 }
 
+/** Full Lab report returned from getLabReportSnapshot. */
 export interface LabReportSnapshot {
   generatedAt: string
   periodDays: number

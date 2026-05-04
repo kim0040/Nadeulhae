@@ -1,3 +1,12 @@
+/**
+ * GET  /api/chat — Returns chat state (messages, session info) for the authenticated user.
+ * POST /api/chat — Sends a user message and returns (or streams) the assistant reply.
+ * Body (POST): { message, locale?, weatherContext?, sessionId? }
+ * Returns: { messages, sessions, usage, policy, serverNow } or SSE event stream.
+ * Handles concurrency per-user lock, daily rate limits, memory compaction, profile memory refresh,
+ * and assistant identity sanitization across 4 locales (ko/en/zh/ja).
+ */
+
 import { NextRequest } from "next/server"
 
 import { withApiAnalytics } from "@/lib/analytics/route"
@@ -157,6 +166,10 @@ function getLocalizedDisclosure(locale: ChatLocale): string {
   return "I can't share model or internal system details."
 }
 
+/**
+ * Replace self-referential model disclosures ("I am ChatGPT", "저는 AI 언어모델입니다")
+ * with the localized Nadeul AI identity. Prevents leakage of underlying provider info.
+ */
 function enforceAssistantIdentity(content: string, locale: ChatLocale) {
   const identity = getLocalizedIdentity(locale)
   const disclosureNote = getLocalizedDisclosure(locale)
@@ -263,6 +276,7 @@ function sanitizeWeatherTags(value: unknown) {
     .slice(0, 6)
 }
 
+/** Sanitize and validate the weather context object from the client request body. */
 function sanitizeWeatherContext(value: unknown): ChatWeatherContext | null {
   if (!value || typeof value !== "object") {
     return null
@@ -487,6 +501,7 @@ async function refreshUserProfileMemory(input: {
   }
 }
 
+// ========== HANDLER: GET ==========
 async function handleGET(request: NextRequest) {
   try {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
@@ -520,7 +535,9 @@ async function handleGET(request: NextRequest) {
   }
 }
 
+// ========== HANDLER: POST ==========
 async function handlePOST(request: NextRequest) {
+  // === 1. REQUEST VALIDATION ===
   const requestStartedAt = Date.now()
   const invalidRequestResponse = validateAuthMutationRequest(request)
   if (invalidRequestResponse) {
@@ -556,6 +573,7 @@ async function handlePOST(request: NextRequest) {
     )
   }
 
+  // === 2. AUTHENTICATION & CONCURRENCY LOCK ===
   let resolvedSessionId: number | null = null
   let lockedUserId: string | null = null
   let lockReleased = false
@@ -636,6 +654,7 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
+    // === 3. CONTEXT LOADING ===
     const [latestSessionMemory, profileMemory, contextMessages] = await Promise.all([
       getChatSessionMemorySnapshot({
         userId: authenticatedSession.user.id,
@@ -664,6 +683,7 @@ async function handlePOST(request: NextRequest) {
       message
     )
 
+    // === 4. SSE STREAM (preferred when client sends Accept: text/event-stream) ===
     if (acceptSSE) {
       const encoder = new TextEncoder()
       let accumulated = ""
@@ -782,6 +802,7 @@ async function handlePOST(request: NextRequest) {
       })
     }
 
+    // === 5. NON-STREAMING COMPLETION ===
     const completionResult = await createGeneralChatCompletion({
       requestKind: "chat",
       messages: chatMessages,
@@ -817,6 +838,7 @@ async function handlePOST(request: NextRequest) {
     )
     return attachRefreshedAuthCookie(response, authenticatedSession)
   } catch (error) {
+    // === 6. ERROR HANDLING — log failure, return localized message ===
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request).catch(() => null)
     const providerError = error instanceof OpenAiClientError ? error : null
     const runtimeError = error instanceof Error ? error : null

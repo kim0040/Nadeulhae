@@ -1,5 +1,12 @@
 "use client"
 
+/**
+ * LabAiChatPanel — general-purpose AI chat for the experimental lab.
+ * Manages multi-conversation sessions, SSE streaming, markdown/code/mermaid
+ * rendering, file attachment (.txt/.md), web-search toggle, model selection,
+ * thinking-panel UI, and per-user daily limits.  Fully i18n.
+ */
+
 import { Children, isValidElement, type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
   AlertTriangle,
@@ -778,6 +785,8 @@ function ThinkingProgressPanel({
     </div>
   )
 }
+
+// ---- Component ----
 
 export function LabAiChatPanel() {
   const { language } = useLanguage()

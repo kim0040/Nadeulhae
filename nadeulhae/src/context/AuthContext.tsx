@@ -1,5 +1,16 @@
 "use client"
 
+/**
+ * @fileoverview React context and provider for authentication session state.
+ *
+ * Manages the current user, authentication status (`loading`, `authenticated`,
+ * `guest`), and exposes `refreshSession` to re-validate the session
+ * (typically called on mount). A `useAuth` hook provides typed access;
+ * throws if used outside `AuthProvider`.
+ *
+ * @module AuthContext
+ */
+
 import {
   createContext,
   useCallback,
@@ -11,8 +22,10 @@ import {
 
 import type { AuthUser } from "@/lib/auth/types"
 
+/** Current session lifecycle phase — used to gate UI rendering. */
 type AuthStatus = "loading" | "authenticated" | "guest"
 
+/** Shape of the context value exposed to consumers. */
 interface AuthContextValue {
   user: AuthUser | null
   status: AuthStatus
@@ -22,6 +35,10 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+/**
+ * Provides auth state to the component tree. Fetches the current session
+ * on mount via `GET /api/auth/me`.
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [status, setStatus] = useState<AuthStatus>("loading")
@@ -52,6 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setAuthenticatedUser])
 
+  // Defer session check to avoid blocking the initial paint; setTimeout(0)
+  // pushes the fetch to the end of the microtask queue.
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       void refreshSession()
@@ -73,6 +92,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+/**
+ * Returns the current auth context. Must be called within an `AuthProvider`.
+ * Throws if no provider is found in the tree.
+ */
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {

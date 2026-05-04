@@ -1,3 +1,8 @@
+/**
+ * Lab AI Chat — system-prompt and memory-summary-prompt builders.
+ * Generates locale-aware instructions with user profile, session memory, and optional web-search context.
+ */
+
 import {
   AGE_BAND_OPTIONS,
   INTEREST_OPTIONS,
@@ -12,6 +17,7 @@ function formatList(values: string[]) {
   return values.length > 0 ? values.join(", ") : "-"
 }
 
+/** Build a human-readable profile summary from the authenticated user's profile data. */
 function buildUserProfileSummary(user: AuthUser, locale: LabAiChatLocale) {
   const interests = user.interestTags.map((value) => getOptionLabel(INTEREST_OPTIONS, value, locale))
   if (user.interestOther) {
@@ -37,6 +43,10 @@ function buildUserProfileSummary(user: AuthUser, locale: LabAiChatLocale) {
   ].join("\n")
 }
 
+/**
+ * Build the system prompt injected at the start of every chat completion.
+ * Includes date/time anchor, user profile, session memory, and optional web-search context.
+ */
 export function buildLabAiChatSystemPrompt(input: {
   locale: LabAiChatLocale
   user: AuthUser
@@ -44,6 +54,7 @@ export function buildLabAiChatSystemPrompt(input: {
   webSearchContext?: string | null
 }) {
   const profileSummary = buildUserProfileSummary(input.user, input.locale)
+  // Build KST-anchored timestamps so the model resolves relative dates correctly.
   const nowKst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }))
   const todayIso = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -128,6 +139,10 @@ export function buildLabAiChatSystemPrompt(input: {
   ].join("\n")
 }
 
+/**
+ * Build the prompt used to compact/refresh session memory.
+ * The LLM reads existing memory + new transcript and produces a concise summary.
+ */
 export function buildLabAiChatSummaryPrompt(input: {
   locale: LabAiChatLocale
   existingSummary: string | null

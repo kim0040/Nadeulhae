@@ -1,5 +1,12 @@
 "use client"
 
+/**
+ * Vocab Lab Page — FSRS-based spaced-repetition vocabulary study tool.
+ * Features: AI-generated flashcard decks, SRS review queue, generation
+ * progress tracking over WebSocket, deck import/export (JSON), card editing,
+ * and per-user usage limits.  Fully i18n via LanguageContext.
+ */
+
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState, useRef } from "react"
@@ -964,6 +971,8 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.remove()
   window.URL.revokeObjectURL(url)
 }
+
+// ---- Component ----
 
 export default function LabPage() {
   const router = useRouter()

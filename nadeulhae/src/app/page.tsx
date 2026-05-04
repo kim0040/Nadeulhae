@@ -1,5 +1,12 @@
 "use client"
 
+/**
+ * Home Page — the main landing showing weather score, quick metrics, hourly
+ * forecast, picnic briefing, fire insight panel, and weather imagery.
+ * Uses geolocation to fetch location-based weather data, falling back to
+ * mock/default data on error or when geolocation is denied.
+ */
+
 import dynamic from "next/dynamic"
 import { useEffect, useMemo, useState } from "react"
 import {
@@ -34,7 +41,7 @@ const TodayHourlyForecast = dynamic(() => import("@/components/today-hourly-fore
   loading: () => <div className="h-48 animate-pulse rounded-3xl bg-card" />,
 })
 
-function localizeUvLabel(value: string | undefined, language: string) {
+/** Translate Korean UV level labels to English; pass through for other locales */ function localizeUvLabel(value: string | undefined, language: string) {
   if (!value) return "--"
   if (language === "ko") return value
 
@@ -54,6 +61,8 @@ function localizeUvLabel(value: string | undefined, language: string) {
   }
 }
 
+// ---- Component ----
+
 export default function Home() {
   const { resolvedTheme } = useTheme()
   const { language, t } = useLanguage()
@@ -71,6 +80,7 @@ export default function Home() {
   const meteorCount = useMemo(() => getMeteorCount(3), [])
   const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
+  // Fetch weather on mount: try geolocation first, fall back to IP-based default
   useEffect(() => {
     const loadInitialData = async () => {
       const loadFallback = async () => {
@@ -111,6 +121,7 @@ export default function Home() {
     loadInitialData()
   }, [])
 
+  // Once weather data is available, load hourly forecast + weather images
   useEffect(() => {
     if (!weatherData) return
 
@@ -192,6 +203,7 @@ export default function Home() {
     loadWeatherImages()
   }, [weatherData])
 
+  // Load fire summary scoped to the detected region key
   useEffect(() => {
     if (!weatherData?.metadata?.regionKey) return
 
@@ -205,6 +217,8 @@ export default function Home() {
     loadFireSummary()
   }, [weatherData?.metadata?.regionKey])
 
+  // ---- Render guards ----
+
   if (!weatherData) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-background text-sky-blue animate-pulse font-bold">
@@ -213,6 +227,7 @@ export default function Home() {
     )
   }
 
+  // Score-to-color mapping: 86+ green/blue, 66+ blue, 36+ teal, else red
   const scoreColors = weatherData.score >= 86
     ? { primary: "#0b7d71", secondary: "#2f6fe4" }
     : weatherData.score >= 66
@@ -253,8 +268,12 @@ export default function Home() {
     || weatherData.eventData?.isRain
   )
 
+  // ---- Main render ----
+
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden bg-background">
+
+      {/* Hero — score circle, quick metrics, particles */}
       <section className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden py-24 sm:py-32">
         {particleQuantity > 0 && <Particles className="absolute inset-0 z-0 opacity-70" quantity={particleQuantity} ease={80} color={particleColor} />}
         {meteorCount > 0 && <Meteors number={meteorCount} className="z-0" />}
@@ -316,6 +335,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Content sections — forecast, briefing, fire insights, images */}
       <div className="container mx-auto px-4 relative z-20 pb-24 sm:pb-28">
         <TodayHourlyForecast items={hourlyForecast} />
         <PicnicBriefing weatherData={weatherData} />
@@ -327,6 +347,7 @@ export default function Home() {
         <WeatherImagePanel data={weatherImages} weather={weatherData} />
       </div>
 
+      {/* Footer — legal links and attribution */}
       <footer className="py-12 border-t border-neutral-100 dark:border-neutral-800 text-center transition-colors">
         <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 px-4">
           <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">

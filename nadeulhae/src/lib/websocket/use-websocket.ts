@@ -1,7 +1,16 @@
 "use client"
 
+/**
+ * WebSocket client hook.
+ *
+ * Provides a React-friendly `useWebSocket()` hook with automatic reconnection
+ * (exponential backoff + jitter), heartbeat ping, message subscription, and
+ * cleanup on unmount. Designed to pair with the server-side WebSocket module.
+ */
+
 import { useEffect, useRef, useCallback, useState } from "react"
 
+/** Inbound message shape after JSON parse. */
 interface WsMessage {
   type: string
   payload: unknown
@@ -9,6 +18,7 @@ interface WsMessage {
 
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? ""
 
+/** Resolve the WebSocket URL from the env variable or derive it from window.location. */
 function getWsUrl() {
   if (WS_BASE) return WS_BASE
   if (typeof window === "undefined") return ""
@@ -16,10 +26,17 @@ function getWsUrl() {
   return `${proto}//${window.location.host}/ws`
 }
 
-const RECONNECT_BASE_DELAY = 1000
-const MAX_RECONNECT_DELAY = 30000
+const RECONNECT_BASE_DELAY = 1000  // Initial backoff in ms.
+const MAX_RECONNECT_DELAY = 30000  // Cap for exponential backoff.
+// Close codes that should not trigger reconnection (e.g. origin/authorization rejection).
 const NON_RETRIABLE_CLOSE_CODES = new Set([4403])
 
+/**
+ * React hook that manages a persistent WebSocket connection.
+ *
+ * Returns `connected` (boolean state), `subscribe` (register a message-type
+ * handler), and `send` (send a message to the server).
+ */
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -30,12 +47,13 @@ export function useWebSocket() {
   const [connected, setConnected] = useState(false)
   const mountedRef = useRef(true)
 
+  /** Compute the next reconnect delay with exponential backoff and jitter. */
   const getReconnectDelay = useCallback(() => {
-    // Exponential backoff + jitter avoids reconnect stampede after transient outages.
     const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttemptsRef.current), MAX_RECONNECT_DELAY)
     return delay + Math.random() * 500
   }, [])
 
+  /** Open a new WebSocket connection and wire up all event handlers. */
   const connect = useCallback(() => {
     if (!mountedRef.current) return
     if (wsRef.current?.readyState === WebSocket.OPEN) return
@@ -123,10 +141,17 @@ export function useWebSocket() {
     wsRef.current = ws
   }, [getReconnectDelay])
 
+  // Keep connectRef.current in sync so onclose can always reference the latest connect.
   useEffect(() => {
     connectRef.current = connect
   }, [connect])
 
+  /**
+   * Register a handler for a specific message type.
+   * Returns an unsubscribe function. Stale listeners are automatically cleaned
+   * up, and empty handler sets are removed from the map to prevent unbounded
+   * key growth.
+   */
   const subscribe = useCallback(
     (type: string, handler: (payload: unknown) => void) => {
       if (!handlersRef.current.has(type)) {
@@ -134,11 +159,9 @@ export function useWebSocket() {
       }
       handlersRef.current.get(type)!.add(handler)
       return () => {
-        // Keep handler sets clean; stale listeners are a common source of duplicate UI updates.
         const handlers = handlersRef.current.get(type)
         if (handlers) {
           handlers.delete(handler)
-          // Remove empty sets from the map to avoid unbounded key growth.
           if (handlers.size === 0) {
             handlersRef.current.delete(type)
           }
@@ -148,6 +171,7 @@ export function useWebSocket() {
     []
   )
 
+  /** Send a typed message to the server. Returns false if the socket is not open. */
   const send = useCallback((type: string, payload?: Record<string, unknown>) => {
     const ws = wsRef.current
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -162,6 +186,7 @@ export function useWebSocket() {
     }
   }, [])
 
+  // Establish the connection on mount and tear down on unmount.
   useEffect(() => {
     mountedRef.current = true
     connect()

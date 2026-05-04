@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * Terms & Privacy Page — displays the combined terms of service, privacy policy,
+ * cookies/analytics notice, and cross-border data transfer disclosure.
+ * Fully i18n via LanguageContext; content is statically defined in POLICY_CONTENT.
+ */
+
 import { FileCheck2, ShieldCheck } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -16,6 +22,8 @@ type PolicySection = {
   title: string
   items: string[]
 }
+
+// ---- Multi-language policy content (ko / en / zh / ja) ----
 
 const POLICY_CONTENT: Record<
   "ko" | "en" | "zh" | "ja",
@@ -453,6 +461,8 @@ const POLICY_CONTENT: Record<
     ],
   },
 }
+
+// ---- Component ----
 
 export default function TermsPage() {
   const { language } = useLanguage()

@@ -1,3 +1,12 @@
+/**
+ * GET  /api/lab/ai-chat — Returns lab AI chat state (messages, sessions, available models) for lab-enabled users.
+ * POST /api/lab/ai-chat — Sends a user message to LLM; supports SSE streaming with reasoning filter.
+ * Body (POST): { message, locale?, sessionId?, modelId?, webSearchEnabled? }
+ * Returns: chat state + models info, or SSE event stream with status/token/done events.
+ * Features: per-user concurrency lock, daily rate limits, memory compaction, web search context injection,
+ * reasoning tag stripping, assistant identity sanitization, markdown sanitization.
+ */
+
 import { NextRequest } from "next/server"
 
 import { withApiAnalytics } from "@/lib/analytics/route"
@@ -190,6 +199,7 @@ const ASSISTANT_NAME_EN = "Nadeul AI"
 const MODEL_DISCLOSURE_PATTERN = /\b(chatgpt|gpt(?:-|_)?\d[\w.-]*|openai|claude|gemini|llama|mistral|deepseek|qwen|kimi|glm|minimax|gemma)\b/i
 const SELF_REFERENCE_PATTERN = /(저는|나는|제가|내가|i am|i'm|as an?)/i
 
+/** Strip <think>, <thinking>, <reasoning> XML tags and their content from assistant output. */
 function stripAssistantReasoning(content: string) {
   return content
     .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
@@ -201,6 +211,10 @@ function stripAssistantReasoning(content: string) {
     .trim()
 }
 
+/**
+ * Streaming token filter that hides <think>/<thinking>/<reasoning> blocks from the client
+ * by buffering tokens until the closing tag is found or the block is flushed.
+ */
 function createAssistantReasoningStreamFilter() {
   let buffer = ""
   let hiddenTag: "think" | "thinking" | "reasoning" | null = null
@@ -301,6 +315,7 @@ function enforceAssistantIdentity(content: string, locale: LabAiChatLocale) {
   return sanitized
 }
 
+/** Remove web-search context scaffolding that may leak into the final assistant response. */
 function stripLeakedWebSearchScaffold(content: string) {
   const lines = content.split(/\r?\n/)
   const kept: string[] = []
@@ -671,6 +686,7 @@ async function prepareLabAiChatContext(input: {
   return { latestSessionMemory, contextMessages }
 }
 
+// ========== HANDLER: GET ==========
 async function handleGET(request: NextRequest) {
   try {
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request)
@@ -715,7 +731,9 @@ async function handleGET(request: NextRequest) {
   }
 }
 
+// ========== HANDLER: POST ==========
 async function handlePOST(request: NextRequest) {
+  // === 1. REQUEST VALIDATION ===
   const requestStartedAt = Date.now()
   const invalidRequestResponse = validateAuthMutationRequest(request)
   if (invalidRequestResponse) {
@@ -753,6 +771,7 @@ async function handlePOST(request: NextRequest) {
     )
   }
 
+  // === 2. AUTHENTICATION & CONCURRENCY LOCK ===
   let resolvedSessionId: number | null = null
   let lockedUserId: string | null = null
   let lockReleased = false
@@ -851,6 +870,7 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
+    // === 3. SSE STREAM PATH ===
     const acceptSSE = request.headers.get("accept")?.includes("text/event-stream")
 
     if (acceptSSE) {
@@ -1026,6 +1046,7 @@ async function handlePOST(request: NextRequest) {
       })
     }
 
+    // === 4. NON-STREAMING PATH ===
     const { latestSessionMemory, contextMessages } = await prepareLabAiChatContext({
       userId: authenticatedSession.user.id,
       sessionId: resolvedSession.activeSessionId,
@@ -1091,6 +1112,7 @@ async function handlePOST(request: NextRequest) {
       authenticatedSession
     )
   } catch (error) {
+    // === 5. ERROR HANDLING ===
     const authenticatedSession = await getAuthenticatedSessionFromRequest(request).catch(() => null)
     const providerError = error instanceof LabChatError ? error : null
     const runtimeError = error instanceof Error ? error : null

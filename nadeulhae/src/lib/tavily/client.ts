@@ -1,8 +1,23 @@
+/**
+ * Tavily search API client.
+ *
+ * Provides types, error handling, and a request function for the Tavily
+ * search engine. Wraps the REST /search endpoint with configurable
+ * search depth, topic filtering, time ranges, domain inclusions, and
+ * automatic result pagination. All network calls use a 20-second timeout
+ * controlled via AbortController.
+ */
+
+/** Topic filter for Tavily searches. */
 export type TavilyTopic = "general" | "news" | "finance"
+/** Search depth / speed tier. */
 export type TavilySearchDepth = "basic" | "advanced" | "fast" | "ultra-fast"
+/** Time range filter (short and long form aliases). */
 export type TavilyTimeRange = "day" | "week" | "month" | "year" | "d" | "w" | "m" | "y"
+/** Whether to include an AI-generated answer alongside results. */
 export type TavilyAnswerMode = boolean | "basic" | "advanced"
 
+/** A single search result from the Tavily API. */
 export interface TavilySearchResultItem {
   title: string
   url: string
@@ -11,12 +26,14 @@ export interface TavilySearchResultItem {
   publishedDate: string | null
 }
 
+/** Top-level response envelope from the Tavily /search endpoint. */
 export interface TavilySearchResponse {
   query: string
   answer: string | null
   results: TavilySearchResultItem[]
 }
 
+/** Parameters for a Tavily search. Only `query` is required. */
 export interface TavilySearchRequest {
   query: string
   topic?: TavilyTopic
@@ -56,6 +73,7 @@ interface TavilySearchPayload {
   }>
 }
 
+/** Error class that carries the HTTP status from a failed Tavily API call. */
 export class TavilyError extends Error {
   statusCode: number
 
@@ -66,6 +84,7 @@ export class TavilyError extends Error {
   }
 }
 
+/** Reads and validates the TAVILY_API_KEY environment variable. */
 function requireTavilyApiKey() {
   const key = process.env.TAVILY_API_KEY?.trim()
   if (!key) {
@@ -74,31 +93,42 @@ function requireTavilyApiKey() {
   return key
 }
 
+/** Returns the Tavily API base URL, defaulting to the public endpoint. */
 function getTavilyBaseUrl() {
   return (process.env.TAVILY_BASE_URL || "https://api.tavily.com").replace(/\/$/, "")
 }
 
+/** Clamps max results to [1, 20], defaulting to 5. */
 function normalizeMaxResults(value?: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) return 5
   return Math.min(20, Math.max(1, Math.floor(value)))
 }
 
+/** Clamps chunks-per-source to [1, 3] or returns undefined when absent. */
 function normalizeChunksPerSource(value?: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined
   return Math.min(3, Math.max(1, Math.floor(value)))
 }
 
+/** Validates a YYYY-MM-DD date string. Returns undefined for invalid or empty input. */
 function normalizeDate(value?: string) {
   if (!value) return undefined
   const normalized = value.trim()
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : undefined
 }
 
+/**
+ * Executes a search against the Tavily API and returns normalized results.
+ *
+ * Sets a 20-second AbortController timeout. On failure, extracts the most
+ * descriptive error message from the response body and throws a TavilyError.
+ * Results are trimmed and filtered — items without a URL are excluded.
+ */
 export async function createTavilySearch(input: TavilySearchRequest): Promise<TavilySearchResponse> {
   const apiKey = requireTavilyApiKey()
   const timeoutMs = 20_000
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs) // Hard limit to prevent hanging.
 
   try {
     const response = await fetch(`${getTavilyBaseUrl()}/search`, {
@@ -135,6 +165,7 @@ export async function createTavilySearch(input: TavilySearchRequest): Promise<Ta
     const json = await response.json().catch(() => ({}))
     if (!response.ok) {
       const payload = json as TavilyErrorPayload
+      // Drill through Tavily's various error shapes (detail, error, message) to find a human-readable string.
       const extractMsg = (v: unknown): string | undefined => {
         if (typeof v === "string") return v
         if (v && typeof v === "object" && "error" in v && typeof (v as Record<string, unknown>).error === "string") {
@@ -155,6 +186,7 @@ export async function createTavilySearch(input: TavilySearchRequest): Promise<Ta
     return {
       query: payload.query?.trim() || input.query,
       answer: payload.answer?.trim() || null,
+      // Normalize snake_case from API to camelCase, trim whitespace, filter out empty-URL results.
       results: (payload.results ?? [])
         .map((item) => ({
           title: item.title?.trim() || "Untitled",

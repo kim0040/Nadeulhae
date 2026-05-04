@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * Jeonju Page — city-specific landing for Jeonju with fixed geolocation.
+ * Shows hero, marquee of local places, daily briefing, picnic briefing + calendar,
+ * safety panel, and community chat. All data fetches are scoped to JEONJU_COORDS.
+ */
+
 import { useEffect, useMemo, useState } from "react"
 import { useTheme } from "next-themes"
 
@@ -20,19 +26,26 @@ import { getParticleCount } from "@/lib/performance"
 
 
 
+// ---- Fixed geolocation for Jeonju ----
+
 const JEONJU_COORDS = {
   lat: 35.8242,
   lon: 127.148,
 }
+
+// ---- Component ----
 
 export default function JeonjuPage() {
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [fireSummary, setFireSummary] = useState<FireSummaryData | null>(null)
+
+  // Derived visual settings
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
   const particleQuantity = useMemo(() => getParticleCount(24), [])
 
+  // Fetch Jeonju-scoped weather + fire data on mount; fall back to mock on error
   useEffect(() => {
     const loadJeonjuData = async () => {
       try {
@@ -49,6 +62,8 @@ export default function JeonjuPage() {
     }
     loadJeonjuData()
   }, [])
+
+  // ---- i18n text maps ----
 
   const texts = useMemo(() => {
     const map: Record<string, { heroTag: string; heroTitle: string; heroDesc: string; fixedTitle: string; fixedDesc: string; marqueeTitle: string; yesterdayTitle: string; yesterdayDesc: string }> = {
@@ -98,6 +113,7 @@ export default function JeonjuPage() {
 
 
 
+  // Local Jeonju place tags (locale-aware hashtags for the marquee)
   const jeonjuPlaces = useMemo(() => {
     const map: Record<string, string[]> = {
       ko: [
@@ -210,6 +226,8 @@ export default function JeonjuPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground overflow-x-hidden">
+
+      {/* Hero — Jeonju badge + animated title + description */}
       <section className="relative overflow-hidden px-4 pt-24 pb-20 sm:pt-28">
         {particleQuantity > 0 ? (
           <Particles className="absolute inset-0 z-0 opacity-60" quantity={particleQuantity} color={particleColor} />
@@ -228,7 +246,7 @@ export default function JeonjuPage() {
         </div>
       </section>
 
-      <section className="py-14 relative overflow-hidden">
+      {/* Place tags marquee — locale-aware Jeonju landmarks */}      <section className="py-14 relative overflow-hidden">
         <div className="container mx-auto max-w-6xl px-4 mb-6 text-center">
           <AnimatedGradientText
             className="text-base sm:text-xl font-black tracking-tight"
@@ -250,7 +268,7 @@ export default function JeonjuPage() {
         </Marquee>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+      {/* Daily briefing — AI-curated Jeonju news */}      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <div className="mb-8 max-w-3xl">
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">
               {texts.yesterdayTitle}
@@ -262,7 +280,7 @@ export default function JeonjuPage() {
         <JeonjuDailyBriefing language={language} />
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+      {/* Fixed Jeonju briefing + picnic calendar (no geolocation) */}      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <div className="mb-8 max-w-3xl">
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">{texts.fixedTitle}</h2>
           <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400 break-words">
@@ -277,12 +295,11 @@ export default function JeonjuPage() {
         <PicnicCalendar useGeolocation={false} />
       </section>
 
-      {weatherData && (
+      {/* Safety panel — weather + fire data for Jeonju */}      {weatherData && (
         <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
           <JeonjuSafetyPanel weatherData={weatherData} fireSummary={fireSummary} language={language} />
         </section>
       )}
-
 
       {/* Jeonju Community Chat */}
       <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">

@@ -1,3 +1,12 @@
+/**
+ * WebSocket server module.
+ *
+ * Bootstraps the WebSocketServer on the `/ws` path, handles origin validation,
+ * cookie-based authentication, heartbeat (ping/pong), and code-share session
+ * lifecycle (subscribe, unsubscribe, typing indicators, presence broadcast).
+ * Delegates client/room registry and message distribution to the broadcast module.
+ */
+
 import { randomUUID } from "node:crypto"
 import { WebSocketServer, WebSocket } from "ws"
 import type { IncomingMessage } from "node:http"
@@ -21,9 +30,9 @@ import { getCodeShareSessionById } from "@/lib/code-share/repository"
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const CODE_SHARE_ACTOR_COOKIE_NAME = process.env.CODE_SHARE_ACTOR_COOKIE_NAME ?? "nadeulhae_code_share_actor"
 const CODE_SHARE_ALIAS_COOKIE_NAME = process.env.CODE_SHARE_ALIAS_COOKIE_NAME ?? "nadeulhae_code_share_alias"
-const PING_INTERVAL_MS = 30_000
-const PING_TIMEOUT_MS = 60_000
-const CODE_SHARE_TYPING_TIMEOUT_MS = 7_500
+const PING_INTERVAL_MS = 30_000   // How often the server pings clients.
+const PING_TIMEOUT_MS = 60_000    // How long to wait for a pong before terminating.
+const CODE_SHARE_TYPING_TIMEOUT_MS = 7_500  // Auto-clear typing after inactivity.
 const WS_ORIGIN_ALLOWLIST = new Set([
   process.env.APP_BASE_URL,
   "https://nadeulhae.space",
@@ -31,6 +40,7 @@ const WS_ORIGIN_ALLOWLIST = new Set([
   "http://localhost:3000",
 ].filter(Boolean))
 
+/** Tracks a single participant's presence state within a code-share session. */
 type CodeSharePresenceActor = {
   actorId: string
   alias: string
@@ -38,9 +48,12 @@ type CodeSharePresenceActor = {
   typing: boolean
 }
 
+// Per-session presence: outer key = sessionId, inner key = actorId.
 const codeSharePresenceBySession = new Map<string, Map<string, CodeSharePresenceActor>>()
+// Typing-auto-clear timers keyed by `${sessionId}:${actorId}`.
 const codeShareTypingTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
+/** Minimal cookie parser. Extracts a flat key/value map from a Cookie header string. */
 function parseCookie(cookieHeader: string | undefined): Record<string, string> {
   const result: Record<string, string> = {}
   if (!cookieHeader) return result
@@ -54,13 +67,20 @@ function parseCookie(cookieHeader: string | undefined): Record<string, string> {
   return result
 }
 
+/**
+ * Reject connections from unlisted origins.
+ * WebSocket does not use CORS preflight. Origin allowlist is explicit server-side protection.
+ */
 function validateOrigin(req: IncomingMessage): boolean {
-  // WebSocket does not use CORS preflight. Origin allowlist is explicit server-side protection.
   const origin = req.headers.origin
   if (!origin) return true
   return WS_ORIGIN_ALLOWLIST.has(origin)
 }
 
+/**
+ * Authenticate the WebSocket upgrade request via the session auth cookie.
+ * Returns the user ID on success, or null if no valid session is found.
+ */
 async function authenticateWs(req: IncomingMessage): Promise<string | null> {
   const cookieHeader = req.headers.cookie
   if (!cookieHeader) return null
@@ -85,6 +105,7 @@ async function authenticateWs(req: IncomingMessage): Promise<string | null> {
   }
 }
 
+/** Extract the code-share actor ID from the dedicated cookie, validating UUID format. */
 function getActorIdFromRequest(req: IncomingMessage) {
   const cookieHeader = req.headers.cookie
   const cookies = parseCookie(cookieHeader)
@@ -101,6 +122,7 @@ function getActorIdFromRequest(req: IncomingMessage) {
   return normalized
 }
 
+/** Extract the code-share display alias from the dedicated cookie, validating length and charset. */
 function getActorAliasFromRequest(req: IncomingMessage) {
   const cookieHeader = req.headers.cookie
   const cookies = parseCookie(cookieHeader)
@@ -117,10 +139,12 @@ function getActorAliasFromRequest(req: IncomingMessage) {
   return normalized
 }
 
+/** Composites a timeout-map key from session ID and actor ID. */
 function getTypingTimeoutKey(sessionId: string, actorId: string) {
   return `${sessionId}:${actorId}`
 }
 
+/** Cancel and remove a typing timer for the given session/actor pair. */
 function clearTypingTimeout(sessionId: string, actorId: string) {
   const key = getTypingTimeoutKey(sessionId, actorId)
   const timeout = codeShareTypingTimeouts.get(key)
@@ -130,6 +154,7 @@ function clearTypingTimeout(sessionId: string, actorId: string) {
   }
 }
 
+/** Return the presence map for a session, creating one if it does not exist. */
 function getOrCreatePresenceMap(sessionId: string) {
   if (!codeSharePresenceBySession.has(sessionId)) {
     codeSharePresenceBySession.set(sessionId, new Map())
@@ -137,12 +162,15 @@ function getOrCreatePresenceMap(sessionId: string) {
   return codeSharePresenceBySession.get(sessionId)!
 }
 
+/**
+ * Add or increment a participant in the presence map.
+ * Same actor may open multiple tabs; track connection count per actor.
+ */
 function joinCodeSharePresence(sessionId: string, actorId: string, alias: string) {
   const presenceMap = getOrCreatePresenceMap(sessionId)
   const existing = presenceMap.get(actorId)
 
   if (existing) {
-    // Same actor may open multiple tabs; track connection count per actor.
     existing.connections += 1
     existing.alias = alias
     return
@@ -156,6 +184,10 @@ function joinCodeSharePresence(sessionId: string, actorId: string, alias: string
   })
 }
 
+/**
+ * Remove or decrement a participant from the presence map.
+ * Cleans up the session entry when the last participant leaves.
+ */
 function leaveCodeSharePresence(sessionId: string, actorId: string) {
   const presenceMap = codeSharePresenceBySession.get(sessionId)
   if (!presenceMap) {
@@ -178,6 +210,11 @@ function leaveCodeSharePresence(sessionId: string, actorId: string) {
   }
 }
 
+/**
+ * Set a participant's typing state.
+ * When isTyping is true, a timeout auto-resets the state after inactivity
+ * in case the client disconnects abruptly without sending isTyping=false.
+ */
 function setCodeShareTyping(sessionId: string, actorId: string, isTyping: boolean) {
   const presenceMap = codeSharePresenceBySession.get(sessionId)
   if (!presenceMap) {
@@ -199,7 +236,6 @@ function setCodeShareTyping(sessionId: string, actorId: string, isTyping: boolea
   clearTypingTimeout(sessionId, actorId)
 
   const timeoutKey = getTypingTimeoutKey(sessionId, actorId)
-  // Auto-clear typing status if client disconnects abruptly without sending isTyping=false.
   const timeout = setTimeout(() => {
     const latestMap = codeSharePresenceBySession.get(sessionId)
     const latest = latestMap?.get(actorId)
@@ -216,6 +252,11 @@ function setCodeShareTyping(sessionId: string, actorId: string, isTyping: boolea
   codeShareTypingTimeouts.set(timeoutKey, timeout)
 }
 
+/**
+ * Build the presence payload for a session.
+ * `count` tracks active socket connections (not unique actors) to mirror
+ * "currently connected tabs".
+ */
 function buildCodeSharePresencePayload(sessionId: string) {
   const actors = codeSharePresenceBySession.get(sessionId)
   if (!actors) {
@@ -238,7 +279,6 @@ function buildCodeSharePresencePayload(sessionId: string) {
       typing: actor.typing,
     }))
 
-  // Count tracks active socket connections (not unique actors) to mirror "currently connected tabs".
   const count = [...actors.values()].reduce((sum, actor) => sum + Math.max(0, actor.connections), 0)
 
   return {
@@ -248,11 +288,13 @@ function buildCodeSharePresencePayload(sessionId: string) {
   }
 }
 
+/** Broadcast current presence state for a session to all its room subscribers. */
 function broadcastCodeSharePresence(sessionId: string) {
   const room = toCodeShareRoomName(sessionId)
   broadcastToRoom(room, "code_share_presence", buildCodeSharePresencePayload(sessionId))
 }
 
+/** Start periodic ping and pong timeout monitoring for a single client. */
 function setupHeartbeat(ws: WebSocket) {
   let timeoutTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -298,6 +340,15 @@ function setupHeartbeat(ws: WebSocket) {
   })
 }
 
+/**
+ * Create and configure the WebSocket server.
+ *
+ * - Validates origin and connection cap on upgrade.
+ * - Registers the client immediately (userId null), then patches identity after
+ *   optional async authentication resolves.
+ * - Manages code-share session subscribe/unsubscribe/typing/saved signals.
+ * - Broadcasts presence and user-count updates to connected clients.
+ */
 export function createWebSocketServer(server: import("node:http").Server) {
   const wss = new WebSocketServer({ server, path: "/ws" })
 

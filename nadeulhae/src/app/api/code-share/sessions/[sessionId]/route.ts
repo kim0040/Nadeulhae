@@ -1,3 +1,14 @@
+/**
+ * GET    /api/code-share/sessions/[sessionId] — Get code session by ID.
+ * PATCH  /api/code-share/sessions/[sessionId] — Update code content (version-gated).
+ * DELETE /api/code-share/sessions/[sessionId] — Delete session (creator-only).
+ *
+ * GET returns session with viewer identity cookies set.
+ * PATCH expects { version, title?, language?, code? }, broadcasts patch to WebSocket room.
+ * DELETE requires authenticated session as creator; notifies room of deletion.
+ * All ops: rate-limited per client, with inactivity cleanup before reads.
+ */
+
 import { NextRequest } from "next/server"
 
 import { withApiAnalytics } from "@/lib/analytics/route"
@@ -133,6 +144,7 @@ function cleanupRateLimitMap(map: Map<string, RateLimitEntry>, windowMs: number,
   }
 }
 
+/** Fixed-window rate limiter: returns { allowed } and increments count within windowMs. */
 function checkFixedWindow(map: Map<string, RateLimitEntry>, key: string, limit: number, windowMs: number, nowMs: number) {
   const current = map.get(key)
   if (!current || nowMs - current.windowStartMs >= windowMs) {
@@ -233,6 +245,7 @@ function withSessionPermissions<T extends {
   }
 }
 
+// ========== HANDLER: GET ==========
 async function handleGET(
   request: NextRequest,
   context: { params: Promise<{ sessionId: string }> }
@@ -249,6 +262,7 @@ async function handleGET(
       )
     }
 
+    // Close stale sessions before reading
     await closeInactiveCodeShareSessions()
 
     const session = await getCodeShareSessionById(sessionId)
@@ -303,6 +317,7 @@ async function handleGET(
   }
 }
 
+// ========== HANDLER: PATCH ==========
 async function handlePATCH(
   request: NextRequest,
   context: { params: Promise<{ sessionId: string }> }
@@ -350,6 +365,7 @@ async function handlePATCH(
 
     await closeInactiveCodeShareSessions()
 
+    // Rate limit check before update
     const nowMs = Date.now()
     const patchWindowMap = getPatchWindowMap()
     cleanupRateLimitMap(patchWindowMap, PATCH_WINDOW_MS, nowMs)
@@ -469,6 +485,7 @@ async function handlePATCH(
   }
 }
 
+// ========== HANDLER: DELETE ==========
 async function handleDELETE(
   request: NextRequest,
   context: { params: Promise<{ sessionId: string }> }

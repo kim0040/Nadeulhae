@@ -1,3 +1,9 @@
+/**
+ * Auth database schema bootstrap and encrypted-column migration.
+ * Creates/upgrades the users, user_sessions, auth_attempt_buckets,
+ * and auth_security_events tables. Migrates legacy plaintext columns
+ * to deterministic encryption with blind-index support.
+ */
 import { getDbPool } from "@/lib/db"
 import type { RowDataPacket } from "mysql2/promise"
 import {
@@ -11,6 +17,10 @@ import {
 declare global {
   var __nadeulhaeAuthSchemaPromise: Promise<void> | undefined
 }
+
+// ──────────────────────────────────────────
+// users table DDL and migration statements
+// ──────────────────────────────────────────
 
 const createUsersTableSql = `
   CREATE TABLE IF NOT EXISTS users (
@@ -140,6 +150,10 @@ const addLabEnabledColumnSql = `
     ADD COLUMN IF NOT EXISTS lab_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER analytics_agreed_at
 `
 
+// ──────────────────────────────────────────
+// user_sessions table DDL and migration statements
+// ──────────────────────────────────────────
+
 const createSessionsTableSql = `
   CREATE TABLE IF NOT EXISTS user_sessions (
     id CHAR(36) PRIMARY KEY,
@@ -166,6 +180,10 @@ const modifySessionIpAddressColumnSql = `
     MODIFY COLUMN ip_address VARCHAR(700) NULL
 `
 
+// ──────────────────────────────────────────
+// auth_attempt_buckets table (rate-limit tracking)
+// ──────────────────────────────────────────
+
 const createAttemptBucketsTableSql = `
   CREATE TABLE IF NOT EXISTS auth_attempt_buckets (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -182,6 +200,10 @@ const createAttemptBucketsTableSql = `
     KEY idx_auth_attempt_last (last_attempt_at)
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
+
+// ──────────────────────────────────────────
+// auth_security_events table (audit log)
+// ──────────────────────────────────────────
 
 const createSecurityEventsTableSql = `
   CREATE TABLE IF NOT EXISTS auth_security_events (
@@ -227,6 +249,10 @@ const modifySecurityEventUserAgentColumnSql = `
     MODIFY COLUMN user_agent VARCHAR(700) NULL
 `
 
+// ──────────────────────────────────────────
+// Migration helper types and constants
+// ──────────────────────────────────────────
+
 interface MigrationUserRow extends RowDataPacket {
   id: string
   email: string
@@ -261,6 +287,7 @@ const MAX_EMAIL_PLAIN_LENGTH = 254
 const MAX_IP_PLAIN_LENGTH = 64
 const MAX_USER_AGENT_PLAIN_LENGTH = 255
 
+// Normalizes email to lowercase for consistent blind-index lookups.
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase()
 }
@@ -269,6 +296,7 @@ function normalizeNickname(value: string) {
   return value.trim().normalize("NFKC")
 }
 
+// Truncates a string to fit within maxBytes of UTF-8 storage to avoid DB truncation errors.
 function truncateUtf8(value: string, maxBytes: number) {
   if (Buffer.byteLength(value, "utf8") <= maxBytes) {
     return value
@@ -313,6 +341,7 @@ function readEncryptedOrPlainArrayValue(value: unknown, context: string) {
   return parseJsonStringArray(plain)
 }
 
+// Runs a DDL statement, silently ignoring duplicate-key errors (for idempotent index creation).
 async function runIgnoreDuplicateKey(sql: string) {
   try {
     await getDbPool().query(sql)
@@ -329,6 +358,12 @@ async function runIgnoreDuplicateKey(sql: string) {
   }
 }
 
+// ──────────────────────────────────────────
+// Migration functions: batch-encrypts legacy plaintext columns
+// ──────────────────────────────────────────
+
+// Migrates users.email, display_name, nickname, and other PII columns
+// to encrypted format with blind indexes.
 async function migrateUsersSensitiveColumns() {
   const pool = getDbPool()
 
@@ -436,6 +471,7 @@ async function migrateUsersSensitiveColumns() {
   }
 }
 
+// Migrates user_sessions.user_agent and ip_address to encrypted values.
 async function migrateSessionSensitiveColumns() {
   const pool = getDbPool()
 
@@ -487,6 +523,7 @@ async function migrateSessionSensitiveColumns() {
   }
 }
 
+// Migrates auth_security_events.email, ip_address, user_agent to encrypted values.
 async function migrateSecurityEventSensitiveColumns() {
   const pool = getDbPool()
 
@@ -568,6 +605,7 @@ async function migrateSecurityEventSensitiveColumns() {
   }
 }
 
+/** Ensures all auth tables exist and runs PII encryption migrations. Idempotent — uses a global promise to guard against concurrent bootstrap. */
 export async function ensureAuthSchema() {
   if (globalThis.__nadeulhaeAuthSchemaPromise) {
     return globalThis.__nadeulhaeAuthSchemaPromise

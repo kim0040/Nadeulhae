@@ -42,11 +42,13 @@ export function detectDeviceTier(): DeviceTier {
   return "high"
 }
 
+/** Returns `true` when the user has requested reduced motion via OS / browser setting. */
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined") return false
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches
 }
 
+/** Returns `true` when the viewport is narrower than 768 px (mobile breakpoint). */
 export function isMobileViewport(): boolean {
   if (typeof window === "undefined") return false
   return window.innerWidth < 768
@@ -124,6 +126,12 @@ export function getMarqueeRepeat(defaultRepeat: number): number {
   return Math.max(1, defaultRepeat)
 }
 
+/**
+ * Returns `true` when animations should run at all.
+ *
+ * Returns `false` on the server (no window) or when the user has opted
+ * into reduced motion.
+ */
 export function shouldRunAnimation(): boolean {
   if (typeof window === "undefined") return false
   return !prefersReducedMotion()
@@ -152,6 +160,13 @@ export function shouldRunRichAnimation(): boolean {
   return true
 }
 
+/**
+ * Returns `true` when continuous / looping animations should keep running.
+ *
+ * Adds an extra check on top of `shouldRunAnimation`: the document must
+ * not be hidden (via Page Visibility API) so that animations pause when
+ * the tab is backgrounded, saving battery and CPU.
+ */
 export function shouldRunContinuousAnimation(): boolean {
   if (typeof window === "undefined") return false
   if (prefersReducedMotion()) return false

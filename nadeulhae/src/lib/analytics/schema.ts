@@ -1,5 +1,17 @@
+/**
+ * @fileoverview
+ * Analytics database schema module.
+ * Defines and bootstraps the analytics tables (daily route metrics, unique entities,
+ * actor activity, page context metrics, and consent metrics) on application startup.
+ * Tables use a pre-aggregated daily rollup design with dimension-keyed primary keys
+ * for efficient query-time summarisation.
+ */
+
 import { getDbPool } from "@/lib/db"
 
+// Module-level singleton promise that guards schema bootstrap.
+// Ensures the five analytics tables are created exactly once across the lifetime
+// of the server, even under concurrent requests.
 declare global {
   var __nadeulhaeAnalyticsSchemaPromise: Promise<void> | undefined
 }
@@ -114,7 +126,14 @@ const createDailyConsentMetricsTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/**
+ * Ensures all analytics tables exist.
+ * Uses a module-level global promise so the DDL runs only once, even when called
+ * concurrently from multiple request handlers. Errors are caught and logged so that
+ * a single failure does not prevent subsequent requests from retrying.
+ */
 export async function ensureAnalyticsSchema() {
+  // Return the in-flight promise if bootstrap has already been initiated.
   if (globalThis.__nadeulhaeAnalyticsSchemaPromise) {
     return globalThis.__nadeulhaeAnalyticsSchemaPromise
   }
@@ -128,6 +147,8 @@ export async function ensureAnalyticsSchema() {
     await pool.query(createDailyConsentMetricsTableSql)
   })()
 
+  // Catch-and-log so a failed bootstrap does not become an unhandled rejection
+  // and the global reference stays in place for the next caller.
   globalThis.__nadeulhaeAnalyticsSchemaPromise = bootstrapPromise.catch((error) => {
     console.error("[analytics-schema] Bootstrap failed:", error.message ?? error)
   })

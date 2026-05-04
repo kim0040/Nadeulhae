@@ -1,3 +1,11 @@
+/**
+ * Location Usage Proof System
+ *
+ * Records verifiable proof of location data usage for privacy compliance.
+ * Every location-related API call is logged with session or anonymous
+ * fingerprints, route path, and region key to create an auditable trail.
+ * Proofs are retained for 6 months per the data retention policy.
+ */
 import { createHash } from "node:crypto"
 
 import { getSessionTokenHash } from "@/lib/auth/session"
@@ -31,6 +39,10 @@ const createLocationUsageProofTableSql = `
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `
 
+/**
+ * Parses a raw Cookie header string into a Map of name-value pairs.
+ * Handles URL-encoded values and malformed entries gracefully.
+ */
 function parseCookies(cookieHeader: string | null) {
   if (!cookieHeader) {
     return new Map<string, string>()
@@ -57,10 +69,16 @@ function parseCookies(cookieHeader: string | null) {
   )
 }
 
+/** SHA-256 hashes an input string and returns the hex digest. */
 function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex")
 }
 
+/**
+ * Extracts the client IP from a Request, respecting trusted proxy headers
+ * (Cloudflare CF-Connecting-IP, X-Real-IP, X-Forwarded-For).
+ * Falls back to "anonymous" when headers are not trusted or absent.
+ */
 function getClientIp(request: Request) {
   if (!TRUST_PROXY_HEADERS) {
     return "anonymous"
@@ -74,6 +92,7 @@ function getClientIp(request: Request) {
   ).slice(0, 64)
 }
 
+/** Normalises and truncates a route path for safe DB insertion. Ensures it starts with "/" and does not exceed 191 characters. */
 function normalizeRoutePath(value: string) {
   const trimmed = value.trim()
   if (!trimmed.startsWith("/")) {
@@ -83,16 +102,23 @@ function normalizeRoutePath(value: string) {
   return trimmed.slice(0, 191)
 }
 
+/** Normalises an HTTP method to uppercase, truncated to 16 chars. Defaults to "GET". */
 function normalizeMethod(value: string) {
   const normalized = value.trim().toUpperCase()
   return normalized ? normalized.slice(0, 16) : "GET"
 }
 
+/** Normalises a region key to lowercase, truncated to 32 chars. Defaults to "unknown". */
 function normalizeRegionKey(value: string) {
   const normalized = value.trim().toLowerCase()
   return normalized ? normalized.slice(0, 32) : "unknown"
 }
 
+/**
+ * Ensures the location_usage_proofs table exists. Idempotent — uses
+ * CREATE TABLE IF NOT EXISTS. Memoised globally so DDL runs once per
+ * process lifetime. Resets the promise on failure to allow retries.
+ */
 export async function ensureLocationUsageProofSchema() {
   if (globalThis.__nadeulhaeLocationProofSchemaPromise) {
     return globalThis.__nadeulhaeLocationProofSchemaPromise
@@ -110,6 +136,11 @@ export async function ensureLocationUsageProofSchema() {
   return globalThis.__nadeulhaeLocationProofSchemaPromise
 }
 
+/**
+ * Input data for recording a location usage proof. Captures who
+ * (session or anonymous fingerprint), what (route and method), and where
+ * (region key) was accessed, along with the type of location event.
+ */
 export interface LocationUsageProofInput {
   request: Request
   routePath: string
@@ -119,6 +150,11 @@ export interface LocationUsageProofInput {
   eventKind?: "location_lookup" | "weather_current" | "weather_forecast" | "fire_summary"
 }
 
+/**
+ * Records a verifiable proof of location data usage. Computes a session
+ * or anonymous fingerprint, hashes identifiers for privacy, and inserts
+ * a row into the location_usage_proofs table.
+ */
 export async function recordLocationUsageProof(input: LocationUsageProofInput) {
   await ensureLocationUsageProofSchema()
 
@@ -128,6 +164,8 @@ export async function recordLocationUsageProof(input: LocationUsageProofInput) {
   const sessionId = input.sessionId || cookies.get(REQUEST_SESSION_COOKIE_NAME) || null
   const authToken = cookies.get(AUTH_COOKIE_NAME) || null
 
+  // Derive session source: use session ID for authenticated users,
+  // fall back to IP+UserAgent fingerprint for anonymous visitors.
   const sessionSource = sessionId
     ? `sid:${sessionId}`
     : `anon:${ipAddress}|${userAgent}`
@@ -150,11 +188,16 @@ export async function recordLocationUsageProof(input: LocationUsageProofInput) {
       normalizeRoutePath(input.routePath),
       normalizeMethod(input.method),
       normalizeRegionKey(input.regionKey),
+      // event kind distinguishes location_lookup from weather or fire-summary access
       input.eventKind ?? "location_lookup",
     ]
   )
 }
 
+/**
+ * Error-safe wrapper around recordLocationUsageProof. Logs and swallows
+ * errors to prevent location tracking failures from breaking the request.
+ */
 export async function recordLocationUsageProofSafely(input: LocationUsageProofInput) {
   try {
     await recordLocationUsageProof(input)
@@ -163,6 +206,10 @@ export async function recordLocationUsageProofSafely(input: LocationUsageProofIn
   }
 }
 
+/**
+ * Deletes location usage proof records older than 6 months.
+ * Run periodically via the retention sweep to comply with policy.
+ */
 export async function cleanupExpiredLocationUsageProofs() {
   await ensureLocationUsageProofSchema()
 

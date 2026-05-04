@@ -9,6 +9,8 @@ import { mockWeatherData, mockInsights, mockTrends, mockCourse } from "@/data/mo
 const MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE === "true";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/weather";
 
+// ---- In-memory cache with TTL + request deduplication ----
+
 interface CacheEntry<T> {
   value: T;
   expiresAt: number;
@@ -18,6 +20,7 @@ const API_CACHE_MAX_KEYS = 256;
 const apiCache = new Map<string, CacheEntry<unknown>>();
 const apiInFlight = new Map<string, Promise<unknown>>();
 
+/** Read a cached value by key; returns null if expired or missing */
 function getCachedValue<T>(key: string): T | null {
   const cached = apiCache.get(key);
   if (!cached) return null;
@@ -28,6 +31,7 @@ function getCachedValue<T>(key: string): T | null {
   return cached.value as T;
 }
 
+/** Store a value with TTL; evicts oldest entries if cache exceeds API_CACHE_MAX_KEYS */
 function setCachedValue<T>(key: string, value: T, ttlMs: number) {
   apiCache.set(key, {
     value,
@@ -38,6 +42,7 @@ function setCachedValue<T>(key: string, value: T, ttlMs: number) {
     return;
   }
 
+  // Evict oldest entries (Map iteration order = insertion order)
   const overflow = apiCache.size - API_CACHE_MAX_KEYS;
   let removed = 0;
   for (const cacheKey of apiCache.keys()) {
@@ -49,6 +54,7 @@ function setCachedValue<T>(key: string, value: T, ttlMs: number) {
   }
 }
 
+/** Get cached or fetch + cache; deduplicates concurrent requests for the same key */
 async function getOrFetchCached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
   const cached = getCachedValue<T>(key);
   if (cached != null) {
