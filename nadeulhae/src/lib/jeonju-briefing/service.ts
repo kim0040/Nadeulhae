@@ -94,7 +94,7 @@ function getYesterdayInKst(): string {
   // Before 7 AM, "yesterday" means 2 calendar days ago.
   const offset = p.hour < 7 ? 2 : 1
   const d = new Date(`${String(p.year)}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}T00:00:00+09:00`)
-  d.setUTCDate(d.getUTCDate() - offset)
+  d.setDate(d.getDate() - offset)
   return d.toISOString().slice(0, 10)
 }
 

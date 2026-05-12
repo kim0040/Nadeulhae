@@ -60,7 +60,7 @@ async function generateForToday(): Promise<void> {
   // Day boundary is 07:00 KST, not midnight
   const offset = p.hour < 7 ? 2 : 1
   const d = new Date(`${p.year}-${p.month}-${p.day}T00:00:00+09:00`)
-  d.setUTCDate(d.getUTCDate() - offset)
+  d.setDate(d.getDate() - offset)
   const dateStr = d.toISOString().slice(0, 10)
 
   try {

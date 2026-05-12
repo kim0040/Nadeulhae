@@ -56,10 +56,20 @@ function resolveSslOptions() {
 }
 
 function getYesterdayInKst() {
-  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
-  const yesterday = new Date(kstNow)
-  yesterday.setDate(yesterday.getDate() - 1)
-  return yesterday.toISOString().slice(0, 10)
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date())
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? "00"
+  const hour = Number(get("hour"))
+  const offset = hour < 7 ? 2 : 1
+  const d = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00+09:00`)
+  d.setDate(d.getDate() - offset)
+  return d.toISOString().slice(0, 10)
 }
 
 async function main() {

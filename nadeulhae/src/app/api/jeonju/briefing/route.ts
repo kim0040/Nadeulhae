@@ -171,7 +171,7 @@ function getYesterdayInKst(): string {
   // Day boundary is 07:00 KST, not midnight
   const offset = hour < 7 ? 2 : 1
   const d = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00+09:00`)
-  d.setUTCDate(d.getUTCDate() - offset)
+  d.setDate(d.getDate() - offset)
   return d.toISOString().slice(0, 10)
 }
 
