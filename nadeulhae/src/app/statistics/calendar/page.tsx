@@ -6,16 +6,19 @@ import { PicnicArchiveCalendar } from "@/components/picnic-archive-calendar"
 import { useLanguage } from "@/context/LanguageContext"
 import { Particles } from "@/components/magicui/particles"
 import { useTheme } from "next-themes"
+import { getParticleCount } from "@/lib/performance"
+import { useMemo } from "react"
 
 export default function CalendarPage() {
   const { t } = useLanguage()
   const { resolvedTheme } = useTheme()
+  const particleQuantity = useMemo(() => getParticleCount(48), [])
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-64 pt-24 sm:pt-28">
       <Particles
         className="absolute inset-0 z-0"
-        quantity={84}
+        quantity={particleQuantity}
         color={resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"}
       />
       

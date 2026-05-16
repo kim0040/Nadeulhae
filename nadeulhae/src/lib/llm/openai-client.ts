@@ -178,8 +178,19 @@ export async function requestCompletion(
     temperature: number
     maxTokens: number
     timeoutMs: number
+    reasoningEffort?: string
   }
 ): Promise<Omit<LlmCompletionResult, "requestedModel">> {
+  const body: Record<string, unknown> = {
+    model: config.model,
+    messages: input.messages,
+    temperature: input.temperature,
+    max_tokens: input.maxTokens,
+  }
+  if (input.reasoningEffort) {
+    body.reasoning_effort = input.reasoningEffort
+  }
+
   const { response, json } = await fetchJson<OpenAiCompletionPayload | OpenAiErrorPayload>(
     buildUrl(config.baseUrl, "chat/completions"),
     {
@@ -189,12 +200,7 @@ export async function requestCompletion(
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.apiKey}`,
       },
-      body: JSON.stringify({
-        model: config.model,
-        messages: input.messages,
-        temperature: input.temperature,
-        max_tokens: input.maxTokens,
-      }),
+      body: JSON.stringify(body),
       cache: "no-store",
     },
     input.timeoutMs
@@ -243,6 +249,7 @@ export async function requestCompletionStream(
     temperature: number
     maxTokens: number
     timeoutMs: number
+    reasoningEffort?: string
     onToken: (token: string) => void
   }
 ): Promise<Omit<LlmCompletionResult, "requestedModel">> {
@@ -250,6 +257,17 @@ export async function requestCompletionStream(
   const timeout = setTimeout(() => controller.abort(), input.timeoutMs)
 
   try {
+    const body: Record<string, unknown> = {
+      model: config.model,
+      messages: input.messages,
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+      stream: true,
+    }
+    if (input.reasoningEffort) {
+      body.reasoning_effort = input.reasoningEffort
+    }
+
     const response = await fetch(buildUrl(config.baseUrl, "chat/completions"), {
       method: "POST",
       headers: {
@@ -257,13 +275,7 @@ export async function requestCompletionStream(
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.apiKey}`,
       },
-      body: JSON.stringify({
-        model: config.model,
-        messages: input.messages,
-        temperature: input.temperature,
-        max_tokens: input.maxTokens,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
       cache: "no-store",
       signal: controller.signal,
     })
@@ -313,6 +325,9 @@ export async function requestCompletionStream(
               resolvedModel = parsed.model ?? resolvedModel
               // Streaming payloads carry finish_reason on the last delta only
               finishReason = normalizeFinishReason(parsed.choices?.[0]?.finish_reason) ?? finishReason
+
+              // Skip reasoning_content deltas — these are model-internal thinking tokens (CrofAI)
+              if (typeof parsed.choices?.[0]?.delta?.reasoning_content === "string") continue
 
               const token = typeof parsed.choices?.[0]?.delta?.content === "string"
                 ? parsed.choices[0].delta.content

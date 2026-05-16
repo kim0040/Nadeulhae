@@ -579,13 +579,13 @@ function buildThoughtSummaryDetails(input: {
   language: string
   userMessage: string
   modelLabel: string
-  isThinkingMode: boolean
+  isThinkingEnabled: boolean
 }): ThoughtSummaryDetails {
   const base = (THOUGHT_SUMMARIES as any)[input.language][input.kind]
   const signal = extractRequestSignals(input.userMessage, input.language)
 
   if (input.language === "ko") {
-    const mode = input.isThinkingMode
+    const mode = input.isThinkingEnabled
       ? `${input.modelLabel}로 더 신중하게 검토`
       : `${input.modelLabel}로 빠르게 답변 구성`
 
@@ -601,7 +601,7 @@ function buildThoughtSummaryDetails(input: {
   }
 
   if (input.language === "zh") {
-    const mode = input.isThinkingMode
+    const mode = input.isThinkingEnabled
       ? `使用 ${input.modelLabel} 更仔细地审查`
       : `使用 ${input.modelLabel} 快速构建回答`
 
@@ -617,7 +617,7 @@ function buildThoughtSummaryDetails(input: {
   }
 
   if (input.language === "ja") {
-    const mode = input.isThinkingMode
+    const mode = input.isThinkingEnabled
       ? `${input.modelLabel} でより慎重に検討`
       : `${input.modelLabel} で直接回答を作成`
 
@@ -632,7 +632,7 @@ function buildThoughtSummaryDetails(input: {
     }
   }
 
-  const mode = input.isThinkingMode
+  const mode = input.isThinkingEnabled
     ? `Using ${input.modelLabel} for a more deliberate pass`
     : `Using ${input.modelLabel} for a direct response`
 
@@ -809,6 +809,7 @@ export function LabAiChatPanel() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [isThinkingPanelOpen, setIsThinkingPanelOpen] = useState(true)
+  const [isThinkingEnabled, setIsThinkingEnabled] = useState(false)
   const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(true)
 
@@ -919,7 +920,7 @@ export function LabAiChatPanel() {
 
   useEffect(() => {
     if (models.length === 0) return
-    const matched = models.find((model) => model.id === selectedModelId || model.thinkingId === selectedModelId)
+    const matched = models.find((model) => model.id === selectedModelId || model.slug === selectedModelId)
     if (matched) return
 
     const next = defaultModelId ?? models[0]?.id ?? null
@@ -999,23 +1000,18 @@ export function LabAiChatPanel() {
   }, [messageContentSize, messages.length, scrollToBottom])
 
   const resolvedModelId = useMemo(() => {
-    const matched = models.find((model) => model.id === selectedModelId || model.thinkingId === selectedModelId)
+    const matched = models.find((model) => model.id === selectedModelId || model.slug === selectedModelId)
     if (matched) return selectedModelId
     return defaultModelId ?? models[0]?.id ?? null
   }, [defaultModelId, models, selectedModelId])
 
   const activeModel = useMemo(() => {
-    return models.find((model) => model.id === resolvedModelId || model.thinkingId === resolvedModelId)
+    return models.find((model) => model.id === resolvedModelId || model.slug === resolvedModelId)
   }, [models, resolvedModelId])
 
-  const isThinkingMode = Boolean(resolvedModelId && resolvedModelId === activeModel?.thinkingId)
-  const activeModelLabel = activeModel ? `${activeModel.label}${isThinkingMode ? ` · ${copy.thinking}` : ""}` : copy.modelLabel
+  const activeModelLabel = activeModel ? `${activeModel.label}${isThinkingEnabled && activeModel.reasoningEffort ? ` · ${copy.thinking}` : ""}` : copy.modelLabel
   const activeModelDescription = activeModel?.description ?? copy.modelMenuHint
-  const activeModelWarning = activeModel
-    ? isThinkingMode
-      ? activeModel.thinkingWarning
-      : activeModel.warning
-    : null
+  const activeModelWarning = activeModel?.warning ?? null
 
   const remainingRequests = usage?.remainingRequests ?? policy?.dailyLimit ?? 0
   const isLimitReached = !isLoading && remainingRequests <= 0
@@ -1030,10 +1026,9 @@ export function LabAiChatPanel() {
   }, [])
 
   const handleThinkingToggle = useCallback(() => {
-    if (!activeModel?.thinkingId) return
-    const next = isThinkingMode ? activeModel.id : activeModel.thinkingId
-    if (next && next !== resolvedModelId) handleModelSelect(next)
-  }, [activeModel, handleModelSelect, isThinkingMode, resolvedModelId])
+    if (!activeModel?.reasoningEffort) return
+    setIsThinkingEnabled((current) => !current)
+  }, [activeModel])
 
   const handleWebSearchToggle = useCallback(() => {
     if (!resolvedActiveSessionId) return
@@ -1251,6 +1246,7 @@ export function LabAiChatPanel() {
             sessionId: resolvedActiveSessionId,
             modelId: resolvedModelId,
             webSearchEnabled: isWebSearchEnabled,
+            thinkingEnabled: isThinkingEnabled,
           }),
         })
 
@@ -1348,6 +1344,7 @@ export function LabAiChatPanel() {
     copy.sendError,
     focusInput,
     isLimitReached,
+    isThinkingEnabled,
     language,
     resolvedActiveSessionId,
     resolvedModelId,
@@ -1563,15 +1560,14 @@ export function LabAiChatPanel() {
                   </div>
                   <div className="max-h-[min(26rem,calc(100svh-12rem))] overflow-y-auto p-1.5 custom-scrollbar sm:max-h-[22rem]">
                     {models.map((model) => {
-                      const nextModelId = isThinkingMode && model.thinkingId ? model.thinkingId : model.id
-                      const isSelected = resolvedModelId === model.id || resolvedModelId === model.thinkingId
-                      const modelWarning = isThinkingMode && model.thinkingId ? model.thinkingWarning : model.warning
+                      const isSelected = resolvedModelId === model.id || resolvedModelId === model.slug
+                      const hasReasoning = model.reasoningEffort
                       return (
                         <button
                           key={model.id}
                           type="button"
                           onClick={() => {
-                            handleModelSelect(nextModelId)
+                            handleModelSelect(model.id)
                             setIsModelMenuOpen(false)
                           }}
                           className={cn(
@@ -1580,12 +1576,20 @@ export function LabAiChatPanel() {
                           )}
                         >
                           <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold">{model.label}</span>
+                            <span className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                              {model.label}
+                              {model.quantization ? (
+                                <span className="shrink-0 rounded bg-muted px-1 py-px text-[10px] font-medium leading-snug text-muted-foreground">{model.quantization}</span>
+                              ) : null}
+                              {hasReasoning ? (
+                                <span className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium leading-snug text-accent dark:bg-accent/15">{copy.thinking}</span>
+                              ) : null}
+                            </span>
                             <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{model.description}</span>
-                            {modelWarning ? (
+                            {model.warning ? (
                               <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium leading-4 text-amber-700 dark:text-amber-300">
                                 <AlertTriangle className="size-3 shrink-0" />
-                                <span>{modelWarning}</span>
+                                <span>{model.warning}</span>
                               </span>
                             ) : null}
                           </span>
@@ -1598,13 +1602,13 @@ export function LabAiChatPanel() {
               ) : null}
             </div>
 
-            {activeModel?.thinkingId ? (
+            {activeModel?.reasoningEffort ? (
               <button
                 type="button"
                 onClick={handleThinkingToggle}
                 className={cn(
                   "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition duration-200 active:scale-[0.98] sm:h-9 sm:w-auto sm:gap-1.5 sm:px-2.5",
-                  isThinkingMode
+                  isThinkingEnabled
                     ? "border-accent/35 bg-accent/10 text-accent dark:bg-accent/15"
                     : "border-border bg-card/75 text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
@@ -1645,7 +1649,7 @@ export function LabAiChatPanel() {
         <div
           ref={messageViewportRef}
           onScroll={updateBottomState}
-          className="relative z-10 flex-1 overflow-y-auto scroll-smooth custom-scrollbar"
+          className="relative z-10 flex-1 overflow-y-auto scroll-smooth overscroll-contain touch-manipulation custom-scrollbar"
         >
           {isLoading ? (
             <div className="flex h-full items-center justify-center px-4">
@@ -1671,7 +1675,7 @@ export function LabAiChatPanel() {
                     language,
                     userMessage: previousUserMessage,
                     modelLabel: activeModelLabel,
-                    isThinkingMode,
+                     isThinkingEnabled,
                   })
                   return (
                     <div

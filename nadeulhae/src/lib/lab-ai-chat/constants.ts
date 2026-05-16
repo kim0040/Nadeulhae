@@ -4,7 +4,7 @@
  */
 
 /** Max chat requests per user per calendar day (KST). */
-export const LAB_AI_CHAT_DAILY_REQUEST_LIMIT = 100
+export const LAB_AI_CHAT_DAILY_REQUEST_LIMIT = 50
 /** Max characters a single user message may contain. */
 export const LAB_AI_CHAT_INPUT_MAX_CHARACTERS = 16000
 /** How many recent messages to return to the UI. */

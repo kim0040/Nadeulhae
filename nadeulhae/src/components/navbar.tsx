@@ -194,10 +194,13 @@ export function Navbar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "relative flex shrink-0 items-center gap-1 whitespace-nowrap py-1 text-[12px] font-bold transition-all hover:text-sky-blue sm:gap-1.5 sm:text-[13px] md:gap-2 md:text-sm lg:text-sm xl:text-[15px] xl:font-black",
+                    "relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full py-1 transition-all duration-300 hover:text-sky-blue sm:gap-1.5 sm:text-[13px] md:gap-2 md:text-sm lg:text-sm xl:text-[15px] xl:font-black",
                     pathname === item.href
-                      ? "scale-105 text-sky-blue"
-                      : "text-neutral-500 hover:scale-105 dark:text-neutral-400"
+                      ? "text-sky-blue"
+                      : "text-neutral-500 hover:scale-105 dark:text-neutral-400",
+                    pathname === item.href
+                      ? "px-2 sm:px-2.5 md:px-3 bg-sky-blue/10"
+                      : "px-2 sm:px-2.5 md:px-3"
                   )}
                 >
                   <item.icon size={15} className="shrink-0 sm:size-[16px] md:size-[17px] lg:size-[18px]" />

@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
         },
         {
           key: "Content-Security-Policy",
-          value: "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr; font-src 'self'; connect-src 'self' https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr https://apis.data.go.kr wss://nadeulhae.space wss://www.nadeulhae.space ws://localhost:3000; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
+          value: "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr; font-src 'self'; connect-src 'self' https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr https://apis.data.go.kr wss://nadeulhae.space wss://www.nadeulhae.space; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
         },
         {
           key: "Cross-Origin-Opener-Policy",

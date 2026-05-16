@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/context/AuthContext";
 import { AnalyticsConsentBanner } from "@/components/analytics/analytics-consent-banner";
 import { PageViewTracker } from "@/components/analytics/page-view-tracker";
+import { PageTransition } from "@/components/page-transition";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,13 +25,12 @@ export const metadata: Metadata = {
 
 import type { Viewport } from "next";
 
-// Prevent iOS Safari auto-zoom on input focus (font-size < 16px triggers zoom).
-// maximum-scale=1 stops the zoom while user-scalable=yes keeps pinch-zoom accessible.
+// Prevent iOS Safari auto-zoom on input focus while keeping pinch-zoom accessible.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 import { Navbar } from "@/components/navbar";
@@ -62,9 +62,9 @@ export default function RootLayout({
               </Suspense>
               <AnalyticsConsentBanner />
               <Navbar />
-              <div className="relative">
+              <PageTransition>
                 {children}
-              </div>
+              </PageTransition>
             </AuthProvider>
           </ThemeProvider>
         </LanguageProvider>

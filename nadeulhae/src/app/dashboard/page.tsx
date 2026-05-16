@@ -472,7 +472,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
               <button
                 type="button"
                 onClick={() => void refreshWeather()}
-                className="inline-flex items-center gap-2 self-start rounded-full border border-card-border/70 bg-background/75 px-4 py-2 text-sm font-black text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue disabled:opacity-50"
+                className="inline-flex items-center gap-2 self-start rounded-full border border-card-border/70 bg-background/75 px-4 py-2 text-sm font-black text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue active:scale-[0.97] disabled:opacity-50"
                 disabled={isWeatherRefreshing}
               >
                 <RefreshCcw className={cn("size-4", isWeatherRefreshing && "animate-spin")} />

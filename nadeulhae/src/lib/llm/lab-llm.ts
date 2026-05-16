@@ -1,10 +1,9 @@
 /**
  * Lab-specific LLM Chat Wrapper
  *
- * Study-assistant-oriented LLM client with curated model selection,
- * thinking/reasoning mode support, and daily quota enforcement.
- * Unlike general-llm, this exposes a fixed set of allowed models with
- * user-facing labels, descriptions, and optional thinking variants.
+ * General-purpose AI assistant client with curated model selection,
+ * reasoning-effort control, and daily quota enforcement.
+ * Uses CrofAI API (OpenAI-compatible) for all lab chat completions.
  */
 import type { LlmCompletionResult, LlmRequestKind, LlmConfig, LlmModelOption } from "@/lib/llm/types"
 import {
@@ -32,83 +31,165 @@ const SUMMARY_PROVIDER_TIMEOUT_MS = 90_000
 const COMPLETION_MAX_TOKENS = 8000
 const SUMMARY_MAX_TOKENS = 1600
 
-/** Internal spec for an allowed lab model. Defines slug, display info, candidate model IDs, and optional thinking mode variants. */
+/** Internal spec for an allowed lab model. Defines slug, display info, candidate model IDs, and reasoning support. */
 type AllowedModelSpec = {
   slug: string
   label: string
   description: string
   warning?: string
   candidates: string[]
-  thinkingCandidates?: string[]
-  thinkingWarning?: string
+  quantization?: string
+  reasoningEffort: boolean
 }
 
 const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
-    slug: "deepseek-v4-flash",
-    label: "DeepSeek V4 Flash",
-    description: "1M 컨텍스트를 지원하는 효율형 MoE 모델로, 빠른 대화·코딩·일상 작업에 좋아요.",
-    candidates: ["deepseek/deepseek-v4-flash"],
-    thinkingCandidates: ["deepseek/deepseek-v4-flash:thinking"],
-    thinkingWarning: "생각 모드는 일반 모드보다 응답 시작이 느릴 수 있어요.",
-  },
-  {
     slug: "deepseek-v4-pro",
     label: "DeepSeek V4 Pro",
-    description: "1.6T급 V4 상위 모델로, 긴 맥락 분석·추론·복잡한 코드 작업에 적합해요.",
-    candidates: ["deepseek/deepseek-v4-pro"],
-    thinkingCandidates: ["deepseek/deepseek-v4-pro:thinking"],
-    thinkingWarning: "생각 모드는 느리고 긴 답변에서 중간에 멈출 수 있어요.",
+    description: "1.6T MoE 상위 모델. 긴 맥락 분석·추론·복잡한 코딩에 최적화. 1M 컨텍스트.",
+    candidates: ["deepseek-v4-pro"],
+    quantization: "Q4_0",
+    reasoningEffort: true,
   },
   {
-    slug: "kimi-k2-6",
-    label: "Kimi K2.6",
-    description: "장기 코딩, 문서 기반 작업, 에이전트형 워크플로를 길게 이어가는 데 강해요.",
-    candidates: ["moonshotai/kimi-k2.6"],
-    thinkingCandidates: ["moonshotai/kimi-k2.6:thinking"],
-    thinkingWarning: "현재 생각 모드는 빈 응답이 나올 수 있어 사용에 주의가 필요해요.",
+    slug: "deepseek-v4-pro-precision",
+    label: "DeepSeek V4 Pro Precision",
+    description: "V4 Pro의 Q8_0 정밀 양자화 버전. 더 높은 정확도가 필요한 작업에 적합. 1M 컨텍스트.",
+    warning: "가격이 2~3배 높아요.",
+    candidates: ["deepseek-v4-pro-precision"],
+    quantization: "Q8_0",
+    reasoningEffort: true,
   },
   {
-    slug: "qwen-3-6",
-    label: "Qwen 3.6",
-    description: "35B/3B 활성 MoE 모델로, 빠른 일반 대화와 실무형 코딩 보조에 무난해요.",
-    candidates: ["Qwen/Qwen3.6-35B-A3B"],
-    thinkingCandidates: ["Qwen/Qwen3.6-35B-A3B:thinking"],
-    thinkingWarning: "생각 모드는 최종 답변보다 reasoning 텍스트가 노출될 수 있어요.",
+    slug: "deepseek-v4-flash",
+    label: "DeepSeek V4 Flash",
+    description: "가성비 높은 효율형 MoE 모델. 빠른 대화·코딩·일상 작업용. 1M 컨텍스트.",
+    candidates: ["deepseek-v4-flash"],
+    quantization: "Q4_0",
+    reasoningEffort: true,
   },
   {
-    slug: "glm-5-1",
+    slug: "deepseek-v3.2",
+    label: "DeepSeek V3.2",
+    description: "안정적인 범용 모델. 일상 대화와 중간 복잡도 작업에 무난. 163K 컨텍스트.",
+    candidates: ["deepseek-v3.2"],
+    quantization: "Q4_0",
+    reasoningEffort: false,
+  },
+  {
+    slug: "mimo-v2.5-pro",
+    label: "MiMo V2.5 Pro",
+    description: "Xiaomi의 최신 MoE 모델. 1M 컨텍스트로 장문 처리에 강점.",
+    candidates: ["mimo-v2.5-pro"],
+    quantization: "Q4_0",
+    reasoningEffort: true,
+  },
+  {
+    slug: "glm-5.1",
     label: "GLM 5.1",
-    description: "에이전트형 엔지니어링과 긴 코딩 작업에 초점을 둔 모델이에요.",
-    warning: "실측 기준 응답 완료가 느린 편이에요.",
-    candidates: ["zai-org/glm-5.1"],
-    thinkingCandidates: ["zai-org/glm-5.1:thinking"],
-    thinkingWarning: "현재 생각 모드는 타임아웃 가능성이 높아 사용에 주의가 필요해요.",
+    description: "에이전트형 엔지니어링·긴 코딩 작업에 특화. 202K 컨텍스트.",
+    warning: "응답 완료가 느린 편이에요.",
+    candidates: ["glm-5.1"],
+    quantization: "Q6_K",
+    reasoningEffort: true,
   },
   {
-    slug: "minimax-m2-7",
-    label: "MiniMax M2.7",
-    description: "긴 맥락 대화와 창작·요약을 부드럽게 이어가요.",
-    candidates: ["minimax/minimax-m2.7", "minimax/minimax-m2.7-turbo"],
+    slug: "kimi-k2.6",
+    label: "Kimi K2.6",
+    description: "장기 코딩·문서 작업·에이전트 워크플로에 강함. 262K 컨텍스트.",
+    candidates: ["kimi-k2.6"],
+    quantization: "Q3_K_L",
+    reasoningEffort: true,
   },
   {
-    slug: "gpt-oss-120b",
-    label: "GPT-OSS 120B",
-    description: "큰 오픈 모델로 깊이 있는 추론과 코딩 분석에 적합해요.",
-    candidates: ["openai/gpt-oss-120b", "TEE/gpt-oss-120b"],
+    slug: "gemma-4-31b-it",
+    label: "Gemma 4 (31B)",
+    description: "Google의 경량 범용 모델. 빠른 응답과 짧은 질의에 적합. 262K 컨텍스트.",
+    candidates: ["gemma-4-31b-it"],
+    quantization: "Q4_0",
+    reasoningEffort: true,
   },
   {
-    slug: "gpt-oss-20b",
-    label: "GPT-OSS 20B",
-    description: "가벼운 오픈 모델로 빠른 답변과 일상 작업에 적합해요.",
-    candidates: ["openai/gpt-oss-20b", "TEE/gpt-oss-20b"],
+    slug: "minimax-m2.5",
+    label: "MiniMax M2.5",
+    description: "긴 맥락 대화와 창작·요약에 부드러운 성능. 204K 컨텍스트.",
+    candidates: ["minimax-m2.5"],
+    quantization: "awq",
+    reasoningEffort: false,
   },
   {
-    slug: "gemma-4",
-    label: "Gemma 4",
-    description: "가벼운 범용 모델로 짧은 질의와 빠른 초안 작성에 좋아요.",
-    candidates: ["google/gemma-4-31b-it", "TEE/gemma4-31b", "google/gemma-4-26b-a4b-it"],
-    thinkingCandidates: ["google/gemma-4-31b-it:thinking", "google/gemma-4-26b-a4b-it:thinking"],
+    slug: "qwen3.6-27b",
+    label: "Qwen 3.6 (27B)",
+    description: "Alibaba의 27B MoE 모델. 범용 대화와 실무 코딩에 무난. 262K 컨텍스트.",
+    candidates: ["qwen3.6-27b"],
+    quantization: "Q4_0",
+    reasoningEffort: true,
+  },
+  {
+    slug: "qwen3.5-9b",
+    label: "Qwen 3.5 (9B)",
+    description: "가장 가볍고 빠른 모델. 일상 대화와 간단한 작업에 적합. 262K 컨텍스트.",
+    candidates: ["qwen3.5-9b"],
+    quantization: "fp8",
+    reasoningEffort: true,
+  },
+  {
+    slug: "qwen3.5-397b-a17b",
+    label: "Qwen 3.5 (397B-A17B)",
+    description: "초대형 MoE 모델. 깊은 추론과 복잡한 분석에 적합. 262K 컨텍스트.",
+    candidates: ["qwen3.5-397b-a17b"],
+    quantization: "Q4_0",
+    reasoningEffort: true,
+  },
+  {
+    slug: "kimi-k2.5",
+    label: "Kimi K2.5",
+    description: "K2.6 이전 세대. 비전 지원·문서 분석에 안정적. 262K 컨텍스트.",
+    candidates: ["kimi-k2.5"],
+    quantization: "Q4_K_M",
+    reasoningEffort: true,
+  },
+  {
+    slug: "kimi-k2.5-lightning",
+    label: "Kimi K2.5 Lightning",
+    description: "초고속 추론 특화. 응답 속도가 매우 빠름. 131K 컨텍스트·32K 출력.",
+    warning: "최대 출력이 32K로 짧은 편이에요.",
+    candidates: ["kimi-k2.5-lightning"],
+    quantization: "530b-int4",
+    reasoningEffort: true,
+  },
+  {
+    slug: "glm-5",
+    label: "GLM 5",
+    description: "GLM 5.1 이전 버전. 범용 대화와 코딩에 안정적. 202K 컨텍스트.",
+    candidates: ["glm-5"],
+    quantization: "Q4_0",
+    reasoningEffort: false,
+  },
+  {
+    slug: "glm-4.7",
+    label: "GLM 4.7",
+    description: "Z.AI의 Q8_0 정밀 모델. 높은 정확도의 범용 작업용. 202K 컨텍스트.",
+    candidates: ["glm-4.7"],
+    quantization: "Q8_0",
+    reasoningEffort: false,
+  },
+  {
+    slug: "glm-4.7-flash",
+    label: "GLM 4.7 Flash",
+    description: "GLM 4.7의 fp8 경량 버전. 빠른 응답과 저비용이 장점. 202K 컨텍스트.",
+    candidates: ["glm-4.7-flash"],
+    quantization: "fp8",
+    reasoningEffort: false,
+  },
+  {
+    slug: "greg",
+    label: "Greg",
+    description: "실험적 초고속 모델. 비전 지원·최고 속도가 특징. 229K 컨텍스트.",
+    warning: "실험 모델이라 응답 품질이 불안정할 수 있어요.",
+    candidates: ["greg"],
+    quantization: "greg",
+    reasoningEffort: false,
   },
 ]
 
@@ -189,18 +270,14 @@ export async function resolveAllowedLabModels(): Promise<LlmModelOption[]> {
       .find((value): value is string => Boolean(value))
     if (!matched) return []
 
-    const thinkingMatched = spec.thinkingCandidates
-      ?.map((candidate) => pickModelCandidate(candidate, available))
-      ?.find((value): value is string => Boolean(value))
-
     return [{
       id: matched,
       slug: spec.slug,
       label: spec.label,
       description: spec.description,
       warning: spec.warning,
-      thinkingId: thinkingMatched,
-      thinkingWarning: spec.thinkingWarning,
+      quantization: spec.quantization,
+      reasoningEffort: spec.reasoningEffort,
     }]
   })
 
@@ -214,8 +291,8 @@ export async function resolveAllowedLabModels(): Promise<LlmModelOption[]> {
 
 /**
  * Resolves a user-requested model to an allowed LlmModelOption. Matches by
- * exact model ID, slug, or thinkingId. Falls back to the first available
- * model if no match is found or the input is empty.
+ * exact model ID or slug. Falls back to the first available model if no
+ * match is found or the input is empty.
  */
 export function resolveRequestedLabModel(
   allowedModels: LlmModelOption[],
@@ -223,9 +300,8 @@ export function resolveRequestedLabModel(
 ): LlmModelOption {
   const normalized = typeof requestedModel === "string" ? requestedModel.trim() : ""
   if (!normalized) return allowedModels[0]
-  // Match by exact id, display slug, or thinking mode id; first-allowed is the default fallback
   return allowedModels.find((item) =>
-    item.id === normalized || item.slug === normalized || item.thinkingId === normalized
+    item.id === normalized || item.slug === normalized
   ) ?? allowedModels[0]
 }
 
@@ -239,6 +315,7 @@ async function doCompletion(input: {
   temperature: number
   maxTokens: number
   timeoutMs: number
+  reasoningEffort?: string
 }) {
   const reservation = await reserveGlobalLlmDailyRequest({ limit: getGlobalDailyLimit() })
   if (!reservation.allowed) {
@@ -247,7 +324,7 @@ async function doCompletion(input: {
   try {
     const result = await requestCompletion(
       { ...getConfig(), model: input.model },
-      { messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, timeoutMs: input.timeoutMs }
+      { messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, timeoutMs: input.timeoutMs, reasoningEffort: input.reasoningEffort }
     )
     await recordGlobalLlmRequestOutcome({ metricDate: reservation.usage.metricDate, success: true }).catch(() => {})
     return result
@@ -267,6 +344,7 @@ async function doCompletionStream(input: {
   temperature: number
   maxTokens: number
   timeoutMs: number
+  reasoningEffort?: string
   onToken: (token: string) => void
 }) {
   const reservation = await reserveGlobalLlmDailyRequest({ limit: getGlobalDailyLimit() })
@@ -276,7 +354,7 @@ async function doCompletionStream(input: {
   try {
     const result = await requestCompletionStream(
       { ...getConfig(), model: input.model },
-      { messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, timeoutMs: input.timeoutMs, onToken: input.onToken }
+      { messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, timeoutMs: input.timeoutMs, reasoningEffort: input.reasoningEffort, onToken: input.onToken }
     )
     await recordGlobalLlmRequestOutcome({ metricDate: reservation.usage.metricDate, success: true }).catch(() => {})
     return result
@@ -288,19 +366,21 @@ async function doCompletionStream(input: {
 
 /**
  * Creates a lab chat completion using the specified model. Adjusts timeouts,
- * max tokens, and temperature based on request kind.
+ * max tokens, and temperature based on request kind. Optionally enables
+ * reasoning_effort for models that support it.
  */
 export async function createLabChatCompletion(input: {
   model: string
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
   requestKind: LlmRequestKind
+  reasoningEffort?: string
 }): Promise<LlmCompletionResult> {
   // Summary requests: shorter timeout, fewer tokens, lower temperature for deterministic output
   const timeoutMs = input.requestKind === "summary" ? SUMMARY_PROVIDER_TIMEOUT_MS : PROVIDER_TIMEOUT_MS
   const maxTokens = input.requestKind === "summary" ? SUMMARY_MAX_TOKENS : COMPLETION_MAX_TOKENS
   const temperature = input.requestKind === "summary" ? 0.2 : 0.55
 
-  const result = await doCompletion({ model: input.model, messages: input.messages, temperature, maxTokens, timeoutMs })
+  const result = await doCompletion({ model: input.model, messages: input.messages, temperature, maxTokens, timeoutMs, reasoningEffort: input.reasoningEffort })
   return { ...result, requestedModel: input.model }
 }
 
@@ -312,12 +392,13 @@ export async function createLabChatCompletionStream(input: {
   model: string
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
   requestKind: LlmRequestKind
+  reasoningEffort?: string
   onToken: (token: string) => void
 }): Promise<LlmCompletionResult> {
   const timeoutMs = input.requestKind === "summary" ? SUMMARY_PROVIDER_TIMEOUT_MS : STREAMING_TIMEOUT_MS
   const maxTokens = input.requestKind === "summary" ? SUMMARY_MAX_TOKENS : COMPLETION_MAX_TOKENS
   const temperature = input.requestKind === "summary" ? 0.2 : 0.55
 
-  const result = await doCompletionStream({ model: input.model, messages: input.messages, temperature, maxTokens, timeoutMs, onToken: input.onToken })
+  const result = await doCompletionStream({ model: input.model, messages: input.messages, temperature, maxTokens, timeoutMs, reasoningEffort: input.reasoningEffort, onToken: input.onToken })
   return { ...result, requestedModel: input.model }
 }

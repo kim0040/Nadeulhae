@@ -740,7 +740,7 @@ async function handlePOST(request: NextRequest) {
     return invalidRequestResponse
   }
 
-  let body: { message?: string; locale?: LabAiChatLocale; sessionId?: unknown; modelId?: unknown; webSearchEnabled?: unknown } = {}
+  let body: { message?: string; locale?: LabAiChatLocale; sessionId?: unknown; modelId?: unknown; webSearchEnabled?: unknown; thinkingEnabled?: unknown } = {}
   try {
     body = await request.json()
   } catch {
@@ -756,6 +756,7 @@ async function handlePOST(request: NextRequest) {
   const requestedSessionId = sanitizeSessionId(body.sessionId)
   const requestedModelId = sanitizeModelId(body.modelId)
   const webSearchEnabled = sanitizeBoolean(body.webSearchEnabled)
+  const thinkingEnabled = sanitizeBoolean(body.thinkingEnabled)
 
   if (!message) {
     return createAuthJsonResponse(
@@ -804,7 +805,6 @@ async function handlePOST(request: NextRequest) {
     const isRequestedModelAllowed = !requestedModelId
       || selectedModel.id === requestedModelId
       || selectedModel.slug === requestedModelId
-      || selectedModel.thinkingId === requestedModelId
 
     if (!isRequestedModelAllowed) {
       return attachRefreshedAuthCookie(
@@ -936,10 +936,15 @@ async function handlePOST(request: NextRequest) {
               message
             )
 
+            const reasoningEffort = selectedModel.reasoningEffort
+              ? thinkingEnabled ? "medium" : "none"
+              : undefined
+
             sendEvent("status", { message: getLabAiChatStatusMessage(locale, "response_generating") })
             const completionResult = await createLabChatCompletionStream({
               model: selectedModelId!,
               requestKind: "chat",
+              reasoningEffort,
               messages: chatMessages,
               onToken: (token) => {
                 if (!checkAlive()) {
@@ -1076,9 +1081,14 @@ async function handlePOST(request: NextRequest) {
       message
     )
 
+    const reasoningEffort = selectedModel.reasoningEffort
+      ? thinkingEnabled ? "medium" : "none"
+      : undefined
+
     const completionResult = await createLabChatCompletion({
       model: selectedModelId!,
       requestKind: "chat",
+      reasoningEffort,
       messages: chatMessages,
     })
     const assistantMessage = finalizeAssistantMessage(

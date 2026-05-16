@@ -23,9 +23,6 @@ import { JeonjuChatPanel } from "@/components/jeonju-chat-panel"
 import { JeonjuDailyBriefing } from "@/components/jeonju-daily-briefing"
 import { getParticleCount } from "@/lib/performance"
 
-
-
-
 // ---- Fixed geolocation for Jeonju ----
 
 const JEONJU_COORDS = {

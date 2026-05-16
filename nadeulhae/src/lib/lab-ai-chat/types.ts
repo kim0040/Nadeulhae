@@ -84,8 +84,8 @@ export interface LabAiChatModelOption {
   label: string
   description: string
   warning?: string
-  thinkingId?: string
-  thinkingWarning?: string
+  quantization?: string
+  reasoningEffort: boolean
 }
 
 /** The minimum server-side state needed to render the chat page. */

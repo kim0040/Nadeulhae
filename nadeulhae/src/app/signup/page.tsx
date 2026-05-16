@@ -714,7 +714,7 @@ export default function SignupPage() {
                 value={form.interestOther}
                 onChange={(event) => setForm((current) => ({ ...current, interestOther: event.target.value }))}
                 placeholder={copy.hobbyOtherPlaceholder}
-                className="w-full rounded-[1.3rem] border border-interactive-border bg-interactive/70 px-4 py-3 text-sm font-medium text-foreground outline-none transition focus:border-sky-blue/50"
+                className="w-full rounded-[1.3rem] border border-interactive-border bg-interactive/70 px-4 py-3 text-base font-medium text-foreground outline-none transition focus:border-sky-blue/50"
               />
             ) : null}
           </div>

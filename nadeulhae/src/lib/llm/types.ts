@@ -24,15 +24,15 @@ export interface LlmCompletionResult {
   usage: LlmUsage
 }
 
-/** Describes an LLM model available in the lab chat, with display metadata and an optional thinking/reasoning variant. */
+/** Describes an LLM model available in the lab chat, with display metadata and optional reasoning-effort support. */
 export interface LlmModelOption {
   id: string
   slug: string
   label: string
   description: string
   warning?: string
-  thinkingId?: string
-  thinkingWarning?: string
+  quantization?: string
+  reasoningEffort: boolean
 }
 
 /** Configuration required to connect to an OpenAI-compatible LLM API provider. */

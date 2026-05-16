@@ -24,7 +24,7 @@ export function AuthField({
         <input
           {...props}
           className={cn(
-            "w-full rounded-[1.45rem] border border-interactive-border bg-interactive/75 py-4 pl-12 text-sm font-medium text-foreground outline-none transition focus:border-sky-blue/50",
+            "w-full rounded-[1.45rem] border border-interactive-border bg-interactive/75 py-4 pl-12 text-base font-medium text-foreground outline-none transition focus:border-sky-blue/50",
             trailing ? "pr-12" : "pr-4",
             props.className
           )}

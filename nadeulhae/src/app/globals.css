@@ -219,3 +219,19 @@ body {
     @apply dark:shadow-[0_0_0_1px_rgba(233,245,243,.05),0_-20px_80px_-20px_rgba(125,179,255,.12)_inset];
   }
 }
+
+/* Page transition — triggered by PageTransition component on route change */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition-enter {
+  animation: page-enter 0.3s ease-out;
+}
