@@ -809,7 +809,6 @@ export function LabAiChatPanel() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [isThinkingPanelOpen, setIsThinkingPanelOpen] = useState(true)
-  const [isThinkingEnabled, setIsThinkingEnabled] = useState(false)
   const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(true)
 
@@ -1009,7 +1008,7 @@ export function LabAiChatPanel() {
     return models.find((model) => model.id === resolvedModelId || model.slug === resolvedModelId)
   }, [models, resolvedModelId])
 
-  const activeModelLabel = activeModel ? `${activeModel.label}${isThinkingEnabled && activeModel.reasoningEffort ? ` · ${copy.thinking}` : ""}` : copy.modelLabel
+  const activeModelLabel = activeModel ? activeModel.label : copy.modelLabel
   const activeModelDescription = activeModel?.description ?? copy.modelMenuHint
   const activeModelWarning = activeModel?.warning ?? null
 
@@ -1024,11 +1023,6 @@ export function LabAiChatPanel() {
     setSelectedModelId(modelId)
     if (typeof window !== "undefined") window.localStorage.setItem(MODEL_STORAGE_KEY, modelId)
   }, [])
-
-  const handleThinkingToggle = useCallback(() => {
-    if (!activeModel?.reasoningEffort) return
-    setIsThinkingEnabled((current) => !current)
-  }, [activeModel])
 
   const handleWebSearchToggle = useCallback(() => {
     if (!resolvedActiveSessionId) return
@@ -1246,7 +1240,6 @@ export function LabAiChatPanel() {
             sessionId: resolvedActiveSessionId,
             modelId: resolvedModelId,
             webSearchEnabled: isWebSearchEnabled,
-            thinkingEnabled: isThinkingEnabled,
           }),
         })
 
@@ -1344,7 +1337,6 @@ export function LabAiChatPanel() {
     copy.sendError,
     focusInput,
     isLimitReached,
-    isThinkingEnabled,
     language,
     resolvedActiveSessionId,
     resolvedModelId,
@@ -1602,22 +1594,6 @@ export function LabAiChatPanel() {
               ) : null}
             </div>
 
-            {activeModel?.reasoningEffort ? (
-              <button
-                type="button"
-                onClick={handleThinkingToggle}
-                className={cn(
-                  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition duration-200 active:scale-[0.98] sm:h-9 sm:w-auto sm:gap-1.5 sm:px-2.5",
-                  isThinkingEnabled
-                    ? "border-accent/35 bg-accent/10 text-accent dark:bg-accent/15"
-                    : "border-border bg-card/75 text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <Lightbulb className="size-4" />
-                <span className="hidden sm:inline">{copy.thinking}</span>
-              </button>
-            ) : null}
-
             <button
               type="button"
               onClick={handleWebSearchToggle}
@@ -1675,7 +1651,7 @@ export function LabAiChatPanel() {
                     language,
                     userMessage: previousUserMessage,
                     modelLabel: activeModelLabel,
-                     isThinkingEnabled,
+                      isThinkingEnabled: true,
                   })
                   return (
                     <div
