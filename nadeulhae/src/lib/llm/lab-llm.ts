@@ -52,15 +52,6 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
     reasoningEffort: true,
   },
   {
-    slug: "deepseek-v4-pro-precision",
-    label: "DeepSeek V4 Pro Precision",
-    description: "V4 Pro의 Q8_0 정밀 양자화 버전. 더 높은 정확도가 필요한 작업에 적합. 1M 컨텍스트.",
-    warning: "가격이 2~3배 높아요.",
-    candidates: ["deepseek-v4-pro-precision"],
-    quantization: "Q8_0",
-    reasoningEffort: true,
-  },
-  {
     slug: "deepseek-v4-flash",
     label: "DeepSeek V4 Flash",
     description: "가성비 높은 효율형 MoE 모델. 빠른 대화·코딩·일상 작업용. 1M 컨텍스트.",
@@ -88,7 +79,6 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
     slug: "glm-5.1",
     label: "GLM 5.1",
     description: "에이전트형 엔지니어링·긴 코딩 작업에 특화. 202K 컨텍스트.",
-    warning: "응답 완료가 느린 편이에요.",
     candidates: ["glm-5.1"],
     quantization: "Q6_K",
     reasoningEffort: true,

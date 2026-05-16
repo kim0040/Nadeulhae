@@ -320,9 +320,8 @@ export default function Home() {
           </MagicCard>
 
           <div className="flex flex-wrap items-start justify-center gap-y-12 sm:gap-10 mt-12 text-foreground w-full max-w-4xl mx-auto px-4">
-            {quickMetrics.map((item, index) => (
-              <BlurFade key={item.label} delay={0.05 * index} inView>
-                <div className="flex flex-col items-center basis-1/2 sm:basis-1/3 xl:basis-auto transition-transform hover:scale-105 active:scale-95 duration-300 max-w-[180px]">
+            {quickMetrics.map((item) => (
+              <div key={item.label} className="flex flex-col items-center basis-1/2 sm:basis-1/3 xl:basis-auto transition-transform hover:scale-105 active:scale-95 duration-300 max-w-[180px]">
                 <item.icon className={cn(item.tone, "mb-2 size-6 sm:size-8")} />
                 <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">{item.label}</span>
                 <span className="font-black text-xl sm:text-3xl leading-tight text-center">{item.value}</span>
@@ -332,7 +331,6 @@ export default function Home() {
                   </span>
                 ) : null}
               </div>
-              </BlurFade>
             ))}
           </div>
         </div>
