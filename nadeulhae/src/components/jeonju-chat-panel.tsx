@@ -10,6 +10,8 @@ import {
   UserX,
   WifiOff,
 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
 
 import { BorderBeam } from "@/components/magicui/border-beam"
@@ -138,7 +140,17 @@ function ChatBubble({
   const showTimestamp = showProfile
 
   return (
-    <div
+    <motion.div
+      layout="position"
+      initial={{ opacity: 0, y: 15, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{
+        type: "spring",
+        stiffness: 450,
+        damping: 38,
+        mass: 0.9,
+      }}
       className={cn(
         "group flex gap-2.5",
         isMine ? "flex-row-reverse" : "flex-row",
@@ -208,7 +220,7 @@ function ChatBubble({
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -459,8 +471,31 @@ export function JeonjuChatPanel() {
               className="max-h-[42rem] min-h-[26rem] space-y-3 overflow-y-auto overscroll-contain p-4 custom-scrollbar [overflow-anchor:none] sm:max-h-[48rem] sm:min-h-[30rem] sm:p-5"
             >
               {isLoading ? (
-                <div className="flex h-32 items-center justify-center text-sm font-semibold text-muted-foreground">
-                  <span className="animate-pulse">{copy.loading}</span>
+                <div className="space-y-5 py-4 w-full">
+                  {/* Left Skeleton Bubble */}
+                  <div className="flex gap-2.5 items-start">
+                    <Skeleton className="size-8 rounded-full shrink-0" />
+                    <div className="space-y-2 w-full max-w-[60%]">
+                      <Skeleton className="h-3.5 w-16 rounded-md" />
+                      <Skeleton className="h-10 w-full rounded-2xl rounded-tl-md" />
+                    </div>
+                  </div>
+                  {/* Right Skeleton Bubble */}
+                  <div className="flex gap-2.5 items-start flex-row-reverse">
+                    <Skeleton className="size-8 rounded-full shrink-0" />
+                    <div className="space-y-2 w-full max-w-[50%] flex flex-col items-end">
+                      <Skeleton className="h-3.5 w-14 rounded-md" />
+                      <Skeleton className="h-10 w-full rounded-2xl rounded-tr-md" />
+                    </div>
+                  </div>
+                  {/* Left Skeleton Bubble */}
+                  <div className="flex gap-2.5 items-start">
+                    <Skeleton className="size-8 rounded-full shrink-0" />
+                    <div className="space-y-2 w-full max-w-[45%]">
+                      <Skeleton className="h-3.5 w-12 rounded-md" />
+                      <Skeleton className="h-10 w-full rounded-2xl rounded-tl-md" />
+                    </div>
+                  </div>
                 </div>
               ) : error ? (
                 <div
@@ -480,35 +515,37 @@ export function JeonjuChatPanel() {
                   </p>
                 </div>
               ) : (
-                messages.map((msg, index) => {
-                  const prev = messages[index - 1]
-                  const prevIsMine = prev?.isMine ?? (user?.id === prev?.userId)
-                  const currentIsMine = msg.isMine ?? (user?.id === msg.userId)
-                  const isSameUser =
-                    prev &&
-                    !prev.isAnonymous &&
-                    !msg.isAnonymous &&
-                    prev.userId === msg.userId &&
-                    prev.isAnonymous === msg.isAnonymous &&
-                    prev.nickname === msg.nickname &&
-                    prevIsMine === currentIsMine
-                  const timeA = prev ? new Date(prev.createdAt.endsWith("Z") ? prev.createdAt : `${prev.createdAt}Z`).getTime() : 0
-                  const timeB = new Date(msg.createdAt.endsWith("Z") ? msg.createdAt : `${msg.createdAt}Z`).getTime()
-                  const timeDiff = timeB - timeA
+                <AnimatePresence initial={false} mode="popLayout">
+                  {messages.map((msg, index) => {
+                    const prev = messages[index - 1]
+                    const prevIsMine = prev?.isMine ?? (user?.id === prev?.userId)
+                    const currentIsMine = msg.isMine ?? (user?.id === msg.userId)
+                    const isSameUser =
+                      prev &&
+                      !prev.isAnonymous &&
+                      !msg.isAnonymous &&
+                      prev.userId === msg.userId &&
+                      prev.isAnonymous === msg.isAnonymous &&
+                      prev.nickname === msg.nickname &&
+                      prevIsMine === currentIsMine
+                    const timeA = prev ? new Date(prev.createdAt.endsWith("Z") ? prev.createdAt : `${prev.createdAt}Z`).getTime() : 0
+                    const timeB = new Date(msg.createdAt.endsWith("Z") ? msg.createdAt : `${msg.createdAt}Z`).getTime()
+                    const timeDiff = timeB - timeA
 
-                  const showProfile = !(isSameUser && timeDiff < 60_000)
+                    const showProfile = !(isSameUser && timeDiff < 60_000)
 
-                  return (
-                    <ChatBubble
-                      key={msg.id}
-                      message={msg}
-                      isMine={currentIsMine}
-                      language={language}
-                      showProfile={showProfile}
-                      nowMs={serverNowMs}
-                    />
-                  )
-                })
+                    return (
+                      <ChatBubble
+                        key={msg.id}
+                        message={msg}
+                        isMine={currentIsMine}
+                        language={language}
+                        showProfile={showProfile}
+                        nowMs={serverNowMs}
+                      />
+                    )
+                  })}
+                </AnimatePresence>
               )}
             </div>
 

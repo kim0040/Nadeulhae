@@ -7,6 +7,7 @@ import { Sparkles, Cloud, Sun, CloudRain } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/context/LanguageContext"
+import { Skeleton } from "@/components/ui/skeleton"
 
 function pickDateFnsLocale(language: string) {
   if (language === "ko") return ko
@@ -131,10 +132,45 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
 
       {/* Horizontal Scroll Container */}
       <div className="relative w-full">
+        {/* Horizontal Scroll Gradient Mask for Visual Continuity */}
+        <div className="absolute left-0 top-6 bottom-6 w-12 bg-gradient-to-r from-background via-background/50 to-transparent pointer-events-none z-20 rounded-l-[2.5rem] opacity-0 sm:opacity-100 transition-opacity duration-300" />
+        <div className="absolute right-0 top-6 bottom-6 w-12 bg-gradient-to-l from-background via-background/50 to-transparent pointer-events-none z-20 rounded-r-[2.5rem] opacity-0 sm:opacity-100 transition-opacity duration-300" />
+
         <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6 py-6 relative z-10">
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {isLoading ? (
-               <div className="w-full flex justify-center py-20 text-nature-green animate-pulse font-bold tracking-widest uppercase">{__l("예보 불러오는 중...", "Loading Forecast...", "正在加载预报...", "予報を読み込み中...")}</div>
+              Array.from({ length: 4 }).map((_, idx) => (
+                <div
+                  key={`skeleton-${idx}`}
+                  className="snap-center sm:snap-start shrink-0 w-[260px] p-6 bg-card border border-card-border/70 rounded-[2.5rem] shadow-[0_22px_55px_-32px_rgba(47,111,228,0.22)] flex flex-col justify-between min-h-[520px]"
+                >
+                  {/* Top: Date & Badge */}
+                  <div className="w-full flex justify-between items-start mb-5 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <Skeleton className="h-3 w-8 rounded" />
+                      <Skeleton className="h-8 w-8 rounded-lg" />
+                    </div>
+                    <Skeleton className="h-6 w-12 rounded-full shrink-0" />
+                  </div>
+
+                  {/* Middle: Icon & Sky */}
+                  <div className="flex flex-col items-center my-4 min-h-[138px]">
+                    <Skeleton className="size-20 rounded-[1.75rem]" />
+                    <Skeleton className="h-8 w-32 rounded-lg mt-4" />
+                  </div>
+
+                  {/* Bottom: Temp and Details */}
+                  <div className="w-full flex flex-col gap-3 mt-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Skeleton className="h-16 w-full rounded-[1.35rem]" />
+                      <Skeleton className="h-16 w-full rounded-[1.35rem]" />
+                    </div>
+                    <Skeleton className="h-16 w-full rounded-[1.35rem]" />
+                    <Skeleton className="h-20 w-full rounded-[1.35rem]" />
+                    <Skeleton className="h-11 w-full rounded-[1.1rem]" />
+                  </div>
+                </div>
+              ))
             ) : forecast?.daily?.map((dayForecast: any, i: number) => {
               const dayDate = new Date(dayForecast.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'))
               const isToday = isSameDay(dayDate, today)

@@ -12,6 +12,8 @@ import {
   Newspaper,
   Lightbulb,
 } from "lucide-react"
+import { motion } from "framer-motion"
+import { Skeleton } from "@/components/ui/skeleton"
 
 // ------------------------------------------------------------------
 // Types
@@ -202,10 +204,57 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
   // ---- Loading ----
   if (status === "idle" || status === "loading") {
     return (
-      <div className="rounded-[2.5rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-8 sm:p-12">
-        <div className="flex items-center justify-center gap-3 py-16">
-          <Loader2 className="h-5 w-5 animate-spin text-sky-blue" />
-          <span className="text-sm font-black text-muted-foreground">{t.loading}</span>
+      <div className="rounded-[2.5rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-8 sm:p-12 space-y-8">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 w-full">
+            <Skeleton className="size-12 rounded-2xl shrink-0" />
+            <div className="space-y-2 w-full max-w-md">
+              <Skeleton className="h-8 w-3/4 rounded-xl" />
+              <Skeleton className="h-4 w-1/3 rounded-lg" />
+            </div>
+          </div>
+          <Skeleton className="h-10 w-28 rounded-xl shrink-0" />
+        </div>
+
+        {/* AI Summary Box Skeleton */}
+        <div className="rounded-[1.85rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Skeleton className="size-4 rounded-full" />
+            <Skeleton className="h-3 w-24 rounded-md" />
+          </div>
+          <Skeleton className="h-24 w-full rounded-[1.4rem]" />
+        </div>
+
+        {/* AI Tips Skeleton */}
+        <div className="rounded-[1.85rem] border border-nature-green/20 bg-nature-green/5 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Skeleton className="size-4 rounded-full" />
+            <Skeleton className="h-3 w-20 rounded-md" />
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full rounded-[1.4rem]" />
+            <Skeleton className="h-12 w-full rounded-[1.4rem]" />
+          </div>
+        </div>
+
+        {/* Weather / Events Grid Skeletons */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Skeleton className="h-28 rounded-[1.45rem]" />
+          <Skeleton className="h-28 rounded-[1.45rem]" />
+        </div>
+
+        {/* News Sources Skeleton */}
+        <div className="rounded-[1.85rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Skeleton className="size-4 rounded-full" />
+            <Skeleton className="h-3 w-24 rounded-md" />
+          </div>
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-[1.4rem]" />
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -235,7 +284,12 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
   const sourceCount = new Set(briefing.newsItems.map((n) => n.source).filter(Boolean)).size
 
   return (
-    <div className="rounded-[2.5rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-8 sm:p-12 pb-6">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="rounded-[2.5rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-8 sm:p-12 pb-6"
+    >
       {/* ── Card Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div className="flex items-center gap-4">
@@ -401,7 +455,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }
 

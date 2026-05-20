@@ -71,6 +71,11 @@
       transform: translateY(0) scale(1);
     }
   }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
 
   --animate-marquee: marquee var(--duration) linear infinite;
   --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
@@ -80,6 +85,7 @@
   --animate-shine: shine var(--duration) infinite linear;
   --animate-lab-chat-rise: lab-chat-rise 220ms ease-out both;
   --animate-lab-chat-popover: lab-chat-popover 160ms ease-out both;
+  --animate-shimmer: shimmer 2.2s infinite;
 }
 
 :root {

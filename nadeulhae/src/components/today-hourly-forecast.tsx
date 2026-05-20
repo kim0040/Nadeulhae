@@ -1,6 +1,7 @@
 "use client"
 
 import { Cloud, CloudMoon, CloudRain, Droplets, Sun } from "lucide-react"
+import { motion } from "framer-motion"
 
 import { useLanguage } from "@/context/LanguageContext"
 import { cn } from "@/lib/utils"
@@ -124,8 +125,12 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
             ) : null}
           </div>
 
-          <div className="mt-5">
-            <div className="-mx-2 overflow-x-auto pb-2 hide-scrollbar sm:mx-0">
+          <div className="mt-5 relative">
+            {/* Horizontal Scroll Gradient Mask for Visual Continuity */}
+            <div className="absolute left-0 top-0 bottom-2 w-12 bg-gradient-to-r from-card via-card/50 to-transparent pointer-events-none z-20 rounded-l-[1.7rem] opacity-0 sm:opacity-100 transition-opacity duration-300" />
+            <div className="absolute right-0 top-0 bottom-2 w-12 bg-gradient-to-l from-card via-card/50 to-transparent pointer-events-none z-20 rounded-r-[1.7rem] opacity-0 sm:opacity-100 transition-opacity duration-300" />
+
+            <div className="-mx-2 overflow-x-auto pb-2 hide-scrollbar sm:mx-0 relative z-10">
               <div className="flex gap-3 px-2 sm:gap-0 sm:px-0">
                 {items.map((item, index) => {
                   const night = parseHour(item.time) >= 18 || parseHour(item.time) <= 5
@@ -133,15 +138,18 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
                   const isLead = index === 0
 
                   return (
-                    <div
+                    <motion.div
                       key={`${item.date}-${item.time}`}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, delay: index * 0.03, ease: "easeOut" }}
                       className={cn(
                         "relative min-w-[148px] shrink-0 px-2 sm:min-w-[176px] sm:px-3",
                         index !== items.length - 1 && "after:absolute after:right-0 after:top-4 after:hidden after:h-[70%] after:w-px after:bg-border after:opacity-80 sm:after:block dark:after:bg-white/12"
                       )}
                     >
                       <div className={cn(
-                        "min-h-[238px] rounded-[1.7rem] border px-4 py-5 transition-colors sm:min-h-[220px] sm:px-3 sm:py-3",
+                        "min-h-[238px] rounded-[1.7rem] border px-4 py-5 transition-all hover:scale-[1.02] duration-300 sm:min-h-[220px] sm:px-3 sm:py-3",
                         isLead
                           ? "border-slate-300 bg-card shadow-[0_18px_44px_-34px_rgba(47,111,228,0.24)] dark:border-active-blue/30"
                           : night
@@ -206,7 +214,7 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   )
                 })}
               </div>

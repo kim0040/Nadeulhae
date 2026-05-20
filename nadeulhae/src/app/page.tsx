@@ -30,6 +30,7 @@ import { WordPullUp } from "@/components/magicui/word-pull-up"
 import { ShineBorder } from "@/components/magicui/shine-border"
 import { BlurFade } from "@/components/magicui/blur-fade"
 import { MagicCard } from "@/components/ui/magic-card"
+import { Skeleton } from "@/components/ui/skeleton"
 import type { HourlyForecastItem } from "@/components/today-hourly-forecast"
 import Link from "next/link"
 import type { WeatherImageData } from "@/components/weather-image-panel"
@@ -39,7 +40,11 @@ const WeatherImagePanel = dynamic(() => import("@/components/weather-image-panel
 const FireInsightPanel = dynamic(() => import("@/components/fire-insight-panel").then(m => ({ default: m.FireInsightPanel })), { ssr: false })
 const TodayHourlyForecast = dynamic(() => import("@/components/today-hourly-forecast").then(m => ({ default: m.TodayHourlyForecast })), {
   ssr: false,
-  loading: () => <div className="h-48 animate-pulse rounded-3xl bg-card" />,
+  loading: () => (
+    <div className="mt-8 mb-10">
+      <Skeleton className="h-72 w-full rounded-[2.7rem]" />
+    </div>
+  ),
 })
 
 /** Translate Korean UV level labels to English; pass through for other locales */ function localizeUvLabel(value: string | undefined, language: string) {
@@ -222,8 +227,47 @@ export default function Home() {
 
   if (!weatherData) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-background text-sky-blue animate-pulse font-bold">
-        {t("loading_weather")}
+      <div className="min-h-screen w-full bg-background px-4 pb-24 pt-24 sm:pt-32 flex flex-col items-center justify-center overflow-hidden relative">
+        {/* Background decorative soft glow */}
+        <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(circle_at_center,rgba(47,111,228,0.1),transparent_60%)]" />
+
+        {/* Hero Loading Skeleton */}
+        <div className="z-10 flex max-w-6xl w-full flex-col items-center gap-8 text-center">
+          {/* Title Skeleton */}
+          <div className="space-y-3 w-full max-w-xl flex flex-col items-center">
+            <Skeleton className="h-14 w-3/4 sm:w-2/3 max-w-md rounded-2xl" />
+            <Skeleton className="h-7 w-1/2 rounded-xl mt-2" />
+          </div>
+
+          {/* Circle Score Skeleton with Loader/Text */}
+          <div className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card/50 border border-card-border/60 shadow-xl backdrop-blur-md">
+            <Skeleton className="size-56 sm:size-72 rounded-full flex flex-col items-center justify-center gap-2">
+              <span className="text-sky-blue font-black text-xs sm:text-sm uppercase tracking-[0.3em] animate-pulse">
+                {t("loading_weather")}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.22em] text-foreground/45">
+                Nadeulhae Outing Lab
+              </span>
+            </Skeleton>
+          </div>
+
+          {/* Quick Metrics Skeletons */}
+          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10 mt-12 w-full max-w-4xl mx-auto px-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-3 basis-1/3 sm:basis-auto w-[120px]">
+                <Skeleton className="size-8 rounded-full" />
+                <Skeleton className="h-3 w-16 rounded-md" />
+                <Skeleton className="h-7 w-20 rounded-lg" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Content sections skeletons */}
+        <div className="container mx-auto px-4 w-full max-w-6xl mt-12 space-y-8 relative z-20">
+          <Skeleton className="h-64 w-full rounded-[2.7rem]" />
+          <Skeleton className="h-72 w-full rounded-[2.7rem]" />
+        </div>
       </div>
     )
   }
