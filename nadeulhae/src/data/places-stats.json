@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-05-24T06:23:42.798Z",
+  "generatedAt": "2026-05-24T06:32:44.247Z",
   "summary": {
     "totalRaw": 30660,
     "totalDeduped": 29233,
     "duplicatesRemoved": 1427,
-    "withCoordinates": 12208,
-    "withoutCoordinates": 18452
+    "withCoordinates": 18949,
+    "withoutCoordinates": 11711
   },
   "categories": {
     "festival": 51,
@@ -41,7 +41,7 @@
     "menuPriceNormalized": "숫자만 추출, 가격대(1~4) 산정"
   },
   "todo": [
-    "⚠️ 카카오 지오코딩: places.json의 withoutCoordinates 건들에 대해 kakaoPlaceId로 위경도 조회 필요 (KAKAO_REST_API_KEY 필요)",
+    "✅ 자체 지오코딩: 이름 기반 매칭으로 API 없이 좌표 보강 완료. 미매칭 약 7,500건은 자연명소·축제장소로, 수동 또는 카카오 API 보완 가능",
     "⚠️ pay_after 원본 업종 오분류: 키워드 기반 자동 교정 완료했으나, 약 3%는 수동 확인 권장",
     "⚠️ 영업시간 파싱: raw 텍스트를 구조화된 {dayOfWeek, open, close}[]로 변환하는 정규식 파서 추가 필요",
     "⚠️ 축제/행사 실시간 연동: 현재 CSV 스냅샷 기준. 주기적 업데이트 파이프라인 필요"
