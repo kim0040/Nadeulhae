@@ -327,24 +327,38 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         </div>
 
         {/* ── AI Summary Card ── */}
-        <div className="rounded-[1.85rem] border px-5 py-5 border-sky-blue/20 bg-sky-blue/10 dark:bg-sky-blue/20 text-sky-blue mb-4">
-          <div className="flex items-center gap-2">
-            <Sparkles size={18} />
-            <span className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
-              {t.summaryLabel}
-            </span>
+        <div className="rounded-[1.85rem] border px-5 py-5 border-nature-green/20 bg-nature-green/10 dark:bg-nature-green/20 text-nature-green mb-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} />
+                <span className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
+                  {t.summaryLabel}
+                </span>
+              </div>
+              <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-words">
+                {briefing.headline}
+              </div>
+              <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-foreground/80 dark:text-current break-words whitespace-pre-line">
+                {briefing.summary}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 lg:max-w-[280px] lg:justify-end">
+              <span className="inline-flex rounded-full border border-current/15 bg-background/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-current dark:bg-background/20">
+                {briefing.modelUsed || "NadeulAI"}
+              </span>
+              {briefing.fromCache && (
+                <span className="inline-flex rounded-full border border-current/15 bg-background/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-current dark:bg-background/20">
+                  {language === "ko" ? "실시간 연동" : language === "zh" ? "实时同步" : language === "ja" ? "リアルタイム同期" : "Realtime synced"}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-words">
-            {briefing.headline}
-          </div>
-          <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-foreground/80 dark:text-current break-words whitespace-pre-line">
-            {briefing.summary}
-          </p>
         </div>
 
         {/* ── AI Insight / Tips Card ── */}
         {briefing.aiInsight && (
-          <div className="rounded-[1.85rem] border px-5 py-5 border-nature-green/20 bg-nature-green/10 dark:bg-nature-green/20 text-nature-green mb-4">
+          <div className="rounded-[1.85rem] border px-5 py-5 border-sky-blue/20 bg-sky-blue/10 dark:bg-sky-blue/20 text-sky-blue mb-4">
             <div className="flex items-center gap-2">
               <Lightbulb size={18} />
               <span className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
@@ -356,8 +370,8 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
                 const cleaned = line.replace(/^•\s*/, "").trim()
                 if (!cleaned) return null
                 return (
-                  <div key={idx} className="flex items-start gap-3 rounded-2xl border border-nature-green/15 dark:border-nature-green/30 bg-background/90 dark:bg-background/20 px-4 py-3 min-w-0">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-nature-green" />
+                  <div key={idx} className="flex items-start gap-3 rounded-2xl border border-sky-blue/15 dark:border-sky-blue/30 bg-background/90 dark:bg-background/20 px-4 py-3 min-w-0">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-blue" />
                     <span className="text-sm sm:text-base font-bold leading-relaxed">{cleaned}</span>
                   </div>
                 )
