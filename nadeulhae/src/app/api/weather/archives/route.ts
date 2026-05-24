@@ -35,8 +35,10 @@ interface ArchiveResponse {
 // ---------------------------------------------------------------------------
 // Cache
 // ---------------------------------------------------------------------------
-const cache = new Map<string, { expiry: number; data: ArchiveResponse }>();
-const CACHE_TTL = 30 * 60 * 1000; // 30 min (historical data never changes)
+const monthCache = new Map<string, { expiry: number; data: ArchiveResponse }>();
+const dateCache = new Map<string, { expiry: number; data: unknown }>();
+const MONTH_CACHE_TTL = 30 * 60 * 1000; // 30 min
+const DATE_CACHE_TTL = 60 * 60 * 1000; // 1 hour (historical data never changes)
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -93,6 +95,12 @@ async function handleGET(request: Request) {
 
   // ---- Single-date detail endpoint ----
   if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const dateCacheKey = `date:${date}`;
+    const dateCached = dateCache.get(dateCacheKey);
+    if (dateCached && dateCached.expiry > Date.now()) {
+      return NextResponse.json(dateCached.data);
+    }
+
     // Year-over-year: same month-day across all years
     const [, m, d] = date.split("-").map(Number);
     const rows = await queryRows<HistoryRow[]>(
@@ -138,14 +146,19 @@ async function handleGET(request: Request) {
       },
     }));
 
-    return NextResponse.json({ date, entries, count: entries.length });
+    const payload = { date, entries, count: entries.length };
+    dateCache.set(dateCacheKey, {
+      expiry: Date.now() + DATE_CACHE_TTL,
+      data: payload,
+    });
+    return NextResponse.json(payload);
   }
 
   // ---- Month archive endpoint ----
-  const cacheKey = `archives:${month}`;
-  const cached = cache.get(cacheKey);
-  if (cached && cached.expiry > Date.now()) {
-    return NextResponse.json(cached.data);
+  const monthCacheKey = `archives:${month}`;
+  const monthCached = monthCache.get(monthCacheKey);
+  if (monthCached && monthCached.expiry > Date.now()) {
+    return NextResponse.json(monthCached.data);
   }
 
   try {
@@ -195,7 +208,10 @@ async function handleGET(request: Request) {
       },
     };
 
-    cache.set(cacheKey, { expiry: Date.now() + CACHE_TTL, data: payload });
+    monthCache.set(monthCacheKey, {
+      expiry: Date.now() + MONTH_CACHE_TTL,
+      data: payload,
+    });
 
     return NextResponse.json(payload);
   } catch (error) {

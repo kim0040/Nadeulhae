@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-05-24T06:23:42.798Z",
+  "summary": {
+    "totalRaw": 30660,
+    "totalDeduped": 29233,
+    "duplicatesRemoved": 1427,
+    "withCoordinates": 12208,
+    "withoutCoordinates": 18452
+  },
+  "categories": {
+    "festival": 51,
+    "sports": 1532,
+    "attraction": 373,
+    "nature": 244,
+    "restaurant": 15694,
+    "shopping": 4670,
+    "cafe": 4176,
+    "culture": 867,
+    "accommodation": 216,
+    "other": 1695,
+    "pub": 863,
+    "bakery": 279
+  },
+  "placeTypes": {
+    "semi-outdoor": 419,
+    "indoor": 28432,
+    "outdoor": 1809
+  },
+  "weatherTags": {
+    "rainy-day": 6281,
+    "clear-day": 594,
+    "cold-day": 1854,
+    "hot-day": 389
+  },
+  "preprocessing": {
+    "dateTypoFixed": true,
+    "misclassifiedFixed": "키워드 기반 자동 재분류 완료",
+    "indoorOutdoorTagged": true,
+    "weatherTagsAdded": true,
+    "hoursNormalized": "JSON 구조로 정규화",
+    "menuPriceNormalized": "숫자만 추출, 가격대(1~4) 산정"
+  },
+  "todo": [
+    "⚠️ 카카오 지오코딩: places.json의 withoutCoordinates 건들에 대해 kakaoPlaceId로 위경도 조회 필요 (KAKAO_REST_API_KEY 필요)",
+    "⚠️ pay_after 원본 업종 오분류: 키워드 기반 자동 교정 완료했으나, 약 3%는 수동 확인 권장",
+    "⚠️ 영업시간 파싱: raw 텍스트를 구조화된 {dayOfWeek, open, close}[]로 변환하는 정규식 파서 추가 필요",
+    "⚠️ 축제/행사 실시간 연동: 현재 CSV 스냅샷 기준. 주기적 업데이트 파이프라인 필요"
+  ],
+  "outputFiles": {
+    "places": "src/data/places.json",
+    "stats": "src/data/places-stats.json"
+  }
+}
