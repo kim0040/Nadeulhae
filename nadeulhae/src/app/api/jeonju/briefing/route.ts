@@ -170,9 +170,17 @@ function getYesterdayInKst(): string {
   const hour = Number(get("hour"))
   // Day boundary is 07:00 KST, not midnight
   const offset = hour < 7 ? 2 : 1
-  const d = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00+09:00`)
-  d.setDate(d.getDate() - offset)
-  return d.toISOString().slice(0, 10)
+  
+  const targetDateMs = Date.now() - offset * 24 * 60 * 60 * 1000
+  const targetParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(targetDateMs))
+  
+  const tGet = (type: string) => targetParts.find((p) => p.type === type)?.value ?? "00"
+  return `${tGet("year")}-${tGet("month")}-${tGet("day")}`
 }
 
 function isRecentlyUpdated(updatedAt: string, nowMs: number, minIntervalMs: number) {
