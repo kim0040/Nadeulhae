@@ -287,182 +287,177 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="relative rounded-[2.5rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-8 sm:p-12 pb-6 transition-colors duration-300 animate-fade-in"
+      className="w-full max-w-5xl mx-auto rounded-[3rem] bg-[var(--card)] border border-[var(--card-border)] shadow-2xl overflow-hidden transition-colors duration-300"
     >
-      {/* ── Card Header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 border-b border-[var(--interactive-border)] pb-8">
-        <div className="flex items-center gap-5">
-          <div className="relative flex items-center justify-center p-3.5 rounded-2xl bg-sky-blue/10 dark:bg-sky-blue/25 text-sky-blue shrink-0">
-            <Newspaper size={24} />
-            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-blue opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-blue"></span>
-            </span>
-          </div>
-          <div>
-            <h3 className="text-2xl sm:text-4xl font-extrabold text-foreground tracking-tight leading-tight break-words">
-              {briefing.headline}
-            </h3>
-            <div className="inline-flex items-center gap-1.5 mt-2">
-              <Sparkles size={12} className="text-sky-blue animate-pulse animate-duration-1000" />
-              <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.25em] italic opacity-95">
+      <div className="p-8 sm:p-12 pb-6">
+        {/* ── Card Header ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-blue to-active-blue text-white shadow-lg shadow-active-blue/20">
+              <Newspaper size={24} />
+            </div>
+            <div>
+              <h3 className="text-2xl sm:text-4xl font-black text-foreground tracking-tight leading-none">
                 {t.badge}
+              </h3>
+              <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.3em] mt-2 italic opacity-70">
+                {language === "ko" ? "과거 아카이브 분석 엔진" : language === "zh" ? "过去档案分析引擎" : language === "ja" ? "過去アーカイブ分析エンジン" : "Past Archive Engine"}
               </p>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-4 shrink-0">
-          <div className="flex flex-col items-end">
-            <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest leading-none mb-1.5">
-              {t.dateLabel}
-            </span>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/40 dark:bg-neutral-900/40 border border-[var(--interactive-border)]">
-              <span className="text-xs font-bold text-foreground">{dateLabel}</span>
-            </div>
-          </div>
-          <button
-            onClick={() => fetchBriefing(true)}
-            className="group/btn p-3 rounded-xl border border-[var(--interactive-border)] bg-white/40 dark:bg-neutral-900/40 hover:bg-sky-blue/15 text-muted-foreground hover:text-sky-blue hover:border-sky-blue/30 active:scale-95 transition-all duration-200"
-            title={t.retry}
-            aria-label={t.retry}
-          >
-            <RefreshCw size={14} className="transition-transform duration-300 group-hover/btn:rotate-180" />
-          </button>
-        </div>
-      </div>
-
-      {/* ── AI Summary ── */}
-      <div className="rounded-[2rem] border-l-4 border-l-sky-blue border-y border-r border-[var(--interactive-border)] bg-white/50 dark:bg-neutral-900/25 p-6 sm:p-8 mb-6 relative overflow-hidden">
-        <div className="flex items-center gap-2.5 mb-4">
-          <Sparkles size={14} className="text-sky-blue" />
-          <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
-            {t.summaryLabel}
-          </span>
-        </div>
-        <p className="text-base sm:text-lg font-bold leading-relaxed text-foreground/90 break-words whitespace-pre-line">
-          {briefing.summary}
-        </p>
-      </div>
-
-      {/* ── AI Insight / Tips ── */}
-      {briefing.aiInsight && (
-        <div className="rounded-[2rem] border border-nature-green/15 dark:border-nature-green/30 bg-nature-green/5 dark:bg-nature-green/10 p-6 sm:p-8 mb-6">
-          <div className="flex items-center gap-2.5 mb-5">
-            <div className="p-1.5 rounded-lg bg-nature-green/10 text-nature-green">
-              <Lightbulb size={16} />
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
-              {t.tipsLabel}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {briefing.aiInsight.split(/\n+/).filter(Boolean).map((line, idx) => {
-              const cleaned = line.replace(/^•\s*/, "").trim()
-              if (!cleaned) return null
-              return (
-                <div key={idx} className="group/tip flex items-start gap-4 rounded-2xl border border-nature-green/10 dark:border-nature-green/20 bg-white/40 dark:bg-neutral-900/30 p-4 transition-colors duration-200">
-                  <div className="flex items-center justify-center size-8 shrink-0 rounded-xl bg-nature-green/15 dark:bg-nature-green/25 text-nature-green">
-                    <Lightbulb size={14} />
-                  </div>
-                  <span className="text-sm sm:text-base font-bold leading-relaxed text-foreground break-words">{cleaned}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Weather / Events Bento ── */}
-      {(briefing.weatherNote || briefing.festivalNote) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          {briefing.weatherNote && (
-            <div className="group/weather rounded-2xl border border-orange-200 dark:border-orange-500/20 bg-orange-50/70 dark:bg-orange-950/10 p-5 transition-colors duration-200">
-              <div className="flex items-center gap-2 mb-3">
-                <Sun size={15} className="text-orange-500 dark:text-orange-400" />
-                <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
-                  {t.weather}
-                </span>
-              </div>
-              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-words">
-                {briefing.weatherNote}
-              </div>
-            </div>
-          )}
-          {briefing.festivalNote && (
-            <div className="group/event rounded-2xl border border-pink-200 dark:border-pink-500/20 bg-pink-50/70 dark:bg-pink-950/10 p-5 transition-colors duration-200">
-              <div className="flex items-center gap-2 mb-3">
-                <PartyPopper size={15} className="text-pink-500 dark:text-pink-400" />
-                <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
-                  {t.events}
-                </span>
-              </div>
-              <div className="text-base sm:text-lg font-black leading-snug text-foreground break-words">
-                {briefing.festivalNote}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── News Links ── */}
-      {briefing.newsItems.length > 0 && (
-        <div className="rounded-[2rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-6 sm:p-8 mb-6">
-          <div className="flex items-center gap-3 mb-5">
-            <ArrowUpRight size={16} className="text-sky-blue" />
-            <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
-              {t.sources}
-            </span>
-            {sourceCount > 0 && (
-              <span className="rounded-full px-2.5 py-0.5 bg-sky-blue/10 text-sky-blue text-[10px] font-bold">
-                {language === "ko" ? `${sourceCount}개 출처` : language === "zh" ? `${sourceCount}个来源` : language === "ja" ? `${sourceCount}件의소스` : `${sourceCount} sources`}
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest leading-none mb-1">
+                {t.dateLabel}
               </span>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--interactive)] border border-[var(--interactive-border)]">
+                <Sparkles size={12} className="text-sky-blue" />
+                <span className="text-xs font-black text-foreground">{dateLabel}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => fetchBriefing(true)}
+              className="p-2 rounded-xl border border-[var(--interactive-border)] bg-[var(--interactive)] text-muted-foreground hover:text-foreground hover:border-foreground/20 active:scale-95 transition-all duration-200"
+              title={t.retry}
+              aria-label={t.retry}
+            >
+              <RefreshCw size={12} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── AI Summary Card ── */}
+        <div className="rounded-[1.85rem] border px-5 py-5 border-sky-blue/20 bg-sky-blue/10 dark:bg-sky-blue/20 text-sky-blue mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles size={18} />
+            <span className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
+              {t.summaryLabel}
+            </span>
+          </div>
+          <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-words">
+            {briefing.headline}
+          </div>
+          <p className="mt-3 text-sm sm:text-base font-bold leading-relaxed text-foreground/80 dark:text-current break-words whitespace-pre-line">
+            {briefing.summary}
+          </p>
+        </div>
+
+        {/* ── AI Insight / Tips Card ── */}
+        {briefing.aiInsight && (
+          <div className="rounded-[1.85rem] border px-5 py-5 border-nature-green/20 bg-nature-green/10 dark:bg-nature-green/20 text-nature-green mb-4">
+            <div className="flex items-center gap-2">
+              <Lightbulb size={18} />
+              <span className="text-[10px] font-black uppercase tracking-[0.24em] text-current/80">
+                {t.tipsLabel}
+              </span>
+            </div>
+            <div className="mt-3 space-y-2 text-foreground dark:text-current">
+              {briefing.aiInsight.split(/\n+/).filter(Boolean).map((line, idx) => {
+                const cleaned = line.replace(/^•\s*/, "").trim()
+                if (!cleaned) return null
+                return (
+                  <div key={idx} className="flex items-start gap-3 rounded-2xl border border-nature-green/15 dark:border-nature-green/30 bg-background/90 dark:bg-background/20 px-4 py-3 min-w-0">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-nature-green" />
+                    <span className="text-sm sm:text-base font-bold leading-relaxed">{cleaned}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Weather / Events Grid ── */}
+        {(briefing.weatherNote || briefing.festivalNote) && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 mb-4">
+            {briefing.weatherNote && (
+              <div className="rounded-[1.45rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-4 py-4 min-w-0">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sun size={15} className="text-orange-500" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+                    {t.weather}
+                  </span>
+                </div>
+                <div className="text-base sm:text-lg font-black leading-snug text-foreground break-words">
+                  {briefing.weatherNote}
+                </div>
+              </div>
+            )}
+            {briefing.festivalNote && (
+              <div className="rounded-[1.45rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-4 py-4 min-w-0">
+                <div className="flex items-center gap-2 mb-3">
+                  <PartyPopper size={15} className="text-pink-500" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+                    {t.events}
+                  </span>
+                </div>
+                <div className="text-base sm:text-lg font-black leading-snug text-foreground break-words">
+                  {briefing.festivalNote}
+                </div>
+              </div>
             )}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {briefing.newsItems.map((item, i) => (
-              <a
-                key={`${item.url}-${i}`}
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group/item flex items-start gap-4 rounded-2xl border border-[var(--interactive-border)] bg-card px-4 py-4 hover:border-sky-blue/20 dark:hover:border-sky-blue/30 hover:bg-sky-blue/5 transition-all duration-200 min-w-0"
-              >
-                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sky-blue/20 bg-sky-blue/10 text-[10px] font-black text-sky-blue">
-                  {i + 1}
+        )}
+
+        {/* ── News Links Sources ── */}
+        {briefing.newsItems.length > 0 && (
+          <div className="rounded-[1.85rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5 mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <ArrowUpRight size={16} className="text-sky-blue" />
+              <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+                {t.sources}
+              </span>
+              {sourceCount > 0 && (
+                <span className="rounded-full border border-sky-blue/15 bg-sky-blue/8 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-sky-blue shadow-sm">
+                  {language === "ko" ? `${sourceCount}개 출처` : language === "zh" ? `${sourceCount}个来源` : language === "ja" ? `${sourceCount}件의소스` : `${sourceCount} sources`}
                 </span>
-                <div className="min-w-0">
-                  <p className="text-sm sm:text-base font-black text-foreground break-words group-hover/item:text-sky-blue transition-colors">
-                    {item.title}
-                  </p>
-                  {item.snippet && (
-                    <p className="mt-1.5 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground/80 break-words line-clamp-2">
-                      {item.snippet}
+              )}
+            </div>
+            <div className="space-y-2">
+              {briefing.newsItems.map((item, i) => (
+                <a
+                  key={`${item.url}-${i}`}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-start gap-3 rounded-[1.4rem] border border-[var(--interactive-border)] bg-card px-4 py-3 hover:border-sky-blue/25 hover:bg-sky-blue/5 transition-colors min-w-0"
+                >
+                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--interactive-border)] text-[10px] font-black text-muted-foreground">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm sm:text-base font-black text-foreground break-words group-hover:text-sky-blue transition-colors">
+                      {item.title}
                     </p>
-                  )}
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted-foreground/60">
-                    <span className="px-2 py-0.5 rounded bg-white/5 dark:bg-neutral-900/10 border border-[var(--interactive-border)]">{item.source}</span>
-                    {item.publishedDate && <span>· {item.publishedDate}</span>}
+                    {item.snippet && (
+                      <p className="mt-1 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground break-words">
+                        {item.snippet}
+                      </p>
+                    )}
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted-foreground/60">
+                      <span className="rounded-full border border-sky-blue/15 bg-sky-blue/8 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-sky-blue">{item.source}</span>
+                      {item.publishedDate && <span>· {item.publishedDate}</span>}
+                    </div>
                   </div>
-                </div>
-              </a>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Tags ── */}
+        {briefing.keywordTags.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {briefing.keywordTags.map((tag, i) => (
+              <span
+                key={i}
+                className="rounded-full border border-[var(--interactive-border)] bg-[var(--interactive)] px-3 py-1.5 text-[11px] font-black text-muted-foreground"
+              >
+                {tag}
+              </span>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* ── Tags ── */}
-      {briefing.keywordTags.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-4 border-t border-[var(--interactive-border)]">
-          {briefing.keywordTags.map((tag, i) => (
-            <span
-              key={i}
-              className="rounded-full border border-sky-blue/10 dark:border-sky-blue/20 bg-sky-blue/5 px-3.5 py-1.5 text-xs font-bold text-sky-blue cursor-default transition-colors"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
+        )}
+      </div>
     </motion.div>
   )
 }
