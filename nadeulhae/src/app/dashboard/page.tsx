@@ -95,55 +95,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
   const meteorCount = useMemo(() => getMeteorCount(4), [])
   const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
-  const personalizedWelcome = useMemo(() => {
-    if (!user) return null
-    const interests = user.interestTags.filter(Boolean)
-    const sensitivities = user.weatherSensitivity.filter(Boolean)
-    
-    if (language === "ko") {
-      return (
-        <span>
-          반가워요, <strong className="text-foreground">{user.displayName}</strong>님! 평소 관심 있으신{" "}
-          <span className="font-extrabold text-foreground underline decoration-nature-green/40 decoration-2">{interests.join(", ")}</span> 활동을 즐기기에 좋은 날씨 타이밍을 분석 중입니다.{" "}
-          {sensitivities.length > 0 ? (
-            <span>특히 민감하신 <strong className="text-foreground underline decoration-orange-400/40 decoration-2">{sensitivities.join(", ")}</strong> 수치를 꼼꼼하게 실시간 체크해 드릴게요.</span>
-          ) : (
-            <span>오늘도 안전하고 쾌적한 피크닉 일정을 위해 대기 및 기상 정보를 정밀 분석하고 있어요.</span>
-          )}
-        </span>
-      )
-    } else if (language === "zh") {
-      return (
-        <span>
-          您好，<strong className="text-foreground">{user.displayName}</strong>！正在为您锁定的出游偏好{" "}
-          <span className="font-extrabold text-foreground underline decoration-nature-green/40 decoration-2">{interests.join(", ") || "户外"}</span> 寻找最佳天气。{" "}
-          {sensitivities.length > 0 && (
-            <span>我们将为您特别关注您所敏感的 <strong className="text-foreground underline decoration-orange-400/40 decoration-2">{sensitivities.join(", ")}</strong> 指标变化。</span>
-          )}
-        </span>
-      )
-    } else if (language === "ja") {
-      return (
-        <span>
-          こんにちは、<strong className="text-foreground">{user.displayName}</strong>さん！ご登録の{" "}
-          <span className="font-extrabold text-foreground underline decoration-nature-green/40 decoration-2">{interests.join(", ") || "お出かけ"}</span> アクティビティに最適なお出かけプランをサポートします.{" "}
-          {sensitivities.length > 0 && (
-            <span>特に敏感な <strong className="text-foreground underline decoration-orange-400/40 decoration-2">{sensitivities.join(", ")}</strong> 情報を優先して精査中です。</span>
-          )}
-        </span>
-      )
-    } else {
-      return (
-        <span>
-          Welcome back, <strong className="text-foreground">{user.displayName}</strong>! We are analyzing the perfect weather window for your favorite{" "}
-          <span className="font-extrabold text-foreground underline decoration-nature-green/40 decoration-2">{interests.join(", ") || "picnic"}</span> activities.{" "}
-          {sensitivities.length > 0 && (
-            <span>Watching out closely for any changes in <strong className="text-foreground underline decoration-orange-400/40 decoration-2">{sensitivities.join(", ")}</strong> conditions!</span>
-          )}
-        </span>
-      )
-    }
-  }, [user, language])
+
 
   // Fetch weather details + hourly forecast in parallel for the given (or default) coords
   const loadWeather = useCallback(async (lat?: number, lon?: number) => {
@@ -481,12 +433,6 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
                 <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg break-words">
                   {copy.heroDescription}
                 </p>
-                {personalizedWelcome && (
-                  <div className="mt-4 flex items-start gap-3 rounded-2xl border border-nature-green/20 bg-nature-green/10 dark:bg-nature-green/5 p-4 text-sm font-semibold text-nature-green">
-                    <Sparkles className="size-4 shrink-0 mt-0.5 text-nature-green animate-pulse" />
-                    <span className="leading-relaxed">{personalizedWelcome}</span>
-                  </div>
-                )}
               </div>
             </div>
 
