@@ -25,6 +25,7 @@ import {
   Wind,
   Droplets,
   Sun,
+  CloudRain,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -95,32 +96,32 @@ const scoreColors = (score: number) => {
     return {
       primary: "#0b7d71",
       secondary: "#2f6fe4",
-      bg: "bg-nature-green/10",
+      bg: "bg-nature-green/10 dark:bg-nature-green/20",
       text: "text-nature-green",
-      border: "border-nature-green/20",
+      border: "border-nature-green/25 dark:border-nature-green/45",
     };
   if (score >= 66)
     return {
       primary: "#2f6fe4",
       secondary: "#7db3ff",
-      bg: "bg-active-blue/10",
+      bg: "bg-active-blue/10 dark:bg-active-blue/20",
       text: "text-active-blue",
-      border: "border-active-blue/20",
+      border: "border-active-blue/25 dark:border-active-blue/45",
     };
   if (score >= 36)
     return {
       primary: "#4d9a90",
       secondary: "#77b2f0",
-      bg: "bg-yellow-500/10",
-      text: "text-yellow-600",
-      border: "border-yellow-500/20",
+      bg: "bg-yellow-500/10 dark:bg-yellow-500/20",
+      text: "text-yellow-600 dark:text-yellow-500",
+      border: "border-yellow-500/25 dark:border-yellow-500/45",
     };
   return {
     primary: "#ef4444",
     secondary: "#f87171",
-    bg: "bg-red-500/10",
+    bg: "bg-red-500/10 dark:bg-red-500/20",
     text: "text-red-500",
-    border: "border-red-500/20",
+    border: "border-red-500/25 dark:border-red-500/45",
   };
 };
 
@@ -216,20 +217,13 @@ export function PicnicArchiveCalendar() {
     return archiveData.highlightedDays.includes(day.getDate());
   };
 
-  const getDayScore = (day: Date): number | null => {
-    const summary = archiveData?.daySummaries?.find(
-      (s) => s.day === day.getDate(),
-    );
-    return summary ? summary.score : null;
-  };
-
   const availableYears = archiveData?.availableYears || [2021, 2022, 2023, 2024, 2025];
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
     <div className="w-full max-w-4xl mx-auto bg-[var(--card)] backdrop-blur-3xl rounded-[3.5rem] border border-[var(--card-border)] p-6 sm:p-12 overflow-hidden relative group">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-16 gap-6 relative z-10">
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-12 gap-6 relative z-10">
         <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
           <div className="flex items-center gap-3 text-neutral-400 mb-2">
             <History size={18} />
@@ -244,7 +238,7 @@ export function PicnicArchiveCalendar() {
               <select
                 value={currentMonth.getFullYear()}
                 onChange={(e) => setCurrentMonth(new Date(Number(e.target.value), currentMonth.getMonth(), 1))}
-                className="appearance-none rounded-2xl border border-card-border bg-card/80 px-4 py-2 sm:px-5 sm:py-2.5 pr-10 text-xl sm:text-2xl font-black text-foreground shadow-md outline-none transition duration-200 hover:border-sky-blue/35 focus:border-sky-blue/35 cursor-pointer"
+                className="appearance-none rounded-2xl border border-card-border bg-card/85 px-4 py-2 sm:px-5 sm:py-2.5 pr-10 text-xl sm:text-2xl font-black text-foreground shadow-md outline-none transition duration-200 hover:border-sky-blue/35 focus:border-sky-blue/35 cursor-pointer"
                 style={{
                   backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888888' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E")`,
                   backgroundPosition: 'right 0.85rem center',
@@ -265,7 +259,7 @@ export function PicnicArchiveCalendar() {
               <select
                 value={currentMonth.getMonth() + 1}
                 onChange={(e) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(e.target.value) - 1, 1))}
-                className="appearance-none rounded-2xl border border-card-border bg-card/80 px-4 py-2 sm:px-5 sm:py-2.5 pr-10 text-xl sm:text-2xl font-black text-foreground shadow-md outline-none transition duration-200 hover:border-sky-blue/35 focus:border-sky-blue/35 cursor-pointer"
+                className="appearance-none rounded-2xl border border-card-border bg-card/85 px-4 py-2 sm:px-5 sm:py-2.5 pr-10 text-xl sm:text-2xl font-black text-foreground shadow-md outline-none transition duration-200 hover:border-sky-blue/35 focus:border-sky-blue/35 cursor-pointer"
                 style={{
                   backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888888' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E")`,
                   backgroundPosition: 'right 0.85rem center',
@@ -296,6 +290,26 @@ export function PicnicArchiveCalendar() {
           >
             <ChevronRight size={28} />
           </button>
+        </div>
+      </div>
+
+      {/* Heatmap Legend */}
+      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 mb-8 text-[10px] font-black text-muted-foreground uppercase tracking-widest relative z-10">
+        <div className="flex items-center gap-1.5">
+          <div className="size-2.5 rounded-full bg-nature-green/20 border border-nature-green/45 shadow-sm" />
+          <span>{statusLabels[language]?.excellent ?? "Excellent"}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="size-2.5 rounded-full bg-active-blue/20 border border-active-blue/45 shadow-sm" />
+          <span>{statusLabels[language]?.good ?? "Good"}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="size-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/45 shadow-sm" />
+          <span>{statusLabels[language]?.fair ?? "Fair"}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="size-2.5 rounded-full bg-red-500/20 border border-red-500/45 shadow-sm" />
+          <span>{statusLabels[language]?.poor ?? "Poor"}</span>
         </div>
       </div>
 
@@ -333,8 +347,15 @@ export function PicnicArchiveCalendar() {
               const isCurrentMonth = isSameMonth(day, monthStart);
               const isSelected = selectedDate && isSameDay(day, selectedDate);
               const isToday = isSameDay(day, today);
-              const score = getDayScore(day);
+              
+              const summary = archiveData?.daySummaries?.find(
+                (s) => s.day === day.getDate(),
+              );
+              const score = summary ? summary.score : null;
               const clr = score != null ? scoreColors(score) : null;
+
+              const isRainy = summary?.knockout === "rain" || summary?.sky?.includes("비") || summary?.sky?.includes("눈");
+              const isSunny = summary?.sky?.includes("맑음");
 
               return (
                 <button
@@ -342,47 +363,51 @@ export function PicnicArchiveCalendar() {
                   onClick={() => handleDateClick(day)}
                   disabled={!isCurrentMonth}
                   className={cn(
-                    "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-center rounded-2xl sm:rounded-[2.5rem] text-sm sm:text-xl font-black transition-all border cursor-pointer",
+                    "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-between p-2 sm:p-3 rounded-2xl sm:rounded-[2rem] text-sm font-black transition-all border cursor-pointer",
                     !isCurrentMonth &&
                       "text-neutral-200 dark:text-neutral-800 border-transparent opacity-30 cursor-default",
                     isCurrentMonth &&
-                      !highlighted &&
                       !isSelected &&
-                      "text-foreground/70 border-transparent hover:bg-sky-blue/5 hover:border-sky-blue/10",
-                    highlighted &&
-                      !isSelected &&
-                      "bg-gradient-to-br from-nature-green/10 to-active-blue/10 text-sky-blue border-sky-blue/20 shadow-blue shadow-sky-blue/5",
+                      (score != null
+                        ? cn(clr?.bg, clr?.border, clr?.text, "hover:scale-[1.04] shadow-sm hover:shadow-md")
+                        : "text-foreground/70 border-transparent hover:bg-sky-blue/5 hover:border-sky-blue/10"),
                     isSelected &&
                       "bg-sky-blue text-white border-sky-blue shadow-lg scale-105",
                     isToday &&
                       isCurrentMonth &&
                       !isSelected &&
-                      "border-active-blue/40 ring-1 ring-active-blue/20",
+                      "ring-2 ring-active-blue/50 ring-offset-2 ring-offset-background",
                   )}
                 >
-                  <span className="relative z-10">
-                    {format(day, "d")}
-                    {isToday && isCurrentMonth && (
-                      <span className="absolute -top-1 -right-4 text-[8px] text-active-blue">
-                        {__l("오늘", "Today", "今天", "今日")}
-                      </span>
-                    )}
-                  </span>
-                  {score != null && isCurrentMonth && !isSelected && (
-                    <span
-                      className={cn("text-[9px] font-bold mt-0.5", clr?.text)}
-                    >
-                      {score}{__l("점", " Pts", "分", "点")}
+                  {/* Top Row: Date Number */}
+                  <div className="w-full flex justify-between items-start">
+                    <span className="text-[11px] sm:text-base font-black relative z-10 leading-none">
+                      {format(day, "d")}
+                      {isToday && isCurrentMonth && (
+                        <span className="absolute -top-1 -right-3 text-[8px] font-black text-active-blue animate-pulse">
+                          ●
+                        </span>
+                      )}
                     </span>
-                  )}
-                  {highlighted && !isSelected && (
-                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                      <Sparkles size={12} className="text-sky-blue/40" />
-                    </div>
-                  )}
-                  {isSelected && (
-                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                      <Sparkles size={12} className="text-white/60" />
+                    {highlighted && !isSelected && (
+                      <Sparkles size={10} className="text-sky-blue/45 shrink-0" />
+                    )}
+                  </div>
+
+                  {/* Bottom Row: Premium Weather Icon & Score Badge */}
+                  {score != null && isCurrentMonth && (
+                    <div className={cn(
+                      "flex items-center gap-1 text-[9px] sm:text-xs font-black px-1.5 py-0.5 rounded-full shadow-inner",
+                      isSelected ? "bg-white/20 text-white" : "bg-background/40"
+                    )}>
+                      {isRainy ? (
+                        <CloudRain size={10} className="shrink-0" />
+                      ) : isSunny ? (
+                        <Sun size={10} className="shrink-0 animate-spin-slow" />
+                      ) : (
+                        <Cloud size={10} className="shrink-0" />
+                      )}
+                      <span>{score}</span>
                     </div>
                   )}
                 </button>
@@ -441,7 +466,7 @@ export function PicnicArchiveCalendar() {
                       `📅 역대 이 날의 전주 피크닉 점수와 날씨 기록(${detailData.length}년 치)을 한눈에 비교해 보세요.`,
                       `📅 Compare picnic scores and weather in Jeonju on this day over the last ${detailData.length} years.`,
                       `📅 对比过去 ${detailData.length} 年中这一天全州的野餐指数与天气记录。`,
-                      `📅 過去 ${detailData.length} 年間のこの日における全州のピクニックスコアと天気を比較します。`
+                      `📅 過去 ${detailData.length} 年間のこの日における全州의 피크닉(行楽)スコアと天気を比較します。`
                     )}
                   </p>
 
@@ -549,7 +574,7 @@ export function PicnicArchiveCalendar() {
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 {((["air", "temperature", "sky", "wind"] as const)).map((k) => {
                                   const label = {
-                                    air: __l("대기질", "Air Quality", "空气质量", "大気質"),
+                                    air: __l("대기질", "Air Quality", "空气质量", "大気질"),
                                     temperature: __l("기온", "Temp", "气温", "気温"),
                                     sky: __l("하늘상태", "Sky", "天空", "空の状態"),
                                     wind: __l("바람", "Wind", "风速", "風"),
@@ -605,6 +630,21 @@ export function PicnicArchiveCalendar() {
           {archiveData?.metadata?.coverage ? `(${archiveData.metadata.coverage})` : ""}
         </p>
       </div>
+
+      {/* Tailwind & Custom style overrides */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+          animation: spin-slow 12s linear infinite;
+        }
+      `,
+        }}
+      />
     </div>
   );
 }
