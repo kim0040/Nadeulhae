@@ -93,9 +93,12 @@ function getYesterdayInKst(): string {
   // Day boundary is 07:00 KST, not midnight.
   // Before 7 AM, "yesterday" means 2 calendar days ago.
   const offset = p.hour < 7 ? 2 : 1
-  const d = new Date(`${String(p.year)}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}T00:00:00+09:00`)
-  d.setDate(d.getDate() - offset)
-  return d.toISOString().slice(0, 10)
+  
+  // Calculate target date by subtracting offsets in days from the current time
+  const targetDateMs = Date.now() - offset * 24 * 60 * 60 * 1000
+  const targetParts = parseKstParts(targetDateMs)
+  
+  return `${targetParts.year}-${String(targetParts.month).padStart(2, "0")}-${String(targetParts.day).padStart(2, "0")}`
 }
 
 /** Return today's date in KST (YYYY-MM-DD). */
