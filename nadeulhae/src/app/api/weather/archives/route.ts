@@ -1,168 +1,218 @@
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/server";
 
-import { withApiAnalytics } from "@/lib/analytics/route"
-import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
-import { resolveRegionProfile } from "@/lib/weather-utils"
+import { withApiAnalytics } from "@/lib/analytics/route";
+import { queryRows } from "@/lib/db";
+import type { RowDataPacket } from "mysql2/promise";
 
-type ArchiveResponse = {
-  month: string
-  highlightedDays: number[]
-  daySummaries: Array<{
-    day: number
-    score: number
-    sky: string
-    tempMin: number
-    tempMax: number
-    isRecommended: boolean
-  }>
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+interface DaySummary {
+  day: number;
+  score: number;
+  status: string;
+  knockout: string;
+  sky: string;
+  tempMin: number;
+  tempMax: number;
+  avgTemp: number;
+  isRecommended: boolean;
+}
+
+interface ArchiveResponse {
+  month: string;
+  highlightedDays: number[];
+  daySummaries: DaySummary[];
   metadata: {
-    dataSource: string
-    lastUpdate: string
-    mode: "live-forecast" | "fallback"
-    coverage: string
-    note?: string
-  }
+    dataSource: string;
+    lastUpdate: string;
+    mode: "historical";
+    coverage: string;
+    note?: string;
+  };
 }
 
-type CachedArchiveEntry = {
-  expiry: number
-  data: ArchiveResponse
-}
+// ---------------------------------------------------------------------------
+// Cache
+// ---------------------------------------------------------------------------
+const cache = new Map<string, { expiry: number; data: ArchiveResponse }>();
+const CACHE_TTL = 30 * 60 * 1000; // 30 min (historical data never changes)
 
-const archiveCache = new Map<string, CachedArchiveEntry>()
-const ARCHIVE_CACHE_TTL = 5 * 60 * 1000
-
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 function normalizeMonth(input?: string | null) {
-  if (typeof input === "string" && /^\d{4}-\d{2}$/.test(input)) {
-    return input
+  if (typeof input === "string" && /^\d{4}-\d{2}$/.test(input)) return input;
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function skyCodeToLabel(sky: number | null, cloudCover: number | null): string {
+  if (sky != null) {
+    if (sky === 1) return "맑음";
+    if (sky === 3) return "구름많음";
+    return "흐림";
   }
-  return new Date().toLocaleString("sv-SE", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-  })
+  if (cloudCover != null) {
+    if (cloudCover <= 2) return "맑음";
+    if (cloudCover <= 7) return "구름많음";
+    return "흐림";
+  }
+  return "정보없음";
 }
 
-function toDay(dateValue: string) {
-  const normalized = dateValue.replace(/-/g, "")
-  if (normalized.length !== 8) return null
-  return Number(normalized.slice(6, 8))
+interface HistoryRow extends RowDataPacket {
+  date: string;
+  score: number;
+  status: string;
+  knockout: string;
+  air_score: number;
+  temp_score: number;
+  sky_score: number;
+  wind_score: number;
+  avg_temp: number | null;
+  min_temp: number | null;
+  max_temp: number | null;
+  avg_wind: number | null;
+  max_wind: number | null;
+  cloud_cover: number | null;
+  daily_rain: number | null;
+  sunshine_hours: number | null;
+  avg_humidity: number | null;
+  fog_hours: number | null;
+  avg_pm10: number | null;
 }
 
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
 async function handleGET(request: Request) {
-  const url = new URL(request.url)
-  const month = normalizeMonth(url.searchParams.get("month"))
-  const lat = url.searchParams.get("lat")
-  const lon = url.searchParams.get("lon")
-  const parsedLat = lat ? Number(lat) : null
-  const parsedLon = lon ? Number(lon) : null
-  const userLat = Number.isFinite(parsedLat) ? parsedLat : null
-  const userLon = Number.isFinite(parsedLon) ? parsedLon : null
-  const hasDeviceCoordinates = userLat != null && userLon != null
-  const locationRegionKey = hasDeviceCoordinates
-    ? resolveRegionProfile(userLat, userLon).key
-    : "archives"
-  const cacheKey = `${month}:${userLat != null ? Math.round(userLat * 100) : "default"}:${userLon != null ? Math.round(userLon * 100) : "default"}`
+  const url = new URL(request.url);
+  const month = normalizeMonth(url.searchParams.get("month"));
+  const date = url.searchParams.get("date");
 
-  if (hasDeviceCoordinates) {
-    void recordLocationUsageProofSafely({
-      request,
-      routePath: url.pathname,
-      method: request.method,
-      regionKey: locationRegionKey,
-      eventKind: "weather_forecast",
-    })
+  // ---- Single-date detail endpoint ----
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // Year-over-year: same month-day across all years
+    const [, m, d] = date.split("-").map(Number);
+    const rows = await queryRows<HistoryRow[]>(
+      `SELECT * FROM daily_weather_history
+       WHERE MONTH(date) = ? AND DAY(date) = ?
+       ORDER BY date DESC`,
+      [m, d],
+    );
+
+    if (rows.length === 0) {
+      return NextResponse.json({
+        date,
+        entries: [],
+        message: "해당 날짜의 기록이 없습니다.",
+      });
+    }
+
+    const entries = rows.map((r) => ({
+      date: r.date,
+      score: r.score,
+      status: r.status,
+      knockout: r.knockout,
+      breakdown: {
+        air: r.air_score,
+        temperature: r.temp_score,
+        sky: r.sky_score,
+        wind: r.wind_score,
+        total: r.score,
+      },
+      weather: {
+        avgTemp: r.avg_temp,
+        minTemp: r.min_temp,
+        maxTemp: r.max_temp,
+        sky: skyCodeToLabel(null, r.cloud_cover),
+        avgWind: r.avg_wind,
+        maxWind: r.max_wind,
+        humidity: r.avg_humidity,
+        rain: r.daily_rain,
+        sunshine: r.sunshine_hours,
+        fog: r.fog_hours,
+        pm10: r.avg_pm10,
+        cloudCover: r.cloud_cover,
+      },
+    }));
+
+    return NextResponse.json({ date, entries, count: entries.length });
   }
 
-  const cached = archiveCache.get(cacheKey)
+  // ---- Month archive endpoint ----
+  const cacheKey = `archives:${month}`;
+  const cached = cache.get(cacheKey);
   if (cached && cached.expiry > Date.now()) {
-    return NextResponse.json(cached.data, {
-      headers: { "x-nadeulhae-data-mode": cached.data.metadata.mode },
-    })
+    return NextResponse.json(cached.data);
   }
 
   try {
-    const forecastUrl = new URL("/api/weather/forecast", url)
-    if (userLat != null) forecastUrl.searchParams.set("lat", String(userLat))
-    if (userLon != null) forecastUrl.searchParams.set("lon", String(userLon))
+    const rows = await queryRows<HistoryRow[]>(
+      `SELECT date, score, status, knockout, avg_temp, min_temp, max_temp, cloud_cover
+       FROM daily_weather_history
+       WHERE DATE_FORMAT(date, '%Y-%m') = ?
+       ORDER BY date`,
+      [month],
+    );
 
-    const forecastResponse = await fetch(forecastUrl.toString(), {
-      cache: "no-store",
-      headers: {
-        "x-nadeulhae-internal-call": "1",
-      },
-    })
-    if (!forecastResponse.ok) {
-      throw new Error(`Forecast API responded with ${forecastResponse.status}`)
+    const highlightedDays: number[] = [];
+    const daySummaries: DaySummary[] = [];
+
+    for (const r of rows) {
+      const day = new Date(r.date).getDate();
+      const score = Number(r.score);
+      const isRecommended = score >= 80;
+      if (isRecommended) highlightedDays.push(day);
+
+      daySummaries.push({
+        day,
+        score,
+        status: r.status,
+        knockout: r.knockout,
+        sky: skyCodeToLabel(null, r.cloud_cover),
+        tempMin: Number(r.min_temp ?? 0),
+        tempMax: Number(r.max_temp ?? 0),
+        avgTemp: Number(r.avg_temp ?? 0),
+        isRecommended,
+      });
     }
-
-    const forecastData = await forecastResponse.json()
-    const daily = Array.isArray(forecastData?.daily) ? forecastData.daily : []
-    const monthToken = month.replace("-", "")
-    const monthDays = daily.filter((item: any) => String(item?.date || "").startsWith(monthToken))
-    const highlightedDays = monthDays
-      .filter((item: any) => Number(item?.score) >= 80)
-      .map((item: any) => toDay(String(item?.date || "")))
-      .filter((day: number | null): day is number => Number.isFinite(day))
-      .sort((a: number, b: number) => a - b)
-
-    const daySummaries = monthDays
-      .map((item: any) => {
-        const day = toDay(String(item?.date || ""))
-        if (!Number.isFinite(day)) return null
-        const score = Number(item?.score ?? 0)
-        return {
-          day,
-          score,
-          sky: String(item?.sky || ""),
-          tempMin: Number(item?.tempMin ?? 0),
-          tempMax: Number(item?.tempMax ?? 0),
-          isRecommended: score >= 80,
-        }
-      })
-      .filter((entry: any) => entry !== null)
 
     const payload: ArchiveResponse = {
       month,
       highlightedDays,
       daySummaries,
       metadata: {
-        dataSource: "기상청 단기·중기 예보 (KMA)",
-        lastUpdate: forecastData?.metadata?.lastUpdate || "--:--",
-        mode: "live-forecast",
-        coverage: "today+10d",
-        note: monthDays.length
-          ? undefined
-          : "선택한 월에는 현재 제공 범위 내 추천일 데이터가 없습니다.",
+        dataSource: "기상청 ASOS 관측자료 (지점 146 · 전주)",
+        lastUpdate: new Date().toISOString(),
+        mode: "historical",
+        coverage: "2021-01 ~ 2025-12",
+        note:
+          rows.length === 0
+            ? "해당 월의 과거 관측 데이터가 없습니다."
+            : undefined,
       },
-    }
+    };
 
-    archiveCache.set(cacheKey, {
-      data: payload,
-      expiry: Date.now() + ARCHIVE_CACHE_TTL,
-    })
+    cache.set(cacheKey, { expiry: Date.now() + CACHE_TTL, data: payload });
 
-    return NextResponse.json(payload, {
-      headers: { "x-nadeulhae-data-mode": "live-forecast" },
-    })
+    return NextResponse.json(payload);
   } catch (error) {
-    console.error("Archive API fallback:", error)
-    const fallback: ArchiveResponse = {
+    console.error("Archive API error:", error);
+    return NextResponse.json({
       month,
       highlightedDays: [],
       daySummaries: [],
       metadata: {
-        dataSource: "기상청 단기·중기 예보 (KMA)",
+        dataSource: "기상청 ASOS",
         lastUpdate: "--:--",
-        mode: "fallback",
-        coverage: "today+10d",
-        note: "아카이브 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        mode: "historical" as const,
+        coverage: "2021-01 ~ 2025-12",
+        note: "데이터를 불러오지 못했습니다.",
       },
-    }
-    return NextResponse.json(fallback, {
-      headers: { "x-nadeulhae-data-mode": "fallback" },
-    })
+    });
   }
 }
 
-export const GET = withApiAnalytics(handleGET)
+export const GET = withApiAnalytics(handleGET);
