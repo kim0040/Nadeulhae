@@ -27,12 +27,7 @@ import {
   shouldRunRichAnimation,
 } from "@/lib/performance";
 import { useLanguage } from "@/context/LanguageContext";
-import {
-  useFireSummary,
-  useHourlyForecast,
-  useWeatherData,
-  useWeatherImages,
-} from "@/hooks/use-weather";
+import { useDerivedWeatherData, useWeatherData } from "@/hooks/use-weather";
 import { Particles } from "@/components/magicui/particles";
 import { Meteors } from "@/components/magicui/meteors";
 import { WordPullUp } from "@/components/magicui/word-pull-up";
@@ -106,9 +101,8 @@ export default function Home() {
 
   // ---- Custom hooks: data fetching ----
   const { weatherData } = useWeatherData();
-  const hourlyForecast = useHourlyForecast(weatherData);
-  const weatherImages = useWeatherImages(weatherData);
-  const fireSummary = useFireSummary(weatherData);
+  const { hourlyForecast, weatherImages, fireSummary } =
+    useDerivedWeatherData(weatherData);
 
   // ---- Derived values ----
   const [heroMessageSeed] = useState(() => {
