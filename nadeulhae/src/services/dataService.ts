@@ -1,4 +1,9 @@
-import { mockWeatherData, mockInsights, mockTrends, mockCourse } from "@/data/mockData"
+import {
+  mockWeatherData,
+  mockInsights,
+  mockTrends,
+  mockCourse,
+} from "@/data/mockData";
 
 /**
  * [BACKEND_LINK]: 데이터 연동을 위한 전용 서비스 계층입니다.
@@ -55,7 +60,11 @@ function setCachedValue<T>(key: string, value: T, ttlMs: number) {
 }
 
 /** Get cached or fetch + cache; deduplicates concurrent requests for the same key */
-async function getOrFetchCached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
+async function getOrFetchCached<T>(
+  key: string,
+  ttlMs: number,
+  fetcher: () => Promise<T>,
+): Promise<T> {
   const cached = getCachedValue<T>(key);
   if (cached != null) {
     return cached;
@@ -247,15 +256,13 @@ export const dataService = {
   getWeatherData: async (lat?: number, lon?: number): Promise<WeatherData> => {
     try {
       if (MOCK_MODE) {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
         // Dynamic mock data for testing UI changes
         const states = [
           { score: 95, status: "status_excellent", message: "msg_excellent" },
           { score: 72, status: "status_good", message: "msg_good" },
-          { score: 45, status: "status_fair", message: "msg_fair" }
+          { score: 45, status: "status_fair", message: "msg_fair" },
         ];
-        
+
         // Rotate state based on current time (minutes) to show different states on refresh
         const stateIndex = Math.floor(Date.now() / 15000) % states.length;
         return {
@@ -263,8 +270,13 @@ export const dataService = {
           ...states[stateIndex],
           details: {
             ...mockWeatherData.details,
-            temp: states[stateIndex].score === 95 ? 22 : states[stateIndex].score === 72 ? 26 : 31
-          }
+            temp:
+              states[stateIndex].score === 95
+                ? 22
+                : states[stateIndex].score === 72
+                  ? 26
+                  : 31,
+          },
         };
       }
 
@@ -275,7 +287,9 @@ export const dataService = {
 
       return await getOrFetchCached(cacheKey, 45_000, async () => {
         const query = hasCoords ? `?lat=${lat}&lon=${lon}` : "";
-        const response = await fetch(`${API_BASE}/current${query}`, { next: { revalidate: 60 } });
+        const response = await fetch(`${API_BASE}/current${query}`, {
+          next: { revalidate: 60 },
+        });
         if (!response.ok) throw new Error("Weather API error");
         return await response.json();
       });
@@ -290,11 +304,15 @@ export const dataService = {
     try {
       if (MOCK_MODE) return mockInsights as Insight[];
 
-      return await getOrFetchCached("insights:default", 5 * 60_000, async () => {
-        const response = await fetch(`${API_BASE}/insights`);
-        if (!response.ok) throw new Error("Insights API error");
-        return await response.json();
-      });
+      return await getOrFetchCached(
+        "insights:default",
+        5 * 60_000,
+        async () => {
+          const response = await fetch(`${API_BASE}/insights`);
+          if (!response.ok) throw new Error("Insights API error");
+          return await response.json();
+        },
+      );
     } catch (error) {
       console.error("Failed to fetch insights:", error);
       return mockInsights as Insight[];
@@ -321,14 +339,13 @@ export const dataService = {
   generateCourse: async (params: { timeRange: string; location: string }) => {
     try {
       if (MOCK_MODE) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
         return mockCourse;
       }
-      
+
       const response = await fetch(`${API_BASE}/recommendations/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params)
+        body: JSON.stringify(params),
       });
       if (!response.ok) throw new Error("AI Recommendation error");
       return await response.json();
@@ -338,25 +355,33 @@ export const dataService = {
     }
   },
 
-  getFireSummary: async (params?: { regionKey?: string; lat?: number; lon?: number; days?: number }): Promise<FireSummaryData | null> => {
+  getFireSummary: async (params?: {
+    regionKey?: string;
+    lat?: number;
+    lon?: number;
+    days?: number;
+  }): Promise<FireSummaryData | null> => {
     try {
-      const query = new URLSearchParams()
-      if (params?.regionKey) query.set("regionKey", params.regionKey)
-      if (params?.lat != null) query.set("lat", String(params.lat))
-      if (params?.lon != null) query.set("lon", String(params.lon))
-      if (params?.days != null) query.set("days", String(params.days))
+      const query = new URLSearchParams();
+      if (params?.regionKey) query.set("regionKey", params.regionKey);
+      if (params?.lat != null) query.set("lat", String(params.lat));
+      if (params?.lon != null) query.set("lon", String(params.lon));
+      if (params?.days != null) query.set("days", String(params.days));
 
-      const cacheKey = `fire:${query.toString() || "default"}`
+      const cacheKey = `fire:${query.toString() || "default"}`;
       return await getOrFetchCached(cacheKey, 30 * 60_000, async () => {
-        const response = await fetch(`/api/fire/summary${query.toString() ? `?${query.toString()}` : ""}`, {
-          next: { revalidate: 60 * 60 },
-        })
-        if (!response.ok) return null
-        return await response.json()
-      })
+        const response = await fetch(
+          `/api/fire/summary${query.toString() ? `?${query.toString()}` : ""}`,
+          {
+            next: { revalidate: 60 * 60 },
+          },
+        );
+        if (!response.ok) return null;
+        return await response.json();
+      });
     } catch (error) {
-      console.error("Failed to fetch fire summary:", error)
-      return null
+      console.error("Failed to fetch fire summary:", error);
+      return null;
     }
   },
 };

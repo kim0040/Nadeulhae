@@ -32,6 +32,7 @@ yarn-error.log*
 brain/
 temp/
 /tmp/
+low data/
 
 # Planning & Documentation (local only)
 docs/나들해_계획서.md
