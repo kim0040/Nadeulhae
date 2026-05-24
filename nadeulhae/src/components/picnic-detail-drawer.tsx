@@ -300,11 +300,17 @@ export function PicnicDetailDrawer({
 
               {/* SECTION 2: "과거엔 이랬어요!" Link */}
               <div className="border-t border-card-border/50 pt-8">
-                <div className="flex items-center gap-2 mb-6 text-foreground">
-                  <CalendarRange size={18} className="text-sky-blue" />
-                  <h4 className="text-lg font-black tracking-tight">
-                    {__l("과거엔 이랬어요!", "This day in the past!", "历史上的今天", "過去のこの日は！")}
-                  </h4>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-6 text-foreground">
+                  <div className="flex items-center gap-2">
+                    <CalendarRange size={18} className="text-sky-blue" />
+                    <h4 className="text-lg font-black tracking-tight">
+                      {__l("과거엔 이랬어요!", "This day in the past!", "历史上的今天", "過去のこの日は！")}
+                    </h4>
+                  </div>
+                  {/* Jeonju Area Only Badge */}
+                  <span className="inline-flex items-center gap-1 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-sky-blue">
+                    {__l("전주 지역 기준", "Jeonju Area Only", "仅限全州地区", "全州地域限定")}
+                  </span>
                 </div>
 
                 {loading ? (

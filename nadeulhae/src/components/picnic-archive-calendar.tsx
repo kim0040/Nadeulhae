@@ -227,10 +227,16 @@ export function PicnicArchiveCalendar() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between mb-12 gap-6 relative z-10">
         <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-          <div className="flex items-center gap-3 text-neutral-400 mb-2">
-            <History size={18} />
-            <span className="text-xs font-black uppercase tracking-widest">
-              {__l("과거 나들이 기록", "Past Outing Records", "历史出行记录", "過去のお出かけ記録")}
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-neutral-400 mb-2">
+            <div className="flex items-center gap-2">
+              <History size={18} />
+              <span className="text-xs font-black uppercase tracking-widest">
+                {__l("과거 나들이 기록", "Past Outing Records", "历史出行记录", "過去のお出かけ記録")}
+              </span>
+            </div>
+            {/* Jeonju Area Only Badge */}
+            <span className="inline-flex items-center gap-1 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-sky-blue">
+              {__l("전주 지역 한정", "Jeonju Area Only", "仅限全州地区", "全州地域限定")}
             </span>
           </div>
           
