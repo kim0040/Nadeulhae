@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import {
   Sparkles,
   ArrowUpRight,
-  Loader2,
   RefreshCw,
   AlertTriangle,
   Sun,
@@ -285,77 +284,90 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-      className="rounded-[2.5rem] border border-[var(--interactive-border)] bg-[var(--interactive)] p-8 sm:p-12 pb-6"
+      transition={{ duration: 0.6, ease: "easeOut" }}
+      className="group relative rounded-[2.5rem] border border-sky-blue/15 bg-gradient-to-b from-white/10 to-white/5 dark:from-neutral-900/40 dark:to-neutral-950/60 p-8 sm:p-12 pb-6 shadow-[0_24px_80px_rgba(0,0,0,0.06)] hover:shadow-[0_24px_80px_rgba(14,165,233,0.08)] backdrop-blur-xl transition-all duration-500"
     >
+      {/* Background radial highlight */}
+      <div className="absolute top-0 right-0 -z-10 h-72 w-72 rounded-full bg-sky-blue/5 blur-[120px] transition-all group-hover:bg-sky-blue/8 pointer-events-none" />
+
       {/* ── Card Header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-blue to-active-blue text-white shadow-lg shadow-active-blue/20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 border-b border-sky-blue/10 pb-8">
+        <div className="flex items-center gap-5">
+          <div className="relative flex items-center justify-center p-3.5 rounded-2xl bg-gradient-to-br from-sky-blue via-sky-500 to-active-blue text-white shadow-[0_8px_30px_rgba(14,165,233,0.3)] transition-transform duration-300 group-hover:scale-105">
             <Newspaper size={24} />
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-blue opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-blue"></span>
+            </span>
           </div>
           <div>
-            <h3 className="text-2xl sm:text-4xl font-black text-foreground tracking-tight leading-none break-words">
+            <h3 className="text-2xl sm:text-4xl font-extrabold text-foreground tracking-tight leading-tight break-words bg-gradient-to-r from-foreground via-foreground to-foreground/80">
               {briefing.headline}
             </h3>
-            <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.3em] mt-2 italic opacity-70">
-              {t.badge}
-            </p>
+            <div className="inline-flex items-center gap-1.5 mt-2">
+              <Sparkles size={12} className="text-sky-blue animate-pulse" />
+              <p className="text-[10px] sm:text-xs font-black text-sky-blue uppercase tracking-[0.25em] italic opacity-85">
+                {t.badge}
+              </p>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4 shrink-0">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest leading-none mb-1">
+            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest leading-none mb-1.5">
               {t.dateLabel}
             </span>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--interactive)] border border-[var(--interactive-border)]">
-              <Sparkles size={12} className="text-sky-blue" />
-              <span className="text-xs font-black text-foreground">{dateLabel}</span>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-sky-blue/10 shadow-inner">
+              <span className="text-xs font-bold text-foreground/90">{dateLabel}</span>
             </div>
           </div>
           <button
-            onClick={() => fetchBriefing(false)}
-            className="p-2.5 rounded-xl border border-[var(--interactive-border)] bg-[var(--interactive)] text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+            onClick={() => fetchBriefing(true)}
+            className="group/btn p-3 rounded-xl border border-sky-blue/10 bg-white/5 hover:bg-sky-blue/10 text-muted-foreground hover:text-sky-blue hover:border-sky-blue/30 shadow-inner active:scale-95 transition-all duration-300"
+            title={t.retry}
             aria-label={t.retry}
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={14} className="transition-transform duration-500 group-hover/btn:rotate-180" />
           </button>
         </div>
       </div>
 
       {/* ── AI Summary ── */}
-      <div className="rounded-[1.85rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5 mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={15} className="text-sky-blue" />
+      <div className="rounded-[2rem] border border-sky-blue/10 bg-white/5 dark:bg-neutral-900/10 p-6 sm:p-8 mb-6 shadow-inner relative overflow-hidden">
+        <div className="absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-sky-blue via-sky-500 to-active-blue" />
+        <div className="flex items-center gap-2.5 mb-4">
+          <Sparkles size={14} className="text-sky-blue animate-pulse" />
           <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
             {t.summaryLabel}
           </span>
         </div>
-        <div className="rounded-[1.4rem] border border-sky-blue/15 bg-card px-4 py-4">
-          <p className="text-sm sm:text-base font-bold leading-relaxed text-foreground/90 break-words whitespace-pre-line">
-            {briefing.summary}
-          </p>
-        </div>
+        <p className="text-base sm:text-lg font-bold leading-relaxed text-foreground/90 break-words whitespace-pre-line">
+          {briefing.summary}
+        </p>
       </div>
 
       {/* ── AI Insight / Tips ── */}
       {briefing.aiInsight && (
-        <div className="rounded-[1.85rem] border border-nature-green/20 bg-nature-green/5 px-5 py-5 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Lightbulb size={15} className="text-nature-green" />
+        <div className="rounded-[2rem] border border-nature-green/15 bg-nature-green/5 p-6 sm:p-8 mb-6">
+          <div className="flex items-center gap-2.5 mb-5">
+            <div className="p-1 rounded-lg bg-nature-green/10 text-nature-green">
+              <Lightbulb size={16} />
+            </div>
             <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
               {t.tipsLabel}
             </span>
           </div>
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {briefing.aiInsight.split(/\n+/).filter(Boolean).map((line, idx) => {
               const cleaned = line.replace(/^•\s*/, "").trim()
               if (!cleaned) return null
               return (
-                <div key={idx} className="flex items-start gap-3 rounded-[1.4rem] border border-nature-green/15 bg-card px-4 py-3 min-w-0">
-                  <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-nature-green" />
+                <div key={idx} className="group/tip flex items-start gap-4 rounded-2xl border border-nature-green/10 bg-white/5 dark:bg-neutral-950/20 p-4 hover:border-nature-green/30 hover:bg-nature-green/10 transition-all duration-300">
+                  <div className="flex items-center justify-center size-8 shrink-0 rounded-xl bg-nature-green/10 text-nature-green shadow-inner">
+                    <Lightbulb size={14} className="transition-transform group-hover/tip:scale-110" />
+                  </div>
                   <span className="text-sm sm:text-base font-bold leading-relaxed text-foreground break-words">{cleaned}</span>
                 </div>
               )
@@ -364,13 +376,14 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
         </div>
       )}
 
-      {/* ── Weather / Events ── */}
+      {/* ── Weather / Events Bento ── */}
       {(briefing.weatherNote || briefing.festivalNote) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           {briefing.weatherNote && (
-            <div className="rounded-[1.45rem] border border-orange-400/20 bg-orange-400/5 px-4 py-4 min-w-0">
+            <div className="group/weather rounded-2xl border border-orange-400/15 bg-gradient-to-br from-orange-500/5 to-amber-500/5 p-5 hover:border-orange-400/30 transition-all duration-300 relative overflow-hidden">
+              <div className="absolute top-0 right-0 -mt-4 -mr-4 h-16 w-16 rounded-full bg-orange-500/10 blur-xl group-hover/weather:bg-orange-500/20 transition-all pointer-events-none" />
               <div className="flex items-center gap-2 mb-3">
-                <Sun size={15} className="text-orange-400" />
+                <Sun size={15} className="text-orange-400 animate-spin-slow" />
                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
                   {t.weather}
                 </span>
@@ -381,9 +394,10 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
             </div>
           )}
           {briefing.festivalNote && (
-            <div className="rounded-[1.45rem] border border-pink-400/20 bg-pink-400/5 px-4 py-4 min-w-0">
+            <div className="group/event rounded-2xl border border-pink-400/15 bg-gradient-to-br from-pink-500/5 to-purple-500/5 p-5 hover:border-pink-400/30 transition-all duration-300 relative overflow-hidden">
+              <div className="absolute top-0 right-0 -mt-4 -mr-4 h-16 w-16 rounded-full bg-pink-500/10 blur-xl group-hover/event:bg-pink-500/20 transition-all pointer-events-none" />
               <div className="flex items-center gap-2 mb-3">
-                <PartyPopper size={15} className="text-pink-400" />
+                <PartyPopper size={15} className="text-pink-400 animate-pulse" />
                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
                   {t.events}
                 </span>
@@ -398,41 +412,41 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
       {/* ── News Links ── */}
       {briefing.newsItems.length > 0 && (
-        <div className="rounded-[1.85rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <ArrowUpRight size={15} className="text-sky-blue" />
+        <div className="rounded-[2rem] border border-sky-blue/10 bg-white/5 dark:bg-neutral-900/5 p-6 sm:p-8 mb-6">
+          <div className="flex items-center gap-3 mb-5">
+            <ArrowUpRight size={16} className="text-sky-blue animate-pulse" />
             <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
               {t.sources}
             </span>
             {sourceCount > 0 && (
-              <span className="text-[10px] font-bold text-muted-foreground/60">
+              <span className="rounded-full px-2.5 py-0.5 bg-sky-blue/10 text-sky-blue text-[10px] font-bold">
                 {language === "ko" ? `${sourceCount}개 출처` : language === "zh" ? `${sourceCount}个来源` : language === "ja" ? `${sourceCount}件のソース` : `${sourceCount} sources`}
               </span>
             )}
           </div>
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {briefing.newsItems.map((item, i) => (
               <a
                 key={`${item.url}-${i}`}
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-start gap-3 rounded-[1.4rem] border border-[var(--interactive-border)] bg-card px-4 py-3 hover:border-sky-blue/25 hover:bg-sky-blue/5 transition-colors min-w-0"
+                className="group/item flex items-start gap-4 rounded-2xl border border-sky-blue/5 bg-white/5 dark:bg-neutral-950/20 p-4 hover:border-sky-blue/25 hover:bg-sky-blue/5 hover:translate-x-1 hover:shadow-md transition-all duration-300 min-w-0"
               >
-                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--interactive-border)] text-[10px] font-black text-muted-foreground">
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sky-blue/20 bg-sky-blue/10 text-[10px] font-black text-sky-blue shadow-inner group-hover/item:bg-sky-blue group-hover/item:text-white transition-all">
                   {i + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm sm:text-base font-black text-foreground break-words group-hover:text-sky-blue transition-colors">
+                  <p className="text-sm sm:text-base font-black text-foreground break-words group-hover/item:text-sky-blue transition-colors">
                     {item.title}
                   </p>
                   {item.snippet && (
-                    <p className="mt-1 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground break-words">
+                    <p className="mt-1.5 text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground/80 break-words line-clamp-2">
                       {item.snippet}
                     </p>
                   )}
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted-foreground/60">
-                    <span>{item.source}</span>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted-foreground/60">
+                    <span className="px-2 py-0.5 rounded bg-white/5 border border-sky-blue/5">{item.source}</span>
                     {item.publishedDate && <span>· {item.publishedDate}</span>}
                   </div>
                 </div>
@@ -444,11 +458,11 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
       {/* ── Tags ── */}
       {briefing.keywordTags.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-2">
+        <div className="flex flex-wrap gap-2 pt-4 border-t border-sky-blue/10">
           {briefing.keywordTags.map((tag, i) => (
             <span
               key={i}
-              className="rounded-full border border-[var(--interactive-border)] bg-[var(--interactive)] px-3 py-1.5 text-[11px] font-black text-muted-foreground"
+              className="rounded-full border border-sky-blue/10 dark:border-sky-blue/20 bg-sky-blue/5 px-3.5 py-1.5 text-xs font-black text-sky-blue hover:scale-105 hover:bg-sky-blue/10 hover:border-sky-blue/30 transition-all duration-200 cursor-default shadow-sm"
             >
               {tag}
             </span>
@@ -458,6 +472,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
     </motion.div>
   )
 }
+
 
 // ------------------------------------------------------------------
 // i18n
