@@ -589,16 +589,6 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                   {aiBriefingText || integratedGuide.text}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 lg:max-w-[280px] lg:justify-end">
-                {integratedGuide.chips.map((chip) => (
-                  <span
-                    key={chip}
-                    className="inline-flex rounded-full border border-current/15 bg-background/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-current dark:bg-background/20"
-                  >
-                    {chip}
-                  </span>
-                ))}
-              </div>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
