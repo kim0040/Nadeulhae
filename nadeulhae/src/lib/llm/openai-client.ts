@@ -191,6 +191,13 @@ export async function requestCompletion(
     body.reasoning_effort = input.reasoningEffort
   }
 
+  // Disable thinking/reasoning explicitly for DeepSeek models unless requested
+  if (config.baseUrl.includes("deepseek.com") || config.model.includes("deepseek-v4")) {
+    if (!input.reasoningEffort) {
+      body.thinking = { type: "disabled" }
+    }
+  }
+
   const { response, json } = await fetchJson<OpenAiCompletionPayload | OpenAiErrorPayload>(
     buildUrl(config.baseUrl, "chat/completions"),
     {
@@ -266,6 +273,13 @@ export async function requestCompletionStream(
     }
     if (input.reasoningEffort) {
       body.reasoning_effort = input.reasoningEffort
+    }
+
+    // Disable thinking/reasoning explicitly for DeepSeek models unless requested
+    if (config.baseUrl.includes("deepseek.com") || config.model.includes("deepseek-v4")) {
+      if (!input.reasoningEffort) {
+        body.thinking = { type: "disabled" }
+      }
     }
 
     const response = await fetch(buildUrl(config.baseUrl, "chat/completions"), {
