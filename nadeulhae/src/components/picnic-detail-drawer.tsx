@@ -11,6 +11,7 @@ import {
   Sun,
   CalendarRange,
   CloudRain,
+  AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -317,13 +318,16 @@ export function PicnicDetailDrawer({
                   </div>
                 ) : historyData && historyData.length > 0 ? (
                   <div className="space-y-4">
-                    <p className="text-xs font-semibold text-muted-foreground leading-relaxed">
-                      {__l(
-                        `📅 예전 이맘때 전주천변이나 한옥마을은 어땠을까요? 과거 ${historyData.length}년 치 날씨 실측 데이터를 모았어요.`,
-                        `📅 What was the weather in Jeonju like in past years? Here's ${historyData.length} years of historical readings on this day.`,
-                        `📅 历史上的这一天全州天气如何？整理了过去 ${historyData.length} 年的实际观测数据。`,
-                        `📅 過去 ${historyData.length} 年間のこの日における全州の実際のお出かけ・天気記録を集めました。`
-                      )}
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground leading-relaxed">
+                      <CalendarRange size={14} className="text-sky-blue shrink-0" />
+                      <span>
+                        {__l(
+                          `예전 이맘때 전주천변이나 한옥마을은 어땠을까요? 과거 ${historyData.length}년 치 날씨 실측 데이터를 모았어요.`,
+                          `What was the weather in Jeonju like in past years? Here's ${historyData.length} years of historical readings on this day.`,
+                          `历史上的这一天全州天气如何？整理了过去 ${historyData.length} 年的实际观测数据。`,
+                          `過去 ${historyData.length} 年間のこの日における全州の实际のお出かけ・天気記録を集めました。`
+                        )}
+                      </span>
                     </p>
 
                     {historyData.slice(0, 3).map((entry) => {
@@ -367,8 +371,9 @@ export function PicnicDetailDrawer({
                                   )}
                                 </span>
                                 {entry.weather.rain != null && entry.weather.rain > 0 && (
-                                  <span className="text-active-blue font-bold">
-                                    🌧️ {entry.weather.rain}mm
+                                  <span className="flex items-center gap-1 text-active-blue font-bold">
+                                    <CloudRain size={12} className="shrink-0" />
+                                    <span>{entry.weather.rain}mm</span>
                                   </span>
                                 )}
                               </div>
@@ -377,10 +382,18 @@ export function PicnicDetailDrawer({
 
                           {/* Knockout status badge */}
                           {entry.knockout !== "clear" && (
-                            <span className="text-[10px] font-black text-red-500 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20 shrink-0">
-                              {entry.knockout === "rain"
-                                ? __l("🌧️ 비", "🌧️ Rain", "🌧️ 雨", "🌧️ 雨")
-                                : __l("⚠️ 특보", "⚠️ Warning", "⚠️ 预警", "⚠️ 特報")}
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-red-500 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20 shrink-0">
+                              {entry.knockout === "rain" ? (
+                                <>
+                                  <CloudRain size={10} className="shrink-0" />
+                                  <span>{__l("비", "Rain", "雨", "雨")}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertTriangle size={10} className="shrink-0 text-red-500" />
+                                  <span>{__l("특보", "Warning", "预警", "特報")}</span>
+                                </>
+                              )}
                             </span>
                           )}
                         </div>

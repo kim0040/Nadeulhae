@@ -26,6 +26,8 @@ import {
   Droplets,
   Sun,
   CloudRain,
+  AlertTriangle,
+  CalendarRange,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -461,13 +463,16 @@ export function PicnicArchiveCalendar() {
                 </div>
               ) : detailData && detailData.length > 0 ? (
                 <div className="space-y-4">
-                  <p className="text-sm font-bold text-muted-foreground mb-4">
-                    {__l(
-                      `📅 역대 이 날의 전주 피크닉 점수와 날씨 기록(${detailData.length}년 치)을 한눈에 비교해 보세요.`,
-                      `📅 Compare picnic scores and weather in Jeonju on this day over the last ${detailData.length} years.`,
-                      `📅 对比过去 ${detailData.length} 年中这一天全州的野餐指数与天气记录。`,
-                      `📅 過去 ${detailData.length} 年間のこの日における全州의 피크닉(行楽)スコアと天気を比較します。`
-                    )}
+                  <p className="flex items-center gap-1.5 text-sm font-bold text-muted-foreground mb-4">
+                    <CalendarRange size={16} className="text-sky-blue shrink-0" />
+                    <span>
+                      {__l(
+                        `역대 이 날의 전주 피크닉 점수와 날씨 기록(${detailData.length}년 치)을 한눈에 비교해 보세요.`,
+                        `Compare picnic scores and weather in Jeonju on this day over the last ${detailData.length} years.`,
+                        `对比过去 ${detailData.length} 年中这一天全州的野餐指数与天气记录。`,
+                        `過去 ${detailData.length} 年間のこの日における全州의 피크닉(行楽)スコアと天気を比較します。`
+                      )}
+                    </span>
                   </p>
 
                   {detailData.map((entry, idx) => {
@@ -503,10 +508,18 @@ export function PicnicArchiveCalendar() {
                                 {entry.date.slice(0, 4)}{__l("년", " ", "", "年")}
                               </span>
                               {entry.knockout !== "clear" && (
-                                <span className="ml-2 text-xs font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
-                                  {entry.knockout === "rain"
-                                    ? __l("🌧️ 비", "🌧️ Rain", "🌧️ 雨", "🌧️ 雨")
-                                    : __l("⚠️ 특보", "⚠️ Warning", "⚠️ 预警", "⚠️ 特報")}
+                                <span className="inline-flex items-center gap-1 ml-2 text-xs font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                                  {entry.knockout === "rain" ? (
+                                    <>
+                                      <CloudRain size={12} className="shrink-0" />
+                                      <span>{__l("비", "Rain", "雨", "雨")}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertTriangle size={12} className="shrink-0 text-red-500" />
+                                      <span>{__l("특보", "Warning", "预警", "特報")}</span>
+                                    </>
+                                  )}
                                 </span>
                               )}
                             </div>
@@ -519,10 +532,18 @@ export function PicnicArchiveCalendar() {
                                 {entry.date.slice(0, 4)}{__l("년", "", "", "年")}
                               </span>
                               {entry.knockout !== "clear" && (
-                                <span className="text-xs font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
-                                  {entry.knockout === "rain"
-                                    ? __l("🌧️ 비", "🌧️ Rain", "🌧️ 雨", "🌧️ 雨")
-                                    : __l("⚠️ 특보", "⚠️ Warning", "⚠️ 预警", "⚠️ 特報")}
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                                  {entry.knockout === "rain" ? (
+                                    <>
+                                      <CloudRain size={12} className="shrink-0" />
+                                      <span>{__l("비", "Rain", "雨", "雨")}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertTriangle size={12} className="shrink-0 text-red-500" />
+                                      <span>{__l("특보", "Warning", "预警", "特報")}</span>
+                                    </>
+                                  )}
                                 </span>
                               )}
                             </div>
@@ -555,7 +576,8 @@ export function PicnicArchiveCalendar() {
                               {entry.weather.rain != null &&
                                 entry.weather.rain > 0 && (
                                   <span className="flex items-center gap-1 text-active-blue font-semibold">
-                                    🌧️ {entry.weather.rain}mm
+                                    <CloudRain size={14} className="shrink-0" />
+                                    {entry.weather.rain}mm
                                   </span>
                                 )}
                               {entry.weather.sunshine != null && (
