@@ -13,7 +13,7 @@ import {
   eachDayOfInterval,
   isSameDay,
 } from "date-fns";
-import { ko, enUS } from "date-fns/locale";
+import { ko, enUS, zhCN, ja } from "date-fns/locale";
 import {
   ChevronLeft,
   ChevronRight,
@@ -49,6 +49,7 @@ interface ArchiveResponse {
   month: string;
   highlightedDays: number[];
   daySummaries: DaySummary[];
+  availableYears: number[];
   metadata: {
     dataSource: string;
     lastUpdate: string;
@@ -126,20 +127,44 @@ const scoreColors = (score: number) => {
 const statusLabels: Record<string, Record<string, string>> = {
   ko: { excellent: "매우 좋음", good: "좋음", fair: "보통", poor: "나쁨" },
   en: { excellent: "Excellent", good: "Good", fair: "Fair", poor: "Poor" },
+  zh: { excellent: "极佳", good: "优", fair: "良", poor: "差" },
+  ja: { excellent: "非常に良い", good: "良い", fair: "普通", poor: "悪い" },
 };
+
+function pickDateFnsLocale(language: string) {
+  if (language === "ko") return ko;
+  if (language === "zh") return zhCN;
+  if (language === "ja") return ja;
+  return enUS;
+}
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 export function PicnicArchiveCalendar() {
   const { language } = useLanguage();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const __l = (ko: string, en: string, zh?: string, ja?: string) => {
+    if (language === "ko") return ko;
+    if (language === "zh") return zh || en || ko;
+    if (language === "ja") return ja || en || ko;
+    return en || ko;
+  };
+
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    // Default to the same month in 2025 if current year exceeds database coverage
+    if (now.getFullYear() > 2025) {
+      return new Date(2025, now.getMonth(), 1);
+    }
+    return now;
+  });
+
   const [archiveData, setArchiveData] = useState<ArchiveResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [detailData, setDetailData] = useState<HistoryEntry[] | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const locale = language === "ko" ? ko : enUS;
+  const locale = pickDateFnsLocale(language);
   const today = new Date();
 
   // Fetch month archive
@@ -198,6 +223,9 @@ export function PicnicArchiveCalendar() {
     return summary ? summary.score : null;
   };
 
+  const availableYears = archiveData?.availableYears || [2021, 2022, 2023, 2024, 2025];
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
   return (
     <div className="w-full max-w-4xl mx-auto bg-[var(--card)] backdrop-blur-3xl rounded-[3.5rem] border border-[var(--card-border)] p-6 sm:p-12 overflow-hidden relative group">
       {/* Header */}
@@ -206,13 +234,55 @@ export function PicnicArchiveCalendar() {
           <div className="flex items-center gap-3 text-neutral-400 mb-2">
             <History size={18} />
             <span className="text-xs font-black uppercase tracking-widest">
-              {language === "ko" ? "과거 나들이 기록" : "Past Outing Records"}
+              {__l("과거 나들이 기록", "Past Outing Records", "历史出行记录", "過去のお出かけ記録")}
             </span>
           </div>
-          <h2 className="text-4xl sm:text-5xl font-black tracking-tighter text-foreground">
-            {format(currentMonth, "yyyy. MMMM", { locale })}
-          </h2>
+          
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-1">
+            {/* Year Selector */}
+            <div className="relative group">
+              <select
+                value={currentMonth.getFullYear()}
+                onChange={(e) => setCurrentMonth(new Date(Number(e.target.value), currentMonth.getMonth(), 1))}
+                className="appearance-none rounded-2xl border border-card-border bg-card/80 px-4 py-2 sm:px-5 sm:py-2.5 pr-10 text-xl sm:text-2xl font-black text-foreground shadow-md outline-none transition duration-200 hover:border-sky-blue/35 focus:border-sky-blue/35 cursor-pointer"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888888' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E")`,
+                  backgroundPosition: 'right 0.85rem center',
+                  backgroundSize: '0.85rem',
+                  backgroundRepeat: 'no-repeat'
+                }}
+              >
+                {availableYears.map((y) => (
+                  <option key={y} value={y} className="bg-background text-foreground text-sm font-semibold">
+                    {y}{__l("년", "", "", "")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Month Selector */}
+            <div className="relative group">
+              <select
+                value={currentMonth.getMonth() + 1}
+                onChange={(e) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(e.target.value) - 1, 1))}
+                className="appearance-none rounded-2xl border border-card-border bg-card/80 px-4 py-2 sm:px-5 sm:py-2.5 pr-10 text-xl sm:text-2xl font-black text-foreground shadow-md outline-none transition duration-200 hover:border-sky-blue/35 focus:border-sky-blue/35 cursor-pointer"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888888' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E")`,
+                  backgroundPosition: 'right 0.85rem center',
+                  backgroundSize: '0.85rem',
+                  backgroundRepeat: 'no-repeat'
+                }}
+              >
+                {months.map((m) => (
+                  <option key={m} value={m} className="bg-background text-foreground text-sm font-semibold">
+                    {m}{__l("월", "", "", "")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
+        
         <div className="flex gap-4">
           <button
             onClick={prevMonth}
@@ -272,7 +342,7 @@ export function PicnicArchiveCalendar() {
                   onClick={() => handleDateClick(day)}
                   disabled={!isCurrentMonth}
                   className={cn(
-                    "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-center rounded-[2rem] sm:rounded-[2.5rem] text-sm sm:text-xl font-black transition-all border cursor-pointer",
+                    "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-center rounded-2xl sm:rounded-[2.5rem] text-sm sm:text-xl font-black transition-all border cursor-pointer",
                     !isCurrentMonth &&
                       "text-neutral-200 dark:text-neutral-800 border-transparent opacity-30 cursor-default",
                     isCurrentMonth &&
@@ -294,7 +364,7 @@ export function PicnicArchiveCalendar() {
                     {format(day, "d")}
                     {isToday && isCurrentMonth && (
                       <span className="absolute -top-1 -right-4 text-[8px] text-active-blue">
-                        오늘
+                        {__l("오늘", "Today", "今天", "今日")}
                       </span>
                     )}
                   </span>
@@ -302,7 +372,7 @@ export function PicnicArchiveCalendar() {
                     <span
                       className={cn("text-[9px] font-bold mt-0.5", clr?.text)}
                     >
-                      {score}점
+                      {score}{__l("점", " Pts", "分", "点")}
                     </span>
                   )}
                   {highlighted && !isSelected && (
@@ -336,10 +406,11 @@ export function PicnicArchiveCalendar() {
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-black tracking-tight text-foreground">
-                  {format(selectedDate, "yyyy년 M월 d일", { locale })}
+                  {format(selectedDate, __l("yyyy년 M월 d일", "MMMM d, yyyy", "yyyy年M月d日", "yyyy年M月d日"), { locale })}
+                  {__l("의 역대 나들이 기록", " Weather History", "的历史出行记录", "の過去のお出かけ記録")}
                   {isSameDay(selectedDate, today) && (
                     <span className="ml-3 text-sm font-bold text-sky-blue bg-sky-blue/10 px-3 py-1 rounded-full">
-                      오늘
+                      {__l("오늘", "Today", "今天", "今日")}
                     </span>
                   )}
                 </h3>
@@ -365,13 +436,14 @@ export function PicnicArchiveCalendar() {
                 </div>
               ) : detailData && detailData.length > 0 ? (
                 <div className="space-y-4">
-                  {isSameDay(selectedDate, today) && (
-                    <p className="text-sm font-bold text-muted-foreground mb-4">
-                      {language === "ko"
-                        ? `📅 예전 이맘때는 어땠을까요? 과거 ${detailData.length}년 치 기록을 모아봤어요.`
-                        : `📅 What was this day like in past years? Here's ${detailData.length} years of history.`}
-                    </p>
-                  )}
+                  <p className="text-sm font-bold text-muted-foreground mb-4">
+                    {__l(
+                      `📅 역대 이 날의 전주 피크닉 점수와 날씨 기록(${detailData.length}년 치)을 한눈에 비교해 보세요.`,
+                      `📅 Compare picnic scores and weather in Jeonju on this day over the last ${detailData.length} years.`,
+                      `📅 对比过去 ${detailData.length} 年中这一天全州的野餐指数与天气记录。`,
+                      `📅 過去 ${detailData.length} 年間のこの日における全州のピクニックスコアと天気を比較します。`
+                    )}
+                  </p>
 
                   {detailData.map((entry, idx) => {
                     const clr = scoreColors(entry.score);
@@ -388,8 +460,9 @@ export function PicnicArchiveCalendar() {
                           <div className="flex shrink-0 items-center gap-4">
                             <div
                               className={cn(
-                                "size-20 rounded-full flex flex-col items-center justify-center border-2",
+                                "size-20 rounded-full flex flex-col items-center justify-center border-2 shadow-sm transition-transform hover:scale-105",
                                 clr.border,
+                                clr.bg
                               )}
                             >
                               <span className="text-2xl font-black">
@@ -402,13 +475,13 @@ export function PicnicArchiveCalendar() {
                             </div>
                             <div className="sm:hidden">
                               <span className="text-base font-black">
-                                {entry.date.slice(0, 4)}년
+                                {entry.date.slice(0, 4)}{__l("년", " ", "", "年")}
                               </span>
                               {entry.knockout !== "clear" && (
                                 <span className="ml-2 text-xs font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
                                   {entry.knockout === "rain"
-                                    ? "🌧️ 비"
-                                    : "⚠️ 특보"}
+                                    ? __l("🌧️ 비", "🌧️ Rain", "🌧️ 雨", "🌧️ 雨")
+                                    : __l("⚠️ 특보", "⚠️ Warning", "⚠️ 预警", "⚠️ 特報")}
                                 </span>
                               )}
                             </div>
@@ -418,13 +491,13 @@ export function PicnicArchiveCalendar() {
                           <div className="flex-1 min-w-0">
                             <div className="hidden sm:flex items-center gap-2 mb-2">
                               <span className="text-base font-black">
-                                {entry.date.slice(0, 4)}년
+                                {entry.date.slice(0, 4)}{__l("년", "", "", "年")}
                               </span>
                               {entry.knockout !== "clear" && (
                                 <span className="text-xs font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
                                   {entry.knockout === "rain"
-                                    ? "🌧️ 비"
-                                    : "⚠️ 특보"}
+                                    ? __l("🌧️ 비", "🌧️ Rain", "🌧️ 雨", "🌧️ 雨")
+                                    : __l("⚠️ 특보", "⚠️ Warning", "⚠️ 预警", "⚠️ 特報")}
                                 </span>
                               )}
                             </div>
@@ -439,7 +512,12 @@ export function PicnicArchiveCalendar() {
                               </span>
                               <span className="flex items-center gap-1 text-muted-foreground">
                                 <Cloud size={14} />
-                                {entry.weather.sky}
+                                {__l(
+                                  entry.weather.sky === "맑음" ? "맑음" : entry.weather.sky === "구름많음" ? "구름많음" : "흐림",
+                                  entry.weather.sky === "맑음" ? "Clear" : entry.weather.sky === "구름많음" ? "Mostly Cloudy" : "Cloudy",
+                                  entry.weather.sky === "맑음" ? "晴" : entry.weather.sky === "구름많음" ? "多云" : "阴",
+                                  entry.weather.sky === "맑음" ? "晴れ" : entry.weather.sky === "구름많음" ? "曇り時々晴れ" : "曇り"
+                                )}
                               </span>
                               <span className="flex items-center gap-1 text-muted-foreground">
                                 <Wind size={14} />
@@ -451,51 +529,57 @@ export function PicnicArchiveCalendar() {
                               </span>
                               {entry.weather.rain != null &&
                                 entry.weather.rain > 0 && (
-                                  <span className="flex items-center gap-1 text-active-blue">
+                                  <span className="flex items-center gap-1 text-active-blue font-semibold">
                                     🌧️ {entry.weather.rain}mm
                                   </span>
                                 )}
                               {entry.weather.sunshine != null && (
-                                <span className="flex items-center gap-1 text-yellow-500">
+                                <span className="flex items-center gap-1 text-yellow-500 font-semibold">
                                   <Sun size={14} />
                                   {entry.weather.sunshine}h
                                 </span>
                               )}
                             </div>
-                            {/* Score breakdown mini bars */}
-                            <div className="flex gap-1.5 mt-3">
-                              {(
-                                ["air", "temperature", "sky", "wind"] as const
-                              ).map((k) => {
-                                const max =
-                                  k === "air"
-                                    ? 40
-                                    : k === "temperature"
-                                      ? 30
-                                      : k === "sky"
-                                        ? 20
-                                        : 10;
-                                const pct = Math.round(
-                                  (entry.breakdown[k] / max) * 100,
-                                );
-                                return (
-                                  <div
-                                    key={k}
-                                    className="flex-1 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden"
-                                    title={`${k}: ${entry.breakdown[k]}/${max}`}
-                                  >
-                                    <div
-                                      className={cn(
-                                        "h-full rounded-full",
-                                        clr.bg
-                                          .replace("bg-", "bg-")
-                                          .replace("/10", ""),
-                                      )}
-                                      style={{ width: `${pct}%` }}
-                                    />
-                                  </div>
-                                );
-                              })}
+
+                            {/* Labeled Score Breakdown Grid */}
+                            <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-white/5">
+                              <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3">
+                                {__l("세부 점수 분석", "Score Breakdown", "评分明细", "スコア内訳")}
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {((["air", "temperature", "sky", "wind"] as const)).map((k) => {
+                                  const label = {
+                                    air: __l("대기질", "Air Quality", "空气质量", "大気質"),
+                                    temperature: __l("기온", "Temp", "气温", "気温"),
+                                    sky: __l("하늘상태", "Sky", "天空", "空の状態"),
+                                    wind: __l("바람", "Wind", "风速", "風"),
+                                  }[k];
+                                  const max = k === "air" ? 40 : k === "temperature" ? 30 : k === "sky" ? 20 : 10;
+                                  const val = entry.breakdown[k];
+                                  const pct = Math.round((val / max) * 100);
+
+                                  return (
+                                    <div key={k} className="bg-background/40 rounded-xl p-2.5 border border-card-border/50">
+                                      <div className="flex justify-between items-baseline mb-1">
+                                        <span className="text-[11px] font-bold text-muted-foreground">{label}</span>
+                                        <span className="text-xs font-black text-foreground">
+                                          {val}
+                                          <span className="text-[9px] font-normal text-muted-foreground">/{max}</span>
+                                        </span>
+                                      </div>
+                                      <div className="w-full h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+                                        <div
+                                          className={cn(
+                                            "h-full rounded-full",
+                                            clr.bg.replace("bg-", "bg-").replace("/10", "")
+                                          )}
+                                          style={{ width: `${pct}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -505,9 +589,7 @@ export function PicnicArchiveCalendar() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  {language === "ko"
-                    ? "이 날짜의 기록이 없습니다."
-                    : "No records for this date."}
+                  {__l("이 날짜의 기록이 없습니다.", "No records for this date.", "该日期没有记录。", "この日付の記録はありません。")}
                 </p>
               )}
             </div>
@@ -518,9 +600,9 @@ export function PicnicArchiveCalendar() {
       {/* Info Footnote */}
       <div className="mt-12 pt-8 border-t border-neutral-100 dark:border-white/5">
         <p className="text-xs sm:text-sm font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest leading-relaxed text-center sm:text-left">
-          {archiveData?.metadata?.dataSource
-            ? `출처: ${archiveData.metadata.dataSource} (${archiveData.metadata.coverage})`
-            : "출처: 기상청 ASOS 관측자료"}
+          {__l("출처", "Source", "来源", "ソース")}:{" "}
+          {archiveData?.metadata?.dataSource || __l("기상청 ASOS 관측자료", "KMA ASOS Observation Data", "气象厅 ASOS 观测数据", "気象庁 ASOS 観測データ")}{" "}
+          {archiveData?.metadata?.coverage ? `(${archiveData.metadata.coverage})` : ""}
         </p>
       </div>
     </div>

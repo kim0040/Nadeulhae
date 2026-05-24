@@ -23,6 +23,7 @@ interface ArchiveResponse {
   month: string;
   highlightedDays: number[];
   daySummaries: DaySummary[];
+  availableYears: number[];
   metadata: {
     dataSource: string;
     lastUpdate: string;
@@ -43,6 +44,24 @@ const DATE_CACHE_TTL = 60 * 60 * 1000; // 1 hour (historical data never changes)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+let cachedYears: number[] | null = null;
+async function getAvailableYears(): Promise<number[]> {
+  if (cachedYears) return cachedYears;
+  try {
+    const rows = await queryRows<{ year: number }[] & RowDataPacket[]>(
+      "SELECT DISTINCT YEAR(date) as year FROM daily_weather_history ORDER BY year DESC"
+    );
+    cachedYears = rows.map((r) => r.year);
+    if (cachedYears.length === 0) {
+      cachedYears = [2021, 2022, 2023, 2024, 2025]; // fallback
+    }
+  } catch (error) {
+    console.error("[db-archives] Failed to fetch available years dynamically:", error);
+    cachedYears = [2021, 2022, 2023, 2024, 2025]; // fallback
+  }
+  return cachedYears;
+}
+
 function normalizeMonth(input?: string | null) {
   if (typeof input === "string" && /^\d{4}-\d{2}$/.test(input)) return input;
   const now = new Date();
@@ -92,6 +111,7 @@ async function handleGET(request: Request) {
   const url = new URL(request.url);
   const month = normalizeMonth(url.searchParams.get("month"));
   const date = url.searchParams.get("date");
+  const availableYears = await getAvailableYears();
 
   // ---- Single-date detail endpoint ----
   if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -101,16 +121,26 @@ async function handleGET(request: Request) {
       return NextResponse.json(dateCached.data);
     }
 
-    // Year-over-year: same month-day across all years
+    // Year-over-year: same month-day across all years dynamically
     const [, m, d] = date.split("-").map(Number);
-    const rows = await queryRows<HistoryRow[]>(
-      `SELECT * FROM daily_weather_history
-       WHERE MONTH(date) = ? AND DAY(date) = ?
-       ORDER BY date DESC`,
-      [m, d],
-    );
+    
+    // Construct index-friendly exact lookup dates
+    const targetDates: string[] = [];
+    for (const year of availableYears) {
+      // Validate day exists in target year (handles leap years)
+      const tempDate = new Date(year, m - 1, d);
+      if (
+        tempDate.getFullYear() === year &&
+        tempDate.getMonth() === m - 1 &&
+        tempDate.getDate() === d
+      ) {
+        targetDates.push(
+          `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+        );
+      }
+    }
 
-    if (rows.length === 0) {
+    if (targetDates.length === 0) {
       return NextResponse.json({
         date,
         entries: [],
@@ -118,8 +148,17 @@ async function handleGET(request: Request) {
       });
     }
 
+    // Primary key lookup - extremely fast (Point Lookup)
+    const placeholders = targetDates.map(() => "?").join(", ");
+    const rows = await queryRows<HistoryRow[]>(
+      `SELECT * FROM daily_weather_history
+       WHERE date IN (${placeholders})
+       ORDER BY date DESC`,
+      targetDates
+    );
+
     const entries = rows.map((r) => ({
-      date: r.date,
+      date: typeof r.date === "string" ? r.date : new Date(r.date).toISOString().slice(0, 10),
       score: r.score,
       status: r.status,
       knockout: r.knockout,
@@ -146,7 +185,7 @@ async function handleGET(request: Request) {
       },
     }));
 
-    const payload = { date, entries, count: entries.length };
+    const payload = { date, entries, count: entries.length, availableYears };
     dateCache.set(dateCacheKey, {
       expiry: Date.now() + DATE_CACHE_TTL,
       data: payload,
@@ -162,12 +201,18 @@ async function handleGET(request: Request) {
   }
 
   try {
+    // Range Scan query utilizing primary key index
+    const startOfTargetMonth = `${month}-01`;
+    const [yNum, mNum] = month.split("-").map(Number);
+    const lastDay = new Date(yNum, mNum, 0).getDate();
+    const endOfTargetMonth = `${month}-${String(lastDay).padStart(2, "0")}`;
+
     const rows = await queryRows<HistoryRow[]>(
       `SELECT date, score, status, knockout, avg_temp, min_temp, max_temp, cloud_cover
        FROM daily_weather_history
-       WHERE DATE_FORMAT(date, '%Y-%m') = ?
+       WHERE date >= ? AND date <= ?
        ORDER BY date`,
-      [month],
+      [startOfTargetMonth, endOfTargetMonth]
     );
 
     const highlightedDays: number[] = [];
@@ -196,11 +241,12 @@ async function handleGET(request: Request) {
       month,
       highlightedDays,
       daySummaries,
+      availableYears,
       metadata: {
         dataSource: "기상청 ASOS 관측자료 (지점 146 · 전주)",
         lastUpdate: new Date().toISOString(),
         mode: "historical",
-        coverage: "2021-01 ~ 2025-12",
+        coverage: `${Math.min(...availableYears)}-01 ~ ${Math.max(...availableYears)}-12`,
         note:
           rows.length === 0
             ? "해당 월의 과거 관측 데이터가 없습니다."
@@ -220,11 +266,12 @@ async function handleGET(request: Request) {
       month,
       highlightedDays: [],
       daySummaries: [],
+      availableYears,
       metadata: {
         dataSource: "기상청 ASOS",
         lastUpdate: "--:--",
         mode: "historical" as const,
-        coverage: "2021-01 ~ 2025-12",
+        coverage: `${Math.min(...availableYears)}-01 ~ ${Math.max(...availableYears)}-12`,
         note: "데이터를 불러오지 못했습니다.",
       },
     });
