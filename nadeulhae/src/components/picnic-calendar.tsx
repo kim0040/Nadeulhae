@@ -435,7 +435,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
         <div className="absolute right-0 top-6 bottom-6 w-12 bg-gradient-to-l from-background via-background/50 to-transparent pointer-events-none z-20 rounded-r-[2.5rem] opacity-0 sm:opacity-100 transition-opacity duration-300" />
 
         <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6 py-6 relative z-10">
-          <AnimatePresence mode="wait">
+          <AnimatePresence>
             {isLoading
               ? Array.from({ length: 4 }).map((_, idx) => (
                   <div
