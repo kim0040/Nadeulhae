@@ -326,7 +326,7 @@ export function PicnicArchiveCalendar() {
         {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => (
           <div
             key={day}
-            className="text-center text-[10px] font-black text-neutral-400 dark:text-neutral-500 tracking-[0.3em] pb-4"
+            className="text-center text-[9px] sm:text-[10px] font-black text-neutral-400 dark:text-neutral-500 tracking-[0.1em] sm:tracking-[0.3em] pb-2 sm:pb-4"
           >
             {day}
           </div>
@@ -347,7 +347,7 @@ export function PicnicArchiveCalendar() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
             transition={{ duration: 0.3 }}
-            className="grid grid-cols-7 gap-3 sm:gap-5"
+            className="grid grid-cols-7 gap-1.5 sm:gap-5"
           >
             {calendarDays.map((day, i) => {
               const highlighted =
@@ -371,7 +371,7 @@ export function PicnicArchiveCalendar() {
                   onClick={() => handleDateClick(day)}
                   disabled={!isCurrentMonth}
                   className={cn(
-                    "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-between p-2 sm:p-3 rounded-2xl sm:rounded-[2rem] text-sm font-black transition-all border cursor-pointer",
+                    "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-between p-1.5 sm:p-3 rounded-xl sm:rounded-[2rem] text-sm font-black transition-all border cursor-pointer",
                     !isCurrentMonth &&
                       "text-neutral-200 dark:text-neutral-800 border-transparent opacity-30 cursor-default",
                     isCurrentMonth &&
@@ -389,33 +389,33 @@ export function PicnicArchiveCalendar() {
                 >
                   {/* Top Row: Date Number */}
                   <div className="w-full flex justify-between items-start">
-                    <span className="text-[11px] sm:text-base font-black relative z-10 leading-none">
+                    <span className="text-[10px] sm:text-base font-black relative z-10 leading-none">
                       {format(day, "d")}
                       {isToday && isCurrentMonth && (
-                        <span className="absolute -top-1 -right-3 text-[8px] font-black text-active-blue animate-pulse">
+                        <span className="absolute -top-1 -right-3 text-[7px] font-black text-active-blue animate-pulse">
                           ●
                         </span>
                       )}
                     </span>
                     {highlighted && !isSelected && (
-                      <Sparkles size={10} className="text-sky-blue/45 shrink-0" />
+                      <Sparkles className="size-2 sm:size-3 text-sky-blue/45 shrink-0" />
                     )}
                   </div>
 
                   {/* Bottom Row: Premium Weather Icon & Score Badge */}
                   {score != null && isCurrentMonth && (
                     <div className={cn(
-                      "flex items-center gap-1 text-[9px] sm:text-xs font-black px-1.5 py-0.5 rounded-full shadow-inner",
+                      "flex items-center gap-0.5 sm:gap-1 text-[8px] sm:text-xs font-black px-1 sm:px-1.5 py-0.5 rounded-full shadow-inner w-full sm:w-auto justify-center",
                       isSelected ? "bg-white/20 text-white" : "bg-background/40"
                     )}>
                       {isRainy ? (
-                        <CloudRain size={10} className="shrink-0" />
+                        <CloudRain className="size-2 sm:size-3 shrink-0" />
                       ) : isSunny ? (
-                        <Sun size={10} className="shrink-0 animate-spin-slow" />
+                        <Sun className="size-2 sm:size-3 shrink-0 animate-spin-slow" />
                       ) : (
-                        <Cloud size={10} className="shrink-0" />
+                        <Cloud className="size-2 sm:size-3 shrink-0" />
                       )}
-                      <span>{score}</span>
+                      <span className="leading-none">{score}</span>
                     </div>
                   )}
                 </button>

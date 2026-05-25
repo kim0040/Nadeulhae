@@ -151,6 +151,18 @@ export function PicnicDetailDrawer({
     fetchHistory();
   }, [isOpen, day]);
 
+  // Body scroll lock
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
   // Escape key close listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -180,15 +192,18 @@ export function PicnicDetailDrawer({
             className="fixed inset-0 z-40 bg-background backdrop-blur-sm"
           />
 
-          {/* Sliding Drawer */}
+          {/* Sliding Bottom Sheet */}
           <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
+            initial={{ y: "100%", x: "-50%" }}
+            animate={{ y: 0, x: "-50%" }}
+            exit={{ y: "100%", x: "-50%" }}
             transition={{ type: "spring", damping: 30, stiffness: 220 }}
-            className="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-card border-l border-card-border/70 p-6 sm:p-10 shadow-2xl flex flex-col justify-between overflow-y-auto custom-scrollbar bg-background/95 backdrop-blur-2xl"
+            className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl bg-card border-t border-x border-card-border/70 p-6 sm:p-10 shadow-[0_-15px_50px_-15px_rgba(0,0,0,0.3)] flex flex-col justify-between overflow-y-auto custom-scrollbar bg-background/95 backdrop-blur-2xl h-[80vh] rounded-t-[2.5rem]"
           >
             <div>
+              {/* Handle Bar for Bottom Sheet */}
+              <div className="w-12 h-1.5 bg-neutral-300 dark:bg-neutral-800 rounded-full mx-auto mb-6 shrink-0" />
+
               {/* Header */}
               <div className="flex justify-between items-start mb-8">
                 <div>

@@ -559,7 +559,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                             )}
                           </div>
                         </div>
-                        <span className="text-2xl sm:text-3xl font-black mt-4 text-foreground text-center break-words line-clamp-3 min-h-[4rem]">
+                        <span className="text-xl sm:text-2xl font-black mt-4 text-foreground text-center break-words line-clamp-2 min-h-[3rem]">
                           {localizedSky}
                         </span>
                       </div>
