@@ -154,11 +154,25 @@ export function PicnicDetailDrawer({
   // Body scroll lock
   useEffect(() => {
     if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
       document.body.style.overflow = "hidden";
     } else {
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
       document.body.style.overflow = "";
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
     }
     return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
       document.body.style.overflow = "";
     };
   }, [isOpen]);
@@ -189,16 +203,16 @@ export function PicnicDetailDrawer({
             animate={{ opacity: 0.6 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-40 bg-background backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-background backdrop-blur-sm touch-none"
           />
 
           {/* Sliding Bottom Sheet */}
           <motion.div
-            initial={{ y: "100%", x: "-50%" }}
-            animate={{ y: 0, x: "-50%" }}
-            exit={{ y: "100%", x: "-50%" }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 220 }}
-            className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl bg-card border-t border-x border-card-border/70 p-6 sm:p-10 shadow-[0_-15px_50px_-15px_rgba(0,0,0,0.3)] flex flex-col justify-between overflow-y-auto custom-scrollbar bg-background/95 backdrop-blur-2xl h-[80vh] rounded-t-[2.5rem]"
+            className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-xl mx-auto bg-card border-t border-x border-card-border/70 p-6 sm:p-10 shadow-[0_-15px_50px_-15px_rgba(0,0,0,0.3)] flex flex-col justify-between overflow-y-auto custom-scrollbar bg-background/95 backdrop-blur-2xl h-[80vh] rounded-t-[2.5rem]"
           >
             <div>
               {/* Handle Bar for Bottom Sheet */}
