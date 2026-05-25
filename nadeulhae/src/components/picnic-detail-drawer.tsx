@@ -212,11 +212,16 @@ export function PicnicDetailDrawer({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 220 }}
-            className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-xl mx-auto bg-card border-t border-x border-card-border/70 p-6 sm:p-10 shadow-[0_-15px_50px_-15px_rgba(0,0,0,0.3)] flex flex-col justify-between overflow-y-auto custom-scrollbar bg-background/95 backdrop-blur-2xl h-[80vh] rounded-t-[2.5rem]"
+            className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-3xl mx-auto bg-card border-t border-x border-card-border/70 shadow-[0_-15px_50px_-15px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden bg-background/95 backdrop-blur-2xl h-[80vh] rounded-t-[2.5rem]"
           >
-            <div>
-              {/* Handle Bar for Bottom Sheet */}
-              <div className="w-12 h-1.5 bg-neutral-300 dark:bg-neutral-800 rounded-full mx-auto mb-6 shrink-0" />
+            {/* Top Fixed Area: Handle Bar */}
+            <div className="pt-5 pb-2 shrink-0">
+              <div className="w-12 h-1.5 bg-neutral-300 dark:bg-neutral-800 rounded-full mx-auto" />
+            </div>
+
+            {/* Scrollable Container */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-6 sm:px-12 pb-10 pt-2 flex flex-col justify-between">
+              <div>
 
               {/* Header */}
               <div className="flex justify-between items-start mb-8">
@@ -444,7 +449,7 @@ export function PicnicDetailDrawer({
             </div>
 
             {/* Close Button / Footnote */}
-            <div className="mt-12 text-center">
+            <div className="mt-12 text-center shrink-0">
               <span className="text-[10px] text-muted-foreground/60 block">
                 {__l(
                   "실시간 예보 데이터는 기상청 제공이며 과거 기록은 기상청 전주 ASOS 기준입니다.",
@@ -454,7 +459,8 @@ export function PicnicDetailDrawer({
                 )}
               </span>
             </div>
-          </motion.div>
+          </div>
+        </motion.div>
         </>
       )}
     </AnimatePresence>
