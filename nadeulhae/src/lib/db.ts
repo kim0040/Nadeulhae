@@ -71,6 +71,10 @@ function resolveSslOptions() {
     }
   }
 
+  console.warn(
+    "[db] No system CA bundle found; falling back to TLSv1.2 minimum without explicit CA. " +
+    "Set DB_CA_PATH to ensure certificate verification."
+  )
   return {
     rejectUnauthorized: true,
     minVersion: "TLSv1.2",
@@ -86,7 +90,7 @@ export function getDbPool() {
   const connectionLimit = Number(process.env.DB_POOL_LIMIT ?? "10")
   const isProduction = process.env.NODE_ENV === "production"
 
-  // In dev, cap at min(2, connectionLimit) and set queueLimit to 100
+  // In dev, cap at min(connectionLimit, 2) and set queueLimit to 100
   // to avoid exhausting connections on HMR reloads.
   const config: PoolOptions = {
     host: requireEnv("DB_HOST"),
@@ -97,7 +101,7 @@ export function getDbPool() {
     ssl: resolveSslOptions(),
     timezone: "+00:00",
     waitForConnections: true,
-    connectionLimit: isProduction ? connectionLimit : Math.max(2, connectionLimit),
+    connectionLimit: isProduction ? connectionLimit : Math.min(connectionLimit, 2),
     queueLimit: isProduction ? 0 : 100,
     enableKeepAlive: true,
     connectTimeout: 10000,
@@ -113,7 +117,7 @@ export function getDbPool() {
  */
 export async function queryRows<T extends RowDataPacket[]>(
   sql: string,
-  params: any[] = []
+  params: unknown[] = []
 ) {
   const [rows] = await getDbPool().query<T>(sql, params)
   return rows
@@ -126,7 +130,7 @@ export async function queryRows<T extends RowDataPacket[]>(
  */
 export async function executeStatement(
   sql: string,
-  params: any[] = []
+  params: unknown[] = []
 ) {
   const [result] = await getDbPool().execute<ResultSetHeader>(sql, params)
   return result

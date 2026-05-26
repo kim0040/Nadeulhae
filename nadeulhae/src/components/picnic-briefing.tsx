@@ -571,6 +571,14 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                   ? "border-orange-500/20 bg-orange-500/8 text-orange-600 dark:text-orange-300"
                   : "border-nature-green/20 bg-nature-green/10 text-nature-green"
             )}
+            role="region"
+            aria-label={
+              integratedGuide.tone === "danger"
+                ? __l("위험 수준", "Danger level", "危险级别", "危険レベル")
+                : integratedGuide.tone === "caution"
+                  ? __l("주의 수준", "Caution level", "注意级别", "注意レベル")
+                  : __l("안전 수준", "Safe level", "安全级别", "安全レベル")
+            }
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
@@ -580,6 +588,22 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
                     {aiBriefingText
                       ? __l("나들AI 종합 안내", "NadeulAI Briefing", "NadeulAI 综合指南", "NadeulAI 総合案内")
                       : __l("오늘의 종합 안내", "Today's guidance")}
+                  </span>
+                  <span
+                    className={cn(
+                      "ml-auto text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
+                      integratedGuide.tone === "danger"
+                        ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
+                        : integratedGuide.tone === "caution"
+                          ? "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400"
+                          : "border-nature-green/30 bg-nature-green/10 text-nature-green"
+                    )}
+                  >
+                    {integratedGuide.tone === "danger"
+                      ? __l("위험", "Danger", "危险", "危険")
+                      : integratedGuide.tone === "caution"
+                        ? __l("주의", "Caution", "注意", "注意")
+                        : __l("안전", "Safe", "安全", "安全")}
                   </span>
                 </div>
                 <div className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground dark:text-current break-words">

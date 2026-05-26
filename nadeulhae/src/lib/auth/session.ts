@@ -67,6 +67,12 @@ const AUTH_SESSION_CACHE_MAX_ENTRIES = parsePositiveInt(
   100,
   50_000
 )
+const AUTH_SESSION_CACHE_PRUNE_INTERVAL_MS = parsePositiveInt(
+  process.env.AUTH_SESSION_CACHE_PRUNE_INTERVAL_MS,
+  30_000, // 30초마다 pruning
+  5_000,
+  300_000
+)
 
 interface AuthSessionCacheEntry {
   sessionId: string
@@ -78,6 +84,7 @@ interface AuthSessionCacheEntry {
 
 declare global {
   var __nadeulhaeAuthSessionCache: Map<string, AuthSessionCacheEntry> | undefined
+  var __nadeulhaeAuthSessionCacheLastPrune: number | undefined
 }
 
 function getExpirationDate() {
@@ -134,7 +141,13 @@ function setAuthSessionCache(tokenHash: string, value: {
     cacheExpiresAt: now + Math.max(3_000, AUTH_SESSION_CACHE_TTL_MS),
     lastTouchedAt: value.lastTouchedAt ?? now,
   })
-  pruneAuthSessionCache(cache)
+  
+  // 시간 기반 스로틀링: 마지막 prune 이후 충분한 시간이 경과한 경우에만 pruning 실행
+  const lastPrune = globalThis.__nadeulhaeAuthSessionCacheLastPrune ?? 0
+  if (now - lastPrune >= AUTH_SESSION_CACHE_PRUNE_INTERVAL_MS) {
+    globalThis.__nadeulhaeAuthSessionCacheLastPrune = now
+    pruneAuthSessionCache(cache)
+  }
 }
 
 function deleteAuthSessionCache(tokenHash: string) {

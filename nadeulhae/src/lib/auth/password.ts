@@ -9,7 +9,8 @@ const SCRYPT_COST = 16384
 const SCRYPT_BLOCK_SIZE = 8
 const SCRYPT_PARALLELIZATION = 1
 const SCRYPT_MAX_MEMORY = 32 * 1024 * 1024
-const DUMMY_PASSWORD_SALT = "***REMOVED***"
+// Dynamically generated dummy salt to prevent any potential precomputation attacks
+const DUMMY_PASSWORD_SALT = randomBytes(16).toString("hex")
 
 export const PASSWORD_ALGORITHM = "scrypt-v1"
 

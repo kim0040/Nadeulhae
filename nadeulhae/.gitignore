@@ -49,3 +49,4 @@ test-reset.ts
 test-check.ts
 air_raw.json
 lint_output.txt
+scratch/

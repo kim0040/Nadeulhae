@@ -30,21 +30,25 @@ const NAVBAR_COPY = {
     logout: "로그아웃",
     logoutError: "로그아웃에 실패했어요. 다시 시도해 주세요.",
     themeToggle: "테마 변경",
+    languageToggle: "언어 변경",
   },
   en: {
     logout: "Log out",
     logoutError: "Failed to log out. Please try again.",
     themeToggle: "Toggle theme",
+    languageToggle: "Change language",
   },
   zh: {
     logout: "登出",
     logoutError: "登出失败，请重试。",
     themeToggle: "切换主题",
+    languageToggle: "更改语言",
   },
   ja: {
     logout: "ログアウト",
     logoutError: "ログアウトに失敗しました。もう一度お試しください。",
     themeToggle: "テーマ切り替え",
+    languageToggle: "言語を変更",
   },
 } as const;
 
@@ -235,6 +239,7 @@ export function Navbar() {
                 type="button"
                 onClick={handleLogout}
                 disabled={isPending}
+                aria-label={copy.logout}
                 className="flex items-center gap-1 p-1.5 text-[11px] font-bold text-neutral-500 transition-all hover:text-sky-blue disabled:opacity-50 sm:gap-1.5 sm:p-2 sm:text-xs md:text-[13px] xl:text-[13px]"
                 title={copy.logout}
               >
@@ -253,6 +258,7 @@ export function Navbar() {
                     THEME_MODES.length;
                   setTheme(THEME_MODES[nextIndex]);
                 }}
+                aria-label={copy.themeToggle}
                 className="flex items-center gap-1 p-1.5 text-neutral-500 transition-all hover:text-sky-blue sm:p-2"
                 title={copy.themeToggle}
               >
@@ -278,7 +284,9 @@ export function Navbar() {
                 const idx = cycle.indexOf(language as any);
                 setLanguage((cycle[(idx + 1) % 4] ?? "ko") as any);
               }}
+              aria-label={copy.languageToggle}
               className="flex items-center gap-1 p-1.5 text-[11px] font-black text-neutral-500 transition-all hover:text-sky-blue sm:p-2 sm:text-xs md:text-[13px]"
+              title={copy.languageToggle}
             >
               <Languages size={16} className="sm:size-[17px]" />
               <span className="hidden md:inline">{language.toUpperCase()}</span>

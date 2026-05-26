@@ -41,20 +41,28 @@ export const runtime = "nodejs"
 
 function getDuplicateErrorContext(error: unknown) {
   if (typeof error !== "object" || error === null || !("code" in error)) {
-    return { isDuplicate: false, message: "" }
+    return { isDuplicate: false, isNicknameDuplicate: false }
   }
 
   const mysqlError = error as { code?: unknown; sqlMessage?: unknown; message?: unknown }
   const mysqlCode = String(mysqlError.code ?? "")
-  const mysqlMessage = typeof mysqlError.sqlMessage === "string"
-    ? mysqlError.sqlMessage
-    : typeof mysqlError.message === "string"
-      ? mysqlError.message
-      : ""
+  const isDuplicate = mysqlCode === "ER_DUP_ENTRY"
+
+  // Check if it's a nickname duplicate by testing the error message pattern
+  // without exposing the full message in logs
+  let isNicknameDuplicate = false
+  if (isDuplicate) {
+    const message = typeof mysqlError.sqlMessage === "string"
+      ? mysqlError.sqlMessage
+      : typeof mysqlError.message === "string"
+        ? mysqlError.message
+        : ""
+    isNicknameDuplicate = /uq_users_nickname_hash_tag|nickname_tag/i.test(message)
+  }
 
   return {
-    isDuplicate: mysqlCode === "ER_DUP_ENTRY",
-    message: mysqlMessage,
+    isDuplicate,
+    isNicknameDuplicate,
   }
 }
 
@@ -304,7 +312,7 @@ async function handlePOST(request: NextRequest) {
     // === 4. ERROR HANDLING — duplicate nickname/email or internal error ===
     const duplicateContext = getDuplicateErrorContext(error)
     const duplicateNickname = error instanceof NicknameTagExhaustedError
-      || (duplicateContext.isDuplicate && /uq_users_nickname_hash_tag|nickname_tag/i.test(duplicateContext.message))
+      || duplicateContext.isNicknameDuplicate
 
     if (duplicateNickname) {
       await recordAuthSecurityEventSafely({
@@ -338,7 +346,11 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
-    console.error("Register API failed:", error)
+    console.error("Register API failed:", {
+      name: error instanceof Error ? error.name : "Unknown",
+      code: typeof error === "object" && error !== null && "code" in error ? (error as Record<string, unknown>).code : undefined,
+      // Omit raw SQL message to prevent schema/query leakage in logs
+    })
     await recordAuthSecurityEventSafely({
       eventType: "register_internal_error",
       action: "register",

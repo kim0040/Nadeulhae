@@ -26,6 +26,7 @@ import {
   getParticleCount,
   shouldRunRichAnimation,
 } from "@/lib/performance";
+import { parseServerTimestamp } from "@/lib/time/server-time";
 import { useLanguage } from "@/context/LanguageContext";
 import { useDerivedWeatherData, useWeatherData } from "@/hooks/use-weather";
 import { Particles } from "@/components/magicui/particles";
@@ -77,7 +78,9 @@ function localizeUvLabel(value: string | undefined, language: string) {
   if (!value) return "--";
   if (language === "ko") return value;
 
-  switch (value.replace(/\s+/g, "")) {
+  // Trim leading/trailing whitespace, then normalize internal spaces for robust matching
+  const normalized = value.trim().replace(/\s+/g, "");
+  switch (normalized) {
     case "낮음":
       return "Low";
     case "보통":
@@ -105,13 +108,25 @@ export default function Home() {
     useDerivedWeatherData(weatherData);
 
   // ---- Derived values ----
-  const [heroMessageSeed] = useState(() => {
-    const now = new Date();
+  const heroMessageSeed = useMemo(() => {
+    // 서버 시간을 우선 사용 (taste: 서버 시간을 표준 시간으로 사용)
+    const serverTimeStr = weatherData?.metadata?.lastUpdate;
+    let now: Date;
+    
+    if (serverTimeStr) {
+      const parsed = parseServerTimestamp(
+        typeof serverTimeStr === "string" ? serverTimeStr : serverTimeStr.kma
+      );
+      now = parsed || new Date();
+    } else {
+      now = new Date();
+    }
+    
     return (
       (now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate()) %
       1_000_000
     );
-  });
+  }, [weatherData?.metadata?.lastUpdate]);
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4";
   const particleQuantity = useMemo(() => getParticleCount(20), []);
   const meteorCount = useMemo(() => getMeteorCount(3), []);
@@ -355,14 +370,32 @@ export default function Home() {
 
       {/* Content sections — forecast, briefing, fire insights, images */}
       <div className="container mx-auto px-4 relative z-20 pb-24 sm:pb-28">
-        <BlurFade delay={0.1}>
+        {enableAnimations ? (
+          <BlurFade delay={0.1}>
+            <TodayHourlyForecast items={hourlyForecast} />
+          </BlurFade>
+        ) : (
           <TodayHourlyForecast items={hourlyForecast} />
-        </BlurFade>
-        <BlurFade delay={0.15}>
+        )}
+        {enableAnimations ? (
+          <BlurFade delay={0.15}>
+            <PicnicBriefing weatherData={weatherData} />
+          </BlurFade>
+        ) : (
           <PicnicBriefing weatherData={weatherData} />
-        </BlurFade>
-        {fireSummary?.overview?.showOnHome && (
-          <BlurFade delay={0.2}>
+        )}
+        {fireSummary?.overview?.showOnHome &&
+          (enableAnimations ? (
+            <BlurFade delay={0.2}>
+              <div className="mt-6">
+                <FireInsightPanel
+                  data={fireSummary}
+                  language={language}
+                  variant="compact"
+                />
+              </div>
+            </BlurFade>
+          ) : (
             <div className="mt-6">
               <FireInsightPanel
                 data={fireSummary}
@@ -370,11 +403,14 @@ export default function Home() {
                 variant="compact"
               />
             </div>
+          ))}
+        {enableAnimations ? (
+          <BlurFade delay={0.25}>
+            <WeatherImagePanel data={weatherImages} weather={weatherData} />
           </BlurFade>
-        )}
-        <BlurFade delay={0.25}>
+        ) : (
           <WeatherImagePanel data={weatherImages} weather={weatherData} />
-        </BlurFade>
+        )}
       </div>
 
       {/* Footer — legal links and attribution */}
