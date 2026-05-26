@@ -49,17 +49,19 @@ async function handlePOST(request: NextRequest) {
     const nLat2 = Number(lat2)
     const nLon2 = Number(lon2)
 
-    // 1. Get Kakao Key and dynamic origin based on request headers
-    const key = process.env.KAKAO_JS_KEY || "***REMOVED***"
-    let origin = "http://localhost:3000"
+    // 1. Get Kakao Key: prefer REST API Key for server-side REST calls, fallback to JS key
+    const restKey = process.env.KAKAO_REST_KEY
+    const jsKey = process.env.KAKAO_JS_KEY || "***REMOVED***"
+    const key = restKey || jsKey
     
+    let origin = "http://localhost:3000"
     const host = request.headers.get("host") || ""
     const referer = request.headers.get("referer") || ""
     if (host.includes("127.0.0.1") || referer.includes("127.0.0.1")) {
       origin = "http://127.0.0.1:3000"
     }
     
-    // 2. Prepare headers (satisfying origin requirements of JS key)
+    // 2. Prepare headers (satisfying origin requirements of JS key if fallback is used)
     const headers = {
       "Authorization": `KakaoAK ${key}`,
       "KA": `sdk/1.0.0 os/javascript lang/ko device/web origin/${origin}`,
