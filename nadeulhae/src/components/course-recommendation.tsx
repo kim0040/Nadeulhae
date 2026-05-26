@@ -175,7 +175,7 @@ const COPY = {
     noMenu: "メニュー情報なし",
     nearby: "近くのおすすめ",
     startAt: "訪問",
-    empty: "現在の天気条件に合うコースが見つかりません。天気が良くなったらまたおすすめします。",
+    empty: "現在の天気条件에 맞는 코스를 찾을 수 없어요. 날씨가 좋아지면 다시 추천해 드릴게요.",
     fallbackNote: "デフォルトコースを表示中（天気データなし）。",
     dislike: "別の場所",
     dislikeHint: "別のおすすめを見る",
@@ -184,7 +184,7 @@ const COPY = {
     // Journey Timeline Japanese
     startNode: "出発地",
     myLocation: "現在地 (GPS)",
-    defaultLocation: "全州市中心部 (デフォルト)",
+    defaultLocation: "全州市中心부 (デフォルト)",
     transitWalk: "徒歩移動",
     transitDrive: "車/タクシー移動",
     finishNode: "お出かけ完了・帰路",
@@ -271,7 +271,7 @@ function getRouteInfo(
       type: "walk" as const
     }
   } else {
-    // 30km/h average in the city including traffic lights
+    // 30km/h average in the city including traffic signals
     const driveTime = Math.round(dist * 2.5) + 2
     return {
       text: locale === "ko" ? `차량 약 ${driveTime}분 (${dist.toFixed(1)}km)`
@@ -388,6 +388,9 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const [kakaoKey, setKakaoKey] = useState<string | null>(null)
   const [kakaoLoadError, setKakaoLoadError] = useState(false)
   const kakaoKeyLoaded = kakaoKey != null
+
+  // Real-time directions state (SWR progressive updates)
+  const [realtimeRoutes, setRealtimeRoutes] = useState<any[]>([])
 
   // Fetch Kakao Maps JS Key from rate-limited backend DB quota counter
   useEffect(() => {
@@ -555,12 +558,12 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     return copy.step3
   }
 
-  // Precompute all route elements
-  const routingData = useMemo(() => {
+  // Fallback synchronous routing (client-side heuristic)
+  const heuristicRoutingData = useMemo(() => {
     if (slots.length === 0) return []
     const routes: any[] = []
 
-    // 1. Route from Starting Point to Slot 1
+    // 1. Starting Point ➔ Slot 1
     const p1 = slots[0]?.places[0]
     routes.push(getRouteInfo(originLat, originLon, p1?.lat, p1?.lon, language))
 
@@ -571,11 +574,90 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       routes.push(getRouteInfo(from?.lat, from?.lon, to?.lat, to?.lon, language))
     }
 
-    // 3. Route from Last Slot back to Starting Point
+    // 3. Last Slot ➔ Starting Point (Return Home)
     const pLast = slots[slots.length - 1]?.places[0]
     routes.push(getRouteInfo(pLast?.lat, pLast?.lon, originLat, originLon, language))
 
     return routes
+  }, [slots, originLat, originLon, language])
+
+  // Fetch real-time traffic directions asynchronously (Stale-While-Revalidate)
+  useEffect(() => {
+    if (slots.length === 0) {
+      setRealtimeRoutes([])
+      return
+    }
+
+    const fetchRealtimeRoutes = async () => {
+      const transitions: any[] = []
+
+      // 1. Starting Point ➔ Slot 1
+      const p1 = slots[0]?.places[0]
+      transitions.push({ lat1: originLat, lon1: originLon, lat2: p1?.lat, lon2: p1?.lon })
+
+      // 2. Slot i ➔ Slot i+1
+      for (let i = 0; i < slots.length - 1; i++) {
+        const from = slots[i]?.places[0]
+        const to = slots[i + 1]?.places[0]
+        transitions.push({ lat1: from?.lat, lon1: from?.lon, lat2: to?.lat, lon2: to?.lon })
+      }
+
+      // 3. Last Slot ➔ Starting Point (Return Home)
+      const pLast = slots[slots.length - 1]?.places[0]
+      transitions.push({ lat1: pLast?.lat, lon1: pLast?.lon, lat2: originLat, lon2: originLon })
+
+      try {
+        const promises = transitions.map(async (t) => {
+          if (t.lat1 == null || t.lon1 == null || t.lat2 == null || t.lon2 == null) {
+            return null
+          }
+          const res = await fetch("/api/places/directions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat1: t.lat1, lon1: t.lon1, lat2: t.lat2, lon2: t.lon2 }),
+          })
+
+          if (res.ok) {
+            const data = await res.json()
+            const dist = data.distanceMeters / 1000 // KM
+            const timeMin = Math.round(data.durationSeconds / 60)
+            
+            let text = ""
+            let type: "walk" | "drive" = dist < 1.0 ? "walk" : "drive"
+
+            if (dist < 0.05) {
+              text = language === "ko" ? "바로 인접 (도보 1분 이내)" 
+                    : language === "en" ? "Right next to it (walk < 1 min)"
+                    : language === "zh" ? "紧邻 (步行不到1分钟)"
+                    : "すぐ隣 (徒歩 1 分以内)"
+              type = "walk"
+            } else if (dist < 1.0) {
+              text = language === "ko" ? `도보 약 ${timeMin}분 (약 ${data.distanceMeters}m)`
+                    : language === "en" ? `Walk approx ${timeMin} min (approx ${data.distanceMeters}m)`
+                    : language === "zh" ? `步行约 ${timeMin} 分钟 (约 ${data.distanceMeters}米)`
+                    : `徒歩約 ${timeMin} 分 (約 ${data.distanceMeters}m)`
+              type = "walk"
+            } else {
+              text = language === "ko" ? `차량 약 ${timeMin}분 (${dist.toFixed(1)}km)`
+                    : language === "en" ? `Car approx ${timeMin} min (${dist.toFixed(1)}km)`
+                    : language === "zh" ? `乘车约 ${timeMin} 分钟 (${dist.toFixed(1)}公里)`
+                    : `車で約 ${timeMin} 分 (${dist.toFixed(1)}km)`
+              type = "drive"
+            }
+
+            return { text, dist, type, source: data.source }
+          }
+          return null
+        })
+
+        const results = await Promise.all(promises)
+        setRealtimeRoutes(results)
+      } catch (err) {
+        console.error("[KakaoMap] Asynchronous directions fetch failed:", err)
+      }
+    }
+
+    fetchRealtimeRoutes()
   }, [slots, originLat, originLon, language])
 
   if (loading) {
@@ -696,7 +778,9 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
           {slots.map((slot, i) => {
             const isExpanded = expandedSlot === i
             const style = TYPE_STYLE[slot.type] ?? TYPE_STYLE.실내
-            const transitToThis = routingData[i] // Route from previous node to this slot
+            
+            // Progressive enhancement: render real-time DB directions if loaded, fallback to client heuristic
+            const transitToThis = realtimeRoutes[i] || heuristicRoutingData[i]
 
             return (
               <div key={`${slot.time}-${i}`}>
@@ -715,6 +799,11 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                         <Car className="size-3 text-sky-blue" />
                       )}
                       <span>{transitToThis.text}</span>
+                      {transitToThis.source === "kakao" && (
+                        <span className="inline-flex items-center rounded bg-sky-blue/10 px-1 py-0.2 text-[8px] font-black text-sky-blue border border-sky-blue/15 scale-[0.9]">
+                          실시간 교통
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -905,19 +994,29 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
           })}
 
           {/* ============================== 🚗 3. Transit Path Badge BEFORE the Finish node ============================== */}
-          {routingData[routingData.length - 1] && (
-            <div className="relative h-14">
-              {/* Dotted connector */}
-              <div className="absolute left-[19px] top-0 bottom-0 w-0.5 border-l-2 border-dashed border-sky-blue/35" />
-              
-              {/* Floating capsule info */}
-              <div className="absolute left-[20px] top-1/2 -translate-y-1/2 ml-5 z-10 flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/90 px-3 py-1 text-[10.5px] font-bold text-muted-foreground shadow-sm backdrop-blur-md">
-                <Car className="size-3 text-sky-blue" />
-                <span className="text-[10px] font-semibold text-sky-blue/80 mr-0.5">{copy.returnHome}:</span>
-                <span>{routingData[routingData.length - 1].text}</span>
+          {(() => {
+            const transitToHome = realtimeRoutes[realtimeRoutes.length - 1] || heuristicRoutingData[heuristicRoutingData.length - 1]
+            if (!transitToHome) return null
+
+            return (
+              <div className="relative h-14">
+                {/* Dotted connector */}
+                <div className="absolute left-[19px] top-0 bottom-0 w-0.5 border-l-2 border-dashed border-sky-blue/35" />
+                
+                {/* Floating capsule info */}
+                <div className="absolute left-[20px] top-1/2 -translate-y-1/2 ml-5 z-10 flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/90 px-3 py-1 text-[10.5px] font-bold text-muted-foreground shadow-sm backdrop-blur-md">
+                  <Car className="size-3 text-sky-blue" />
+                  <span className="text-[10px] font-semibold text-sky-blue/80 mr-0.5">{copy.returnHome}:</span>
+                  <span>{transitToHome.text}</span>
+                  {transitToHome.source === "kakao" && (
+                    <span className="inline-flex items-center rounded bg-sky-blue/10 px-1 py-0.2 text-[8px] font-black text-sky-blue border border-sky-blue/15 scale-[0.9]">
+                      실시간 교통
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* ============================== 🏁 4. FINISH NODE ============================== */}
           <div className="relative">
