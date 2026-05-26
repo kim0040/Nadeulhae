@@ -63,20 +63,8 @@ async function handleGET(request: NextRequest) {
       ON DUPLICATE KEY UPDATE request_count = request_count + 1, last_used_at = NOW()
     `, [actorKey])
 
-    // 5. Retrieve key from environment or local test fallback based on host domain
-    let key = process.env.KAKAO_JS_KEY
-    if (!key) {
-      const host = request.headers.get("host") || ""
-      const referer = request.headers.get("referer") || ""
-      
-      // Serve the key matching 127.0.0.1 if the user accessed via 127.0.0.1
-      if (host.includes("127.0.0.1") || referer.includes("127.0.0.1")) {
-        key = "***REMOVED***"
-      } else {
-        // Fallback to localhost key
-        key = "***REMOVED***"
-      }
-    }
+    // 5. Retrieve key from environment or local test fallback
+    const key = process.env.KAKAO_JS_KEY || "***REMOVED***"
 
     return NextResponse.json({
       kakaoKey: key,
