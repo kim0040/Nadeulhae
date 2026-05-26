@@ -63,8 +63,15 @@ async function handleGET(request: NextRequest) {
       ON DUPLICATE KEY UPDATE request_count = request_count + 1, last_used_at = NOW()
     `, [actorKey])
 
-    // 5. Retrieve key from environment or local test fallback
-    const key = process.env.KAKAO_JS_KEY || "4643b10dc75bdd9048a7c9ef415ec074"
+    // 5. Retrieve key from environment
+    const key = process.env.KAKAO_JS_KEY
+    if (!key) {
+      console.error("[kakao-config] KAKAO_JS_KEY is not defined in environment variables.")
+      return NextResponse.json(
+        { error: "Map configuration not available" },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       kakaoKey: key,

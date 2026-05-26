@@ -51,8 +51,14 @@ async function handlePOST(request: NextRequest) {
 
     // 1. Get Kakao Key: prefer REST API Key for server-side REST calls, fallback to JS key
     const restKey = process.env.KAKAO_REST_KEY
-    const jsKey = process.env.KAKAO_JS_KEY || "4643b10dc75bdd9048a7c9ef415ec074"
+    const jsKey = process.env.KAKAO_JS_KEY
     const key = restKey || jsKey
+    
+    if (!key) {
+      console.warn("[kakao-directions] No KAKAO_REST_KEY or KAKAO_JS_KEY found in environment variables. Falling back to heuristic.")
+      const fallback = calculateFallbackRoute(nLat1, nLon1, nLat2, nLon2)
+      return NextResponse.json(fallback)
+    }
     
     let origin = "http://localhost:3000"
     const host = request.headers.get("host") || ""

@@ -551,7 +551,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const handleDislike = useCallback((slotIndex: number) => {
     if (slotIndex >= slots.length) return
     const slot = slots[slotIndex]
-    const namesToExclude = slot.places.map(p => p.name)
+    const namesToExclude = slot?.places?.map((p: any) => p.name) || []
     const next = [...new Set([...excludedNames, ...namesToExclude])]
     setExcludedNames(next)
     excludeRef.current = next
@@ -882,7 +882,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                     {/* Expanded details */}
                     {isExpanded && (
                       <div className="mt-4 space-y-2.5 border-t border-card-border/50 pt-4">
-                        {slot.places.map((place, pi) => (
+                        {slot.places?.map((place, pi) => (
                           <div
                             key={`${place.name}-${pi}`}
                             className="flex flex-col gap-3 rounded-[1.2rem] border border-card-border/40 bg-card/45 backdrop-blur-[2px] px-4 py-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] hover:scale-[1.01] hover:border-sky-blue/30 hover:shadow-md transition-all duration-300"
