@@ -112,7 +112,20 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-XSS-Protection": "0",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr; font-src 'self'; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
+  "Cross-Origin-Resource-Policy": "cross-origin",
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://dapi.kakao.com http://dapi.kakao.com https://*.daumcdn.net http://*.daumcdn.net https://*.kakaocdn.net http://*.kakaocdn.net",
+    "style-src 'self' 'unsafe-inline' https://*.daumcdn.net http://*.daumcdn.net",
+    "img-src 'self' data: blob: https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net https://*.kakao.com http://*.kakao.com",
+    "font-src 'self' https://*.daumcdn.net http://*.daumcdn.net",
+    "connect-src 'self' https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr https://apis.data.go.kr wss://nadeulhae.space wss://www.nadeulhae.space https://dapi.kakao.com http://dapi.kakao.com https://*.kakaocdn.net http://*.kakaocdn.net https://*.daumcdn.net http://*.daumcdn.net",
+    "worker-src 'self' blob:",
+    "child-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ") + ";",
 }
 
 const STATIC_CACHE_HEADERS: Record<string, string> = {

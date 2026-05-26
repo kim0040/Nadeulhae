@@ -10,73 +10,30 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
-  RefreshCcw,
-  ShieldAlert,
   Sparkles,
   Settings,
   MapPin,
-  Thermometer,
-  Droplets,
-  Wind,
   Cloud,
+  Sun,
+  CloudRain,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
-import { BorderBeam } from "@/components/magicui/border-beam"
-import { MagicCard } from "@/components/magicui/magic-card"
 import { Meteors } from "@/components/magicui/meteors"
 import { Particles } from "@/components/magicui/particles"
-import { getMeteorCount, getParticleCount, shouldRunRichAnimation } from "@/lib/performance"
+import { getMeteorCount, getParticleCount } from "@/lib/performance"
 import { DashboardChatPanel } from "@/components/chat/dashboard-chat-panel"
 import { CourseRecommendation } from "@/components/course-recommendation"
-import { TodayHourlyForecast, type HourlyForecastItem } from "@/components/today-hourly-forecast"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
 import { getOptionLabel, PRIMARY_REGION_OPTIONS } from "@/lib/auth/profile-options"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { AuthUser } from "@/lib/auth/types"
-import { formatServerDateTime, parseServerTimestamp, type SupportedLocale } from "@/lib/time/server-time"
-import { cn } from "@/lib/utils"
-import {
-  normalizeBulletinText,
-  buildBulletinSourceCandidates,
-  buildBulletinHighlight,
-  buildBulletinSegments,
-  toBulletinBodyItem,
-  getBulletinSeverity,
-  getBulletinSeverityTone,
-  getBulletinTagToneClass,
-  normalizeTagKey,
-  extractBulletinKeywordTags,
-  type BulletinKeywordTag,
-} from "@/lib/bulletin"
 import { dataService, type WeatherData } from "@/services/dataService"
 
 import { DASHBOARD_COPY } from "./constants"
 import { SectionCard, StatusMetric } from "@/components/dashboard/ui"
 import { SettingsModal } from "@/components/dashboard/settings-modal"
-
-/** Format a raw last-update value (string or record) into a locale-aware display string */ function formatLastUpdate(
-  value: WeatherData["metadata"] extends { lastUpdate: infer T } ? T : unknown,
-  language: SupportedLocale
-) {
-  const formatValue = (raw: string) => {
-    const parsed = parseServerTimestamp(raw)
-    if (!parsed) {
-      return raw
-    }
-
-    return formatServerDateTime(parsed, language)
-  }
-
-  if (!value) return "-"
-  if (typeof value === "string") return formatValue(value)
-  if (typeof value === "object" && value !== null) {
-    const record = value as Record<string, string>
-    return Object.values(record).filter(Boolean).map(formatValue).join(" / ")
-  }
-  return "-"
-}
 
 // ---- Memoized workspace (re-render only when derived key changes) ----
 
@@ -86,53 +43,30 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
   const copy = (((DASHBOARD_COPY as any)[language] ?? DASHBOARD_COPY.ko) ?? DASHBOARD_COPY.ko)
 
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
-  const [hourlyForecast, setHourlyForecast] = useState<HourlyForecastItem[]>([])
-  const [weatherError, setWeatherError] = useState<string | null>(null)
-  const [isWeatherRefreshing, setIsWeatherRefreshing] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [customCourse, setCustomCourse] = useState<any[] | null>(null)
 
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
   const particleQuantity = useMemo(() => getParticleCount(30), [])
   const meteorCount = useMemo(() => getMeteorCount(4), [])
-  const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
-
-
-  // Fetch weather details + hourly forecast in parallel for the given (or default) coords
+  // Fetch weather details for the given (or default) coords
   const loadWeather = useCallback(async (lat?: number, lon?: number) => {
-    const query = lat != null && lon != null ? `?lat=${lat}&lon=${lon}` : ""
-    const [detail, response] = await Promise.all([
-      dataService.getWeatherData(lat, lon),
-      fetch(`/api/weather/forecast${query}`, {
-        cache: "no-store",
-        credentials: "include",
-      }),
-    ])
-
-    setWeatherData(detail)
-    if (!response.ok) {
-      setHourlyForecast([])
-      return
+    try {
+      const detail = await dataService.getWeatherData(lat, lon)
+      setWeatherData(detail)
+    } catch (error) {
+      console.error("Failed to load weather details:", error)
     }
-
-    const data = await response.json()
-    setHourlyForecast(Array.isArray(data?.todayHourly) ? data.todayHourly : [])
   }, [])
 
   // Full weather refresh with geolocation attempt + fallback
   const refreshWeather = useCallback(async () => {
-    setIsWeatherRefreshing(true)
-    setWeatherError(null)
-
     const fallback = async () => {
       try {
         await loadWeather()
       } catch (error) {
         console.error("Dashboard weather refresh failed:", error)
-        setWeatherError(copy.weatherError)
-      } finally {
-        setIsWeatherRefreshing(false)
       }
     }
 
@@ -148,9 +82,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
         } catch (error) {
           console.error("Location weather refresh failed:", error)
           await fallback()
-          return
         }
-        setIsWeatherRefreshing(false)
       },
       async () => {
         await fallback()
@@ -161,218 +93,26 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
         maximumAge: 0,
       }
     )
-  }, [copy.weatherError, loadWeather])
+  }, [loadWeather])
 
   useEffect(() => {
     void refreshWeather()
   }, [refreshWeather])
 
-  const weatherPrimaryMetrics = useMemo(() => {
-    if (!weatherData) return []
-    const localizedStatus = t(weatherData.status, weatherData.status)
-    return [
-      { label: copy.score, value: String(weatherData.score), meta: localizedStatus, icon: <Sparkles className="size-4" /> },
-      { label: copy.temp, value: `${weatherData.details.temp ?? "--"}°C`, icon: <Thermometer className="size-4" /> },
-      { label: copy.feelsLike, value: `${weatherData.details.feelsLike ?? weatherData.details.temp ?? "--"}°C`, icon: <Thermometer className="size-4" /> },
-      { label: copy.humidity, value: `${weatherData.details.humidity ?? "--"}%`, icon: <Droplets className="size-4" /> },
-      { label: copy.wind, value: `${weatherData.details.wind ?? "--"}m/s`, icon: <Wind className="size-4" /> },
-      { label: copy.pm10, value: weatherData.details.pm10 != null ? `${weatherData.details.pm10}` : weatherData.details.dust || "--", icon: <Cloud className="size-4" /> },
-    ]
-  }, [copy, t, weatherData])
-
-  const weatherTags = useMemo(() => {
-    return weatherData?.metadata?.alertSummary?.hazardTags?.filter(Boolean) ?? []
-  }, [weatherData])
-
-  const rawBulletinSummary = weatherData?.metadata?.bulletin?.summary?.trim() ?? ""
-  const rawBulletinWarningStatus = weatherData?.metadata?.bulletin?.warningStatus?.trim() ?? ""
-  const rawWarningTitle = weatherData?.metadata?.alertSummary?.warningTitle?.trim() ?? ""
-  const rawEventWarningMessage = weatherData?.eventData?.warningMessage?.trim() ?? ""
-  const bulletinSourceCandidates = useMemo(
-    () =>
-      buildBulletinSourceCandidates(
-        [rawBulletinWarningStatus, rawWarningTitle, rawBulletinSummary],
-        [rawEventWarningMessage]
-      ),
-    [rawBulletinWarningStatus, rawWarningTitle, rawBulletinSummary, rawEventWarningMessage]
-  )
-  const bulletinHighlight = useMemo(
-    () => buildBulletinHighlight(bulletinSourceCandidates),
-    [bulletinSourceCandidates]
-  )
-  const bulletinSegments = useMemo(
-    () => buildBulletinSegments(bulletinSourceCandidates),
-    [bulletinSourceCandidates]
-  )
-  const bulletinBodySegments = useMemo(() => {
-    if (!bulletinHighlight) {
-      return bulletinSegments
+  // Smooth scroll to recommendation map when custom course is generated from chat
+  useEffect(() => {
+    if (customCourse) {
+      const timer = setTimeout(() => {
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: "smooth",
+        })
+      }, 150)
+      return () => clearTimeout(timer)
     }
+  }, [customCourse])
 
-    const normalizedHighlight = normalizeBulletinText(bulletinHighlight)
-    return bulletinSegments.filter((segment, index) => {
-      if (index !== 0) {
-        return true
-      }
 
-      return normalizeBulletinText(segment) !== normalizedHighlight
-    })
-  }, [bulletinHighlight, bulletinSegments])
-  const bulletinBodyItems = useMemo(
-    () =>
-      bulletinBodySegments
-        .map((segment) => toBulletinBodyItem(segment, language as any))
-        .filter((item) => item.content.length > 0),
-    [bulletinBodySegments, language]
-  )
-  const bulletinKeywordTags = useMemo(
-    () =>
-      extractBulletinKeywordTags(
-        [
-          ...bulletinSourceCandidates,
-          ...bulletinBodyItems.map((item) => item.content),
-        ],
-        language
-      ),
-    [bulletinSourceCandidates, bulletinBodyItems, language]
-  )
-  const bulletinTags = useMemo(() => {
-    const merged: BulletinKeywordTag[] = []
-    const seen = new Set<string>()
-
-    const push = (tag: BulletinKeywordTag) => {
-      const key = normalizeTagKey(tag.label)
-      if (!key || seen.has(key)) {
-        return
-      }
-
-      seen.add(key)
-      merged.push(tag)
-    }
-
-    for (const tag of bulletinKeywordTags) {
-      push(tag)
-    }
-
-    for (const tag of weatherTags) {
-      const normalized = tag.trim()
-      if (!normalized) {
-        continue
-      }
-
-      push({
-        id: `meta-${normalized}`,
-        label: normalized,
-        tone: "info",
-      })
-    }
-
-    return merged.slice(0, 8)
-  }, [bulletinKeywordTags, weatherTags])
-  const bulletinHighlightTone = useMemo(() => {
-    if (!bulletinHighlight) {
-      return null
-    }
-
-    return getBulletinSeverityTone(getBulletinSeverity(bulletinHighlight))
-  }, [bulletinHighlight])
-  const bulletinUpdatedLabel = useMemo(() => {
-    return formatLastUpdate(
-      weatherData?.metadata?.bulletin?.updatedAt || weatherData?.metadata?.lastUpdate,
-      language
-    )
-  }, [language, weatherData?.metadata?.bulletin?.updatedAt, weatherData?.metadata?.lastUpdate])
-  const bulletinContent = (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 rounded-full border border-sky-blue/20 bg-sky-blue/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.24em] text-sky-blue">
-          <ShieldAlert className="size-4" />
-          {copy.bulletin}
-        </div>
-        <span className="rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-bold text-muted-foreground">
-          {copy.updatedAt}: {bulletinUpdatedLabel}
-        </span>
-      </div>
-
-      {bulletinHighlight && bulletinHighlightTone ? (
-        <div className={cn("mt-4 rounded-[1.3rem] border px-4 py-4 sm:px-5", bulletinHighlightTone.container)}>
-          <div className="flex items-start gap-3">
-            <span className={cn(
-              "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border",
-              bulletinHighlightTone.iconWrapper
-            )}>
-              <ShieldAlert className={cn("size-4", bulletinHighlightTone.icon)} />
-            </span>
-            <div className="min-w-0">
-              <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", bulletinHighlightTone.kicker)}>
-                {language === "ko" ? "핵심 공지" : language === "zh" ? "重要公告" : language === "ja" ? "重要なお知らせ" : "Key Notice"}
-              </p>
-              <p className={cn("mt-1 text-sm font-semibold leading-6 sm:text-[15px] break-words", bulletinHighlightTone.text)}>
-                {bulletinHighlight}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {bulletinTags.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {bulletinTags.map((tag) => (
-            <span
-              key={tag.id}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-semibold",
-                getBulletinTagToneClass(tag.tone)
-              )}
-            >
-              {tag.label}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      {bulletinBodyItems.length > 0 ? (
-        <div className="mt-4 space-y-2.5">
-          {bulletinBodyItems.map((item, index) => {
-            const itemTone = getBulletinSeverityTone(getBulletinSeverity(item.content))
-            return (
-              <article
-                key={`${item.label ?? "notice"}-${item.content}-${index + 1}`}
-                className={cn("rounded-[1.15rem] border px-4 py-3.5", itemTone.itemContainer)}
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={cn(
-                        "inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
-                        item.label
-                          ? itemTone.itemLabel
-                          : "border border-card-border/70 bg-background/70 text-muted-foreground"
-                      )}
-                    >
-                      {item.label ?? (language === "ko" ? `공지 ${index + 1}` : `Notice ${index + 1}`)}
-                    </span>
-                    <span className="text-[11px] font-semibold text-muted-foreground">
-                      #{String(index + 1).padStart(2, "0")}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-foreground/95 break-words">{item.content}</p>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      ) : !bulletinHighlight ? (
-        <p className="mt-4 rounded-[1.2rem] border border-card-border/70 bg-card/70 px-4 py-3 text-sm leading-7 text-muted-foreground break-words">
-          {copy.noBulletin}
-        </p>
-      ) : null}
-
-      <p className="mt-3 text-xs font-semibold text-muted-foreground">
-        {copy.location}: {weatherData?.metadata?.region || "-"} · {copy.station}: {weatherData?.metadata?.station || "-"} · {copy.updatedAt}: {formatLastUpdate(weatherData?.metadata?.lastUpdate, language)}
-      </p>
-    </>
-  )
 
   const chatWeatherContext = useMemo<ChatWeatherContext | null>(() => {
     if (!weatherData) {
@@ -439,12 +179,43 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row xl:flex-col">
-              <StatusMetric
-                label={copy.location}
-                value={getOptionLabel(PRIMARY_REGION_OPTIONS, user.primaryRegion, language)}
-                meta={copy.heroMetricsLocation}
-                icon={<MapPin className="size-4" />}
-              />
+              {weatherData ? (
+                <div className="relative overflow-hidden rounded-[1.3rem] border border-sky-blue/20 bg-sky-blue/5 p-4.5 flex items-center justify-between gap-4 backdrop-blur-md shadow-inner shadow-white/5 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-xl bg-gradient-to-br from-sky-blue to-active-blue p-2.5 text-white shadow-md shadow-sky-blue/20 shrink-0">
+                      {weatherData.status.includes("비") || weatherData.status.includes("눈") || weatherData.status.includes("소나기") ? (
+                        <CloudRain className="size-5" />
+                      ) : weatherData.status.includes("맑음") ? (
+                        <Sun className="size-5 animate-spin" style={{ animationDuration: "35s" }} />
+                      ) : (
+                        <Cloud className="size-5" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 flex items-center gap-1">
+                        <MapPin className="size-3 text-sky-blue shrink-0" />
+                        {weatherData.metadata?.region || getOptionLabel(PRIMARY_REGION_OPTIONS, user.primaryRegion, language)}
+                      </p>
+                      <h4 className="text-[17px] font-black tracking-tight text-foreground mt-0.5">
+                        {weatherData.details.temp ?? "--"}°C
+                        <span className="text-[11px] font-bold text-sky-blue ml-2">{t(weatherData.status, weatherData.status)}</span>
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="text-right border-l border-card-border/50 pl-4 shrink-0">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">나들이 지수</span>
+                    <p className="text-lg font-black tracking-tight text-active-blue mt-0.5">{weatherData.score}점</p>
+                  </div>
+                </div>
+              ) : (
+                <StatusMetric
+                  label={copy.location}
+                  value={getOptionLabel(PRIMARY_REGION_OPTIONS, user.primaryRegion, language)}
+                  meta={copy.heroMetricsLocation}
+                  icon={<MapPin className="size-4" />}
+                />
+              )}
+
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(true)}
@@ -464,100 +235,9 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
           </div>
         </SectionCard>
 
-        {/* Responsive 2-Column Layout */}
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)]">
-          {/* Weather & Briefing Module */}
-          <SectionCard className="min-w-0">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-2">
-                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
-                  {copy.weatherTitle}
-                </p>
-                <h2 className="text-3xl font-black tracking-tight text-foreground">
-                  {weatherData?.metadata?.region || weatherData?.metadata?.regionEn || copy.weatherTitle}
-                </h2>
-                <p className="text-sm leading-6 text-muted-foreground break-words">{copy.weatherDescription}</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void refreshWeather()}
-                className="inline-flex items-center gap-2 self-start rounded-full border border-card-border/70 bg-background/75 px-4 py-2 text-sm font-black text-foreground transition hover:border-sky-blue/30 hover:text-sky-blue active:scale-[0.97] disabled:opacity-50"
-                disabled={isWeatherRefreshing}
-              >
-                <RefreshCcw className={cn("size-4", isWeatherRefreshing && "animate-spin")} />
-                {copy.weatherRefresh}
-              </button>
-            </div>
-
-            {weatherError && (
-              <div className="mt-5 rounded-[1.4rem] border border-danger/20 bg-danger/10 px-4 py-4 text-sm font-semibold text-danger">
-                <div className="flex items-center justify-between gap-3">
-                  <span>{weatherError}</span>
-                  <button
-                    type="button"
-                    onClick={() => void refreshWeather()}
-                    className="rounded-full border border-danger/20 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em]"
-                  >
-                    {copy.weatherRetry}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!weatherData && !weatherError && (
-              <div className="mt-5 rounded-[1.4rem] border border-card-border/70 bg-background/75 px-4 py-5 text-sm font-semibold text-muted-foreground">
-                {copy.weatherLoading}
-              </div>
-            )}
-
-            {weatherData && (
-              <>
-                <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-3">
-                  {weatherPrimaryMetrics.map((metric) => (
-                    <StatusMetric
-                      key={metric.label}
-                      label={metric.label}
-                      value={metric.value}
-                      meta={metric.meta}
-                      icon={metric.icon}
-                      compact
-                    />
-                  ))}
-                </div>
-
-                {enableAnimations ? (
-                  <MagicCard
-                    className="mt-6 overflow-hidden rounded-[1.7rem]"
-                    gradientSize={220}
-                    gradientOpacity={0.68}
-                  >
-                    <div className="relative rounded-[1.7rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
-                      <BorderBeam
-                        size={170}
-                        duration={11}
-                        colorFrom="var(--beam-from)"
-                        colorTo="var(--beam-to)"
-                      />
-                      <div className="relative z-10">{bulletinContent}</div>
-                    </div>
-                  </MagicCard>
-                ) : (
-                  <div className="mt-6 overflow-hidden rounded-[1.7rem]">
-                    <div className="relative rounded-[1.7rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
-                      <div className="relative z-10">
-                        {bulletinContent}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <TodayHourlyForecast items={hourlyForecast} />
-              </>
-            )}
-          </SectionCard>
-
-          <SectionCard className="min-w-0">
+        {/* Spacious Dashboard Chat Panel (Centered & Premium) */}
+        <div className="mx-auto w-full max-w-4xl animate-in fade-in slide-in-from-top-3 duration-500">
+          <SectionCard className="min-w-0 border-active-blue/10 shadow-lg shadow-sky-blue/5">
             <DashboardChatPanel 
               user={user} 
               weatherContext={chatWeatherContext} 
@@ -566,8 +246,9 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
           </SectionCard>
         </div>
 
-        {weatherData && (
-          <div className="mt-6">
+        {/* Dynamic bottom section that spans full width, revealed only when recommended course is generated */}
+        {customCourse && (
+          <div className="mt-6 w-full animate-in fade-in slide-in-from-bottom-5 duration-500">
             <CourseRecommendation
               weatherContext={chatWeatherContext}
               userProfile={{

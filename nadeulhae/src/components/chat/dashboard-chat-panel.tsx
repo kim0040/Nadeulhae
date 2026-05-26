@@ -28,6 +28,14 @@ import {
 } from "@/lib/time/server-time"
 import { cn } from "@/lib/utils"
 
+
+// Shared Kakao JS Key cache in client-side window memory to prevent multiple configuration requests
+if (typeof window !== "undefined") {
+  const win = window as any
+  win.__nadeulhaeKakaoKey = win.__nadeulhaeKakaoKey || null
+  win.__nadeulhaeKakaoLoadError = win.__nadeulhaeKakaoLoadError || false
+}
+
 type UiChatMessage = ChatConversationMessage & {
   pending?: boolean
 }
@@ -281,11 +289,70 @@ const CHAT_SUGGESTIONS = {
   )
 }
 
-/** Renders a highly interactive, gorgeous course recommendation card directly inside the chat flow */
+function tryParsePartialJson(jsonStr: string): any {
+  const clean = jsonStr.trim()
+  try {
+    return JSON.parse(clean)
+  } catch {
+    // Attempt auto-completion of unclosed brackets and braces for streaming segments
+    let balanced = clean
+    const openBrackets: string[] = []
+    let inString = false
+    let escape = false
+
+    for (let i = 0; i < clean.length; i++) {
+      const char = clean[i]
+      if (escape) {
+        escape = false
+        continue
+      }
+      if (char === "\\") {
+        escape = true
+        continue
+      }
+      if (char === '"') {
+        inString = !inString
+        continue
+      }
+      if (!inString) {
+        if (char === "{" || char === "[") {
+          openBrackets.push(char)
+        } else if (char === "}") {
+          if (openBrackets[openBrackets.length - 1] === "{") {
+            openBrackets.pop()
+          }
+        } else if (char === "]") {
+          if (openBrackets[openBrackets.length - 1] === "[") {
+            openBrackets.pop()
+          }
+        }
+      }
+    }
+
+    if (inString) {
+      balanced += '"'
+    }
+
+    for (let i = openBrackets.length - 1; i >= 0; i--) {
+      const open = openBrackets[i]
+      if (open === "{") {
+        balanced += "}"
+      } else if (open === "[") {
+        balanced += "]"
+      }
+    }
+
+    try {
+      return JSON.parse(balanced)
+    } catch {
+      return null
+    }
+  }
+}
+
 function InteractiveCourseWidget({
   code,
   onCourseGenerated,
-  isPending,
 }: {
   code: string
   onCourseGenerated?: (course: any) => void
@@ -296,103 +363,55 @@ function InteractiveCourseWidget({
   const lastGeneratedRef = useRef<string>("")
 
   useEffect(() => {
-    try {
-      const cleanedCode = code.trim()
-      const parsed = JSON.parse(cleanedCode)
-      if (parsed && Array.isArray(parsed.slots)) {
+    const timer = setTimeout(() => {
+      const parsed = tryParsePartialJson(code)
+      if (parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0) {
         setCourse(parsed)
         setError(false)
         
-        // Sync with dashboard main course, but prevent infinite updates and wait until message is fully loaded
-        if (!isPending) {
-          const courseStr = JSON.stringify(parsed.slots)
-          if (lastGeneratedRef.current !== courseStr) {
-            lastGeneratedRef.current = courseStr
-            onCourseGenerated?.(parsed.slots)
-          }
+        const courseStr = JSON.stringify(parsed.slots)
+        if (lastGeneratedRef.current !== courseStr) {
+          lastGeneratedRef.current = courseStr
+          onCourseGenerated?.(parsed.slots)
         }
       } else {
         setError(true)
       }
-    } catch {
-      setError(true)
-    }
-  }, [code, onCourseGenerated, isPending])
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [code, onCourseGenerated])
 
   if (error && !course) {
     return (
-      <div className="rounded-2xl border border-sky-blue/20 bg-background/60 p-4 text-center backdrop-blur-md">
+      <div className="my-2 rounded-2xl border border-sky-blue/20 bg-sky-blue/5 p-4 text-center backdrop-blur-sm animate-pulse">
         <div className="flex items-center justify-center gap-2 text-sky-blue">
           <LoaderCircle className="size-4 animate-spin" />
-          <span className="text-xs font-semibold">나들이 일정을 구성하는 중...</span>
+          <span className="text-xs font-black">🗺️ 실시간 나들이 코스를 구성하는 중...</span>
         </div>
       </div>
     )
   }
 
-  if (!course) return null
-
   return (
-    <div className="my-3 space-y-3.5 rounded-[1.6rem] border border-sky-blue/20 bg-card/90 p-4.5 shadow-lg shadow-sky-blue/5 backdrop-blur-xl animate-in fade-in-50 duration-300">
-      <div className="flex items-center justify-between border-b border-card-border/50 pb-2.5">
-        <div className="flex items-center gap-2">
-          <div className="rounded-full bg-gradient-to-br from-sky-blue to-active-blue p-1.5 text-white shadow-sm shadow-sky-blue/10">
-            <Sparkles className="size-3.5" />
-          </div>
-          <h4 className="text-xs font-black uppercase tracking-wider text-foreground">나들AI 맞춤 추천 코스</h4>
+    <div className="my-2 rounded-[1.3rem] border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-md shadow-emerald-500/5 backdrop-blur-md flex items-center justify-between gap-4 animate-in fade-in duration-300">
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 text-white shadow-md shadow-emerald-500/20 animate-bounce" style={{ animationDuration: "2.5s" }}>
+          <Sparkles className="size-4" />
         </div>
-        <span className="text-[10px] font-bold text-sky-blue px-2 py-0.5 rounded-full bg-sky-blue/10 border border-sky-blue/20">
-          실시간 연동됨
-        </span>
+        <div>
+          <h4 className="text-xs font-black tracking-wider text-emerald-400 uppercase">나들AI 추천 코스 완성!</h4>
+          <p className="mt-0.5 text-[11px] text-muted-foreground font-semibold leading-5 break-words">
+            하단에 지도와 상세 타임라인 코스가 로딩되었습니다. 아래에서 확인해 보세요.
+          </p>
+        </div>
       </div>
-      <div className="space-y-4">
-        {course.slots.map((slot: any, idx: number) => {
-          const isOutdoor = slot.type === "야외"
-          const isSemi = slot.type === "반실외"
-          const badgeColor = isOutdoor 
-            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-            : isSemi
-              ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
-              : "bg-sky-500/10 border-sky-500/20 text-sky-blue"
-
-          return (
-            <div key={idx} className="relative pl-5 border-l border-sky-blue/20 last:border-0 pb-1">
-              {/* Dot */}
-              <div className="absolute -left-[5.5px] top-1.5 size-2.5 rounded-full bg-sky-blue ring-4 ring-background shadow-sm" />
-              
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-black text-muted-foreground">{slot.time || `코스 ${idx + 1}`}</span>
-                <span className={cn("rounded-full border px-1.5 py-0.5 text-[8px] font-black tracking-wide", badgeColor)}>
-                  {slot.type}
-                </span>
-              </div>
-              <h5 className="mt-0.5 text-sm font-black text-foreground">{slot.title}</h5>
-              <p className="mt-1 text-[11px] leading-5 text-muted-foreground/90">{slot.description}</p>
-              
-              {slot.places && slot.places.length > 0 && (
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  {slot.places.map((place: any, pIdx: number) => (
-                    <div 
-                      key={pIdx} 
-                      className="rounded-xl bg-background/50 border border-card-border/50 px-2.5 py-1 flex items-center gap-1.5 hover:border-sky-blue/30 transition-all duration-300"
-                    >
-                      <span className="text-[10px] font-bold text-foreground/90">{place.name}</span>
-                      {place.rating != null && (
-                        <span className="text-[9px] text-amber-400 font-black flex items-center gap-0.5">
-                          ★{Number(place.rating).toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+      <span className="text-[9.5px] font-black text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/15 uppercase tracking-wider shrink-0">
+        연동 완료
+      </span>
     </div>
   )
 }
+
 
 type MessageGroup = {
   role: "user" | "assistant"
@@ -481,7 +500,7 @@ type MessageGroup = {
         </code>
       )
     },
-  }), [copy.copyCode, copy.copiedCode, onCourseGenerated])
+  }), [copy.copyCode, copy.copiedCode, onCourseGenerated, message.pending])
 
   const roundedClass = isUser
     ? groupPosition === "only"
@@ -511,13 +530,13 @@ type MessageGroup = {
       <div className={cn("max-w-[78%] min-w-0", isUser ? "items-end" : "items-start")}>
         <div
           className={cn(
-            "px-3.5 py-2.5 text-[15px] leading-[1.65]",
+            "px-4 py-3 text-[14.5px] leading-[1.62]",
             roundedClass,
             isUser
-              ? "bg-sky-blue text-white"
+              ? "bg-gradient-to-br from-sky-blue to-active-blue text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_3px_10px_-2px_rgba(47,111,228,0.26)] border border-sky-blue/20"
               : cn(
-                  "border border-card-border/50 bg-card/90 text-foreground",
-                  isLastAssistant && "shadow-[0_2px_12px_-4px_rgba(47,111,228,0.08)]"
+                  "border border-card-border/40 bg-card/65 backdrop-blur-md text-foreground shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)]",
+                  isLastAssistant && "shadow-[0_2px_16px_-2px_rgba(47,111,228,0.06)]"
                 )
           )}
         >
@@ -1050,7 +1069,7 @@ export function DashboardChatPanel({
               {copy.limitReached}
             </div>
           )}
-          <div className="flex items-end gap-2 rounded-2xl border border-card-border/70 bg-card/80 px-3 py-2 transition-colors focus-within:border-accent/40 focus-within:shadow-[0_0_0_2px_rgba(11,125,113,0.08)]">
+          <div className="flex items-end gap-2 rounded-2xl border border-card-border/70 bg-card/80 px-3 py-2 transition-all duration-300 focus-within:border-sky-blue/50 focus-within:bg-background focus-within:shadow-[0_0_0_3px_rgba(47,111,228,0.12)]">
             <textarea
               ref={chatInputRef}
               value={chatInput}

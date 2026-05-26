@@ -64,7 +64,7 @@ async function handleGET(request: NextRequest) {
     `, [actorKey])
 
     // 5. Retrieve key from environment or local test fallback
-    const key = process.env.KAKAO_JS_KEY || "***REMOVED***"
+    const key = process.env.KAKAO_JS_KEY || "4643b10dc75bdd9048a7c9ef415ec074"
 
     return NextResponse.json({
       kakaoKey: key,

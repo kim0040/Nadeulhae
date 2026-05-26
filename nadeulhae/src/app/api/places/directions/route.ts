@@ -51,7 +51,7 @@ async function handlePOST(request: NextRequest) {
 
     // 1. Get Kakao Key: prefer REST API Key for server-side REST calls, fallback to JS key
     const restKey = process.env.KAKAO_REST_KEY
-    const jsKey = process.env.KAKAO_JS_KEY || "***REMOVED***"
+    const jsKey = process.env.KAKAO_JS_KEY || "4643b10dc75bdd9048a7c9ef415ec074"
     const key = restKey || jsKey
     
     let origin = "http://localhost:3000"

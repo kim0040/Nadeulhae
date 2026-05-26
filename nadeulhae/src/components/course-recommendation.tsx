@@ -13,6 +13,10 @@ declare global {
   }
 }
 
+// Client-side cache for Kakao Maps key to avoid hitting API repeatedly (conserves DB usage count / daily quota)
+let cachedKakaoKey: string | null = null
+let cachedKakaoLoadError = false
+
 export interface CoursePlace {
   name: string
   category: string
@@ -296,9 +300,11 @@ interface KakaoPlaceMapProps {
   kakaoKeyLoaded: boolean
   loadError: boolean
   localeCopy: { mapLoading: string; mapError: string; mapErrorSubtext: string }
+  heightClass?: string
 }
 
-export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, localeCopy }: KakaoPlaceMapProps) {
+export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, localeCopy, heightClass }: KakaoPlaceMapProps) {
+  void placeName;
   const mapRef = useRef<HTMLDivElement>(null)
   const [mapInitialized, setMapInitialized] = useState(false)
 
@@ -357,7 +363,7 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
 
   if (loadError) {
     return (
-      <div className="mt-3 flex h-36 w-full flex-col items-center justify-center rounded-2xl border border-danger/10 bg-danger/5 px-4 text-center">
+      <div className={cn("mt-3 flex w-full flex-col items-center justify-center rounded-2xl border border-danger/10 bg-danger/5 px-4 text-center", heightClass || "h-52 sm:h-64")}>
         <MapPin className="size-5 text-danger/50 shrink-0" />
         <p className="mt-1 text-xs font-bold text-danger">{localeCopy.mapError}</p>
         <p className="mt-1 text-[9px] text-muted-foreground leading-4 max-w-sm text-center">{localeCopy.mapErrorSubtext}</p>
@@ -366,8 +372,8 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
   }
 
   return (
-    <div className="relative mt-3 w-full h-36 overflow-hidden rounded-2xl border border-card-border/60 bg-muted/20">
-      <div ref={mapRef} className="w-full h-full" />
+    <div className={cn("relative mt-3 w-full overflow-hidden rounded-2xl border border-card-border/60 bg-muted/20 shadow-md group transition-all duration-300 hover:border-sky-blue/30", heightClass || "h-52 sm:h-64")}>
+      <div ref={mapRef} className="w-full h-full transition-transform duration-500 group-hover:scale-[1.01]" />
       {!mapInitialized && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-[2.5px] gap-2">
           <LoaderCircle className="size-4 animate-spin text-sky-blue" />
@@ -398,6 +404,14 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
 
   // Fetch Kakao Maps JS Key from rate-limited backend DB quota counter
   useEffect(() => {
+    if (cachedKakaoKey) {
+      setKakaoKey(cachedKakaoKey)
+      return
+    }
+    if (cachedKakaoLoadError) {
+      setKakaoLoadError(true)
+      return
+    }
     fetch("/api/places/kakao-config")
       .then((res) => {
         if (!res.ok) throw new Error("Quota exceeded")
@@ -405,12 +419,15 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       })
       .then((data) => {
         if (data.kakaoKey) {
+          cachedKakaoKey = data.kakaoKey
           setKakaoKey(data.kakaoKey)
         } else {
+          cachedKakaoLoadError = true
           setKakaoLoadError(true)
         }
       })
       .catch(() => {
+        cachedKakaoLoadError = true
         setKakaoLoadError(true)
       })
   }, [])
@@ -452,7 +469,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       setError(null)
       try {
         // Collect place names from custom course
-        const names = customCourse.flatMap(slot => slot.places.map((p: any) => p.name))
+        const names = customCourse.flatMap(slot => slot.places?.map((p: any) => p.name) || [])
         if (names.length > 0) {
           // Hydrate place coordinates and details from DB
           const res = await fetch("/api/places/hydrate", {
@@ -470,7 +487,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
             // Unify slots with DB verified coordinate metadata
             const hydratedSlots = customCourse.map((slot: any) => ({
               ...slot,
-              places: slot.places.map((p: any) => {
+              places: (slot.places || []).map((p: any) => {
                 const db = placeMap.get(p.name)
                 return {
                   ...p,
@@ -568,18 +585,18 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     const routes: any[] = []
 
     // 1. Starting Point ➔ Slot 1
-    const p1 = slots[0]?.places[0]
+    const p1 = slots[0]?.places?.[0]
     routes.push(getRouteInfo(originLat, originLon, p1?.lat, p1?.lon, language))
 
     // 2. Routes between Slots
     for (let i = 0; i < slots.length - 1; i++) {
-      const from = slots[i]?.places[0]
-      const to = slots[i + 1]?.places[0]
+      const from = slots[i]?.places?.[0]
+      const to = slots[i + 1]?.places?.[0]
       routes.push(getRouteInfo(from?.lat, from?.lon, to?.lat, to?.lon, language))
     }
 
     // 3. Last Slot ➔ Starting Point (Return Home)
-    const pLast = slots[slots.length - 1]?.places[0]
+    const pLast = slots[slots.length - 1]?.places?.[0]
     routes.push(getRouteInfo(pLast?.lat, pLast?.lon, originLat, originLon, language))
 
     return routes
@@ -596,18 +613,18 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       const transitions: any[] = []
 
       // 1. Starting Point ➔ Slot 1
-      const p1 = slots[0]?.places[0]
+      const p1 = slots[0]?.places?.[0]
       transitions.push({ lat1: originLat, lon1: originLon, lat2: p1?.lat, lon2: p1?.lon })
 
       // 2. Slot i ➔ Slot i+1
       for (let i = 0; i < slots.length - 1; i++) {
-        const from = slots[i]?.places[0]
-        const to = slots[i + 1]?.places[0]
+        const from = slots[i]?.places?.[0]
+        const to = slots[i + 1]?.places?.[0]
         transitions.push({ lat1: from?.lat, lon1: from?.lon, lat2: to?.lat, lon2: to?.lon })
       }
 
       // 3. Last Slot ➔ Starting Point (Return Home)
-      const pLast = slots[slots.length - 1]?.places[0]
+      const pLast = slots[slots.length - 1]?.places?.[0]
       transitions.push({ lat1: pLast?.lat, lon1: pLast?.lon, lat2: originLat, lon2: originLon })
 
       try {
@@ -821,8 +838,8 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                     className={cn(
                       "relative rounded-[1.4rem] border bg-background/80 p-4 transition-all duration-300",
                       isExpanded
-                        ? "border-sky-blue/30 ring-1 ring-sky-blue/10 shadow-md shadow-sky-blue/5"
-                        : "border-card-border/70 hover:border-sky-blue/20",
+                        ? "border-sky-blue/40 ring-1 ring-sky-blue/10 shadow-lg shadow-sky-blue/5 scale-[1.004]"
+                        : "border-card-border/70 hover:border-sky-blue/25 hover:shadow-md hover:shadow-sky-blue/5",
                     )}
                   >
                     <button
@@ -868,7 +885,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                         {slot.places.map((place, pi) => (
                           <div
                             key={`${place.name}-${pi}`}
-                            className="flex flex-col gap-3 rounded-[1.1rem] bg-muted/30 px-3.5 py-3"
+                            className="flex flex-col gap-3 rounded-[1.2rem] border border-card-border/40 bg-card/45 backdrop-blur-[2px] px-4 py-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] hover:scale-[1.01] hover:border-sky-blue/30 hover:shadow-md transition-all duration-300"
                           >
                             <div className="flex items-start gap-3 w-full">
                               <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-blue/10 text-sky-blue">
@@ -894,7 +911,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                                 )}
                                 {place.reviewSummary && (
                                   <p className="mt-1 text-[11px] text-foreground/80 leading-5 break-words">
-                                    "{place.reviewSummary}"
+                                    &ldquo;{place.reviewSummary}&rdquo;
                                   </p>
                                 )}
                                 {place.reviewPicks && place.reviewPicks.length > 0 && (

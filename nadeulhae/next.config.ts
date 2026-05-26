@@ -50,18 +50,8 @@ const nextConfig: NextConfig = {
           key: "Permissions-Policy",
           value: "camera=(), microphone=(), geolocation=(self)",
         },
-        {
-          key: "Content-Security-Policy",
-          value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://dapi.kakao.com http://dapi.kakao.com https://*.daumcdn.net http://*.daumcdn.net https://*.kakaocdn.net http://*.kakaocdn.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net; font-src 'self'; connect-src 'self' https://www.weather.go.kr https://vapi.kma.go.kr https://apihub.kma.go.kr https://apis.data.go.kr wss://nadeulhae.space wss://www.nadeulhae.space https://dapi.kakao.com http://dapi.kakao.com https://*.kakaocdn.net http://*.kakaocdn.net; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
-        },
-        {
-          key: "Cross-Origin-Opener-Policy",
-          value: "same-origin",
-        },
-        {
-          key: "Cross-Origin-Resource-Policy",
-          value: "same-origin",
-        },
+        // CSP and Cross-Origin-Resource-Policy are set in src/middleware.ts
+        // to bypass Next.js Turbopack dev mode CSP override.
       ],
     },
   ],
