@@ -10,18 +10,16 @@ interface UsageRow extends RowDataPacket {
   request_count: number
 }
 
-async function handleGET(request: Request) {
+async function handleGET(request: NextRequest) {
   try {
-    const nextReq = new NextRequest(request)
-    
     // 1. Resolve actor key: try authenticated user, fallback to IP address hash
-    const user = await getAuthenticatedUserFromRequest(nextReq)
+    const user = await getAuthenticatedUserFromRequest(request)
     let actorKey = ""
     
     if (user?.id) {
       actorKey = `user_${user.id}`
     } else {
-      const forwarded = nextReq.headers.get("x-forwarded-for")
+      const forwarded = request.headers.get("x-forwarded-for")
       const clientIp = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1"
       actorKey = `ip_${clientIp}`
     }

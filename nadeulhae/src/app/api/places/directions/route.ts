@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { withApiAnalytics } from "@/lib/analytics/route"
 
 export const runtime = "nodejs"
@@ -35,7 +35,7 @@ function calculateFallbackRoute(lat1: number, lon1: number, lat2: number, lon2: 
   }
 }
 
-async function handlePOST(request: Request) {
+async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json()
     const { lat1, lon1, lat2, lon2 } = body ?? {}
