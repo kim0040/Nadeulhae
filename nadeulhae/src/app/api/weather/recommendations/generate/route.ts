@@ -1,14 +1,30 @@
-import { NextResponse } from "next/server";
-import { mockCourse } from "@/data/mockData";
-import { withApiAnalytics } from "@/lib/analytics/route";
+import { NextResponse } from "next/server"
+import { generateCourse, type CourseRequest } from "@/lib/course-engine"
+import { withApiAnalytics } from "@/lib/analytics/route"
+
+export const runtime = "nodejs"
 
 async function handlePOST(request: Request) {
-  await request.json();
+  let body: CourseRequest = {}
+  try {
+    body = await request.json()
+  } catch {
+    // Use defaults
+  }
 
-  // [BACKEND_LINK]: 실제 고도화 시 여기서 LLM(GPT/Gemini) API를 호출합니다.
-  return NextResponse.json(mockCourse, {
-    headers: { "x-nadeulhae-data-mode": "mock" },
-  });
+  const course = await generateCourse({
+    timeRange: body.timeRange,
+    location: body.location,
+    weatherContext: body.weatherContext ?? null,
+    userProfile: body.userProfile ?? null,
+    userLat: body.userLat ?? null,
+    userLon: body.userLon ?? null,
+    excludeNames: body.excludeNames ?? [],
+  })
+
+  return NextResponse.json(course, {
+    headers: { "x-nadeulhae-data-mode": "live" },
+  })
 }
 
 export const POST = withApiAnalytics(handlePOST)

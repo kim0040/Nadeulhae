@@ -28,6 +28,7 @@ import { Meteors } from "@/components/magicui/meteors"
 import { Particles } from "@/components/magicui/particles"
 import { getMeteorCount, getParticleCount, shouldRunRichAnimation } from "@/lib/performance"
 import { DashboardChatPanel } from "@/components/chat/dashboard-chat-panel"
+import { CourseRecommendation } from "@/components/course-recommendation"
 import { TodayHourlyForecast, type HourlyForecastItem } from "@/components/today-hourly-forecast"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
@@ -559,6 +560,23 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
             <DashboardChatPanel user={user} weatherContext={chatWeatherContext} />
           </SectionCard>
         </div>
+
+        {weatherData && (
+          <div className="mt-6">
+            <CourseRecommendation
+              weatherContext={chatWeatherContext}
+              userProfile={{
+                interestTags: user.interestTags,
+                preferredTimeSlot: user.preferredTimeSlot,
+                weatherSensitivity: user.weatherSensitivity,
+                primaryRegion: user.primaryRegion,
+                ageBand: user.ageBand,
+              }}
+              userLat={weatherData?.metadata?.locationContext?.coordinates?.lat ?? null}
+              userLon={weatherData?.metadata?.locationContext?.coordinates?.lon ?? null}
+            />
+          </div>
+        )}
       </div>
 
       <SettingsModal 

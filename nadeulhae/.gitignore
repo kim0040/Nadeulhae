@@ -50,3 +50,4 @@ test-check.ts
 air_raw.json
 lint_output.txt
 scratch/
+src/data/reviews_enriched.json

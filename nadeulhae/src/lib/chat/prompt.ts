@@ -162,6 +162,7 @@ export function buildChatSystemPrompt(input: {
   profileSummary: string | null
   profileAssessment: string | null
   weatherContext: ChatWeatherContext | null
+  placeContext?: string | null
 }) {
   const profileSummary = buildUserProfileSummary(input.user, input.locale)
   const weatherSummary = buildWeatherSummary(input.weatherContext, input.locale)
@@ -204,12 +205,17 @@ export function buildChatSystemPrompt(input: {
       "- 다이어그램이 필요하면 반드시 ```mermaid 코드블록으로만 출력할 것",
       "- Mermaid 관련 HTML/SVG(<div>, <svg>, style 태그) 원문을 절대 출력하지 말 것",
       "- 추천은 실용적으로 제시하고, 가능하면 3개 이내의 핵심 옵션으로 정리할 것",
+      "- 장소를 추천할 때는 [전주 장소 DB]에 있는 실제 장소명을 우선 인용하고, 평점·분위기·대표메뉴를 함께 언급할 것",
+      "- [전주 장소 DB]에 없는 장소는 함부로 만들어내지 말고, DB에 있는 유사 장소를 대신 추천할 것",
       "",
       "[사용자 프로필]",
       profileSummary,
       "",
       "[실시간 날씨 컨텍스트]",
       weatherSummary,
+      "",
+      "[전주 장소 DB (날씨에 맞는 추천 장소, 실제 존재하는 장소만)]",
+      input.placeContext || "장소 DB를 불러오지 못했습니다.",
       "",
       // Long-term profile memory (summary + assessment from previous profile refreshes)
       "[사용자 장기 메모리(내부용)]",
@@ -249,6 +255,9 @@ export function buildChatSystemPrompt(input: {
       "[实时天气]",
       weatherSummary,
       "",
+      "[全州场所数据库 (根据天气精选的实际场所)]",
+      input.placeContext || "场所数据库不可用。",
+      "",
       // Long-term profile memory (summary + assessment)
       "[长期用户记忆(内部)]",
       profileMemory,
@@ -287,6 +296,9 @@ export function buildChatSystemPrompt(input: {
       "[リアルタイム天気]",
       weatherSummary,
       "",
+      "[全州場所DB (天気に合わせたおすすめ実在場所)]",
+      input.placeContext || "場所DBを利用できません。",
+      "",
       // Long-term profile memory (summary + assessment)
       "[長期ユーザー記憶(内部)]",
       profileMemory,
@@ -323,6 +335,9 @@ export function buildChatSystemPrompt(input: {
     "",
     "[Live weather context]",
     weatherSummary,
+    "",
+    "[Jeonju Place DB (curated places matching current weather, real venues only)]",
+    input.placeContext || "Place DB unavailable.",
     "",
     // Long-term profile memory (summary + assessment)
     "[Long-term user memory (internal)]",

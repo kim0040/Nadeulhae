@@ -31,6 +31,7 @@ import {
   buildSummaryPrompt,
   type ChatWeatherContext,
 } from "@/lib/chat/prompt"
+import { getTopPlacesForChat, type UserProfile } from "@/lib/course-engine"
 import {
   getChatMemorySnapshot,
   getChatPolicySnapshot,
@@ -670,6 +671,35 @@ async function handlePOST(request: NextRequest) {
     contextMessageCount = contextMessages.length
 
     const acceptSSE = request.headers.get("accept")?.includes("text/event-stream")
+
+    // Determine weather mood for place context
+    const weatherMood = weatherContext?.rainingNow ? "rain"
+      : (weatherContext?.temperatureC != null && weatherContext.temperatureC < 10) ? "cold"
+      : (weatherContext?.temperatureC != null && weatherContext.temperatureC > 28) ? "hot"
+      : "clear"
+
+    const userProfile: UserProfile = {
+      interestTags: authenticatedSession.user.interestTags,
+      preferredTimeSlot: authenticatedSession.user.preferredTimeSlot,
+      weatherSensitivity: authenticatedSession.user.weatherSensitivity,
+      primaryRegion: authenticatedSession.user.primaryRegion,
+    }
+
+    let placeContext: string | null = null
+    try {
+      const topPlaces = await getTopPlacesForChat({ profile: userProfile, weatherMood, limit: 12 })
+      if (topPlaces.length > 0) {
+        placeContext = topPlaces.map(p => {
+          let line = `- ${p.name} (${p.category}, 평점 ${p.rating ?? "?"}${p.menuSummary ? `, 메뉴: ${p.menuSummary}` : ""}${p.interestMatch ? ` [취향: ${p.interestMatch}]` : ""})`
+          if (p.reviewSummary) line += `\n  리뷰요약: ${p.reviewSummary}`
+          if (p.reviewKeywords.length > 0) line += `\n  태그: [${p.reviewKeywords.join(", ")}]`
+          return line
+        }).join("\n")
+      }
+    } catch {
+      // non-critical: proceed without place context
+    }
+
     const chatMessages = buildChatPayload(
       contextMessages,
       buildChatSystemPrompt({
@@ -679,6 +709,7 @@ async function handlePOST(request: NextRequest) {
         profileSummary: profileMemory?.summary ?? null,
         profileAssessment: profileMemory?.assessment ?? null,
         weatherContext,
+        placeContext,
       }),
       message
     )
