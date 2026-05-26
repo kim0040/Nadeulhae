@@ -426,7 +426,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     const script = document.createElement("script")
     script.id = scriptId
     script.type = "text/javascript"
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&autoload=false`
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&autoload=false`
     script.async = true
     script.onload = () => {
       if (window.kakao && window.kakao.maps) {
