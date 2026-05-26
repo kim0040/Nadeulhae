@@ -75,7 +75,8 @@ const COPY = {
     directions: "길찾기",
     mapView: "지도 보기",
     mapLoading: "인터랙티브 지도 불러오는 중...",
-    mapError: "지도를 로딩할 수 없습니다 (할당량 초과)",
+    mapError: "지도를 로딩할 수 없습니다 (설정 확인 필요)",
+    mapErrorSubtext: "일일 쿼타 초과(50회) 또는 카카오 개발자 콘솔의 [플랫폼 > Web]에 현재 접속 주소(예: http://localhost:3000)가 정상 등록되어 있는지 확인해 주세요.",
   },
   en: {
     badge: "Recommended Course",
@@ -116,7 +117,8 @@ const COPY = {
     directions: "Directions",
     mapView: "View Map",
     mapLoading: "Loading interactive map...",
-    mapError: "Unable to load map (Limit Exceeded)",
+    mapError: "Unable to load map (Check Settings)",
+    mapErrorSubtext: "Quota exceeded (50/day) or check if your current URL (e.g., http://localhost:3000) is registered under [Platforms > Web] in the Kakao Developers Console.",
   },
   zh: {
     badge: "推荐路线",
@@ -157,7 +159,8 @@ const COPY = {
     directions: "导航",
     mapView: "查看地图",
     mapLoading: "正在加载地图...",
-    mapError: "无法加载地图 (超出限制)",
+    mapError: "无法加载地图 (需要检查设置)",
+    mapErrorSubtext: "每日限额已超(50次)或请检查当前域名(如 http://localhost:3000)是否已在 Kakao 控制台의 [平台 > Web] 中注册。",
   },
   ja: {
     badge: "おすすめコース",
@@ -198,7 +201,8 @@ const COPY = {
     directions: "ルート",
     mapView: "地図を見る",
     mapLoading: "インタラクティブ地図を読み込み中...",
-    mapError: "地図をロードできません (限度超過)",
+    mapError: "地図をロードできません (設定確認が必要)",
+    mapErrorSubtext: "1일 제한(50회)을 초과했거나 현재 접속 도메인(예: http://localhost:3000)이 Kakao 개발자 콘솔의 [플랫폼 > Web]에 등록되어 있는지 확인하세요.",
   },
 } as const
 
@@ -291,7 +295,7 @@ interface KakaoPlaceMapProps {
   lon: number
   kakaoKeyLoaded: boolean
   loadError: boolean
-  localeCopy: { mapLoading: string; mapError: string }
+  localeCopy: { mapLoading: string; mapError: string; mapErrorSubtext: string }
 }
 
 export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, localeCopy }: KakaoPlaceMapProps) {
@@ -356,7 +360,7 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
       <div className="mt-3 flex h-36 w-full flex-col items-center justify-center rounded-2xl border border-danger/10 bg-danger/5 px-4 text-center">
         <MapPin className="size-5 text-danger/50 shrink-0" />
         <p className="mt-1 text-xs font-bold text-danger">{localeCopy.mapError}</p>
-        <p className="mt-0.5 text-[9px] text-muted-foreground leading-4">일일 쿼타 한도(50회)가 초과되었거나 로컬 환경 설정이 불안정합니다.</p>
+        <p className="mt-1 text-[9px] text-muted-foreground leading-4 max-w-sm text-center">{localeCopy.mapErrorSubtext}</p>
       </div>
     )
   }
