@@ -1,11 +1,17 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MapPin, Clock, Star, Utensils, Coffee, Sparkles, RefreshCcw, ChevronRight, LoaderCircle, CloudAlert, Shuffle, Home, Car, Footprints } from "lucide-react"
+import { MapPin, Clock, Star, Utensils, Coffee, Sparkles, RefreshCcw, ChevronRight, LoaderCircle, CloudAlert, Shuffle, Home, Car, Footprints, Navigation } from "lucide-react"
 import { useLanguage } from "@/context/LanguageContext"
 import { cn } from "@/lib/utils"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { UserProfile } from "@/lib/course-engine"
+
+declare global {
+  interface Window {
+    kakao: any
+  }
+}
 
 export interface CoursePlace {
   name: string
@@ -64,6 +70,12 @@ const COPY = {
     step1: "1차 방문지",
     step2: "2차 경유지",
     step3: "최종 목적지",
+    
+    // Kakao Map UI
+    directions: "길찾기",
+    mapView: "지도 보기",
+    mapLoading: "인터랙티브 지도 불러오는 중...",
+    mapError: "지도를 로딩할 수 없습니다 (할당량 초과)",
   },
   en: {
     badge: "Recommended Course",
@@ -99,6 +111,12 @@ const COPY = {
     step1: "1st Destination",
     step2: "2nd Waypoint",
     step3: "Final Destination",
+
+    // Kakao Map English
+    directions: "Directions",
+    mapView: "View Map",
+    mapLoading: "Loading interactive map...",
+    mapError: "Unable to load map (Limit Exceeded)",
   },
   zh: {
     badge: "推荐路线",
@@ -134,15 +152,21 @@ const COPY = {
     step1: "第一站",
     step2: "第二站 (途经)",
     step3: "最终目的地",
+
+    // Kakao Map Chinese
+    directions: "导航",
+    mapView: "查看地图",
+    mapLoading: "正在加载地图...",
+    mapError: "无法加载地图 (超出限制)",
   },
   ja: {
     badge: "おすすめコース",
     title: "今日のおすすめコース",
-    description: "リアルタイム의 天気を反映した全州半일コースです。",
+    description: "リアルタイム의 天기를 반영한 전주 반나절 코스입니다.",
     loading: "最適なコースを探しています...",
-    error: "コースを読み込めませんでした。",
+    error: "コース를 불러오지 못했어요.",
     retry: "再試行",
-    refreshHint: "3분ごとに自動更新",
+    refreshHint: "3분마다 자동 갱신",
     outdoor: "屋外",
     indoor: "屋内",
     semiOutdoor: "半屋外",
@@ -169,6 +193,12 @@ const COPY = {
     step1: "1番目の目的地",
     step2: "2番目の経由地",
     step3: "最終目的地",
+
+    // Kakao Map Japanese
+    directions: "ルート",
+    mapView: "地図を見る",
+    mapLoading: "インタラクティブ地図を読み込み中...",
+    mapError: "地図をロードできません (限度超過)",
   },
 } as const
 
@@ -254,6 +284,96 @@ function getRouteInfo(
   }
 }
 
+// Subcomponent to load and render dynamic Kakao Map dynamically client side
+interface KakaoPlaceMapProps {
+  placeName: string
+  lat: number
+  lon: number
+  kakaoKeyLoaded: boolean
+  loadError: boolean
+  localeCopy: { mapLoading: string; mapError: string }
+}
+
+export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, localeCopy }: KakaoPlaceMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const [mapInitialized, setMapInitialized] = useState(false)
+
+  useEffect(() => {
+    if (!kakaoKeyLoaded || loadError || !mapRef.current) return
+
+    const initMap = () => {
+      try {
+        if (typeof window === "undefined" || !window.kakao || !window.kakao.maps) {
+          // Wait for window namespace to settle
+          setTimeout(initMap, 150)
+          return
+        }
+
+        const container = mapRef.current
+        const options = {
+          center: new window.kakao.maps.LatLng(lat, lon),
+          level: 3,
+        }
+        
+        const map = new window.kakao.maps.Map(container, options)
+        
+        // Add single marker at coordinates
+        const markerPosition = new window.kakao.maps.LatLng(lat, lon)
+        const marker = new window.kakao.maps.Marker({
+          position: markerPosition,
+        })
+        marker.setMap(map)
+
+        // Add standard zoom control UI
+        const zoomControl = new window.kakao.maps.ZoomControl()
+        map.addControl(zoomControl, window.kakao.maps.ControlPosition.RIGHT)
+
+        setMapInitialized(true)
+      } catch (err) {
+        console.error("[KakaoMap] Failed to initialize map canvas:", err)
+      }
+    }
+
+    if (window.kakao && window.kakao.maps) {
+      if (window.kakao.maps.Map) {
+        initMap()
+      } else {
+        window.kakao.maps.load(initMap)
+      }
+    } else {
+      const interval = setInterval(() => {
+        if (window.kakao && window.kakao.maps && window.kakao.maps.Map) {
+          clearInterval(interval)
+          initMap()
+        }
+      }, 300)
+      return () => clearInterval(interval)
+    }
+  }, [lat, lon, kakaoKeyLoaded, loadError])
+
+  if (loadError) {
+    return (
+      <div className="mt-3 flex h-36 w-full flex-col items-center justify-center rounded-2xl border border-danger/10 bg-danger/5 px-4 text-center">
+        <MapPin className="size-5 text-danger/50 shrink-0" />
+        <p className="mt-1 text-xs font-bold text-danger">{localeCopy.mapError}</p>
+        <p className="mt-0.5 text-[9px] text-muted-foreground leading-4">일일 쿼타 한도(50회)가 초과되었거나 로컬 환경 설정이 불안정합니다.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative mt-3 w-full h-36 overflow-hidden rounded-2xl border border-card-border/60 bg-muted/20">
+      <div ref={mapRef} className="w-full h-full" />
+      {!mapInitialized && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-[2.5px] gap-2">
+          <LoaderCircle className="size-4 animate-spin text-sky-blue" />
+          <span className="text-[10px] text-muted-foreground font-semibold">{localeCopy.mapLoading}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CourseRecommendation({ weatherContext, userProfile, userLat, userLon, className, customCourse }: CourseRecommendationProps) {
   const { language } = useLanguage()
   const copy = COPY[language as keyof typeof COPY] ?? COPY.ko
@@ -263,6 +383,56 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const [expandedSlot, setExpandedSlot] = useState<number | null>(0)
   const [excludedNames, setExcludedNames] = useState<string[]>([])
   const excludeRef = useRef<string[]>([])
+
+  // Kakao Map SDK integration state
+  const [kakaoKey, setKakaoKey] = useState<string | null>(null)
+  const [kakaoLoadError, setKakaoLoadError] = useState(false)
+  const kakaoKeyLoaded = kakaoKey != null
+
+  // Fetch Kakao Maps JS Key from rate-limited backend DB quota counter
+  useEffect(() => {
+    fetch("/api/places/kakao-config")
+      .then((res) => {
+        if (!res.ok) throw new Error("Quota exceeded")
+        return res.json()
+      })
+      .then((data) => {
+        if (data.kakaoKey) {
+          setKakaoKey(data.kakaoKey)
+        } else {
+          setKakaoLoadError(true)
+        }
+      })
+      .catch(() => {
+        setKakaoLoadError(true)
+      })
+  }, [])
+
+  // Inject script dynamically to avoid polluting standard header
+  useEffect(() => {
+    if (!kakaoKey) return
+    if (window.kakao && window.kakao.maps) return
+
+    const scriptId = "kakao-maps-sdk"
+    if (document.getElementById(scriptId)) return
+
+    const script = document.createElement("script")
+    script.id = scriptId
+    script.type = "text/javascript"
+    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&autoload=false`
+    script.async = true
+    script.onload = () => {
+      if (window.kakao && window.kakao.maps) {
+        window.kakao.maps.load(() => {
+          console.log("[KakaoMap] Dynamic client-side SDK ready.")
+        })
+      }
+    }
+    script.onerror = () => {
+      setKakaoLoadError(true)
+    }
+    document.head.appendChild(script)
+  }, [kakaoKey])
 
   // Resolve starting coordinates (fallback to Jeonju center if no GPS)
   const originLat = userLat ?? 35.8242
@@ -526,9 +696,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
           {slots.map((slot, i) => {
             const isExpanded = expandedSlot === i
             const style = TYPE_STYLE[slot.type] ?? TYPE_STYLE.실내
-            const isLast = i === slots.length - 1
             const transitToThis = routingData[i] // Route from previous node to this slot
-            const transitToNext = routingData[i + 1] // Route from this slot to next node (or home)
 
             return (
               <div key={`${slot.time}-${i}`}>
@@ -607,68 +775,99 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                         {slot.places.map((place, pi) => (
                           <div
                             key={`${place.name}-${pi}`}
-                            className="flex items-start gap-3 rounded-[1.1rem] bg-muted/30 px-3.5 py-3"
+                            className="flex flex-col gap-3 rounded-[1.1rem] bg-muted/30 px-3.5 py-3"
                           >
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-blue/10 text-sky-blue">
-                              {CATEGORY_ICON[place.category] ?? <MapPin className="size-3.5" />}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-black text-foreground">{place.name}</span>
-                                {place.rating != null && (
-                                  <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-black text-amber-400">
-                                    <Star className="size-2.5 fill-amber-400" />
-                                    {place.rating.toFixed(1)}
-                                  </span>
+                            <div className="flex items-start gap-3 w-full">
+                              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-blue/10 text-sky-blue">
+                                {CATEGORY_ICON[place.category] ?? <MapPin className="size-3.5" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-black text-foreground">{place.name}</span>
+                                  {place.rating != null && (
+                                    <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-black text-amber-400">
+                                      <Star className="size-2.5 fill-amber-400" />
+                                      {place.rating.toFixed(1)}
+                                    </span>
+                                  )}
+                                </div>
+                                {place.address && (
+                                  <p className="mt-0.5 text-[11px] text-muted-foreground truncate">{place.address}</p>
+                                )}
+                                {place.menuSummary && (
+                                  <p className="mt-1 text-[11px] text-sky-blue/80 font-semibold">
+                                    {copy.menu}: {place.menuSummary}
+                                  </p>
+                                )}
+                                {place.reviewSummary && (
+                                  <p className="mt-1 text-[11px] text-foreground/80 leading-5 break-words">
+                                    "{place.reviewSummary}"
+                                  </p>
+                                )}
+                                {place.reviewPicks && place.reviewPicks.length > 0 && (
+                                  <div className="mt-1.5 flex flex-col gap-1">
+                                    {place.reviewPicks.slice(0, 2).map((pick, ri) => (
+                                      <p key={ri} className="text-[10px] text-muted-foreground leading-4 break-words font-medium">
+                                        {pick}
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+                                {place.reviewKeywords && place.reviewKeywords.length > 0 && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {place.reviewKeywords.map((kw, ki) => (
+                                      <span key={ki} className="rounded-full border border-card-border/50 bg-muted/40 px-2 py-0.5 text-[9px] font-semibold text-muted-foreground">
+                                        {kw}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {place.lat && place.lon && (
+                                  <p className="mt-1 text-[9px] text-muted-foreground/60 font-mono">
+                                    GPS: {place.lat.toFixed(4)}, {place.lon.toFixed(4)}
+                                  </p>
                                 )}
                               </div>
-                              {place.address && (
-                                <p className="mt-0.5 text-[11px] text-muted-foreground truncate">{place.address}</p>
-                              )}
-                              {place.menuSummary && (
-                                <p className="mt-1 text-[11px] text-sky-blue/80 font-semibold">
-                                  {copy.menu}: {place.menuSummary}
-                                </p>
-                              )}
-                              {place.reviewSummary && (
-                                <p className="mt-1 text-[11px] text-foreground/80 leading-5 break-words">
-                                  "{place.reviewSummary}"
-                                </p>
-                              )}
-                              {place.reviewPicks && place.reviewPicks.length > 0 && (
-                                <div className="mt-1.5 flex flex-col gap-1">
-                                  {place.reviewPicks.slice(0, 2).map((pick, ri) => (
-                                    <p key={ri} className="text-[10px] text-muted-foreground leading-4 break-words font-medium">
-                                      {pick}
-                                    </p>
-                                  ))}
-                                </div>
-                              )}
-                              {place.reviewKeywords && place.reviewKeywords.length > 0 && (
-                                <div className="mt-1.5 flex flex-wrap gap-1">
-                                  {place.reviewKeywords.map((kw, ki) => (
-                                    <span key={ki} className="rounded-full border border-card-border/50 bg-muted/40 px-2 py-0.5 text-[9px] font-semibold text-muted-foreground">
-                                      {kw}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                              {place.lat && place.lon && (
-                                <p className="mt-1 text-[9px] text-muted-foreground/60 font-mono">
-                                  GPS: {place.lat.toFixed(4)}, {place.lon.toFixed(4)}
-                                </p>
-                              )}
+                              <div className="flex flex-col gap-1.5 shrink-0">
+                                {place.kakaoUrl && (
+                                  <a
+                                    href={place.kakaoUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-full bg-muted/60 hover:bg-sky-blue/15 hover:text-sky-blue px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title={copy.mapView}
+                                  >
+                                    <MapPin className="size-3" />
+                                    <span>{copy.mapView}</span>
+                                  </a>
+                                )}
+                                {place.lat && place.lon && (
+                                  <a
+                                    href={`https://map.kakao.com/link/to/${place.name},${place.lat},${place.lon}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-full bg-muted/60 hover:bg-emerald-500/15 hover:text-emerald-400 px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title={copy.directions}
+                                  >
+                                    <Navigation className="size-3" />
+                                    <span>{copy.directions}</span>
+                                  </a>
+                                )}
+                              </div>
                             </div>
-                            {place.kakaoUrl && (
-                              <a
-                                href={place.kakaoUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="shrink-0 rounded-full bg-muted/50 p-1.5 text-muted-foreground transition hover:bg-sky-blue/10 hover:text-sky-blue"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MapPin className="size-3.5" />
-                              </a>
+
+                            {/* Dynamic Kakao Map Integration (Client Side render) */}
+                            {place.lat != null && place.lon != null && (
+                              <KakaoPlaceMap
+                                placeName={place.name}
+                                lat={place.lat}
+                                lon={place.lon}
+                                kakaoKeyLoaded={kakaoKeyLoaded}
+                                loadError={kakaoLoadError}
+                                localeCopy={copy}
+                              />
                             )}
                           </div>
                         ))}
