@@ -237,6 +237,25 @@ export async function getAuthenticatedUserFromRequest(request: NextRequest) {
 }
 
 /**
+ * Looks up a cached session by its raw token string without hitting the DB.
+ * Returns the cached AuthUser if the token is in the in-memory cache and not
+ * expired; otherwise returns null. This is a lightweight, read-only check
+ * intended for hot paths like analytics identity resolution.
+ */
+export function getCachedUserByToken(token: string): AuthUser | null {
+  const tokenHash = getSessionTokenHash(token)
+  const now = Date.now()
+  const cache = getAuthSessionCache()
+  const entry = cache.get(tokenHash)
+
+  if (!entry || entry.cacheExpiresAt <= now || entry.expiresAt.getTime() <= now) {
+    return null
+  }
+
+  return entry.user
+}
+
+/**
  * Resolves the authenticated session from the request cookie.
  * Checks the in-memory cache first; on cache hit, optionally refreshes or touches
  * the DB session. On cache miss, queries the DB and populates the cache.

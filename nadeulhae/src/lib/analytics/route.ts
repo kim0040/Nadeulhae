@@ -60,7 +60,9 @@ export function withApiAnalytics<TRequest extends Request = Request, TContext = 
     try {
       const response = await handler(request, context)
 
-      await recordDailyUsageEventSafely({
+      // Fire-and-forget: analytics writes are non-critical and should not
+      // block the response. Errors are swallowed by recordDailyUsageEventSafely.
+      void recordDailyUsageEventSafely({
         request,
         routeKind: "api",
         routePath: new URL(request.url).pathname,
@@ -71,7 +73,7 @@ export function withApiAnalytics<TRequest extends Request = Request, TContext = 
 
       return response
     } catch (error) {
-      await recordDailyUsageEventSafely({
+      void recordDailyUsageEventSafely({
         request,
         routeKind: "api",
         routePath: new URL(request.url).pathname,

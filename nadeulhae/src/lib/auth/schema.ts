@@ -282,7 +282,7 @@ interface MigrationSecurityEventRow extends RowDataPacket {
   user_agent: string | null
 }
 
-const MAX_MIGRATION_BATCHES = 200
+const MAX_MIGRATION_BATCHES = 20
 const MAX_EMAIL_PLAIN_LENGTH = 254
 const MAX_IP_PLAIN_LENGTH = 64
 const MAX_USER_AGENT_PLAIN_LENGTH = 255

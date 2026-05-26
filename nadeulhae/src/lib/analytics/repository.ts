@@ -22,7 +22,7 @@ import { createHash } from "node:crypto"
 import type { PoolConnection, ResultSetHeader } from "mysql2/promise"
 
 import { findUserBySessionTokenHash, updateUserAnalyticsConsent } from "@/lib/auth/repository"
-import { getSessionTokenHash } from "@/lib/auth/session"
+import { getCachedUserByToken, getSessionTokenHash } from "@/lib/auth/session"
 import {
   type AnalyticsConsentPreference,
   resolveAnalyticsConsentPreference,
@@ -393,11 +393,19 @@ async function resolveIdentity(request: Request, fallbackSessionId?: string | nu
   let analyticsAccepted: boolean | null = null
 
   if (authToken) {
-    const session = await findUserBySessionTokenHash(getSessionTokenHash(authToken))
-    if (session?.user?.id) {
-      userId = session.user.id
+    // Try in-memory session cache first to avoid a DB round-trip on every request.
+    const cachedUser = getCachedUserByToken(authToken)
+    if (cachedUser) {
+      userId = cachedUser.id
       authState = "authenticated"
-      analyticsAccepted = session.user.analyticsAccepted
+      analyticsAccepted = cachedUser.analyticsAccepted
+    } else {
+      const session = await findUserBySessionTokenHash(getSessionTokenHash(authToken))
+      if (session?.user?.id) {
+        userId = session.user.id
+        authState = "authenticated"
+        analyticsAccepted = session.user.analyticsAccepted
+      }
     }
   }
 

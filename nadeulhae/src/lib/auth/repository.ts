@@ -417,7 +417,7 @@ export async function createUser(input: {
   return created
 }
 
-/** Creates a new session record, prunes expired sessions, and enforces the per-user session cap. */
+/** Creates a new session record and enforces the per-user session cap. */
 export async function createSessionRecord(input: {
   id: string
   userId: string
@@ -432,7 +432,8 @@ export async function createSessionRecord(input: {
     throw new Error("Invalid session cap value")
   }
 
-  await executeStatement("DELETE FROM user_sessions WHERE expires_at < NOW()", [])
+  // Note: Global expired-session cleanup is handled by the retention sweep
+  // (privacy/retention.ts) to avoid running a full-table DELETE on every login.
 
   await executeStatement(
     `
