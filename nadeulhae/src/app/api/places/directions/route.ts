@@ -49,13 +49,25 @@ async function handlePOST(request: NextRequest) {
     const nLat2 = Number(lat2)
     const nLon2 = Number(lon2)
 
-    // 1. Get Kakao Key from env
-    const key = process.env.KAKAO_JS_KEY || "***REMOVED***"
+    // 1. Get Kakao Key and origin based on request headers
+    let key = process.env.KAKAO_JS_KEY
+    let origin = "http://localhost:3000"
+    if (!key) {
+      const host = request.headers.get("host") || ""
+      const referer = request.headers.get("referer") || ""
+      if (host.includes("127.0.0.1") || referer.includes("127.0.0.1")) {
+        key = "***REMOVED***"
+        origin = "http://127.0.0.1:3000"
+      } else {
+        key = "***REMOVED***"
+        origin = "http://localhost:3000"
+      }
+    }
     
     // 2. Prepare headers (satisfying origin requirements of JS key)
     const headers = {
       "Authorization": `KakaoAK ${key}`,
-      "KA": "sdk/1.0.0 os/javascript lang/ko device/web origin/http://localhost:3000",
+      "KA": `sdk/1.0.0 os/javascript lang/ko device/web origin/${origin}`,
       "Content-Type": "application/json"
     }
 
