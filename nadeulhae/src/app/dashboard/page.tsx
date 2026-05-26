@@ -90,6 +90,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
   const [weatherError, setWeatherError] = useState<string | null>(null)
   const [isWeatherRefreshing, setIsWeatherRefreshing] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [customCourse, setCustomCourse] = useState<any[] | null>(null)
 
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
   const particleQuantity = useMemo(() => getParticleCount(30), [])
@@ -557,7 +558,11 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
           </SectionCard>
 
           <SectionCard className="min-w-0">
-            <DashboardChatPanel user={user} weatherContext={chatWeatherContext} />
+            <DashboardChatPanel 
+              user={user} 
+              weatherContext={chatWeatherContext} 
+              onCourseGenerated={setCustomCourse}
+            />
           </SectionCard>
         </div>
 
@@ -574,6 +579,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
               }}
               userLat={weatherData?.metadata?.locationContext?.coordinates?.lat ?? null}
               userLon={weatherData?.metadata?.locationContext?.coordinates?.lon ?? null}
+              customCourse={customCourse}
             />
           </div>
         )}

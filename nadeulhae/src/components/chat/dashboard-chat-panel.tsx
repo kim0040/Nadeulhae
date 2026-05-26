@@ -281,6 +281,119 @@ const CHAT_SUGGESTIONS = {
   )
 }
 
+/** Renders a highly interactive, gorgeous course recommendation card directly inside the chat flow */
+function InteractiveCourseWidget({
+  code,
+  onCourseGenerated,
+  isPending,
+}: {
+  code: string
+  onCourseGenerated?: (course: any) => void
+  isPending?: boolean
+}) {
+  const [course, setCourse] = useState<any>(null)
+  const [error, setError] = useState(false)
+  const lastGeneratedRef = useRef<string>("")
+
+  useEffect(() => {
+    try {
+      const cleanedCode = code.trim()
+      const parsed = JSON.parse(cleanedCode)
+      if (parsed && Array.isArray(parsed.slots)) {
+        setCourse(parsed)
+        setError(false)
+        
+        // Sync with dashboard main course, but prevent infinite updates and wait until message is fully loaded
+        if (!isPending) {
+          const courseStr = JSON.stringify(parsed.slots)
+          if (lastGeneratedRef.current !== courseStr) {
+            lastGeneratedRef.current = courseStr
+            onCourseGenerated?.(parsed.slots)
+          }
+        }
+      } else {
+        setError(true)
+      }
+    } catch {
+      setError(true)
+    }
+  }, [code, onCourseGenerated, isPending])
+
+  if (error && !course) {
+    return (
+      <div className="rounded-2xl border border-sky-blue/20 bg-background/60 p-4 text-center backdrop-blur-md">
+        <div className="flex items-center justify-center gap-2 text-sky-blue">
+          <LoaderCircle className="size-4 animate-spin" />
+          <span className="text-xs font-semibold">나들이 일정을 구성하는 중...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!course) return null
+
+  return (
+    <div className="my-3 space-y-3.5 rounded-[1.6rem] border border-sky-blue/20 bg-card/90 p-4.5 shadow-lg shadow-sky-blue/5 backdrop-blur-xl animate-in fade-in-50 duration-300">
+      <div className="flex items-center justify-between border-b border-card-border/50 pb-2.5">
+        <div className="flex items-center gap-2">
+          <div className="rounded-full bg-gradient-to-br from-sky-blue to-active-blue p-1.5 text-white shadow-sm shadow-sky-blue/10">
+            <Sparkles className="size-3.5" />
+          </div>
+          <h4 className="text-xs font-black uppercase tracking-wider text-foreground">나들AI 맞춤 추천 코스</h4>
+        </div>
+        <span className="text-[10px] font-bold text-sky-blue px-2 py-0.5 rounded-full bg-sky-blue/10 border border-sky-blue/20">
+          실시간 연동됨
+        </span>
+      </div>
+      <div className="space-y-4">
+        {course.slots.map((slot: any, idx: number) => {
+          const isOutdoor = slot.type === "야외"
+          const isSemi = slot.type === "반실외"
+          const badgeColor = isOutdoor 
+            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+            : isSemi
+              ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+              : "bg-sky-500/10 border-sky-500/20 text-sky-blue"
+
+          return (
+            <div key={idx} className="relative pl-5 border-l border-sky-blue/20 last:border-0 pb-1">
+              {/* Dot */}
+              <div className="absolute -left-[5.5px] top-1.5 size-2.5 rounded-full bg-sky-blue ring-4 ring-background shadow-sm" />
+              
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black text-muted-foreground">{slot.time || `코스 ${idx + 1}`}</span>
+                <span className={cn("rounded-full border px-1.5 py-0.5 text-[8px] font-black tracking-wide", badgeColor)}>
+                  {slot.type}
+                </span>
+              </div>
+              <h5 className="mt-0.5 text-sm font-black text-foreground">{slot.title}</h5>
+              <p className="mt-1 text-[11px] leading-5 text-muted-foreground/90">{slot.description}</p>
+              
+              {slot.places && slot.places.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {slot.places.map((place: any, pIdx: number) => (
+                    <div 
+                      key={pIdx} 
+                      className="rounded-xl bg-background/50 border border-card-border/50 px-2.5 py-1 flex items-center gap-1.5 hover:border-sky-blue/30 transition-all duration-300"
+                    >
+                      <span className="text-[10px] font-bold text-foreground/90">{place.name}</span>
+                      {place.rating != null && (
+                        <span className="text-[9px] text-amber-400 font-black flex items-center gap-0.5">
+                          ★{Number(place.rating).toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 type MessageGroup = {
   role: "user" | "assistant"
   messages: UiChatMessage[]
@@ -304,11 +417,13 @@ type MessageGroup = {
   language,
   isLastAssistant,
   groupPosition,
+  onCourseGenerated,
 }: {
   message: UiChatMessage
   language: string
   isLastAssistant: boolean
   groupPosition: "first" | "middle" | "last" | "only"
+  onCourseGenerated?: (course: any) => void
 }) {
   const isUser = message.role === "user"
   const showAvatar = !isUser && (groupPosition === "first" || groupPosition === "only")
@@ -328,7 +443,9 @@ type MessageGroup = {
       if (
         childArray.length === 1 &&
         isValidElement(childArray[0]) &&
-        (childArray[0].type === MermaidDiagram || childArray[0].type === DashboardMarkdownCodeBlock)
+        (childArray[0].type === MermaidDiagram || 
+         childArray[0].type === DashboardMarkdownCodeBlock ||
+         childArray[0].type === InteractiveCourseWidget)
       ) {
         return <>{childArray[0]}</>
       }
@@ -339,6 +456,9 @@ type MessageGroup = {
       const codeText = Children.toArray(children).join("").replace(/\n$/, "")
       const lang = /language-([A-Za-z0-9_+#.-]+)/.exec(className ?? "")?.[1] ?? null
       const isBlock = Boolean(lang) || codeText.includes("\n")
+      if (lang?.toLowerCase() === "course") {
+        return <InteractiveCourseWidget code={codeText} onCourseGenerated={onCourseGenerated} isPending={message.pending} />
+      }
       if (lang?.toLowerCase() === "mermaid") {
         return <MermaidDiagram code={codeText} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} />
       }
@@ -361,7 +481,7 @@ type MessageGroup = {
         </code>
       )
     },
-  }), [copy.copyCode, copy.copiedCode])
+  }), [copy.copyCode, copy.copiedCode, onCourseGenerated])
 
   const roundedClass = isUser
     ? groupPosition === "only"
@@ -433,9 +553,11 @@ type MessageGroup = {
 export function DashboardChatPanel({
   user,
   weatherContext,
+  onCourseGenerated,
 }: {
   user: AuthUser
   weatherContext: ChatWeatherContext | null
+  onCourseGenerated?: (course: any) => void
 }) {
   const { language } = useLanguage()
   const copy = (((CHAT_PANEL_COPY as any)[language] ?? CHAT_PANEL_COPY.ko) ?? CHAT_PANEL_COPY.ko)
@@ -888,6 +1010,7 @@ export function DashboardChatPanel({
                         language={language}
                         isLastAssistant={message.role === "assistant" && messages.indexOf(message) === lastAssistantIndex}
                         groupPosition={groupPosition}
+                        onCourseGenerated={onCourseGenerated}
                       />
                     )
                   })}

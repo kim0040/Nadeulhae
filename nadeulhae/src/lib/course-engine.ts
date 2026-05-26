@@ -52,6 +52,8 @@ export interface PlaceSlotItem {
   reviewSummary: string | null
   reviewKeywords: string[]
   reviewPicks: string[]
+  lat?: number | null
+  lon?: number | null
 }
 
 export interface UserProfile {
@@ -131,15 +133,22 @@ function qualityScore(r: PlaceRow, reviewKeywords: string[] | null): number {
   if (r.menu_summary) s += 1
   if (r.kakao_url) s += 1
   if (r.rating != null && r.rating >= 4) s += 3
-  // Review bonus: having real customer reviews is a strong quality signal
+
+  // Flat Review Presence Bonus (리뷰 보유 가산점)
+  // Give a strong +8 points bonus if a place has real customer reviews.
+  // This ensures that verified places with reviews are prioritized.
+  let hasValidReviews = false
   if (r.reviews_text) {
     try {
       const reviews = JSON.parse(r.reviews_text)
       if (Array.isArray(reviews) && reviews.length > 0) {
+        s += 8 // Flat 가산점 +8점 부여
         s += Math.min(reviews.length, 5) // +1 per review, max +5
+        hasValidReviews = true
       }
     } catch {}
   }
+
   // Hours bonus: having business hours data is a signal of completeness
   if (r.hours_raw) s += 1
   // LLM review keyword bonus: having keywords means LLM-verified quality
@@ -300,7 +309,9 @@ async function queryPlaces(opts: QueryOpts): Promise<PlaceRow[]> {
   }
 
   if (opts.weatherTag) {
-    conditions.push(`weather_tags LIKE ?`)
+    // Relaxed SQL Filtering: allow empty weather tags (71.7% of DB) to prevent completely excluding them,
+    // but we will apply soft weather tag boosting on the JS side.
+    conditions.push(`(weather_tags LIKE ? OR JSON_LENGTH(weather_tags) = 0 OR weather_tags IS NULL)`)
     params.push(`%${opts.weatherTag}%`)
   }
 
@@ -320,7 +331,66 @@ async function queryPlaces(opts: QueryOpts): Promise<PlaceRow[]> {
 // JS-side scoring
 // ---------------------------------------------------------------------------
 
-function scoreAndRank(rows: PlaceRow[], profile: UserProfile | null, uLat: number | null, uLon: number | null, kstHour?: number, kstDay?: number): ScoredPlace[] {
+// ---------------------------------------------------------------------------
+// JS-side scoring
+// ---------------------------------------------------------------------------
+
+function computeSeasonBonus(
+  category: string,
+  placeType: string,
+  name: string,
+  menuSummary: string | null,
+  reviewSummary: string | null,
+  season: "spring" | "summer" | "autumn" | "winter"
+): number {
+  let score = 0
+  const text = `${name} ${menuSummary ?? ""} ${reviewSummary ?? ""}`
+
+  if (season === "spring") {
+    // Spring category boost: nature, festival
+    if (category === "nature" || category === "festival") score += 4
+    // Spring keywords
+    const keywords = ["벚꽃", "봄꽃", "꽃놀이", "봄바람", "새싹", "피크닉"]
+    if (keywords.some(k => text.includes(k))) score += 3
+  } else if (season === "summer") {
+    // Summer category boost (indoor air-conditioning preference)
+    if (placeType === "indoor" && (category === "cafe" || category === "culture" || category === "shopping")) {
+      score += 4
+    }
+    // Summer keywords
+    const keywords = ["계곡", "물놀이", "빙수", "시원", "에어컨", "야경", "피서"]
+    if (keywords.some(k => text.includes(k))) score += 3
+  } else if (season === "autumn") {
+    // Autumn category boost: nature, festival
+    if (category === "nature" || category === "festival") score += 4
+    // Autumn foliage keywords
+    const keywords = ["단풍", "은행나무", "갈대", "가을", "억새", "산책"]
+    if (keywords.some(k => text.includes(k))) score += 3
+  } else if (season === "winter") {
+    // Winter category boost
+    if (placeType === "outdoor") {
+      score -= 8 // Strong penalty for outdoor in freezing winter
+    } else if (placeType === "indoor") {
+      score += 4 // Preference for indoor cozy spaces
+    }
+    // Winter warm food/cozy keywords
+    const keywords = ["따뜻", "국밥", "전골", "온천", "실내데이트", "핫초코", "코코아", "눈꽃"]
+    if (keywords.some(k => text.includes(k))) score += 3
+  }
+
+  return score
+}
+
+function scoreAndRank(
+  rows: PlaceRow[], 
+  profile: UserProfile | null, 
+  uLat: number | null, 
+  uLon: number | null, 
+  targetHour?: number, 
+  kstDay?: number,
+  weatherTag?: string | null,
+  currentSeason?: "spring" | "summer" | "autumn" | "winter"
+): ScoredPlace[] {
   const scored: ScoredPlace[] = rows.map(r => {
     // Parse LLM-enriched review fields
     let reviewKeywords: string[] | null = null
@@ -332,6 +402,7 @@ function scoreAndRank(rows: PlaceRow[], profile: UserProfile | null, uLat: numbe
     let score = qualityScore(r, reviewKeywords)
     score += bonus
     if (uLat != null && uLon != null) score += distanceBonus(r.lat, r.lon, uLat, uLon)
+    
     // Keyword-interest cross-match: if LLM keywords match user interests, extra bonus
     if (reviewKeywords && profile?.interestTags?.length) {
       const keywordBoostMap: Record<string, string[]> = {
@@ -353,10 +424,29 @@ function scoreAndRank(rows: PlaceRow[], profile: UserProfile | null, uLat: numbe
         }
       }
     }
-    // Time penalty: penalize places likely closed now
-    if (kstHour != null && kstDay != null && isLikelyClosedNow(r.hours_raw, kstHour, kstDay)) {
+
+    // Weather Tag soft boosting
+    if (weatherTag && r.weather_tags) {
+      try {
+        const tags = typeof r.weather_tags === 'string' ? JSON.parse(r.weather_tags) : r.weather_tags
+        if (Array.isArray(tags) && tags.includes(weatherTag)) {
+          score += 6 // Strong soft matching weather bonus!
+        }
+      } catch {}
+    }
+
+    // Season category/keyword boosting
+    if (currentSeason) {
+      score += computeSeasonBonus(r.category, r.place_type, r.name, r.menu_summary, r.review_summary, currentSeason)
+    }
+
+    // Time penalty: penalize places likely closed at the target planned hour (or current system hour fallback)
+    const activeHour = targetHour ?? new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" })).getHours()
+    const activeDay = kstDay ?? new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" })).getDay()
+    if (isLikelyClosedNow(r.hours_raw, activeHour, activeDay)) {
       score -= 8
     }
+
     return {
       name: r.name, category: r.category, place_type: r.place_type,
       lat: r.lat, lon: r.lon, address: r.address, rating: r.rating,
@@ -380,6 +470,8 @@ function toSlotItem(p: ScoredPlace, profile: UserProfile | null): PlaceSlotItem 
     reviewSummary: p.review_summary ?? null,
     reviewKeywords: p.review_keywords ?? [],
     reviewPicks: p.review_picks ?? [],
+    lat: p.lat,
+    lon: p.lon,
   }
 }
 
@@ -410,10 +502,17 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
   const canGoOutdoor = !isRaining && !isBadAir && !(sens.uvSkipOutdoor && wx?.uvLabel === "매우높음")
   const weatherMood = isRaining ? "rain" : isCold ? "cold" : isHot ? "hot" : "clear"
 
-  // KST current time for business hours check
+  // KST current time for business hours and season check
   const kstNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }))
-  const kstHour = kstNow.getHours()
   const kstDay = kstNow.getDay() // 0=Sun, 6=Sat
+  const kstMonth = kstNow.getMonth() + 1 // 1 to 12
+
+  // Determine current season
+  let currentSeason: "spring" | "summer" | "autumn" | "winter" = "spring"
+  if (kstMonth >= 3 && kstMonth <= 5) currentSeason = "spring"
+  else if (kstMonth >= 6 && kstMonth <= 8) currentSeason = "summer"
+  else if (kstMonth >= 9 && kstMonth <= 11) currentSeason = "autumn"
+  else currentSeason = "winter"
 
   const usedNames = new Set(exclude)
   const slots: CourseSlot[] = []
@@ -426,7 +525,8 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
       excludeNames: [...usedNames],
       limit: 30,
     })
-    const scored = scoreAndRank(rows, profile, uLat, uLon, kstHour, kstDay)
+    // Slot 1 planned hour: 14:00 (2 PM)
+    const scored = scoreAndRank(rows, profile, uLat, uLon, 14, kstDay, "clear-day", currentSeason)
     const top = scored.slice(0, 2)
     if (top.length > 0) {
       const m = top[0]
@@ -453,7 +553,8 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
     excludeNames: [...usedNames],
     limit: 50,
   })
-  const scoredIndoor = scoreAndRank(indoorRows, profile, uLat, uLon, kstHour, kstDay)
+  // Slot 2 planned hour: 17:00 (5 PM)
+  const scoredIndoor = scoreAndRank(indoorRows, profile, uLat, uLon, 17, kstDay, weatherTag, currentSeason)
   const topIndoor = scoredIndoor.slice(0, 3)
   if (topIndoor.length > 0) {
     const m = topIndoor[0]
@@ -478,7 +579,8 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
       excludeNames: [...usedNames],
       limit: 20,
     })
-    const scoredDinner = scoreAndRank(dinnerRows, profile, uLat, uLon, kstHour, kstDay)
+    // Slot 3 planned hour: 19:00 (7 PM)
+    const scoredDinner = scoreAndRank(dinnerRows, profile, uLat, uLon, 19, kstDay, isRaining ? "rainy-day" : null, currentSeason)
     const topDinner = scoredDinner.slice(0, 2)
     if (topDinner.length > 0) {
       const m = topDinner[0]
@@ -526,7 +628,7 @@ export async function getTopPlacesForChat(opts: {
 
 function getFallbackCourse(): CourseSlot[] {
   return [
-    { time: "13:00 - 15:30", title: "덕진공원", description: "햇살이 가장 따뜻한 시간대예요.", type: "야외", places: [{ name: "덕진공원", category: "nature", rating: 4.5, address: "전주시 덕진구", menuSummary: null, kakaoUrl: "https://place.map.kakao.com/8124058", reviewSummary: null, reviewKeywords: [], reviewPicks: [] }] },
-    { time: "16:00 - 18:00", title: "전주한옥마을 카페", description: "늦은 오후엔 카페에서 여유를.", type: "실내", places: [{ name: "전주한옥마을 카페거리", category: "cafe", rating: 4.3, address: "전주시 완산구", menuSummary: null, kakaoUrl: "https://place.map.kakao.com/12751100", reviewSummary: null, reviewKeywords: [], reviewPicks: [] }] },
+    { time: "13:00 - 15:30", title: "덕진공원", description: "햇살이 가장 따뜻한 시간대예요.", type: "야외", places: [{ name: "덕진공원", category: "nature", rating: 4.5, address: "전주시 덕진구", menuSummary: null, kakaoUrl: "https://place.map.kakao.com/8124058", reviewSummary: null, reviewKeywords: [], reviewPicks: [], lat: 35.8441, lon: 127.1224 }] },
+    { time: "16:00 - 18:00", title: "전주한옥마을 카페", description: "늦은 오후엔 카페에서 여유를.", type: "실내", places: [{ name: "전주한옥마을 카페거리", category: "cafe", rating: 4.3, address: "전주시 완산구", menuSummary: null, kakaoUrl: "https://place.map.kakao.com/12751100", reviewSummary: null, reviewKeywords: [], reviewPicks: [], lat: 35.8146, lon: 127.1526 }] },
   ]
 }

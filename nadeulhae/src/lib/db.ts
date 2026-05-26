@@ -130,7 +130,7 @@ export async function queryRows<T extends RowDataPacket[]>(
  */
 export async function executeStatement(
   sql: string,
-  params: unknown[] = []
+  params: any[] = []
 ) {
   const [result] = await getDbPool().execute<ResultSetHeader>(sql, params)
   return result
