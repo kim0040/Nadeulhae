@@ -8,9 +8,15 @@
 import { queryRows } from "@/lib/db"
 import type { RowDataPacket } from "mysql2"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
+import type { CourseSlot, PlaceSlotItem, UserProfile, CourseTheme } from "@/lib/course-types"
+import { COURSE_THEME_CONFIG, INTEREST_LABEL_KO } from "@/lib/course-types"
+
+// Re-export types for backward compatibility
+export type { CourseSlot, PlaceSlotItem, UserProfile, CourseTheme }
+export { COURSE_THEME_CONFIG, INTEREST_LABEL_KO }
 
 // ---------------------------------------------------------------------------
-// Types (public interface unchanged)
+// Types (server-only)
 // ---------------------------------------------------------------------------
 
 interface PlaceRow extends RowDataPacket {
@@ -33,37 +39,6 @@ interface PlaceRow extends RowDataPacket {
   review_picks: string | null // JSON array
 }
 
-export interface CourseSlot {
-  time: string
-  title: string
-  description: string
-  type: "야외" | "실내" | "반실외"
-  places: PlaceSlotItem[]
-}
-
-export interface PlaceSlotItem {
-  name: string
-  category: string
-  rating: number | null
-  address: string | null
-  menuSummary: string | null
-  kakaoUrl: string | null
-  interestMatch?: string
-  reviewSummary: string | null
-  reviewKeywords: string[]
-  reviewPicks: string[]
-  lat?: number | null
-  lon?: number | null
-}
-
-export interface UserProfile {
-  interestTags: string[]
-  preferredTimeSlot: string
-  weatherSensitivity: string[]
-  primaryRegion: string
-  ageBand?: string
-}
-
 export interface CourseRequest {
   timeRange?: string
   location?: string
@@ -72,6 +47,7 @@ export interface CourseRequest {
   userLat?: number | null
   userLon?: number | null
   excludeNames?: string[]
+  theme?: CourseTheme
 }
 
 interface ScoredPlace {
@@ -217,13 +193,6 @@ const INTEREST_CATEGORY_BOOST: Record<string, { categories: string[]; boost: num
   drive: { categories: ["attraction", "nature"], boost: 2 },
   family: { categories: ["nature", "attraction"], boost: 3 },
   pet: { categories: ["nature"], boost: 3 },
-}
-
-export const INTEREST_LABEL_KO: Record<string, string> = {
-  foodie: "맛집 탐방", cafe: "카페", nature: "자연 속 힐링",
-  art_museum: "문화·전시", festival: "축제·행사", shopping: "쇼핑",
-  picnic: "피크닉", activity: "야외 액티비티", photography: "사진 스팟",
-  walking: "산책", drive: "드라이브", family: "가족 나들이", pet: "반려동물",
 }
 
 function computeInterestBonus(category: string, name: string, menuSummary: string | null, profile: UserProfile | null): { bonus: number; matchedTag: string | null } {
@@ -381,6 +350,132 @@ function computeSeasonBonus(
   return score
 }
 
+// ---------------------------------------------------------------------------
+// Probabilistic selection (softmax-based diversity)
+// ---------------------------------------------------------------------------
+
+/**
+ * Softmax 기반 확률적 선택으로 추천 다양성을 보장합니다.
+ * temperature가 높을수록 랜덤성이 증가하고, 낮을수록 상위 점수에 집중됩니다.
+ */
+function probabilisticSelect<T extends { score: number }>(items: T[], temperature: number = 0.5): T | null {
+  if (items.length === 0) return null
+  if (items.length === 1) return items[0]
+
+  const scores = items.map(item => item.score)
+  const maxScore = Math.max(...scores)
+  const exps = scores.map(s => Math.exp((s - maxScore) / temperature))
+  const sumExp = exps.reduce((a, b) => a + b, 0)
+  const probs = exps.map(e => e / sumExp)
+
+  // 룰렛 휠 선택
+  const r = Math.random()
+  let cumulative = 0
+  for (let i = 0; i < probs.length; i++) {
+    cumulative += probs[i]
+    if (r < cumulative) return items[i]
+  }
+  return items[0]
+}
+
+/**
+ * 상위 N개 중 확률적으로 1개를 선택합니다.
+ * 단순 slice 대신 다양성을 보장하면서도 품질을 유지합니다.
+ */
+function selectDiverseTop(scored: ScoredPlace[], count: number, temperature: number = 0.3): ScoredPlace[] {
+  if (scored.length <= count) return scored
+  
+  // 상위 count * 3개 중에서 확률적 선택 (너무 많은 후보는 노이즈)
+  const candidates = scored.slice(0, count * 3)
+  const selected: ScoredPlace[] = []
+  const usedIndices = new Set<number>()
+
+  for (let i = 0; i < count; i++) {
+    const remaining = candidates.filter((_, idx) => !usedIndices.has(idx))
+    if (remaining.length === 0) break
+
+    const pick = probabilisticSelect(remaining, temperature)
+    if (pick) {
+      const originalIdx = candidates.indexOf(pick)
+      usedIndices.add(originalIdx)
+      selected.push(pick)
+    }
+  }
+
+  return selected
+}
+
+// ---------------------------------------------------------------------------
+// Hidden gem scoring
+// ---------------------------------------------------------------------------
+
+/**
+ * 숨은 맛집 점수를 계산합니다.
+ * 평점이 높지만 리뷰가 적은 장소에 높은 점수를 부여합니다.
+ */
+function hiddenGemScore(r: PlaceRow): number {
+  if (!r.rating || !r.review_count) return 0
+  
+  // 평점이 높지만 리뷰가 적은 곳 = 숨은 gems
+  const ratingWeight = r.rating * 2
+  // 리뷰가 적을수록 novelty 보너스 (최대 5점)
+  const reviewNovelty = Math.max(0, 5 - Math.log10(r.review_count + 1))
+  // 리뷰 10개 미만이면 추가 보너스
+  const freshnessBonus = r.review_count < 10 ? 3 : 0
+  // 평점 4.0 이상이면 추가 보너스
+  const highRatingBonus = r.rating >= 4.0 ? 2 : 0
+
+  return ratingWeight + reviewNovelty + freshnessBonus + highRatingBonus
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic time slots
+// ---------------------------------------------------------------------------
+
+/**
+ * 현재 시간 기반으로 동적 시간대를 생성합니다.
+ * 고정된 시간대 대신 현재 시간부터 시작하는 자연스러운 코스를 구성합니다.
+ */
+function getDynamicTimeSlots(currentHour: number): Array<{ time: string; label: string; targetHour: number }> {
+  if (currentHour < 10) {
+    return [
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 12:00`, label: "아침 나들이", targetHour: currentHour + 1 },
+      { time: "12:00 - 14:00", label: "점심 맛집", targetHour: 12 },
+      { time: "14:00 - 16:00", label: "카페 타임", targetHour: 14 },
+    ]
+  } else if (currentHour < 12) {
+    return [
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 13:00`, label: "오전 나들이", targetHour: currentHour + 1 },
+      { time: "13:00 - 15:00", label: "점심 시간", targetHour: 13 },
+      { time: "15:00 - 17:00", label: "오후 산책", targetHour: 15 },
+    ]
+  } else if (currentHour < 14) {
+    return [
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 15:30`, label: "점심 시간", targetHour: currentHour },
+      { time: "15:30 - 17:30", label: "산책/문화", targetHour: 15 },
+      { time: "17:30 - 19:30", label: "저녁 준비", targetHour: 17 },
+    ]
+  } else if (currentHour < 16) {
+    return [
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 17:00`, label: "오후 시간", targetHour: currentHour },
+      { time: "17:00 - 19:00", label: "저녁 맛집", targetHour: 17 },
+      { time: "19:00 - 21:00", label: "야경/카페", targetHour: 19 },
+    ]
+  } else if (currentHour < 18) {
+    return [
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 19:00`, label: "늦은 오후", targetHour: currentHour },
+      { time: "19:00 - 21:00", label: "저녁 시간", targetHour: 19 },
+      { time: "21:00 - 23:00", label: "야간 산책", targetHour: 21 },
+    ]
+  } else {
+    return [
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 20:00`, label: "저녁 시간", targetHour: currentHour },
+      { time: "20:00 - 22:00", label: "야경 즐기기", targetHour: 20 },
+      { time: "22:00 - 23:59", label: "마무리", targetHour: 22 },
+    ]
+  }
+}
+
 function scoreAndRank(
   rows: PlaceRow[], 
   profile: UserProfile | null, 
@@ -389,7 +484,8 @@ function scoreAndRank(
   targetHour?: number, 
   kstDay?: number,
   weatherTag?: string | null,
-  currentSeason?: "spring" | "summer" | "autumn" | "winter"
+  currentSeason?: "spring" | "summer" | "autumn" | "winter",
+  preferHiddenGem?: boolean
 ): ScoredPlace[] {
   const scored: ScoredPlace[] = rows.map(r => {
     // Parse LLM-enriched review fields
@@ -438,6 +534,11 @@ function scoreAndRank(
     // Season category/keyword boosting
     if (currentSeason) {
       score += computeSeasonBonus(r.category, r.place_type, r.name, r.menu_summary, r.review_summary, currentSeason)
+    }
+
+    // Hidden gem bonus (숨은 맛집 알고리즘)
+    if (preferHiddenGem) {
+      score += hiddenGemScore(r)
     }
 
     // Time penalty: penalize places likely closed at the target planned hour (or current system hour fallback)
@@ -492,6 +593,7 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
   const uLat = request.userLat ?? null
   const uLon = request.userLon ?? null
   const exclude = request.excludeNames ?? []
+  const theme = request.theme ?? "balanced"
   const sens = getSensitivity(profile)
 
   const isRaining = wx?.rainingNow ?? false
@@ -506,6 +608,7 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
   const kstNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }))
   const kstDay = kstNow.getDay() // 0=Sun, 6=Sat
   const kstMonth = kstNow.getMonth() + 1 // 1 to 12
+  const kstHour = kstNow.getHours()
 
   // Determine current season
   let currentSeason: "spring" | "summer" | "autumn" | "winter" = "spring"
@@ -514,84 +617,101 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
   else if (kstMonth >= 9 && kstMonth <= 11) currentSeason = "autumn"
   else currentSeason = "winter"
 
+  // 동적 시간대 계산
+  const dynamicTimeSlots = getDynamicTimeSlots(kstHour)
+
+  // 테마 설정 가져오기
+  const themeConfig = COURSE_THEME_CONFIG[theme]
   const usedNames = new Set(exclude)
   const slots: CourseSlot[] = []
 
-  // ---- Slot 1: outdoor ----
-  if (canGoOutdoor) {
+  // 테마 기반 코스 생성
+  for (let i = 0; i < themeConfig.slotStructure.length; i++) {
+    const slotConfig = themeConfig.slotStructure[i]
+    const timeSlot = dynamicTimeSlots[i]
+
+    // 비 오는 날 테마가 아닌 경우, 야외 장소는 비 올 때 제외
+    if (!canGoOutdoor && slotConfig.placeTypes.some(t => t === "outdoor" || t === "semi-outdoor")) {
+      continue
+    }
+
+    const weatherTag = weatherMood === "rain" ? "rainy-day" 
+      : weatherMood === "cold" ? "cold-day" 
+      : weatherMood === "hot" ? "hot-day" 
+      : "clear-day"
+
     const rows = await queryPlaces({
-      placeTypes: ["outdoor", "semi-outdoor"],
-      weatherTag: "clear-day",
+      placeTypes: slotConfig.placeTypes,
+      categories: slotConfig.categories,
+      weatherTag: slotConfig.placeTypes.includes("indoor") ? weatherTag : undefined,
       excludeNames: [...usedNames],
-      limit: 30,
+      limit: 40,
     })
-    // Slot 1 planned hour: 14:00 (2 PM)
-    const scored = scoreAndRank(rows, profile, uLat, uLon, 14, kstDay, "clear-day", currentSeason)
-    const top = scored.slice(0, 2)
+
+    const scored = scoreAndRank(
+      rows, profile, uLat, uLon, 
+      timeSlot?.targetHour ?? 14, 
+      kstDay, 
+      weatherTag, 
+      currentSeason,
+      slotConfig.preferHiddenGem
+    )
+
+    // 다양성을 보장하는 상위 선택
+    const top = selectDiverseTop(scored, 2, 0.3)
+    
     if (top.length > 0) {
       const m = top[0]
-      const weatherNote = isHot ? "더위를 피해 그늘에서 즐기기 좋은"
-        : isWindy ? "바람이 다소 있지만 즐길 수 있는"
-        : "햇살 좋은 시간에 방문하기 좋은"
+      const placeType = m.place_type as "야외" | "실내" | "반실외"
+      
+      // 날씨/시간 기반 설명 생성
+      let weatherNote = ""
+      if (i === 0) {
+        weatherNote = isHot ? "더위를 피해 그늘에서 즐기기 좋은"
+          : isWindy ? "바람이 다소 있지만 즐길 수 있는"
+          : isRaining ? "비 오는 날 분위기 좋은"
+          : "방문하기 좋은"
+      } else if (i === 1) {
+        weatherNote = isRaining ? "비 오는 날 실내에서 즐기기 좋은"
+          : isCold ? "따뜻하게 머물기 좋은"
+          : isHot ? "시원하게 쉬기 좋은"
+          : "여유롭게 즐기기 좋은"
+      } else {
+        weatherNote = isRaining ? "비 오는 저녁 따뜻한"
+          : "하루 마무리로 즐기기 좋은"
+      }
+
       slots.push({
-        time: timeSlotLabel(profile, 1),
+        time: timeSlot?.time ?? timeSlotLabel(profile, i + 1),
         title: m.name,
-        description: `${weatherNote} ${categoryLabel(m.category)}입니다.${top[1] ? ` 근처 ${top[1].name}도 함께 둘러보세요.` : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon)}${getReviewNote(m.review_summary)}${m.interestBonus > 4 ? `\n→ ${INTEREST_LABEL_KO[m.interestTag ?? ""] ?? ""} 관심사에 딱 맞는 곳이에요.` : ""}`,
-        type: "야외",
+        description: `${weatherNote} ${categoryLabel(m.category)}입니다.${m.menu_summary ? ` 대표 메뉴: ${m.menu_summary}` : ""}${top[1] ? ` 근처 ${top[1].name}도 추천해요.` : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon)}${getReviewNote(m.review_summary)}${m.interestBonus > 4 ? `\n→ ${INTEREST_LABEL_KO[m.interestTag ?? ""] ?? ""} 관심사에 딱 맞는 곳이에요.` : ""}`,
+        type: placeType,
         places: top.map(p => toSlotItem(p, profile)),
       })
       top.forEach(p => usedNames.add(p.name))
     }
   }
 
-  // ---- Slot 2: indoor ----
-  const weatherTag = weatherMood === "rain" ? "rainy-day" : weatherMood === "cold" ? "cold-day" : weatherMood === "hot" ? "hot-day" : "clear-day"
-  const indoorRows = await queryPlaces({
-    placeTypes: ["indoor"],
-    categories: ["cafe", "restaurant", "bakery", "culture", "shopping"],
-    weatherTag,
-    excludeNames: [...usedNames],
-    limit: 50,
-  })
-  // Slot 2 planned hour: 17:00 (5 PM)
-  const scoredIndoor = scoreAndRank(indoorRows, profile, uLat, uLon, 17, kstDay, weatherTag, currentSeason)
-  const topIndoor = scoredIndoor.slice(0, 3)
-  if (topIndoor.length > 0) {
-    const m = topIndoor[0]
-    const moodNote = isRaining ? "비 오는 날 분위기 좋은" : isCold ? "따뜻하게 머물기 좋은" : isHot ? "시원하게 쉬기 좋은" : "여유롭게 즐기기 좋은"
-    const hasOutdoor = slots.length > 0
-    slots.push({
-      time: hasOutdoor ? timeSlotLabel(profile, 2) : timeSlotLabel(profile, 1),
-      title: m.name,
-      description: `${moodNote} ${categoryLabel(m.category)}입니다.${m.menu_summary ? ` 대표 메뉴: ${m.menu_summary}` : ""}${topIndoor[1] ? ` 근처 ${topIndoor[1].name}도 추천해요.` : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon)}${getReviewNote(m.review_summary)}${m.interestBonus > 4 ? `\n→ ${INTEREST_LABEL_KO[m.interestTag ?? ""] ?? ""} 취향에 맞춰 골랐어요.` : ""}`,
-      type: "실내",
-      places: topIndoor.map(p => toSlotItem(p, profile)),
-    })
-    topIndoor.forEach(p => usedNames.add(p.name))
-  }
-
-  // ---- Slot 3: dinner ----
-  if (isRaining || slots.length < 2) {
-    const dinnerRows = await queryPlaces({
-      placeTypes: ["indoor"],
-      categories: ["restaurant"],
-      weatherTag: isRaining ? "rainy-day" : undefined,
+  // 빈 슬롯 채우기 (기존 로직 유지)
+  if (slots.length < 2 && canGoOutdoor) {
+    const rows = await queryPlaces({
+      placeTypes: ["outdoor", "semi-outdoor"],
+      weatherTag: "clear-day",
       excludeNames: [...usedNames],
-      limit: 20,
+      limit: 30,
     })
-    // Slot 3 planned hour: 19:00 (7 PM)
-    const scoredDinner = scoreAndRank(dinnerRows, profile, uLat, uLon, 19, kstDay, isRaining ? "rainy-day" : null, currentSeason)
-    const topDinner = scoredDinner.slice(0, 2)
-    if (topDinner.length > 0) {
-      const m = topDinner[0]
+    const scored = scoreAndRank(rows, profile, uLat, uLon, 14, kstDay, "clear-day", currentSeason)
+    const top = selectDiverseTop(scored, 2, 0.3)
+    if (top.length > 0) {
+      const m = top[0]
       slots.push({
-        time: timeSlotLabel(profile, 3),
+        time: timeSlotLabel(profile, 1),
         title: m.name,
-        description: `${isRaining ? "비 오는 저녁 따뜻한" : "하루 마무리로 즐기기 좋은"} 맛집입니다.${m.menu_summary ? ` 대표 메뉴: ${m.menu_summary}` : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon)}${getReviewNote(m.review_summary)}${m.interestBonus > 4 && profile?.interestTags?.includes("foodie") ? "\n→ 맛집 탐방 취향에 딱인 저녁이에요." : ""}`,
-        type: "실내",
-        places: topDinner.map(p => toSlotItem(p, profile)),
+        description: `방문하기 좋은 ${categoryLabel(m.category)}입니다.${top[1] ? ` 근처 ${top[1].name}도 함께 둘러보세요.` : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon)}${getReviewNote(m.review_summary)}`,
+        type: "야외",
+        places: top.map(p => toSlotItem(p, profile)),
       })
-      topDinner.forEach(p => usedNames.add(p.name))
+      top.forEach(p => usedNames.add(p.name))
     }
   }
 

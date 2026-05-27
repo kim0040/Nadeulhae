@@ -1,11 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MapPin, Clock, Star, Utensils, Coffee, Sparkles, RefreshCcw, ChevronRight, LoaderCircle, CloudAlert, Shuffle, Home, Car, Footprints, Navigation } from "lucide-react"
+import { MapPin, Clock, Star, Utensils, Coffee, Sparkles, RefreshCcw, ChevronRight, LoaderCircle, CloudAlert, Shuffle, Home, Car, Footprints, Navigation, Palette } from "lucide-react"
 import { useLanguage } from "@/context/LanguageContext"
 import { cn } from "@/lib/utils"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
-import type { UserProfile } from "@/lib/course-engine"
+import type { UserProfile, CourseTheme } from "@/lib/course-types"
+import { COURSE_THEME_CONFIG } from "@/lib/course-types"
 
 declare global {
   interface Window {
@@ -62,6 +63,17 @@ const COPY = {
     dislikeHint: "이 장소 대신 다른 곳을 추천받기",
     excludedCount: "제외됨",
     
+    // Theme selector
+    themeSelect: "코스 테마",
+    themeHint: "원하는 스타일의 코스를 선택하세요",
+    balanced: "균형잡힌 코스",
+    foodie_focus: "맛집 탐방",
+    nature_heal: "자연 힐링",
+    date_night: "데이트 코스",
+    family_fun: "가족 나들이",
+    hidden_gem: "숨은 명소",
+    rainy_day: "비 오는 날",
+    
     // Journey Timeline 추가 번역
     startNode: "나들이 출발지",
     myLocation: "내 실시간 위치 (GPS)",
@@ -103,6 +115,17 @@ const COPY = {
     dislike: "Try elsewhere",
     dislikeHint: "Get a different recommendation",
     excludedCount: "excluded",
+
+    // Theme selector
+    themeSelect: "Course Theme",
+    themeHint: "Choose your preferred course style",
+    balanced: "Balanced",
+    foodie_focus: "Foodie Focus",
+    nature_heal: "Nature Healing",
+    date_night: "Date Night",
+    family_fun: "Family Fun",
+    hidden_gem: "Hidden Gem",
+    rainy_day: "Rainy Day",
 
     // Journey Timeline English
     startNode: "Starting Point",
@@ -146,6 +169,17 @@ const COPY = {
     dislikeHint: "换其他地方推荐",
     excludedCount: "已排除",
 
+    // Theme selector
+    themeSelect: "路线主题",
+    themeHint: "选择您喜欢的路线风格",
+    balanced: "均衡路线",
+    foodie_focus: "美食探店",
+    nature_heal: "自然疗愈",
+    date_night: "约会路线",
+    family_fun: "家庭出行",
+    hidden_gem: "隐藏名所",
+    rainy_day: "雨天路线",
+
     // Journey Timeline Chinese
     startNode: "纳凉出发地",
     myLocation: "当前位置 (GPS)",
@@ -182,16 +216,27 @@ const COPY = {
     noMenu: "メニュー情報なし",
     nearby: "近くのおすすめ",
     startAt: "訪問",
-    empty: "現在の天気条件에 맞는 코스를 찾을 수 없어요. 날씨가 좋아지면 다시 추천해 드릴게요.",
+    empty: "現在の天気条件に 맞す 코스를 찾을 수 없어요. 날씨가 좋아지면 다시 추천해 드릴게요.",
     fallbackNote: "デフォルトコースを表示中（天気データなし）。",
     dislike: "別の場所",
     dislikeHint: "別のおすすめを見る",
     excludedCount: "除外済",
 
+    // Theme selector
+    themeSelect: "コーステーマ",
+    themeHint: "お好みのコーススタイルを選択してください",
+    balanced: "バランス",
+    foodie_focus: "グルメ",
+    nature_heal: "自然癒し",
+    date_night: "デート",
+    family_fun: "家族お出かけ",
+    hidden_gem: "穴場スポット",
+    rainy_day: "雨の日",
+
     // Journey Timeline Japanese
     startNode: "出発地",
     myLocation: "現在地 (GPS)",
-    defaultLocation: "全州市中心부 (デフォルト)",
+    defaultLocation: "全州市中心部 (デフォルト)",
     transitWalk: "徒歩移動",
     transitDrive: "車/タクシー移動",
     finishNode: "お出かけ完了・帰路",
@@ -235,6 +280,7 @@ interface CourseRecommendationProps {
   userLon?: number | null
   className?: string
   customCourse?: any[] | null
+  onThemeChange?: (theme: CourseTheme) => void
 }
 
 // Haversine distance calculator on client
@@ -384,7 +430,7 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
   )
 }
 
-export function CourseRecommendation({ weatherContext, userProfile, userLat, userLon, className, customCourse }: CourseRecommendationProps) {
+export function CourseRecommendation({ weatherContext, userProfile, userLat, userLon, className, customCourse, onThemeChange }: CourseRecommendationProps) {
   const { language } = useLanguage()
   const copy = COPY[language as keyof typeof COPY] ?? COPY.ko
   const [slots, setSlots] = useState<CourseSlotData[]>([])
@@ -392,6 +438,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const [error, setError] = useState<string | null>(null)
   const [expandedSlot, setExpandedSlot] = useState<number | null>(0)
   const [excludedNames, setExcludedNames] = useState<string[]>([])
+  const [selectedTheme, setSelectedTheme] = useState<CourseTheme>("balanced")
   const excludeRef = useRef<string[]>([])
 
   // Kakao Map SDK integration state
@@ -401,6 +448,12 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
 
   // Real-time directions state (SWR progressive updates)
   const [realtimeRoutes, setRealtimeRoutes] = useState<any[]>([])
+
+  // Theme change handler
+  const handleThemeChange = useCallback((theme: CourseTheme) => {
+    setSelectedTheme(theme)
+    onThemeChange?.(theme)
+  }, [onThemeChange])
 
   // Fetch Kakao Maps JS Key from rate-limited backend DB quota counter
   useEffect(() => {
@@ -526,7 +579,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       const res = await fetch("/api/weather/recommendations/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weatherContext, userProfile, userLat, userLon, excludeNames: list }),
+        body: JSON.stringify({ weatherContext, userProfile, userLat, userLon, excludeNames: list, theme: selectedTheme }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
@@ -537,7 +590,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     } finally {
       setLoading(false)
     }
-  }, [weatherContext, userProfile, userLat, userLon, copy.error, customCourse])
+  }, [weatherContext, userProfile, userLat, userLon, copy.error, customCourse, selectedTheme])
 
   useEffect(() => {
     excludeRef.current = excludedNames
@@ -735,6 +788,33 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
           <span className="hidden sm:inline">{copy.refreshHint}</span>
         </button>
       </div>
+
+      {/* Theme Selector */}
+      {!customCourse && (
+        <div className="mt-4 rounded-[1.2rem] border border-card-border/50 bg-background/50 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Palette className="size-3.5 text-sky-blue" />
+            <span className="text-[11px] font-bold text-muted-foreground">{copy.themeSelect}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {(Object.keys(COURSE_THEME_CONFIG) as CourseTheme[]).map((themeKey) => (
+              <button
+                key={themeKey}
+                type="button"
+                onClick={() => handleThemeChange(themeKey)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-[10px] font-bold transition-all duration-200",
+                  selectedTheme === themeKey
+                    ? "bg-sky-blue text-white shadow-md shadow-sky-blue/20"
+                    : "bg-muted/50 text-muted-foreground hover:bg-sky-blue/10 hover:text-sky-blue"
+                )}
+              >
+                {copy[themeKey] ?? COURSE_THEME_CONFIG[themeKey].labelKo}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Weather context note */}
       {!weatherContext && (
