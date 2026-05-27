@@ -151,10 +151,10 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
                       <div className={cn(
                         "min-h-[238px] rounded-[1.7rem] border px-4 py-5 transition-all hover:scale-[1.02] duration-300 sm:min-h-[220px] sm:px-3 sm:py-3",
                         isLead
-                          ? "border-slate-300 bg-card shadow-[0_18px_44px_-34px_rgba(47,111,228,0.24)] dark:border-active-blue/30"
+                          ? "border-card-border bg-card shadow-[0_18px_44px_-34px_rgba(47,111,228,0.24)]"
                           : night
-                            ? "border-slate-300 bg-muted/40 dark:border-white/10 dark:bg-white/[0.04]"
-                            : "border-slate-300 bg-card dark:border-white/10"
+                            ? "border-card-border/50 bg-muted/40"
+                            : "border-card-border bg-card"
                       )}>
                         <div className="flex items-center justify-between gap-2">
                           <span className={cn(
@@ -191,8 +191,8 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
                             hasRain
                               ? "border-active-blue/25 bg-active-blue/10"
                               : night
-                                ? "border-slate-300 bg-card dark:border-white/10 dark:bg-white/[0.04]"
-                                : "border-slate-300 bg-card dark:border-white/10"
+                                ? "border-card-border/50 bg-card"
+                                : "border-card-border bg-card"
                           )}>
                             <WeatherIcon sky={item.sky} night={night} />
                           </div>

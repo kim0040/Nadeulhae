@@ -307,7 +307,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest leading-none mb-1">
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">
                 {t.dateLabel}
               </span>
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--interactive)] border border-[var(--interactive-border)]">

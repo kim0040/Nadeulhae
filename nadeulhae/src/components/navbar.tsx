@@ -240,7 +240,7 @@ export function Navbar() {
                 onClick={handleLogout}
                 disabled={isPending}
                 aria-label={copy.logout}
-                className="flex items-center gap-1 p-1.5 text-[11px] font-bold text-neutral-500 transition-all hover:text-sky-blue disabled:opacity-50 sm:gap-1.5 sm:p-2 sm:text-xs md:text-[13px] xl:text-[13px]"
+                className="flex items-center gap-1 p-1.5 text-[11px] font-bold text-muted-foreground transition-all hover:text-sky-blue disabled:opacity-50 sm:gap-1.5 sm:p-2 sm:text-xs md:text-[13px] xl:text-[13px]"
                 title={copy.logout}
               >
                 <LogOutIcon size={16} className="sm:size-[17px]" />
@@ -259,7 +259,7 @@ export function Navbar() {
                   setTheme(THEME_MODES[nextIndex]);
                 }}
                 aria-label={copy.themeToggle}
-                className="flex items-center gap-1 p-1.5 text-neutral-500 transition-all hover:text-sky-blue sm:p-2"
+                className="flex items-center gap-1 p-1.5 text-muted-foreground transition-all hover:text-sky-blue sm:p-2"
                 title={copy.themeToggle}
               >
                 {theme === "light" && (
@@ -285,7 +285,7 @@ export function Navbar() {
                 setLanguage((cycle[(idx + 1) % 4] ?? "ko") as any);
               }}
               aria-label={copy.languageToggle}
-              className="flex items-center gap-1 p-1.5 text-[11px] font-black text-neutral-500 transition-all hover:text-sky-blue sm:p-2 sm:text-xs md:text-[13px]"
+              className="flex items-center gap-1 p-1.5 text-[11px] font-black text-muted-foreground transition-all hover:text-sky-blue sm:p-2 sm:text-xs md:text-[13px]"
               title={copy.languageToggle}
             >
               <Languages size={16} className="sm:size-[17px]" />

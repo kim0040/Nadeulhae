@@ -163,7 +163,7 @@ function ChatBubble({
           className={cn(
             "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-black",
             message.isAnonymous
-              ? "bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400"
+              ? "bg-muted text-muted-foreground"
               : isMine
                 ? "bg-sky-blue/20 text-sky-blue"
                 : "bg-active-blue/15 text-active-blue"
@@ -190,7 +190,7 @@ function ChatBubble({
             className={cn(
               "text-[11px] font-bold",
               message.isAnonymous
-                ? "text-neutral-400 dark:text-neutral-500"
+                ? "text-muted-foreground"
                 : "text-muted-foreground"
             )}
           >

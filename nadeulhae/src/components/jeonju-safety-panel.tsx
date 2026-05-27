@@ -492,7 +492,7 @@ export function JeonjuSafetyPanel({
           <AnimatedGradientText className="text-3xl sm:text-5xl font-black tracking-tight">
             {language === "ko" ? "오늘의 전주안전" : language === "zh" ? "今日全州安全" : language === "ja" ? "今日の全州安全" : "Today's Jeonju Safety"}
           </AnimatedGradientText>
-          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-neutral-800 dark:text-neutral-400">
+          <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed text-foreground/80">
             {language === "ko"
               ? "전주 기준으로 오늘 바로 확인할 안전 신호를 한곳에 모았습니다. 실시간 특보·재난, 전북 화재 흐름, 이동 주의 포인트를 좌표·관측소·광역 집계 기준에 맞춰 읽을 수 있습니다."
               : language === "zh"

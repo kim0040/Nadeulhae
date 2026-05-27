@@ -216,7 +216,7 @@ export function PicnicDetailDrawer({
           >
             {/* Top Fixed Area: Handle Bar */}
             <div className="pt-5 pb-2 shrink-0">
-              <div className="w-12 h-1.5 bg-neutral-300 dark:bg-neutral-800 rounded-full mx-auto" />
+              <div className="w-12 h-1.5 bg-muted rounded-full mx-auto" />
             </div>
 
             {/* Scrollable Container */}

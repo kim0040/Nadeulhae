@@ -552,7 +552,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           
           <div className="flex items-center gap-3">
              <div className="flex flex-col items-end">
-               <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest leading-none mb-1">{t("status_nearby_station")}</span>
+               <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">{t("status_nearby_station")}</span>
                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--interactive)] border border-[var(--interactive-border)]">
                  <MapPin size={12} className="text-sky-blue" />
                  <span className="text-xs font-black text-foreground">{metadata?.station || t("station_dukjin")}</span>
@@ -758,27 +758,27 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
           <div className="flex items-center gap-3">
              <Clock size={14} className="text-sky-blue opacity-50" />
              <div className="flex flex-col">
-               <span className="text-[8px] font-black text-neutral-400 uppercase tracking-widest">{t("brief_kma_sync")}</span>
-               <span className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 italic">
+               <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">{t("brief_kma_sync")}</span>
+               <span className="text-[10px] font-bold text-muted-foreground italic">
                  {getUpdateTime('kma')} ({t(metadata?.intervals.kma || "interval_45m")})
                </span>
              </div>
           </div>
-          <div className="w-px h-6 bg-neutral-200 dark:bg-neutral-800 hidden sm:block" />
+          <div className="w-px h-6 bg-border/30 hidden sm:block" />
           <div className="flex items-center gap-3">
              <Database size={14} className="text-sky-blue opacity-50" />
              <div className="flex flex-col">
-               <span className="text-[8px] font-black text-neutral-400 uppercase tracking-widest">{t("brief_air_sync")}</span>
-               <span className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 italic">
+               <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">{t("brief_air_sync")}</span>
+               <span className="text-[10px] font-bold text-muted-foreground italic">
                  {getUpdateTime('air')} ({t(metadata?.intervals.air || "interval_0m")})
                </span>
              </div>
           </div>
-          <div className="w-px h-6 bg-neutral-200 dark:bg-neutral-800 hidden sm:block" />
+          <div className="w-px h-6 bg-border/30 hidden sm:block" />
           <div className="flex items-center gap-3">
              <Info size={14} className="text-sky-blue opacity-50" />
              <div className="flex flex-col">
-               <span className="text-[8px] font-black text-neutral-400 uppercase tracking-widest">{t("brief_data_source")}</span>
+               <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">{t("brief_data_source")}</span>
                <div className="mt-1 flex flex-wrap items-center gap-2">
                  {sourceLabels.map((source) => (
                      <span

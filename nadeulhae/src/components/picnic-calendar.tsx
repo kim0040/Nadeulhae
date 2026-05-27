@@ -518,7 +518,7 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                               </span>
                             )}
                             {isRecommended && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-nature-green/25 bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-nature-green shadow-md dark:bg-card">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-nature-green/25 bg-card/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-nature-green shadow-md">
                                 <Sparkles size={12} />
                                 {__l("추천", "Best", "推荐", "おすすめ")}
                               </span>

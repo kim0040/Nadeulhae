@@ -227,7 +227,7 @@ export function PicnicArchiveCalendar() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between mb-12 gap-6 relative z-10">
         <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-neutral-400 mb-2">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-muted-foreground mb-2">
             <div className="flex items-center gap-2">
               <History size={18} />
               <span className="text-xs font-black uppercase tracking-widest">
@@ -326,7 +326,7 @@ export function PicnicArchiveCalendar() {
         {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => (
           <div
             key={day}
-            className="text-center text-[9px] sm:text-[10px] font-black text-neutral-400 dark:text-neutral-500 tracking-[0.1em] sm:tracking-[0.3em] pb-2 sm:pb-4"
+            className="text-center text-[9px] sm:text-[10px] font-black text-muted-foreground tracking-[0.1em] sm:tracking-[0.3em] pb-2 sm:pb-4"
           >
             {day}
           </div>
@@ -373,7 +373,7 @@ export function PicnicArchiveCalendar() {
                   className={cn(
                     "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-between p-1.5 sm:p-3 rounded-xl sm:rounded-[2rem] text-sm font-black transition-all border cursor-pointer",
                     !isCurrentMonth &&
-                      "text-neutral-200 dark:text-neutral-800 border-transparent opacity-30 cursor-default",
+                      "text-muted/40 border-transparent opacity-30 cursor-default",
                     isCurrentMonth &&
                       !isSelected &&
                       (score != null
@@ -435,7 +435,7 @@ export function PicnicArchiveCalendar() {
             transition={{ duration: 0.35, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="mt-8 pt-8 border-t border-neutral-100 dark:border-white/10">
+            <div className="mt-8 pt-8 border-t border-border/30">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-black tracking-tight text-foreground">
@@ -452,7 +452,7 @@ export function PicnicArchiveCalendar() {
                     setSelectedDate(null);
                     setDetailData(null);
                   }}
-                  className="p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                  className="p-2 rounded-xl hover:bg-muted transition-colors"
                 >
                   <X size={20} />
                 </button>
@@ -463,7 +463,7 @@ export function PicnicArchiveCalendar() {
                   {[1, 2, 3].map((i) => (
                     <div
                       key={i}
-                      className="h-24 rounded-2xl bg-neutral-100 dark:bg-neutral-800"
+                      className="h-24 rounded-2xl bg-muted/60"
                     />
                   ))}
                 </div>
@@ -557,7 +557,7 @@ export function PicnicArchiveCalendar() {
                               <span className="flex items-center gap-1 text-muted-foreground">
                                 <ThermometerIcon size={14} />
                                 {entry.weather.avgTemp ?? "--"}°C
-                                <span className="text-xs text-neutral-400">
+                                <span className="text-xs text-muted-foreground/60">
                                   ({entry.weather.minTemp ?? "--"}~
                                   {entry.weather.maxTemp ?? "--"})
                                 </span>
@@ -595,7 +595,7 @@ export function PicnicArchiveCalendar() {
                             </div>
 
                             {/* Labeled Score Breakdown Grid */}
-                            <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-white/5">
+                            <div className="mt-4 pt-4 border-t border-border/30">
                               <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3">
                                 {__l("세부 점수 분석", "Score Breakdown", "评分明细", "スコア内訳")}
                               </div>
@@ -620,7 +620,7 @@ export function PicnicArchiveCalendar() {
                                           <span className="text-[9px] font-normal text-muted-foreground">/{max}</span>
                                         </span>
                                       </div>
-                                      <div className="w-full h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+                                      <div className="w-full h-1.5 rounded-full bg-muted/60 overflow-hidden">
                                         <div
                                           className={cn(
                                             "h-full rounded-full",
@@ -651,8 +651,8 @@ export function PicnicArchiveCalendar() {
       </AnimatePresence>
 
       {/* Info Footnote */}
-      <div className="mt-12 pt-8 border-t border-neutral-100 dark:border-white/5">
-        <p className="text-xs sm:text-sm font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest leading-relaxed text-center sm:text-left">
+      <div className="mt-12 pt-8 border-t border-border/30">
+        <p className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-widest leading-relaxed text-center sm:text-left">
           {__l("출처", "Source", "来源", "ソース")}:{" "}
           {archiveData?.metadata?.dataSource || __l("기상청 ASOS 관측자료", "KMA ASOS Observation Data", "气象厅 ASOS 观测数据", "気象庁 ASOS 観測データ")}{" "}
           {archiveData?.metadata?.coverage ? `(${archiveData.metadata.coverage})` : ""}

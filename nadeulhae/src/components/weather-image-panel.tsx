@@ -232,7 +232,7 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
     cards.push({
       key: "fog",
       title: labels.fog,
-      icon: <Cloud size={16} className="text-neutral-500 dark:text-neutral-300" />,
+      icon: <Cloud size={16} className="text-muted-foreground" />,
       image: data.extras.fog,
     })
   }
