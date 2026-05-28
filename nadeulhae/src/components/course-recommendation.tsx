@@ -48,7 +48,7 @@ const COPY = {
     loading: "날씨에 맞는 코스를 찾는 중...",
     error: "코스를 불러오지 못했어요.",
     retry: "다시 시도",
-    refreshHint: "3분마다 자동 갱신",
+    refreshHint: "새로고침",
     outdoor: "야외",
     indoor: "실내",
     semiOutdoor: "반실외",
@@ -93,6 +93,7 @@ const COPY = {
     mapLoading: "인터랙티브 지도 불러오는 중...",
     mapError: "지도를 로딩할 수 없습니다 (설정 확인 필요)",
     mapErrorSubtext: "일일 쿼타 초과(50회) 또는 카카오 개발자 콘솔의 [플랫폼 > Web]에 현재 접속 주소(예: http://localhost:3000)가 정상 등록되어 있는지 확인해 주세요.",
+    realtimeTraffic: "실시간 교통",
   },
   en: {
     badge: "Recommended Course",
@@ -101,7 +102,7 @@ const COPY = {
     loading: "Finding the best course for today...",
     error: "Failed to load course.",
     retry: "Retry",
-    refreshHint: "Auto-refreshes every 3 min",
+    refreshHint: "Refresh",
     outdoor: "Outdoor",
     indoor: "Indoor",
     semiOutdoor: "Semi-outdoor",
@@ -146,6 +147,7 @@ const COPY = {
     mapLoading: "Loading interactive map...",
     mapError: "Unable to load map (Check Settings)",
     mapErrorSubtext: "Quota exceeded (50/day) or check if your current URL (e.g., http://localhost:3000) is registered under [Platforms > Web] in the Kakao Developers Console.",
+    realtimeTraffic: "Real-time",
   },
   zh: {
     badge: "推荐路线",
@@ -154,7 +156,7 @@ const COPY = {
     loading: "正在寻找最佳路线...",
     error: "无法加载路线。",
     retry: "重试",
-    refreshHint: "每3分钟自动刷新",
+    refreshHint: "刷新",
     outdoor: "户外",
     indoor: "室内",
     semiOutdoor: "半户外",
@@ -199,15 +201,16 @@ const COPY = {
     mapLoading: "正在加载地图...",
     mapError: "无法加载地图 (需要检查设置)",
     mapErrorSubtext: "每日限额已超(50次)或请检查当前域名(如 http://localhost:3000)是否已在 Kakao 控制台의 [平台 > Web] 中注册。",
+    realtimeTraffic: "实时交通",
   },
   ja: {
     badge: "おすすめコース",
     title: "今日のおすすめコース",
-    description: "リアルタイム의 天기를 반영한 전주 반나절 코스입니다.",
+    description: "リアルタイムの天気を反映した全州半日コースです。",
     loading: "最適なコースを探しています...",
-    error: "コース를 불러오지 못했어요.",
+    error: "コースを読み込めませんでした。",
     retry: "再試行",
-    refreshHint: "3분마다 자동 갱신",
+    refreshHint: "更新",
     outdoor: "屋外",
     indoor: "屋内",
     semiOutdoor: "半屋外",
@@ -216,7 +219,7 @@ const COPY = {
     noMenu: "メニュー情報なし",
     nearby: "近くのおすすめ",
     startAt: "訪問",
-    empty: "現在の天気条件に 맞す 코스를 찾을 수 없어요. 날씨가 좋아지면 다시 추천해 드릴게요.",
+    empty: "現在の天気条件に合うコースが見つかりませんでした。天気が良くなったら再度おすすめします。",
     fallbackNote: "デフォルトコースを表示中（天気データなし）。",
     dislike: "別の場所",
     dislikeHint: "別のおすすめを見る",
@@ -251,7 +254,8 @@ const COPY = {
     mapView: "地図を見る",
     mapLoading: "インタラクティブ地図を読み込み中...",
     mapError: "地図をロードできません (設定確認が必要)",
-    mapErrorSubtext: "1일 제한(50회)을 초과했거나 현재 접속 도메인(예: http://localhost:3000)이 Kakao 개발자 콘솔의 [플랫폼 > Web]에 등록되어 있는지 확인하세요.",
+    mapErrorSubtext: "1日の制限(50回)を超過したか、現在のドメイン(例: http://localhost:3000)がKakao開発者コンソールの[プラットフォーム > Web]に登録されているか確認してください。",
+    realtimeTraffic: "リアルタイム交通",
   },
 } as const
 
@@ -281,6 +285,7 @@ interface CourseRecommendationProps {
   className?: string
   customCourse?: any[] | null
   onThemeChange?: (theme: CourseTheme) => void
+  onCourseReset?: () => void
 }
 
 // Haversine distance calculator on client
@@ -300,7 +305,8 @@ function getRouteInfo(
   lon1: number | null | undefined,
   lat2: number | null | undefined,
   lon2: number | null | undefined,
-  locale: string = "ko"
+  locale: string = "ko",
+  transportMode: "walk" | "drive" | "auto" = "auto"
 ) {
   if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null
   const dist = haversineKm(lat1, lon1, lat2, lon2)
@@ -314,6 +320,20 @@ function getRouteInfo(
       type: "walk" as const
     }
   }
+  
+  // 사용자가 도보로 이동한다고 명시한 경우 항상 도보 시간 표시
+  if (transportMode === "walk") {
+    const walkTime = Math.round(dist * 12) // ~5km/h = 12 min per km
+    return {
+      text: locale === "ko" ? `도보 약 ${walkTime}분 (약 ${Math.round(dist * 1000)}m)`
+            : locale === "en" ? `Walk approx ${walkTime} min (approx ${Math.round(dist * 1000)}m)`
+            : locale === "zh" ? `步行约 ${walkTime} 分钟 (约 ${Math.round(dist * 1000)}米)`
+            : `徒歩約 ${walkTime} 分 (約 ${Math.round(dist * 1000)}m)`,
+      dist,
+      type: "walk" as const
+    }
+  }
+  
   if (dist < 1.0) {
     const walkTime = Math.round(dist * 12) // ~5km/h = 12 min per km
     return {
@@ -430,7 +450,7 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
   )
 }
 
-export function CourseRecommendation({ weatherContext, userProfile, userLat, userLon, className, customCourse, onThemeChange }: CourseRecommendationProps) {
+export function CourseRecommendation({ weatherContext, userProfile, userLat, userLon, className, customCourse, onThemeChange, onCourseReset }: CourseRecommendationProps) {
   const { language } = useLanguage()
   const copy = COPY[language as keyof typeof COPY] ?? COPY.ko
   const [slots, setSlots] = useState<CourseSlotData[]>([])
@@ -441,6 +461,26 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const [selectedTheme, setSelectedTheme] = useState<CourseTheme>("balanced")
   const excludeRef = useRef<string[]>([])
 
+  // Props를 useRef로 안정화하여 불필요한 리렌더링 방지
+  const weatherContextRef = useRef(weatherContext)
+  const userProfileRef = useRef(userProfile)
+  const customCourseRef = useRef(customCourse)
+  const onThemeChangeRef = useRef(onThemeChange)
+  const onCourseResetRef = useRef(onCourseReset)
+  const selectedThemeRef = useRef(selectedTheme)
+  const languageRef = useRef(language)
+  const copyRef = useRef(copy)
+
+  // Ref 업데이트
+  useEffect(() => { weatherContextRef.current = weatherContext }, [weatherContext])
+  useEffect(() => { userProfileRef.current = userProfile }, [userProfile])
+  useEffect(() => { customCourseRef.current = customCourse }, [customCourse])
+  useEffect(() => { onThemeChangeRef.current = onThemeChange }, [onThemeChange])
+  useEffect(() => { onCourseResetRef.current = onCourseReset }, [onCourseReset])
+  useEffect(() => { selectedThemeRef.current = selectedTheme }, [selectedTheme])
+  useEffect(() => { languageRef.current = language }, [language])
+  useEffect(() => { copyRef.current = copy }, [copy])
+
   // Kakao Map SDK integration state
   const [kakaoKey, setKakaoKey] = useState<string | null>(null)
   const [kakaoLoadError, setKakaoLoadError] = useState(false)
@@ -449,11 +489,110 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   // Real-time directions state (SWR progressive updates)
   const [realtimeRoutes, setRealtimeRoutes] = useState<any[]>([])
 
+  // fetchCourse를 useRef로 안정화 (무한 루프 방지)
+  const fetchCourseRef = useRef<((excludeList?: string[], themeOverride?: CourseTheme) => Promise<void>) | null>(null)
+
+  // fetchCourse 정의
+  const fetchCourse = useCallback(async (excludeList?: string[], themeOverride?: CourseTheme) => {
+    const currentCustomCourse = customCourseRef.current
+    const currentWeatherContext = weatherContextRef.current
+    const currentUserProfile = userProfileRef.current
+    const currentLanguage = languageRef.current
+    const currentCopy = copyRef.current
+    const currentSelectedTheme = selectedThemeRef.current
+
+    if (currentCustomCourse) {
+      setLoading(true)
+      setError(null)
+      try {
+        const names = currentCustomCourse.flatMap((slot: any) => slot.places?.map((p: any) => p.name) || [])
+        if (names.length > 0) {
+          const res = await fetch("/api/places/hydrate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ names }),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            const placeMap = new Map<string, any>()
+            if (Array.isArray(data?.places)) {
+              data.places.forEach((p: any) => placeMap.set(p.name, p))
+            }
+            const hydratedSlots = currentCustomCourse.map((slot: any) => ({
+              ...slot,
+              places: (slot.places || []).map((p: any) => {
+                const db = placeMap.get(p.name)
+                return {
+                  ...p,
+                  lat: db?.lat ?? p.lat ?? null,
+                  lon: db?.lon ?? p.lon ?? null,
+                  rating: db?.rating ?? p.rating ?? null,
+                  address: db?.address ?? p.address ?? null,
+                  menuSummary: db?.menuSummary ?? p.menuSummary ?? null,
+                  kakaoUrl: db?.kakaoUrl ?? p.kakaoUrl ?? null,
+                  reviewSummary: db?.reviewSummary ?? p.reviewSummary ?? null,
+                  reviewKeywords: (db?.reviewKeywords?.length ? db.reviewKeywords : null) ?? p.reviewKeywords ?? [],
+                  reviewPicks: (db?.reviewPicks?.length ? db.reviewPicks : null) ?? p.reviewPicks ?? [],
+                }
+              })
+            }))
+            setSlots(hydratedSlots)
+          } else {
+            setSlots(currentCustomCourse)
+          }
+        } else {
+          setSlots(currentCustomCourse)
+        }
+      } catch (err) {
+        console.error("Custom course hydration failed:", err)
+        setSlots(currentCustomCourse)
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    const list = excludeList ?? excludeRef.current
+    const theme = themeOverride ?? currentSelectedTheme
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/weather/recommendations/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          weatherContext: currentWeatherContext, 
+          userProfile: currentUserProfile, 
+          userLat, 
+          userLon, 
+          excludeNames: list, 
+          theme, 
+          language: currentLanguage 
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setSlots(Array.isArray(data) ? data : [])
+    } catch (e) {
+      setError(currentCopy.error)
+      console.error("Course fetch failed:", e)
+    } finally {
+      setLoading(false)
+    }
+  }, [userLat, userLon]) // userLat, userLon은 원시값이므로 안정적
+
+  // fetchCourseRef 업데이트
+  useEffect(() => { fetchCourseRef.current = fetchCourse }, [fetchCourse])
+
   // Theme change handler
   const handleThemeChange = useCallback((theme: CourseTheme) => {
     setSelectedTheme(theme)
-    onThemeChange?.(theme)
-  }, [onThemeChange])
+    onThemeChangeRef.current?.(theme)
+    if (customCourseRef.current) {
+      onCourseResetRef.current?.()
+    }
+    fetchCourseRef.current?.(excludeRef.current, theme)
+  }, []) // 의존성 안정화
 
   // Fetch Kakao Maps JS Key from rate-limited backend DB quota counter
   useEffect(() => {
@@ -516,106 +655,36 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const originLon = userLon ?? 127.1480
   const hasGps = userLat != null && userLon != null
 
-  const fetchCourse = useCallback(async (excludeList?: string[]) => {
-    if (customCourse) {
-      setLoading(true)
-      setError(null)
-      try {
-        // Collect place names from custom course
-        const names = customCourse.flatMap(slot => slot.places?.map((p: any) => p.name) || [])
-        if (names.length > 0) {
-          // Hydrate place coordinates and details from DB
-          const res = await fetch("/api/places/hydrate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ names }),
-          })
-          if (res.ok) {
-            const data = await res.json()
-            const placeMap = new Map<string, any>()
-            if (Array.isArray(data?.places)) {
-              data.places.forEach((p: any) => placeMap.set(p.name, p))
-            }
-
-            // Unify slots with DB verified coordinate metadata
-            const hydratedSlots = customCourse.map((slot: any) => ({
-              ...slot,
-              places: (slot.places || []).map((p: any) => {
-                const db = placeMap.get(p.name)
-                return {
-                  ...p,
-                  lat: db?.lat ?? p.lat ?? null,
-                  lon: db?.lon ?? p.lon ?? null,
-                  rating: db?.rating ?? p.rating ?? null,
-                  address: db?.address ?? p.address ?? null,
-                  menuSummary: db?.menuSummary ?? p.menuSummary ?? null,
-                  kakaoUrl: db?.kakaoUrl ?? p.kakaoUrl ?? null,
-                  reviewSummary: db?.reviewSummary ?? p.reviewSummary ?? null,
-                  reviewKeywords: (db?.reviewKeywords?.length ? db.reviewKeywords : null) ?? p.reviewKeywords ?? [],
-                  reviewPicks: (db?.reviewPicks?.length ? db.reviewPicks : null) ?? p.reviewPicks ?? [],
-                }
-              })
-            }))
-            setSlots(hydratedSlots)
-          } else {
-            setSlots(customCourse)
-          }
-        } else {
-          setSlots(customCourse)
-        }
-      } catch (err) {
-        console.error("Custom course hydration failed:", err)
-        setSlots(customCourse)
-      } finally {
-        setLoading(false)
-      }
-      return
-    }
-
-    const list = excludeList ?? excludeRef.current
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/weather/recommendations/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weatherContext, userProfile, userLat, userLon, excludeNames: list, theme: selectedTheme }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      setSlots(Array.isArray(data) ? data : [])
-    } catch (e) {
-      setError(copy.error)
-      console.error("Course fetch failed:", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [weatherContext, userProfile, userLat, userLon, copy.error, customCourse, selectedTheme])
-
+  // 초기 로딩 시 코스 가져오기 (한 번만 실행)
+  const initialLoadRef = useRef(false)
   useEffect(() => {
-    excludeRef.current = excludedNames
-    fetchCourse(excludedNames)
-    const interval = setInterval(() => {
-      if (!customCourse) fetchCourse()
-    }, 3 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [fetchCourse, customCourse, excludedNames])
+    if (!initialLoadRef.current) {
+      initialLoadRef.current = true
+      fetchCourseRef.current?.(excludedNames)
+    }
+  }, []) // 빈 의존성 배열로 한 번만 실행
+
+  // excludedNames 변경 시 코스 다시 가져오기 (디바운스 처리)
+  const excludedNamesRef = useRef(excludedNames)
+  useEffect(() => {
+    excludedNamesRef.current = excludedNames
+  }, [excludedNames])
 
   const handleDislike = useCallback((slotIndex: number) => {
     if (slotIndex >= slots.length) return
     const slot = slots[slotIndex]
     const namesToExclude = slot?.places?.map((p: any) => p.name) || []
-    const next = [...new Set([...excludedNames, ...namesToExclude])]
+    const next = [...new Set([...excludedNamesRef.current, ...namesToExclude])]
     setExcludedNames(next)
     excludeRef.current = next
-    fetchCourse(next)
-  }, [slots, excludedNames, fetchCourse])
+    fetchCourseRef.current?.(next)
+  }, [slots]) // slots만 의존성으로 유지
 
   const handleResetExclusions = useCallback(() => {
     setExcludedNames([])
     excludeRef.current = []
-    fetchCourse([])
-  }, [fetchCourse])
+    fetchCourseRef.current?.([])
+  }, []) // 의존성 안정화
 
   const typeLabel = useMemo(() => {
     return (t: string) => {
@@ -780,7 +849,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
         </div>
         <button
           type="button"
-          onClick={() => fetchCourse()}
+          onClick={() => fetchCourseRef.current?.()}
           disabled={loading}
           className="inline-flex items-center gap-1.5 rounded-full border border-card-border/70 bg-background/75 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
         >
@@ -831,7 +900,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
             <span className="text-sm font-semibold text-danger">{error}</span>
             <button
               type="button"
-              onClick={() => fetchCourse()}
+              onClick={() => fetchCourseRef.current?.()}
               className="rounded-full border border-danger/20 px-3 py-1 text-xs font-bold text-danger"
             >
               {copy.retry}
@@ -902,7 +971,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                       <span>{transitToThis.text}</span>
                       {transitToThis.source === "kakao" && (
                         <span className="inline-flex items-center rounded bg-sky-blue/10 px-1 py-0.2 text-[8px] font-black text-sky-blue border border-sky-blue/15 scale-[0.9]">
-                          실시간 교통
+                          {copy.realtimeTraffic}
                         </span>
                       )}
                     </div>
@@ -1111,7 +1180,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                   <span>{transitToHome.text}</span>
                   {transitToHome.source === "kakao" && (
                     <span className="inline-flex items-center rounded bg-sky-blue/10 px-1 py-0.2 text-[8px] font-black text-sky-blue border border-sky-blue/15 scale-[0.9]">
-                      실시간 교통
+                      {copy.realtimeTraffic}
                     </span>
                   )}
                 </div>

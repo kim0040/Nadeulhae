@@ -88,6 +88,10 @@ const CHAT_PANEL_COPY = {
     intro: "안녕하세요! 지금 조건에 맞는 전주 나들이 계획을 함께 짜볼게요.",
     copyCode: "복사",
     copiedCode: "복사됨",
+    courseLoading: "코스를 불러오는 중...",
+    courseCompleteTitle: "나들AI 추천 코스 완성!",
+    courseCompleteDesc: "하단에 지도와 상세 타임라인 코스가 로딩되었습니다. 아래에서 확인해 보세요.",
+    courseClickLabel: "클릭하여 확인",
   },
   en: {
     title: "Outing mate",
@@ -118,6 +122,10 @@ const CHAT_PANEL_COPY = {
     intro: "Hello! I can build a Jeonju outing plan around your current conditions.",
     copyCode: "Copy",
     copiedCode: "Copied",
+    courseLoading: "Loading course...",
+    courseCompleteTitle: "Recommended course ready!",
+    courseCompleteDesc: "The detailed timeline course has loaded below. Check it out.",
+    courseClickLabel: "Click to view",
   },
   zh: {
     title: "出行助手",
@@ -147,6 +155,10 @@ const CHAT_PANEL_COPY = {
     intro: "您好！让我根据当前条件为您制定全州出行计划。",
     copyCode: "复制",
     copiedCode: "已复制",
+    courseLoading: "正在加载路线...",
+    courseCompleteTitle: "推荐路线已完成！",
+    courseCompleteDesc: "下方已加载详细时间线路线，请查看。",
+    courseClickLabel: "点击查看",
   },
   ja: {
     title: "お出かけメイト",
@@ -176,6 +188,10 @@ const CHAT_PANEL_COPY = {
     intro: "こんにちは！現在の条件に合わせた全州のお出かけ計画を一緒に立てましょう。",
     copyCode: "コピー",
     copiedCode: "コピー済み",
+    courseLoading: "コースを読み込み中...",
+    courseCompleteTitle: "おすすめコース完成！",
+    courseCompleteDesc: "下に地図とタイムラインが読み込まれました。確認してみてください。",
+    courseClickLabel: "クリックして確認",
   },
 } as const
 
@@ -353,62 +369,75 @@ function tryParsePartialJson(jsonStr: string): any {
 function InteractiveCourseWidget({
   code,
   onCourseGenerated,
+  onCourseClick,
+  language,
 }: {
   code: string
   onCourseGenerated?: (course: any) => void
+  onCourseClick?: () => void
   isPending?: boolean
+  language?: string
 }) {
   const [course, setCourse] = useState<any>(null)
-  const [error, setError] = useState(false)
   const lastGeneratedRef = useRef<string>("")
+  const [isLoading, setIsLoading] = useState(true)
+  const copy = (((CHAT_PANEL_COPY as any)[language ?? "ko"] ?? CHAT_PANEL_COPY.ko) ?? CHAT_PANEL_COPY.ko)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const parsed = tryParsePartialJson(code)
-      if (parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0) {
+    const parsed = tryParsePartialJson(code)
+    if (parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0) {
+      const courseStr = JSON.stringify(parsed.slots)
+      if (lastGeneratedRef.current !== courseStr) {
+        lastGeneratedRef.current = courseStr
         setCourse(parsed)
-        setError(false)
-        
-        const courseStr = JSON.stringify(parsed.slots)
-        if (lastGeneratedRef.current !== courseStr) {
-          lastGeneratedRef.current = courseStr
-          onCourseGenerated?.(parsed.slots)
-        }
-      } else {
-        setError(true)
+        setIsLoading(false)
+        onCourseGenerated?.(parsed.slots)
       }
-    }, 0)
-    return () => clearTimeout(timer)
+    }
   }, [code, onCourseGenerated])
 
-  if (error && !course) {
+  if (isLoading && !course) {
     return (
-      <div className="my-2 rounded-2xl border border-sky-blue/20 bg-sky-blue/5 p-4 text-center backdrop-blur-sm animate-pulse">
-        <div className="flex items-center justify-center gap-2 text-sky-blue">
+      <div className="my-2 rounded-2xl border border-nature-green/20 bg-nature-green/5 p-4 text-center backdrop-blur-sm">
+        <div className="flex items-center justify-center gap-2 text-nature-green">
           <LoaderCircle className="size-4 animate-spin" />
-          <span className="text-xs font-black">🗺️ 실시간 나들이 코스를 구성하는 중...</span>
+          <span className="text-xs font-black">{copy.courseLoading}</span>
         </div>
       </div>
     )
   }
 
+  const handleScrollToCourse = () => {
+    onCourseClick?.()
+    setTimeout(() => {
+      const courseElement = document.getElementById('course-recommendation-section')
+      if (courseElement) {
+        courseElement.scrollIntoView({ behavior: 'smooth' })
+      }
+    }, 100)
+  }
+
   return (
-    <div className="my-2 rounded-[1.3rem] border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-md shadow-emerald-500/5 backdrop-blur-md flex items-center justify-between gap-4 animate-in fade-in duration-300">
+    <button
+      type="button"
+      onClick={handleScrollToCourse}
+      className="my-2 w-full rounded-[1.3rem] border border-nature-green/20 bg-nature-green/5 p-4 shadow-md shadow-nature-green/5 backdrop-blur-md flex items-center justify-between gap-4 animate-in fade-in duration-300 hover:border-nature-green/40 hover:bg-nature-green/10 transition-all cursor-pointer"
+    >
       <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 text-white shadow-md shadow-emerald-500/20 animate-bounce" style={{ animationDuration: "2.5s" }}>
+        <div className="rounded-xl bg-gradient-to-br from-nature-green to-active-blue p-2.5 text-white shadow-md shadow-nature-green/20 animate-bounce" style={{ animationDuration: "2.5s" }}>
           <Sparkles className="size-4" />
         </div>
-        <div>
-          <h4 className="text-xs font-black tracking-wider text-emerald-400 uppercase">나들AI 추천 코스 완성!</h4>
+        <div className="text-left">
+          <h4 className="text-xs font-black tracking-wider text-nature-green uppercase">{copy.courseCompleteTitle}</h4>
           <p className="mt-0.5 text-[11px] text-muted-foreground font-semibold leading-5 break-words">
-            하단에 지도와 상세 타임라인 코스가 로딩되었습니다. 아래에서 확인해 보세요.
+            {copy.courseCompleteDesc}
           </p>
         </div>
       </div>
-      <span className="text-[9.5px] font-black text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/15 uppercase tracking-wider shrink-0">
-        연동 완료
+      <span className="text-[9.5px] font-black text-nature-green px-2 py-0.5 rounded-full bg-nature-green/10 border border-nature-green/15 uppercase tracking-wider shrink-0">
+        {copy.courseClickLabel}
       </span>
-    </div>
+    </button>
   )
 }
 
@@ -437,12 +466,14 @@ type MessageGroup = {
   isLastAssistant,
   groupPosition,
   onCourseGenerated,
+  onCourseClick,
 }: {
   message: UiChatMessage
   language: string
   isLastAssistant: boolean
   groupPosition: "first" | "middle" | "last" | "only"
   onCourseGenerated?: (course: any) => void
+  onCourseClick?: () => void
 }) {
   const isUser = message.role === "user"
   const showAvatar = !isUser && (groupPosition === "first" || groupPosition === "only")
@@ -476,7 +507,7 @@ type MessageGroup = {
       const lang = /language-([A-Za-z0-9_+#.-]+)/.exec(className ?? "")?.[1] ?? null
       const isBlock = Boolean(lang) || codeText.includes("\n")
       if (lang?.toLowerCase() === "course") {
-        return <InteractiveCourseWidget code={codeText} onCourseGenerated={onCourseGenerated} isPending={message.pending} />
+        return <InteractiveCourseWidget code={codeText} onCourseGenerated={onCourseGenerated} onCourseClick={onCourseClick} isPending={message.pending} language={language} />
       }
       if (lang?.toLowerCase() === "mermaid") {
         return <MermaidDiagram code={codeText} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} />
@@ -500,7 +531,7 @@ type MessageGroup = {
         </code>
       )
     },
-  }), [copy.copyCode, copy.copiedCode, onCourseGenerated, message.pending])
+    }), [copy.copyCode, copy.copiedCode, onCourseGenerated, onCourseClick, message.pending])
 
   const roundedClass = isUser
     ? groupPosition === "only"
@@ -573,10 +604,12 @@ export function DashboardChatPanel({
   user,
   weatherContext,
   onCourseGenerated,
+  onCourseClick,
 }: {
   user: AuthUser
   weatherContext: ChatWeatherContext | null
   onCourseGenerated?: (course: any) => void
+  onCourseClick?: () => void
 }) {
   const { language } = useLanguage()
   const copy = (((CHAT_PANEL_COPY as any)[language] ?? CHAT_PANEL_COPY.ko) ?? CHAT_PANEL_COPY.ko)
@@ -1030,6 +1063,7 @@ export function DashboardChatPanel({
                         isLastAssistant={message.role === "assistant" && messages.indexOf(message) === lastAssistantIndex}
                         groupPosition={groupPosition}
                         onCourseGenerated={onCourseGenerated}
+                        onCourseClick={onCourseClick}
                       />
                     )
                   })}

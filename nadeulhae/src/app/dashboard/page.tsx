@@ -45,6 +45,8 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [customCourse, setCustomCourse] = useState<any[] | null>(null)
+  const [showCourseRecommendation, setShowCourseRecommendation] = useState(false)
+  const [selectedTheme, setSelectedTheme] = useState<string>("balanced")
 
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
   const particleQuantity = useMemo(() => getParticleCount(30), [])
@@ -110,6 +112,11 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
       }, 150)
       return () => clearTimeout(timer)
     }
+  }, [customCourse])
+
+  // customCourse가 변경될 때 showCourseRecommendation 초기화
+  useEffect(() => {
+    setShowCourseRecommendation(false)
   }, [customCourse])
 
 
@@ -242,13 +249,14 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
               user={user} 
               weatherContext={chatWeatherContext} 
               onCourseGenerated={setCustomCourse}
+              onCourseClick={() => setShowCourseRecommendation(true)}
             />
           </SectionCard>
         </div>
 
         {/* Dynamic bottom section that spans full width, revealed only when recommended course is generated */}
-        {customCourse && (
-          <div className="mt-6 w-full animate-in fade-in slide-in-from-bottom-5 duration-500">
+        {customCourse && showCourseRecommendation && (
+          <div id="course-recommendation-section" className="mt-6 w-full animate-in fade-in slide-in-from-bottom-5 duration-500">
             <CourseRecommendation
               weatherContext={chatWeatherContext}
               userProfile={{
@@ -261,6 +269,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
               userLat={weatherData?.metadata?.locationContext?.coordinates?.lat ?? null}
               userLon={weatherData?.metadata?.locationContext?.coordinates?.lon ?? null}
               customCourse={customCourse}
+              onCourseReset={() => setCustomCourse(null)}
             />
           </div>
         )}

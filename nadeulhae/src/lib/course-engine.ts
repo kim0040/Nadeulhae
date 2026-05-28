@@ -9,11 +9,12 @@ import { queryRows } from "@/lib/db"
 import type { RowDataPacket } from "mysql2"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { CourseSlot, PlaceSlotItem, UserProfile, CourseTheme } from "@/lib/course-types"
-import { COURSE_THEME_CONFIG, INTEREST_LABEL_KO } from "@/lib/course-types"
+import { COURSE_THEME_CONFIG, INTEREST_LABEL_KO, COURSE_ENGINE_COPY } from "@/lib/course-types"
+import type { CourseEngineLanguage } from "@/lib/course-types"
 
 // Re-export types for backward compatibility
-export type { CourseSlot, PlaceSlotItem, UserProfile, CourseTheme }
-export { COURSE_THEME_CONFIG, INTEREST_LABEL_KO }
+export type { CourseSlot, PlaceSlotItem, UserProfile, CourseTheme, CourseEngineLanguage }
+export { COURSE_THEME_CONFIG, INTEREST_LABEL_KO, COURSE_ENGINE_COPY }
 
 // ---------------------------------------------------------------------------
 // Types (server-only)
@@ -48,6 +49,7 @@ export interface CourseRequest {
   userLon?: number | null
   excludeNames?: string[]
   theme?: CourseTheme
+  language?: CourseEngineLanguage
 }
 
 interface ScoredPlace {
@@ -92,13 +94,14 @@ function distanceBonus(lat: number | null, lon: number | null, uLat: number, uLo
   return 0
 }
 
-function getDistanceNote(lat: number | null, lon: number | null, uLat: number | null, uLon: number | null): string {
+function getDistanceNote(lat: number | null, lon: number | null, uLat: number | null, uLon: number | null, lang: CourseEngineLanguage = "ko"): string {
   if (uLat == null || uLon == null || lat == null || lon == null) return ""
   const d = haversineKm(uLat, uLon, lat, lon)
-  if (d <= 0.5) return " (현재 위치에서 도보 5분 거리)"
-  if (d <= 1) return " (현재 위치에서 약 1km)"
-  if (d <= 3) return ` (약 ${Math.round(d)}km 거리)`
-  if (d <= 5) return ` (약 ${Math.round(d)}km 거리)`
+  const copy = COURSE_ENGINE_COPY[lang].distanceNote
+  if (d <= 0.5) return copy.walking5min
+  if (d <= 1) return copy.about1km
+  if (d <= 3) return copy.aboutKm(Math.round(d))
+  if (d <= 5) return copy.aboutKm(Math.round(d))
   return ""
 }
 
@@ -231,17 +234,14 @@ function getSensitivity(profile: UserProfile | null) {
   }
 }
 
-function categoryLabel(cat: string): string {
-  const m: Record<string, string> = {
-    nature: "자연 명소", attraction: "관광 명소", cafe: "카페", bakery: "베이커리",
-    restaurant: "맛집", pub: "펍", culture: "문화 공간", shopping: "쇼핑 장소",
-    sports: "스포츠 시설", festival: "축제·행사",
-  }
-  return m[cat] ?? "추천 장소"
+function categoryLabel(cat: string, lang: CourseEngineLanguage = "ko"): string {
+  const copy = COURSE_ENGINE_COPY[lang].categoryLabel
+  return copy[cat as keyof typeof copy] ?? COURSE_ENGINE_COPY[lang].defaultCategory
 }
 
-function timeSlotLabel(profile: UserProfile | null, idx: number): string {
+function timeSlotLabel(profile: UserProfile | null, idx: number, lang: CourseEngineLanguage = "ko"): string {
   const ts = profile?.preferredTimeSlot
+  const time = COURSE_ENGINE_COPY[lang].timeSlot
   if (!ts || ts === "all_day" || ts === "afternoon") {
     return idx === 1 ? "13:00 - 15:30" : idx === 2 ? "16:00 - 18:00" : "18:00 - 20:00"
   }
@@ -436,42 +436,43 @@ function hiddenGemScore(r: PlaceRow): number {
  * 현재 시간 기반으로 동적 시간대를 생성합니다.
  * 고정된 시간대 대신 현재 시간부터 시작하는 자연스러운 코스를 구성합니다.
  */
-function getDynamicTimeSlots(currentHour: number): Array<{ time: string; label: string; targetHour: number }> {
+function getDynamicTimeSlots(currentHour: number, lang: CourseEngineLanguage = "ko"): Array<{ time: string; label: string; targetHour: number }> {
+  const t = COURSE_ENGINE_COPY[lang].timeSlot
   if (currentHour < 10) {
     return [
-      { time: `${String(currentHour).padStart(2, '0')}:00 - 12:00`, label: "아침 나들이", targetHour: currentHour + 1 },
-      { time: "12:00 - 14:00", label: "점심 맛집", targetHour: 12 },
-      { time: "14:00 - 16:00", label: "카페 타임", targetHour: 14 },
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 12:00`, label: t.morningOuting, targetHour: currentHour + 1 },
+      { time: "12:00 - 14:00", label: t.lunchTime, targetHour: 12 },
+      { time: "14:00 - 16:00", label: t.cafeTime, targetHour: 14 },
     ]
   } else if (currentHour < 12) {
     return [
-      { time: `${String(currentHour).padStart(2, '0')}:00 - 13:00`, label: "오전 나들이", targetHour: currentHour + 1 },
-      { time: "13:00 - 15:00", label: "점심 시간", targetHour: 13 },
-      { time: "15:00 - 17:00", label: "오후 산책", targetHour: 15 },
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 13:00`, label: t.morningWalk, targetHour: currentHour + 1 },
+      { time: "13:00 - 15:00", label: t.lunch, targetHour: 13 },
+      { time: "15:00 - 17:00", label: t.afternoonWalk, targetHour: 15 },
     ]
   } else if (currentHour < 14) {
     return [
-      { time: `${String(currentHour).padStart(2, '0')}:00 - 15:30`, label: "점심 시간", targetHour: currentHour },
-      { time: "15:30 - 17:30", label: "산책/문화", targetHour: 15 },
-      { time: "17:30 - 19:30", label: "저녁 준비", targetHour: 17 },
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 15:30`, label: t.lunch, targetHour: currentHour },
+      { time: "15:30 - 17:30", label: t.afternoonWalk, targetHour: 15 },
+      { time: "17:30 - 19:30", label: t.dinnerPrep, targetHour: 17 },
     ]
   } else if (currentHour < 16) {
     return [
-      { time: `${String(currentHour).padStart(2, '0')}:00 - 17:00`, label: "오후 시간", targetHour: currentHour },
-      { time: "17:00 - 19:00", label: "저녁 맛집", targetHour: 17 },
-      { time: "19:00 - 21:00", label: "야경/카페", targetHour: 19 },
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 17:00`, label: t.afternoon, targetHour: currentHour },
+      { time: "17:00 - 19:00", label: t.dinner, targetHour: 17 },
+      { time: "19:00 - 21:00", label: t.evening, targetHour: 19 },
     ]
   } else if (currentHour < 18) {
     return [
-      { time: `${String(currentHour).padStart(2, '0')}:00 - 19:00`, label: "늦은 오후", targetHour: currentHour },
-      { time: "19:00 - 21:00", label: "저녁 시간", targetHour: 19 },
-      { time: "21:00 - 23:00", label: "야간 산책", targetHour: 21 },
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 19:00`, label: t.lateAfternoon, targetHour: currentHour },
+      { time: "19:00 - 21:00", label: t.dinner, targetHour: 19 },
+      { time: "21:00 - 23:00", label: t.eveningWalk, targetHour: 21 },
     ]
   } else {
     return [
-      { time: `${String(currentHour).padStart(2, '0')}:00 - 20:00`, label: "저녁 시간", targetHour: currentHour },
-      { time: "20:00 - 22:00", label: "야경 즐기기", targetHour: 20 },
-      { time: "22:00 - 23:59", label: "마무리", targetHour: 22 },
+      { time: `${String(currentHour).padStart(2, '0')}:00 - 20:00`, label: t.dinner, targetHour: currentHour },
+      { time: "20:00 - 22:00", label: t.evening, targetHour: 20 },
+      { time: "22:00 - 23:59", label: t.finish, targetHour: 22 },
     ]
   }
 }
@@ -576,11 +577,12 @@ function toSlotItem(p: ScoredPlace, profile: UserProfile | null): PlaceSlotItem 
   }
 }
 
-function getReviewNote(reviewSummary: string | null): string {
+function getReviewNote(reviewSummary: string | null, lang: CourseEngineLanguage = "ko"): string {
   if (!reviewSummary || reviewSummary.length < 10) return ""
   // Trim to 60 chars max for description injection
   const trimmed = reviewSummary.length > 60 ? reviewSummary.slice(0, 57) + "..." : reviewSummary
-  return `\n→ 리뷰: "${trimmed}"`
+  const copy = COURSE_ENGINE_COPY[lang]
+  return `\n${copy.reviewPrefix}${trimmed}${copy.reviewSuffix}`
 }
 
 // ---------------------------------------------------------------------------
@@ -594,6 +596,7 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
   const uLon = request.userLon ?? null
   const exclude = request.excludeNames ?? []
   const theme = request.theme ?? "balanced"
+  const lang = request.language ?? "ko"
   const sens = getSensitivity(profile)
 
   const isRaining = wx?.rainingNow ?? false
@@ -618,7 +621,7 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
   else currentSeason = "winter"
 
   // 동적 시간대 계산
-  const dynamicTimeSlots = getDynamicTimeSlots(kstHour)
+  const dynamicTimeSlots = getDynamicTimeSlots(kstHour, lang)
 
   // 테마 설정 가져오기
   const themeConfig = COURSE_THEME_CONFIG[theme]
@@ -665,26 +668,28 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
       const placeType = m.place_type as "야외" | "실내" | "반실외"
       
       // 날씨/시간 기반 설명 생성
+      const wx = COURSE_ENGINE_COPY[lang].weatherNote
       let weatherNote = ""
       if (i === 0) {
-        weatherNote = isHot ? "더위를 피해 그늘에서 즐기기 좋은"
-          : isWindy ? "바람이 다소 있지만 즐길 수 있는"
-          : isRaining ? "비 오는 날 분위기 좋은"
-          : "방문하기 좋은"
+        weatherNote = isHot ? wx.hot
+          : isWindy ? wx.windy
+          : isRaining ? wx.rainy
+          : wx.good
       } else if (i === 1) {
-        weatherNote = isRaining ? "비 오는 날 실내에서 즐기기 좋은"
-          : isCold ? "따뜻하게 머물기 좋은"
-          : isHot ? "시원하게 쉬기 좋은"
-          : "여유롭게 즐기기 좋은"
+        weatherNote = isRaining ? wx.rainyIndoor
+          : isCold ? wx.cold
+          : isHot ? wx.cool
+          : wx.leisurely
       } else {
-        weatherNote = isRaining ? "비 오는 저녁 따뜻한"
-          : "하루 마무리로 즐기기 좋은"
+        weatherNote = isRaining ? wx.rainyEvening
+          : wx.closing
       }
 
+      const copy = COURSE_ENGINE_COPY[lang]
       slots.push({
-        time: timeSlot?.time ?? timeSlotLabel(profile, i + 1),
+        time: timeSlot?.time ?? timeSlotLabel(profile, i + 1, lang),
         title: m.name,
-        description: `${weatherNote} ${categoryLabel(m.category)}입니다.${m.menu_summary ? ` 대표 메뉴: ${m.menu_summary}` : ""}${top[1] ? ` 근처 ${top[1].name}도 추천해요.` : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon)}${getReviewNote(m.review_summary)}${m.interestBonus > 4 ? `\n→ ${INTEREST_LABEL_KO[m.interestTag ?? ""] ?? ""} 관심사에 딱 맞는 곳이에요.` : ""}`,
+        description: `${weatherNote} ${categoryLabel(m.category, lang)}입니다.${m.menu_summary ? `${copy.menuPrefix}${m.menu_summary}` : ""}${top[1] ? copy.nearbyRecommend(top[1].name) : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon, lang)}${getReviewNote(m.review_summary, lang)}${m.interestBonus > 4 ? copy.interestMatch(INTEREST_LABEL_KO[m.interestTag ?? ""] ?? "") : ""}`,
         type: placeType,
         places: top.map(p => toSlotItem(p, profile)),
       })
@@ -704,10 +709,12 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
     const top = selectDiverseTop(scored, 2, 0.3)
     if (top.length > 0) {
       const m = top[0]
+      const copy = COURSE_ENGINE_COPY[lang]
+      const wx = copy.weatherNote
       slots.push({
-        time: timeSlotLabel(profile, 1),
+        time: timeSlotLabel(profile, 1, lang),
         title: m.name,
-        description: `방문하기 좋은 ${categoryLabel(m.category)}입니다.${top[1] ? ` 근처 ${top[1].name}도 함께 둘러보세요.` : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon)}${getReviewNote(m.review_summary)}`,
+        description: `${wx.good} ${categoryLabel(m.category, lang)}입니다.${top[1] ? copy.nearbyVisit(top[1].name) : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon, lang)}${getReviewNote(m.review_summary, lang)}`,
         type: "야외",
         places: top.map(p => toSlotItem(p, profile)),
       })
