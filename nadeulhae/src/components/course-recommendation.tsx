@@ -43,6 +43,7 @@ export interface CourseSlotData {
 const COPY = {
   ko: {
     badge: "나들 추천 코스",
+    beta: "BETA",
     title: "오늘의 추천 코스",
     description: "실시간 날씨를 반영한 전주 반나절 코스입니다.",
     loading: "날씨에 맞는 코스를 찾는 중...",
@@ -97,6 +98,7 @@ const COPY = {
   },
   en: {
     badge: "Recommended Course",
+    beta: "BETA",
     title: "Today's Course",
     description: "A half-day Jeonju itinerary based on real-time weather.",
     loading: "Finding the best course for today...",
@@ -151,6 +153,7 @@ const COPY = {
   },
   zh: {
     badge: "推荐路线",
+    beta: "BETA",
     title: "今日推荐路线",
     description: "基于实时天气的全州半日行程。",
     loading: "正在寻找最佳路线...",
@@ -205,6 +208,7 @@ const COPY = {
   },
   ja: {
     badge: "おすすめコース",
+    beta: "BETA",
     title: "今日のおすすめコース",
     description: "リアルタイムの天気を反映した全州半日コースです。",
     loading: "最適なコースを探しています...",
@@ -452,60 +456,35 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
 
 export function CourseRecommendation({ weatherContext, userProfile, userLat, userLon, className, customCourse, onThemeChange, onCourseReset }: CourseRecommendationProps) {
   const { language } = useLanguage()
-  const copy = COPY[language as keyof typeof COPY] ?? COPY.ko
+  const copy = useMemo(() => COPY[language as keyof typeof COPY] ?? COPY.ko, [language])
   const [slots, setSlots] = useState<CourseSlotData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedSlot, setExpandedSlot] = useState<number | null>(0)
   const [excludedNames, setExcludedNames] = useState<string[]>([])
   const [selectedTheme, setSelectedTheme] = useState<CourseTheme>("balanced")
-  const excludeRef = useRef<string[]>([])
-
-  // Props를 useRef로 안정화하여 불필요한 리렌더링 방지
-  const weatherContextRef = useRef(weatherContext)
-  const userProfileRef = useRef(userProfile)
-  const customCourseRef = useRef(customCourse)
-  const onThemeChangeRef = useRef(onThemeChange)
-  const onCourseResetRef = useRef(onCourseReset)
-  const selectedThemeRef = useRef(selectedTheme)
-  const languageRef = useRef(language)
-  const copyRef = useRef(copy)
-
-  // Ref 업데이트
-  useEffect(() => { weatherContextRef.current = weatherContext }, [weatherContext])
-  useEffect(() => { userProfileRef.current = userProfile }, [userProfile])
-  useEffect(() => { customCourseRef.current = customCourse }, [customCourse])
-  useEffect(() => { onThemeChangeRef.current = onThemeChange }, [onThemeChange])
-  useEffect(() => { onCourseResetRef.current = onCourseReset }, [onCourseReset])
-  useEffect(() => { selectedThemeRef.current = selectedTheme }, [selectedTheme])
-  useEffect(() => { languageRef.current = language }, [language])
-  useEffect(() => { copyRef.current = copy }, [copy])
+  
+  // Props를 useRef로 안정화
+  const propsRef = useRef({ weatherContext, userProfile, customCourse, onThemeChange, onCourseReset })
+  useEffect(() => { propsRef.current = { weatherContext, userProfile, customCourse, onThemeChange, onCourseReset } })
 
   // Kakao Map SDK integration state
   const [kakaoKey, setKakaoKey] = useState<string | null>(null)
   const [kakaoLoadError, setKakaoLoadError] = useState(false)
   const kakaoKeyLoaded = kakaoKey != null
 
-  // Real-time directions state (SWR progressive updates)
+  // Real-time directions state
   const [realtimeRoutes, setRealtimeRoutes] = useState<any[]>([])
 
-  // fetchCourse를 useRef로 안정화 (무한 루프 방지)
-  const fetchCourseRef = useRef<((excludeList?: string[], themeOverride?: CourseTheme) => Promise<void>) | null>(null)
-
-  // fetchCourse 정의
+  // fetchCourse 함수 (안정적인 참조)
   const fetchCourse = useCallback(async (excludeList?: string[], themeOverride?: CourseTheme) => {
-    const currentCustomCourse = customCourseRef.current
-    const currentWeatherContext = weatherContextRef.current
-    const currentUserProfile = userProfileRef.current
-    const currentLanguage = languageRef.current
-    const currentCopy = copyRef.current
-    const currentSelectedTheme = selectedThemeRef.current
-
-    if (currentCustomCourse) {
+    const { weatherContext: wx, userProfile: profile, customCourse: cc } = propsRef.current
+    
+    if (cc) {
       setLoading(true)
       setError(null)
       try {
-        const names = currentCustomCourse.flatMap((slot: any) => slot.places?.map((p: any) => p.name) || [])
+        const names = cc.flatMap((slot: any) => slot.places?.map((p: any) => p.name) || [])
         if (names.length > 0) {
           const res = await fetch("/api/places/hydrate", {
             method: "POST",
@@ -518,7 +497,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
             if (Array.isArray(data?.places)) {
               data.places.forEach((p: any) => placeMap.set(p.name, p))
             }
-            const hydratedSlots = currentCustomCourse.map((slot: any) => ({
+            const hydratedSlots = cc.map((slot: any) => ({
               ...slot,
               places: (slot.places || []).map((p: any) => {
                 const db = placeMap.get(p.name)
@@ -538,22 +517,22 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
             }))
             setSlots(hydratedSlots)
           } else {
-            setSlots(currentCustomCourse)
+            setSlots(cc)
           }
         } else {
-          setSlots(currentCustomCourse)
+          setSlots(cc)
         }
       } catch (err) {
         console.error("Custom course hydration failed:", err)
-        setSlots(currentCustomCourse)
+        setSlots(cc)
       } finally {
         setLoading(false)
       }
       return
     }
 
-    const list = excludeList ?? excludeRef.current
-    const theme = themeOverride ?? currentSelectedTheme
+    const list = excludeList ?? []
+    const theme = themeOverride ?? selectedTheme
     setLoading(true)
     setError(null)
     try {
@@ -561,40 +540,37 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          weatherContext: currentWeatherContext, 
-          userProfile: currentUserProfile, 
+          weatherContext: wx, 
+          userProfile: profile, 
           userLat, 
           userLon, 
           excludeNames: list, 
           theme, 
-          language: currentLanguage 
+          language 
         }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setSlots(Array.isArray(data) ? data : [])
     } catch (e) {
-      setError(currentCopy.error)
+      setError(copy.error)
       console.error("Course fetch failed:", e)
     } finally {
       setLoading(false)
     }
-  }, [userLat, userLon]) // userLat, userLon은 원시값이므로 안정적
-
-  // fetchCourseRef 업데이트
-  useEffect(() => { fetchCourseRef.current = fetchCourse }, [fetchCourse])
+  }, [userLat, userLon, language, selectedTheme, copy.error])
 
   // Theme change handler
   const handleThemeChange = useCallback((theme: CourseTheme) => {
     setSelectedTheme(theme)
-    onThemeChangeRef.current?.(theme)
-    if (customCourseRef.current) {
-      onCourseResetRef.current?.()
+    propsRef.current.onThemeChange?.(theme)
+    if (propsRef.current.customCourse) {
+      propsRef.current.onCourseReset?.()
     }
-    fetchCourseRef.current?.(excludeRef.current, theme)
-  }, []) // 의존성 안정화
+    fetchCourse([], theme)
+  }, [fetchCourse])
 
-  // Fetch Kakao Maps JS Key from rate-limited backend DB quota counter
+  // Fetch Kakao Maps JS Key
   useEffect(() => {
     if (cachedKakaoKey) {
       setKakaoKey(cachedKakaoKey)
@@ -624,7 +600,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       })
   }, [])
 
-  // Inject script dynamically to avoid polluting standard header
+  // Inject Kakao Maps SDK script
   useEffect(() => {
     if (!kakaoKey) return
     if (window.kakao && window.kakao.maps) return
@@ -650,41 +626,29 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     document.head.appendChild(script)
   }, [kakaoKey])
 
-  // Resolve starting coordinates (fallback to Jeonju center if no GPS)
+  // Resolve starting coordinates
   const originLat = userLat ?? 35.8242
   const originLon = userLon ?? 127.1480
   const hasGps = userLat != null && userLon != null
 
-  // 초기 로딩 시 코스 가져오기 (한 번만 실행)
-  const initialLoadRef = useRef(false)
+  // 초기 로딩 (한 번만 실행)
   useEffect(() => {
-    if (!initialLoadRef.current) {
-      initialLoadRef.current = true
-      fetchCourseRef.current?.(excludedNames)
-    }
-  }, []) // 빈 의존성 배열로 한 번만 실행
-
-  // excludedNames 변경 시 코스 다시 가져오기 (디바운스 처리)
-  const excludedNamesRef = useRef(excludedNames)
-  useEffect(() => {
-    excludedNamesRef.current = excludedNames
-  }, [excludedNames])
+    fetchCourse()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDislike = useCallback((slotIndex: number) => {
     if (slotIndex >= slots.length) return
     const slot = slots[slotIndex]
     const namesToExclude = slot?.places?.map((p: any) => p.name) || []
-    const next = [...new Set([...excludedNamesRef.current, ...namesToExclude])]
+    const next = [...new Set([...excludedNames, ...namesToExclude])]
     setExcludedNames(next)
-    excludeRef.current = next
-    fetchCourseRef.current?.(next)
-  }, [slots]) // slots만 의존성으로 유지
+    fetchCourse(next)
+  }, [slots, excludedNames, fetchCourse])
 
   const handleResetExclusions = useCallback(() => {
     setExcludedNames([])
-    excludeRef.current = []
-    fetchCourseRef.current?.([])
-  }, []) // 의존성 안정화
+    fetchCourse([])
+  }, [fetchCourse])
 
   const typeLabel = useMemo(() => {
     return (t: string) => {
@@ -812,7 +776,10 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
               <Sparkles className="size-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black uppercase tracking-[0.24em] text-foreground">{copy.badge}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black uppercase tracking-[0.24em] text-foreground">{copy.badge}</h3>
+                <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-600 border border-amber-500/20">{copy.beta}</span>
+              </div>
               <p className="text-xs text-muted-foreground">{copy.description}</p>
             </div>
           </div>
@@ -836,6 +803,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-black uppercase tracking-[0.24em] text-foreground">{copy.badge}</h3>
+              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-600 border border-amber-500/20">{copy.beta}</span>
               {customCourse && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-sky-blue/20 to-active-blue/20 px-2.5 py-0.5 text-[9px] font-black text-sky-blue border border-sky-blue/20 animate-pulse">
                   AI 맞춤형
@@ -849,7 +817,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
         </div>
         <button
           type="button"
-          onClick={() => fetchCourseRef.current?.()}
+          onClick={() => fetchCourse()}
           disabled={loading}
           className="inline-flex items-center gap-1.5 rounded-full border border-card-border/70 bg-background/75 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
         >
@@ -900,7 +868,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
             <span className="text-sm font-semibold text-danger">{error}</span>
             <button
               type="button"
-              onClick={() => fetchCourseRef.current?.()}
+              onClick={() => fetchCourse()}
               className="rounded-full border border-danger/20 px-3 py-1 text-xs font-bold text-danger"
             >
               {copy.retry}

@@ -1570,9 +1570,6 @@ export function LabAiChatPanel() {
                           <span className="min-w-0">
                             <span className="flex items-center gap-1.5 truncate text-sm font-semibold">
                               {model.label}
-                              {model.quantization ? (
-                                <span className="shrink-0 rounded bg-muted px-1 py-px text-[10px] font-medium leading-snug text-muted-foreground">{model.quantization}</span>
-                              ) : null}
                               {hasReasoning ? (
                                 <span className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium leading-snug text-accent dark:bg-accent/15">{copy.thinking}</span>
                               ) : null}
