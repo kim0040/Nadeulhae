@@ -532,7 +532,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     }
 
     const list = excludeList ?? []
-    const theme = themeOverride ?? selectedTheme
+    const theme = themeOverride ?? "balanced" // 기본값 사용, selectedTheme은 의존성에서 제거
     setLoading(true)
     setError(null)
     try {
@@ -558,7 +558,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     } finally {
       setLoading(false)
     }
-  }, [userLat, userLon, language, selectedTheme, copy.error])
+  }, [userLat, userLon, language, copy.error])
 
   // Theme change handler
   const handleThemeChange = useCallback((theme: CourseTheme) => {
