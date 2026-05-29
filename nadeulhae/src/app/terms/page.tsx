@@ -15,6 +15,7 @@ import { MagicCard } from "@/components/magicui/magic-card"
 import { Meteors } from "@/components/magicui/meteors"
 import { Particles } from "@/components/magicui/particles"
 import { useLanguage } from "@/context/LanguageContext"
+import { getCopy } from "@/lib/utils"
 
 type PolicySection = {
   id: string
@@ -467,8 +468,7 @@ const POLICY_CONTENT: Record<
 export default function TermsPage() {
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = (POLICY_CONTENT as any)[language] ?? POLICY_CONTENT.en
-  const typedCopy = copy as typeof POLICY_CONTENT.en
+  const copy = getCopy(POLICY_CONTENT, language) as typeof POLICY_CONTENT.en
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-20 pt-24 sm:px-6 sm:pt-28 lg:px-8">
@@ -494,19 +494,19 @@ export default function TermsPage() {
             <div className="relative z-10 space-y-5">
               <span className="inline-flex items-center gap-2 rounded-full border border-active-blue/20 bg-active-blue/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.3em] text-active-blue">
                 <FileCheck2 className="size-3.5" />
-                {typedCopy.badge}
+                {copy.badge}
               </span>
               <div className="space-y-3">
                 <AnimatedGradientText className="text-3xl font-black tracking-tight sm:text-4xl">
-                  {typedCopy.title}
+                  {copy.title}
                 </AnimatedGradientText>
                 <p className="max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base break-words">
-                  {typedCopy.description}
+                  {copy.description}
                 </p>
               </div>
               <div className="grid gap-3">
                 <div className="rounded-[1.5rem] border border-card-border/70 bg-background/70 px-5 py-4 text-sm font-semibold text-foreground">
-                  {typedCopy.effectiveDate}
+                  {copy.effectiveDate}
                 </div>
               </div>
             </div>
@@ -518,14 +518,14 @@ export default function TermsPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
-                  {typedCopy.contentsTitle}
+                  {copy.contentsTitle}
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground">
-                  {typedCopy.summaryTitle}
+                  {copy.summaryTitle}
                 </h2>
               </div>
               <div className="flex flex-wrap gap-2">
-                {typedCopy.sections.map((section) => (
+                {copy.sections.map((section) => (
                   <a
                     key={section.id}
                     href={`#${section.id}`}
@@ -540,7 +540,7 @@ export default function TermsPage() {
         </MagicCard>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {typedCopy.summary.map((item) => (
+          {copy.summary.map((item) => (
             <MagicCard
               key={item.label}
               className="rounded-[1.7rem]"
@@ -563,7 +563,7 @@ export default function TermsPage() {
         </div>
 
         <div className="grid gap-5 sm:gap-6">
-          {typedCopy.sections.map((section) => (
+          {copy.sections.map((section) => (
             <MagicCard
               key={section.id}
               className="rounded-[2rem]"

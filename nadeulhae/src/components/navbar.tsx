@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -21,7 +21,7 @@ import { useTheme } from "next-themes";
 
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { cn } from "@/lib/utils";
+import { cn, getCopy } from "@/lib/utils";
 
 const THEME_MODES = ["light", "dark", "system"] as const;
 
@@ -65,23 +65,28 @@ async function readErrorMessage(response: Response, fallback: string) {
   return fallback;
 }
 
+// Client-side hydration detection (avoids set-state-in-effect warning)
+const emptySubscribe = () => () => {}
+function useIsClient() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  )
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { user, setAuthenticatedUser } = useAuth();
-  const copy =
-    NAVBAR_COPY[language as keyof typeof NAVBAR_COPY] ?? NAVBAR_COPY.ko;
-  const [mounted, setMounted] = useState(false);
+  const copy = getCopy(NAVBAR_COPY, language);
+  const mounted = useIsClient();
   const [isVisible, setIsVisible] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const lastScrollYRef = useRef(0);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     const controlNavbar = () => {
@@ -281,8 +286,8 @@ export function Navbar() {
               type="button"
               onClick={() => {
                 const cycle = ["ko", "en", "zh", "ja"] as const;
-                const idx = cycle.indexOf(language as any);
-                setLanguage((cycle[(idx + 1) % 4] ?? "ko") as any);
+                const idx = cycle.indexOf(language as typeof cycle[number]);
+                setLanguage(cycle[(idx + 1) % 4] ?? "ko");
               }}
               aria-label={copy.languageToggle}
               className="flex items-center gap-1 p-1.5 text-[11px] font-black text-muted-foreground transition-all hover:text-sky-blue sm:p-2 sm:text-xs md:text-[13px]"

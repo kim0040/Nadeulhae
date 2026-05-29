@@ -8,7 +8,7 @@
  */
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   CloudIcon,
   DropletsIcon,

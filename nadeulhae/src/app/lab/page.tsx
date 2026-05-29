@@ -17,6 +17,7 @@ import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { SectionCard } from "@/components/dashboard/ui"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
+import { getCopy } from "@/lib/utils"
 
 const LAB_HUB_COPY = {
   ko: {
@@ -115,7 +116,7 @@ export default function LabHubPage() {
   const router = useRouter()
   const { user, status } = useAuth()
   const { language } = useLanguage()
-  const copy = ((LAB_HUB_COPY as any)[language] ?? LAB_HUB_COPY.ko)
+  const copy = getCopy(LAB_HUB_COPY, language)
 
   // Device/accessibility flags used to reduce heavy visual effects on constrained devices
   const [isCompactViewport, setIsCompactViewport] = useState(false)

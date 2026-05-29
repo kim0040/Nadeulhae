@@ -26,11 +26,11 @@ import { getDbPool } from "@/lib/db"
  * - `reserve*` functions atomically check-and-increment at request time.
  * - `record*Outcome` functions update success/failure counts after the LLM call completes.
  *
- * Refund semantics (not yet implemented):
- * - `refundGlobalLlmDailyRequest` would decrement `request_count` on the global table
+ * Refund semantics:
+ * - `refundGlobalLlmDailyRequest` decrements `request_count` on the global table
  *   when a reserved request is cancelled before execution, freeing the slot for others.
- * - `refundUserActionDailyRequest` would do the same for per-user per-action rows.
- *   Refunds must happen in a `FOR UPDATE` transaction to avoid underflow below zero.
+ * - `refundUserActionDailyRequest` does the same for per-user per-action rows.
+ *   Refunds happen in a `FOR UPDATE` transaction to avoid underflow below zero.
  *
  * Schema initialization is idempotent and memoised globally via a module-level
  * `Promise<void>` singleton (`__nadeulhaeLlmQuotaSchemaPromise`), so multiple
@@ -533,6 +533,95 @@ export async function reserveUserActionDailyRequest(input: {
         limit,
       }),
     }
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+}
+
+/**
+ * Refunds a previously-reserved **global** daily LLM request slot.
+ *
+ * Call this when a reserved request is cancelled before the LLM call executes
+ * (e.g. client disconnect, timeout, abort). Decrements `request_count` by 1,
+ * clamped to 0 to prevent underflow.
+ *
+ * Uses `SELECT ... FOR UPDATE` to serialise with concurrent reservations,
+ * ensuring the refund is visible to the next reservation check.
+ *
+ * @param input.metricDate — The KST date string (YYYY-MM-DD) from the reservation.
+ */
+export async function refundGlobalLlmDailyRequest(input: { metricDate: string }) {
+  await ensureLlmQuotaSchema()
+  const metricDate = input.metricDate
+  const connection = await getDbPool().getConnection()
+
+  try {
+    await connection.beginTransaction()
+    await upsertGlobalUsageRow(connection, metricDate)
+
+    await connection.execute(
+      `
+        UPDATE llm_global_usage_daily
+        SET
+          request_count = GREATEST(0, request_count - 1),
+          last_used_at = NOW()
+        WHERE metric_date = ?
+      `,
+      [metricDate]
+    )
+
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+}
+
+/**
+ * Refunds a previously-reserved **per-user per-action** daily LLM request slot.
+ *
+ * Call this when a reserved request is cancelled before the LLM call executes.
+ * Decrements `request_count` by 1, clamped to 0 to prevent underflow.
+ *
+ * Uses `SELECT ... FOR UPDATE` to serialise with concurrent reservations.
+ *
+ * @param input.userId — The user ID (UUID string).
+ * @param input.quotaKey — The action slug from the original reservation.
+ * @param input.metricDate — The KST date string (YYYY-MM-DD) from the reservation.
+ */
+export async function refundUserActionDailyRequest(input: {
+  userId: string
+  quotaKey: string
+  metricDate: string
+}) {
+  await ensureLlmQuotaSchema()
+  const metricDate = input.metricDate
+  const quotaKey = normalizeQuotaKey(input.quotaKey)
+  const connection = await getDbPool().getConnection()
+
+  try {
+    await connection.beginTransaction()
+    await upsertUserActionUsageRow(connection, metricDate, input.userId, quotaKey)
+
+    await connection.execute(
+      `
+        UPDATE llm_user_action_usage_daily
+        SET
+          request_count = GREATEST(0, request_count - 1),
+          last_used_at = NOW()
+        WHERE metric_date = ?
+          AND user_id = ?
+          AND quota_key = ?
+      `,
+      [metricDate, input.userId, quotaKey]
+    )
+
+    await connection.commit()
   } catch (error) {
     await connection.rollback()
     throw error

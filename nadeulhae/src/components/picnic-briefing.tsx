@@ -497,8 +497,8 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
   })()
   const getUpdateTime = (type: 'kma' | 'air') => {
     if (typeof metadata?.lastUpdate === 'string') return metadata.lastUpdate
-    if (type === 'kma') return (metadata?.lastUpdate as any)?.kma || "--:--"
-    return (metadata?.lastUpdate as any)?.air || "--:--"
+    if (type === 'kma') return (metadata?.lastUpdate as Record<string, string | undefined>)?.kma || "--:--"
+    return (metadata?.lastUpdate as Record<string, string | undefined>)?.air || "--:--"
   }
   const briefingMeta = [
     {

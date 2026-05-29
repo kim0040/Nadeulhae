@@ -21,7 +21,7 @@ import { useLanguage } from "@/context/LanguageContext"
 import { BorderBeam } from "@/components/magicui/border-beam"
 import { MagicCard } from "@/components/magicui/magic-card"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
-import { cn } from "@/lib/utils"
+import { cn, getCopy } from "@/lib/utils"
 
 import {
   AGE_BAND_OPTIONS,
@@ -49,7 +49,7 @@ export function SettingsModal({
   const router = useRouter()
   const { language } = useLanguage()
   const { setAuthenticatedUser } = useAuth()
-  const copy = ((DASHBOARD_COPY as any)[language] ?? DASHBOARD_COPY.ko)
+  const copy = getCopy(DASHBOARD_COPY, language)
 
   const [form, setForm] = useState<ProfileFormState>(() => createProfileFormState(user))
   const [isSaving, setIsSaving] = useState(false)
@@ -327,7 +327,7 @@ export function SettingsModal({
                               <SelectOptionTile
                                 key={option.value}
                                 selected={form.ageBand === option.value}
-                                label={(option.label as any)[language]}
+                                label={getCopy(option.label, language) as string}
                                 onClick={() => setForm((curr) => ({ ...curr, ageBand: option.value }))}
                               />
                             ))}
@@ -340,7 +340,7 @@ export function SettingsModal({
                               <SelectOptionTile
                                 key={option.value}
                                 selected={form.primaryRegion === option.value}
-                                label={(option.label as any)[language]}
+                                label={getCopy(option.label, language) as string}
                                 onClick={() => setForm((curr) => ({ ...curr, primaryRegion: option.value }))}
                               />
                             ))}
@@ -361,7 +361,7 @@ export function SettingsModal({
                           <ToggleChip
                             key={option.value}
                             selected={form.interestTags.includes(option.value)}
-                            label={(option.label as any)[language]}
+                            label={getCopy(option.label, language) as string}
                             onClick={() => handleToggleInterest(option.value)}
                           />
                         ))}
@@ -386,7 +386,7 @@ export function SettingsModal({
                               <SelectOptionTile
                                 key={option.value}
                                 selected={form.preferredTimeSlot === option.value}
-                                label={(option.label as any)[language]}
+                                label={getCopy(option.label, language) as string}
                                 onClick={() => setForm((curr) => ({ ...curr, preferredTimeSlot: option.value }))}
                               />
                             ))}
@@ -399,7 +399,7 @@ export function SettingsModal({
                               <ToggleChip
                                 key={option.value}
                                 selected={form.weatherSensitivity.includes(option.value)}
-                                label={(option.label as any)[language]}
+                                label={getCopy(option.label, language) as string}
                                 onClick={() => handleToggleSensitivity(option.value)}
                               />
                             ))}

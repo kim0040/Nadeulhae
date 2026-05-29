@@ -7,7 +7,7 @@ import { Code2, Loader2, Plus, RefreshCcw, Trash2 } from "lucide-react"
 import { SectionCard } from "@/components/dashboard/ui"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { useLanguage } from "@/context/LanguageContext"
-import { cn } from "@/lib/utils"
+import { cn, getCopy } from "@/lib/utils"
 
 type CodeShareSessionSummary = {
   sessionId: string
@@ -122,7 +122,7 @@ function formatDateLabel(value: string, locale: string) {
 export function CodeShareHub() {
   const router = useRouter()
   const { language } = useLanguage()
-  const copy = ((HUB_COPY as any)[language] ?? HUB_COPY.ko)
+  const copy = getCopy(HUB_COPY, language)
 
   const [sessions, setSessions] = useState<CodeShareSessionSummary[]>([])
   const [viewer, setViewer] = useState<ViewerIdentity | null>(null)

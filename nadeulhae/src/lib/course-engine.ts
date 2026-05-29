@@ -116,14 +116,12 @@ function qualityScore(r: PlaceRow, reviewKeywords: string[] | null): number {
   // Flat Review Presence Bonus (리뷰 보유 가산점)
   // Give a strong +8 points bonus if a place has real customer reviews.
   // This ensures that verified places with reviews are prioritized.
-  let hasValidReviews = false
   if (r.reviews_text) {
     try {
       const reviews = JSON.parse(r.reviews_text)
       if (Array.isArray(reviews) && reviews.length > 0) {
         s += 8 // Flat 가산점 +8점 부여
         s += Math.min(reviews.length, 5) // +1 per review, max +5
-        hasValidReviews = true
       }
     } catch {}
   }
@@ -241,7 +239,7 @@ function categoryLabel(cat: string, lang: CourseEngineLanguage = "ko"): string {
 
 function timeSlotLabel(profile: UserProfile | null, idx: number, lang: CourseEngineLanguage = "ko"): string {
   const ts = profile?.preferredTimeSlot
-  const time = COURSE_ENGINE_COPY[lang].timeSlot
+  void COURSE_ENGINE_COPY[lang].timeSlot
   if (!ts || ts === "all_day" || ts === "afternoon") {
     return idx === 1 ? "13:00 - 15:30" : idx === 2 ? "16:00 - 18:00" : "18:00 - 20:00"
   }

@@ -38,7 +38,7 @@ import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
 import { formatServerDateTime, parseServerTimestamp } from "@/lib/time/server-time"
 import { useWebSocket } from "@/lib/websocket/use-websocket"
-import { cn } from "@/lib/utils"
+import { cn, getCopy } from "@/lib/utils"
 
 const LAB_MIN_CARD_COUNT = 4
 const LAB_MAX_CARD_COUNT = 50
@@ -909,7 +909,7 @@ function formatLabDate(value: string, language: string) {
 
 function formatLearningState(
   state: LabCardSnapshot["learningState"],
-  copy: typeof LAB_COPY.ko | typeof LAB_COPY.en
+  copy: typeof LAB_COPY[keyof typeof LAB_COPY]
 ) {
   switch (state) {
     case "review":
@@ -980,7 +980,7 @@ export default function LabPage() {
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
   const { subscribe, connected: wsConnected } = useWebSocket()
-  const copy = ((LAB_COPY as any)[language] ?? LAB_COPY.ko)
+  const copy = getCopy(LAB_COPY, language)
 
   const [state, setState] = useState<LabStateSnapshot | null>(null)
   const [stateError, setStateError] = useState<string | null>(null)

@@ -5,9 +5,6 @@ import type { NextConfig } from "next";
 const appRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   turbopack: {
     root: appRoot,
   },

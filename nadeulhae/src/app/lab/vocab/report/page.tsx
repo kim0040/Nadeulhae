@@ -11,6 +11,7 @@ import { Particles } from "@/components/magicui/particles"
 import { SectionCard, StatusMetric } from "@/components/dashboard/ui"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
+import { getCopy } from "@/lib/utils"
 
 type LabReportInsights = {
   reviewRatePercent: number
@@ -378,7 +379,7 @@ export default function LabVocabReportPage() {
   const { user, status } = useAuth()
   const { language } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = ((REPORT_COPY as any)[language] ?? REPORT_COPY.ko)
+  const copy = getCopy(REPORT_COPY, language)
 
   const [report, setReport] = useState<LabReportSnapshot | null>(null)
   const [periodDays, setPeriodDays] = useState<(typeof PERIOD_OPTIONS)[number]>(14)

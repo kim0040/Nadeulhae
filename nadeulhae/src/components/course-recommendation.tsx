@@ -615,9 +615,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     script.async = true
     script.onload = () => {
       if (window.kakao && window.kakao.maps) {
-        window.kakao.maps.load(() => {
-          console.log("[KakaoMap] Dynamic client-side SDK ready.")
-        })
+        window.kakao.maps.load(() => {})
       }
     }
     script.onerror = () => {

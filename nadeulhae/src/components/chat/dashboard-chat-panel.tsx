@@ -26,7 +26,7 @@ import {
   formatServerClockTime,
   getServerNowMs,
 } from "@/lib/time/server-time"
-import { cn } from "@/lib/utils"
+import { cn, getCopy } from "@/lib/utils"
 
 
 // Shared Kakao JS Key cache in client-side window memory to prevent multiple configuration requests
@@ -381,11 +381,15 @@ function InteractiveCourseWidget({
   const [course, setCourse] = useState<any>(null)
   const lastGeneratedRef = useRef<string>("")
   const [isLoading, setIsLoading] = useState(true)
-  const copy = (((CHAT_PANEL_COPY as any)[language ?? "ko"] ?? CHAT_PANEL_COPY.ko) ?? CHAT_PANEL_COPY.ko)
+  const copy = getCopy(CHAT_PANEL_COPY, language ?? "ko")
 
+  // Parse course from code (derived state)
+  const parsed = useMemo(() => tryParsePartialJson(code), [code])
+  const hasValidSlots = parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0
+
+  // Sync parsed course to state and notify parent
   useEffect(() => {
-    const parsed = tryParsePartialJson(code)
-    if (parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0) {
+    if (hasValidSlots) {
       const courseStr = JSON.stringify(parsed.slots)
       if (lastGeneratedRef.current !== courseStr) {
         lastGeneratedRef.current = courseStr
@@ -394,7 +398,7 @@ function InteractiveCourseWidget({
         onCourseGenerated?.(parsed.slots)
       }
     }
-  }, [code, onCourseGenerated])
+  }, [hasValidSlots, parsed, onCourseGenerated])
 
   if (isLoading && !course) {
     return (
@@ -479,7 +483,7 @@ type MessageGroup = {
   const showAvatar = !isUser && (groupPosition === "first" || groupPosition === "only")
   const showTimestamp = groupPosition === "last" || groupPosition === "only"
 
-  const copy = (((CHAT_PANEL_COPY as any)[language] ?? CHAT_PANEL_COPY.ko) ?? CHAT_PANEL_COPY.ko)
+  const copy = getCopy(CHAT_PANEL_COPY, language)
   const messageContent = !isUser
     ? sanitizeAssistantMarkdown({ content: message.content, language })
     : message.content
@@ -531,7 +535,7 @@ type MessageGroup = {
         </code>
       )
     },
-    }), [copy.copyCode, copy.copiedCode, onCourseGenerated, onCourseClick, message.pending])
+    }), [language, copy.copyCode, copy.copiedCode, onCourseGenerated, onCourseClick, message.pending])
 
   const roundedClass = isUser
     ? groupPosition === "only"
@@ -612,7 +616,7 @@ export function DashboardChatPanel({
   onCourseClick?: () => void
 }) {
   const { language } = useLanguage()
-  const copy = (((CHAT_PANEL_COPY as any)[language] ?? CHAT_PANEL_COPY.ko) ?? CHAT_PANEL_COPY.ko)
+  const copy = getCopy(CHAT_PANEL_COPY, language)
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)

@@ -18,10 +18,19 @@ let _kmaDailyCount = 0
 let _kmaDailyDate = ""
 
 /**
+ * Get current date in KST (UTC+9).
+ */
+function getKstDate(): string {
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  return kst.toISOString().slice(0, 10)
+}
+
+/**
  * Reset the counter if the date has changed (KST midnight rollover).
  */
 function resetKmaDailyIfNeeded() {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getKstDate()
   if (_kmaDailyDate !== today) {
     _kmaDailyDate = today
     _kmaDailyCount = 0

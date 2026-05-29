@@ -8,7 +8,7 @@ export const runtime = "nodejs"
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const locale = searchParams.get("locale") ?? "ko"
-  if (!LOCALES.includes(locale as any)) {
+  if (!LOCALES.includes(locale as (typeof LOCALES)[number])) {
     return NextResponse.json({ error: "Invalid locale" }, { status: 400 })
   }
 

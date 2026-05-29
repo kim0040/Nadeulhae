@@ -30,6 +30,7 @@ import { getOptionLabel, PRIMARY_REGION_OPTIONS } from "@/lib/auth/profile-optio
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { AuthUser } from "@/lib/auth/types"
 import { dataService, type WeatherData } from "@/services/dataService"
+import { getCopy } from "@/lib/utils"
 
 import { DASHBOARD_COPY } from "./constants"
 import { SectionCard, StatusMetric } from "@/components/dashboard/ui"
@@ -40,13 +41,12 @@ import { SettingsModal } from "@/components/dashboard/settings-modal"
 const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: AuthUser }) {
   const { language, t } = useLanguage()
   const { resolvedTheme } = useTheme()
-  const copy = (((DASHBOARD_COPY as any)[language] ?? DASHBOARD_COPY.ko) ?? DASHBOARD_COPY.ko)
+  const copy = getCopy(DASHBOARD_COPY, language)
 
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [customCourse, setCustomCourse] = useState<any[] | null>(null)
   const [showCourseRecommendation, setShowCourseRecommendation] = useState(false)
-  const [selectedTheme, setSelectedTheme] = useState<string>("balanced")
 
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
   const particleQuantity = useMemo(() => getParticleCount(30), [])
@@ -114,7 +114,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
     }
   }, [customCourse])
 
-  // customCourse가 변경될 때 showCourseRecommendation 초기화
+  // Reset showCourseRecommendation when customCourse changes
   useEffect(() => {
     setShowCourseRecommendation(false)
   }, [customCourse])
@@ -288,7 +288,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { language } = useLanguage()
   const { user, status } = useAuth()
-  const copy = (((DASHBOARD_COPY as any)[language] ?? DASHBOARD_COPY.ko) ?? DASHBOARD_COPY.ko)
+  const copy = getCopy(DASHBOARD_COPY, language)
 
   useEffect(() => {
     if (status === "guest") {

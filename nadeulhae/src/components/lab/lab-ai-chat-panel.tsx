@@ -40,7 +40,7 @@ import {
 } from "@/lib/time/server-time"
 import { highlightCode, normalizeCodeLanguage, type HighlightKind } from "@/lib/markdown/code-highlighting"
 import { sanitizeAssistantMarkdown } from "@/lib/markdown/sanitize-assistant-markdown"
-import { cn } from "@/lib/utils"
+import { cn, getCopy } from "@/lib/utils"
 import { MermaidDiagram } from "@/components/lab/mermaid-diagram"
 
 type UiChatMessage = LabAiChatConversationMessage & {
@@ -581,7 +581,7 @@ function buildThoughtSummaryDetails(input: {
   modelLabel: string
   isThinkingEnabled: boolean
 }): ThoughtSummaryDetails {
-  const base = (THOUGHT_SUMMARIES as any)[input.language][input.kind]
+  const base = getCopy(THOUGHT_SUMMARIES, input.language)[input.kind]
   const signal = extractRequestSignals(input.userMessage, input.language)
 
   if (input.language === "ko") {
@@ -790,7 +790,7 @@ function ThinkingProgressPanel({
 
 export function LabAiChatPanel() {
   const { language } = useLanguage()
-  const copy = ((COPY as any)[language] ?? COPY.ko)
+  const copy = getCopy(COPY, language)
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)

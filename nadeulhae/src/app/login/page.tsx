@@ -11,6 +11,7 @@ import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
 import type { AuthResponseBody } from "@/lib/auth/types"
+import { getCopy } from "@/lib/utils"
 
 const LOGIN_COPY = {
   ko: {
@@ -103,7 +104,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const copy = ((LOGIN_COPY as any)[language] ?? LOGIN_COPY.ko)
+  const copy = getCopy(LOGIN_COPY, language)
 
   useEffect(() => {
     if (status === "authenticated") {

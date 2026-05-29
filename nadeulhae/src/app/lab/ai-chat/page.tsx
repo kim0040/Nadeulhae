@@ -9,6 +9,7 @@ import { SectionCard } from "@/components/dashboard/ui"
 import { LabAiChatPanel } from "@/components/lab/lab-ai-chat-panel"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
+import { getCopy } from "@/lib/utils"
 
 const PAGE_COPY = {
   ko: {
@@ -53,7 +54,7 @@ export default function LabAiChatPage() {
   const router = useRouter()
   const { user, status } = useAuth()
   const { language } = useLanguage()
-  const copy = ((PAGE_COPY as any)[language] ?? PAGE_COPY.ko)
+  const copy = getCopy(PAGE_COPY, language)
 
   useEffect(() => {
     if (status === "guest") {

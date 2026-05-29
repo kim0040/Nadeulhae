@@ -6,6 +6,7 @@ import { AlertTriangle, Flame, Gauge, RefreshCcw, Target, TrendingUp, Zap } from
 import { SectionCard, StatusMetric } from "@/components/dashboard/ui"
 import { useLanguage } from "@/context/LanguageContext"
 import type { LabReportSnapshot } from "@/lib/lab/types"
+import { getCopy } from "@/lib/utils"
 
 const REPORT_COPY = {
   ko: {
@@ -269,7 +270,7 @@ function InsightPill({
 
 export function VocabReportPanel() {
   const { language } = useLanguage()
-  const copy = ((REPORT_COPY as any)[language] ?? REPORT_COPY.ko)
+  const copy = getCopy(REPORT_COPY, language)
 
   const [report, setReport] = useState<LabReportSnapshot | null>(null)
   const [periodDays, setPeriodDays] = useState<(typeof PERIOD_OPTIONS)[number]>(14)
