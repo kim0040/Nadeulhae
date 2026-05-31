@@ -119,6 +119,8 @@ export const DASHBOARD_COPY = {
     weatherRetry: "다시 시도",
     dashboardNav: "대시보드",
     backHome: "홈으로 이동",
+    picnicIndex: "나들이 지수",
+    scoreUnit: "점",
   },
   en: {
     badge: "my space",
@@ -208,6 +210,8 @@ export const DASHBOARD_COPY = {
     weatherRetry: "Try again",
     dashboardNav: "Dashboard",
     backHome: "Go home",
+    picnicIndex: "Outing Index",
+    scoreUnit: "pts",
   },
   zh: {
     badge: "我的空间",
@@ -295,6 +299,8 @@ export const DASHBOARD_COPY = {
     weatherRetry: "重试",
     dashboardNav: "仪表盘",
     backHome: "返回首页",
+    picnicIndex: "出行指数",
+    scoreUnit: "分",
   },
   ja: {
     badge: "マイスペース",
@@ -382,5 +388,7 @@ export const DASHBOARD_COPY = {
     weatherRetry: "再試行",
     dashboardNav: "ダッシュボード",
     backHome: "ホームへ移動",
+    picnicIndex: "お出かけ指数",
+    scoreUnit: "点",
   },
 } as const

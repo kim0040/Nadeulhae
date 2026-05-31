@@ -687,7 +687,7 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
       slots.push({
         time: timeSlot?.time ?? timeSlotLabel(profile, i + 1, lang),
         title: m.name,
-        description: `${weatherNote} ${categoryLabel(m.category, lang)}입니다.${m.menu_summary ? `${copy.menuPrefix}${m.menu_summary}` : ""}${top[1] ? copy.nearbyRecommend(top[1].name) : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon, lang)}${getReviewNote(m.review_summary, lang)}${m.interestBonus > 4 ? copy.interestMatch(INTEREST_LABEL_KO[m.interestTag ?? ""] ?? "") : ""}`,
+        description: `${weatherNote} ${categoryLabel(m.category, lang)}${copy.descSuffix}${m.menu_summary ? `${copy.menuPrefix}${m.menu_summary}` : ""}${top[1] ? copy.nearbyRecommend(top[1].name) : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon, lang)}${getReviewNote(m.review_summary, lang)}${m.interestBonus > 4 ? copy.interestMatch((copy.interestLabel as Record<string, string>)[m.interestTag ?? ""] ?? "") : ""}`,
         type: placeType,
         places: top.map(p => toSlotItem(p, profile)),
       })
@@ -712,7 +712,7 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
       slots.push({
         time: timeSlotLabel(profile, 1, lang),
         title: m.name,
-        description: `${wx.good} ${categoryLabel(m.category, lang)}입니다.${top[1] ? copy.nearbyVisit(top[1].name) : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon, lang)}${getReviewNote(m.review_summary, lang)}`,
+        description: `${wx.good} ${categoryLabel(m.category, lang)}${copy.descSuffix}${top[1] ? copy.nearbyVisit(top[1].name) : ""}${getDistanceNote(m.lat, m.lon, uLat, uLon, lang)}${getReviewNote(m.review_summary, lang)}`,
         type: "야외",
         places: top.map(p => toSlotItem(p, profile)),
       })
@@ -720,7 +720,7 @@ export async function generateCourse(request: CourseRequest = {}): Promise<Cours
     }
   }
 
-  if (slots.length === 0) return getFallbackCourse()
+  if (slots.length === 0) return getFallbackCourse(lang)
   return slots.slice(0, 3)
 }
 
@@ -751,9 +751,61 @@ export async function getTopPlacesForChat(opts: {
 // Fallback
 // ---------------------------------------------------------------------------
 
-function getFallbackCourse(): CourseSlot[] {
+function getFallbackCourse(lang: CourseEngineLanguage = "ko"): CourseSlot[] {
+  const isKo = lang === "ko"
+  const isEn = lang === "en"
+  const isZh = lang === "zh"
+
+  const parkTitle = isKo ? "덕진공원" : isEn ? "Deokjin Park" : isZh ? "德津公园" : "徳津公園"
+  const parkDesc = isKo ? "햇살이 가장 따뜻한 시간대예요." 
+    : isEn ? "It's the warmest time of the day to enjoy the sunshine." 
+    : isZh ? "这是一天中阳光最温暖的时候。" 
+    : "陽射しが一番暖かい時間帯です。"
+
+  const cafeTitle = isKo ? "전주한옥마을 카페" : isEn ? "Jeonju Hanok Village Cafe" : isZh ? "全州韩屋村咖啡馆" : "全州韓屋村カフェ"
+  const cafeDesc = isKo ? "늦은 오후엔 카페에서 여유를." 
+    : isEn ? "Enjoy a relaxing late afternoon at a cafe." 
+    : isZh ? "傍晚时分在咖啡馆里享受悠闲时光。" 
+    : "遅い午後にはカフェでゆったりとした時間を。"
+
   return [
-    { time: "13:00 - 15:30", title: "덕진공원", description: "햇살이 가장 따뜻한 시간대예요.", type: "야외", places: [{ name: "덕진공원", category: "nature", rating: 4.5, address: "전주시 덕진구", menuSummary: null, kakaoUrl: "https://place.map.kakao.com/8124058", reviewSummary: null, reviewKeywords: [], reviewPicks: [], lat: 35.8441, lon: 127.1224 }] },
-    { time: "16:00 - 18:00", title: "전주한옥마을 카페", description: "늦은 오후엔 카페에서 여유를.", type: "실내", places: [{ name: "전주한옥마을 카페거리", category: "cafe", rating: 4.3, address: "전주시 완산구", menuSummary: null, kakaoUrl: "https://place.map.kakao.com/12751100", reviewSummary: null, reviewKeywords: [], reviewPicks: [], lat: 35.8146, lon: 127.1526 }] },
+    { 
+      time: "13:00 - 15:30", 
+      title: parkTitle, 
+      description: parkDesc, 
+      type: "야외", 
+      places: [{ 
+        name: parkTitle, 
+        category: "nature", 
+        rating: 4.5, 
+        address: isKo ? "전주시 덕진구" : isEn ? "Deokjin-gu, Jeonju" : isZh ? "全州市德津区" : "全州市徳津区", 
+        menuSummary: null, 
+        kakaoUrl: "https://place.map.kakao.com/8124058", 
+        reviewSummary: null, 
+        reviewKeywords: [], 
+        reviewPicks: [], 
+        lat: 35.8441, 
+        lon: 127.1224 
+      }] 
+    },
+    { 
+      time: "16:00 - 18:00", 
+      title: cafeTitle, 
+      description: cafeDesc, 
+      type: "실내", 
+      places: [{ 
+        name: cafeTitle, 
+        category: "cafe", 
+        rating: 4.3, 
+        address: isKo ? "전주시 완산구" : isEn ? "Wansan-gu, Jeonju" : isZh ? "全州市完山区" : "全州市完山区", 
+        menuSummary: null, 
+        kakaoUrl: "https://place.map.kakao.com/12751100", 
+        reviewSummary: null, 
+        reviewKeywords: [], 
+        reviewPicks: [], 
+        lat: 35.8146, 
+        lon: 127.1526 
+      }] 
+    },
   ]
 }

@@ -152,6 +152,13 @@ export const INTEREST_LABEL_KO: Record<string, string> = {
 
 export const COURSE_ENGINE_COPY = {
   ko: {
+    descSuffix: "입니다.",
+    interestLabel: {
+      foodie: "맛집 탐방", cafe: "카페", nature: "자연 속 힐링",
+      art_museum: "문화·전시", festival: "축제·행사", shopping: "쇼핑",
+      picnic: "피크닉", activity: "야외 액티비티", photography: "사진 스팟",
+      walking: "산책", drive: "드라이브", family: "가족 나들이", pet: "반려동물",
+    },
     distanceNote: {
       walking5min: " (현재 위치에서 도보 5분 거리)",
       about1km: " (현재 위치에서 약 1km)",
@@ -198,6 +205,13 @@ export const COURSE_ENGINE_COPY = {
     menuPrefix: " 대표 메뉴: ",
   },
   en: {
+    descSuffix: ".",
+    interestLabel: {
+      foodie: "Foodie", cafe: "Cafe", nature: "Nature Healing",
+      art_museum: "Art & Museum", festival: "Festival & Event", shopping: "Shopping",
+      picnic: "Picnic", activity: "Outdoor Activity", photography: "Photography",
+      walking: "Walking", drive: "Driving", family: "Family Outing", pet: "Pet Friendly",
+    },
     distanceNote: {
       walking5min: " (5 min walk from current location)",
       about1km: " (about 1km from current location)",
@@ -244,6 +258,13 @@ export const COURSE_ENGINE_COPY = {
     menuPrefix: " Signature menu: ",
   },
   zh: {
+    descSuffix: "。",
+    interestLabel: {
+      foodie: "美食探店", cafe: "咖啡馆", nature: "亲近自然",
+      art_museum: "文化展览", festival: "节日庆典", shopping: "逛街购物",
+      picnic: "户外野餐", activity: "户外活动", photography: "拍照打卡",
+      walking: "散步休闲", drive: "户外自驾", family: "亲子家庭", pet: "宠物友好",
+    },
     distanceNote: {
       walking5min: " (距离当前位置步行5分钟)",
       about1km: " (距离当前位置约1公里)",
@@ -290,6 +311,13 @@ export const COURSE_ENGINE_COPY = {
     menuPrefix: " 招牌菜单: ",
   },
   ja: {
+    descSuffix: "です。",
+    interestLabel: {
+      foodie: "グルメ巡り", cafe: "カフェ", nature: "自然で癒やし",
+      art_museum: "文化・展示", festival: "祭り・イベント", shopping: "ショッピング",
+      picnic: "ピクニック", activity: "アウトドア", photography: "フォトスポット",
+      walking: "散策", drive: "ドライブ", family: "家族でお出かけ", pet: "ペット同伴",
+    },
     distanceNote: {
       walking5min: " (現在地から徒歩5分)",
       about1km: " (現在地から約1km)",

@@ -210,8 +210,8 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
                     </div>
                   </div>
                   <div className="text-right border-l border-card-border/50 pl-4 shrink-0">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">나들이 지수</span>
-                    <p className="text-lg font-black tracking-tight text-active-blue mt-0.5">{weatherData.score}점</p>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">{copy.picnicIndex}</span>
+                    <p className="text-lg font-black tracking-tight text-active-blue mt-0.5">{weatherData.score}{copy.scoreUnit}</p>
                   </div>
                 </div>
               ) : (

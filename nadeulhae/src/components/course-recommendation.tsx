@@ -16,7 +16,7 @@ declare global {
 
 // Client-side cache for Kakao Maps key to avoid hitting API repeatedly (conserves DB usage count / daily quota)
 let cachedKakaoKey: string | null = null
-let cachedKakaoLoadError = false
+let cachedKakaoLoadErrorTime: number | null = null // TTL cache error timestamp
 
 export interface CoursePlace {
   name: string
@@ -63,6 +63,8 @@ const COPY = {
     dislike: "다른 곳",
     dislikeHint: "이 장소 대신 다른 곳을 추천받기",
     excludedCount: "제외됨",
+    customBadge: "AI 맞춤형",
+    customDescription: "나들AI 챗봇과 실시간 대화를 통해 맞춤 구성한 전주 나들이 코스입니다.",
     
     // Theme selector
     themeSelect: "코스 테마",
@@ -118,6 +120,8 @@ const COPY = {
     dislike: "Try elsewhere",
     dislikeHint: "Get a different recommendation",
     excludedCount: "excluded",
+    customBadge: "AI Custom",
+    customDescription: "A personalized Jeonju course customized through real-time chat with NadeulAI.",
 
     // Theme selector
     themeSelect: "Course Theme",
@@ -173,6 +177,8 @@ const COPY = {
     dislike: "换一个",
     dislikeHint: "换其他地方推荐",
     excludedCount: "已排除",
+    customBadge: "AI 定制",
+    customDescription: "通过与 NadeulAI 实时对话定制的个性化全州路线。",
 
     // Theme selector
     themeSelect: "路线主题",
@@ -228,6 +234,8 @@ const COPY = {
     dislike: "別の場所",
     dislikeHint: "別のおすすめを見る",
     excludedCount: "除外済",
+    customBadge: "AI カスタマイズ",
+    customDescription: "ナ들AI チャットボットとのリアルタイム対話を通じてカスタマイズされた全州お出かけコースです。",
 
     // Theme selector
     themeSelect: "コーステーマ",
@@ -374,7 +382,6 @@ interface KakaoPlaceMapProps {
 }
 
 export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, localeCopy, heightClass }: KakaoPlaceMapProps) {
-  void placeName;
   const mapRef = useRef<HTMLDivElement>(null)
   const [mapInitialized, setMapInitialized] = useState(false)
 
@@ -403,6 +410,13 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
           position: markerPosition,
         })
         marker.setMap(map)
+
+        // Add info window for place name
+        const iwContent = `<div style="padding:5px;font-size:12px;color:#000;text-align:center;width:150px;font-weight:bold;">${placeName}</div>`
+        const infowindow = new window.kakao.maps.InfoWindow({
+          content: iwContent
+        })
+        infowindow.open(map, marker)
 
         // Add standard zoom control UI
         const zoomControl = new window.kakao.maps.ZoomControl()
@@ -463,6 +477,10 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const [expandedSlot, setExpandedSlot] = useState<number | null>(0)
   const [excludedNames, setExcludedNames] = useState<string[]>([])
   const [selectedTheme, setSelectedTheme] = useState<CourseTheme>("balanced")
+  const selectedThemeRef = useRef<CourseTheme>(selectedTheme)
+  useEffect(() => {
+    selectedThemeRef.current = selectedTheme
+  }, [selectedTheme])
   
   // Props를 useRef로 안정화
   const propsRef = useRef({ weatherContext, userProfile, customCourse, onThemeChange, onCourseReset })
@@ -532,7 +550,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     }
 
     const list = excludeList ?? []
-    const theme = themeOverride ?? "balanced" // 기본값 사용, selectedTheme은 의존성에서 제거
+    const theme = themeOverride ?? selectedThemeRef.current ?? "balanced"
     setLoading(true)
     setError(null)
     try {
@@ -576,7 +594,8 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       setKakaoKey(cachedKakaoKey)
       return
     }
-    if (cachedKakaoLoadError) {
+    const ONE_HOUR = 60 * 60 * 1000
+    if (cachedKakaoLoadErrorTime && (Date.now() - cachedKakaoLoadErrorTime < ONE_HOUR)) {
       setKakaoLoadError(true)
       return
     }
@@ -590,12 +609,12 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
           cachedKakaoKey = data.kakaoKey
           setKakaoKey(data.kakaoKey)
         } else {
-          cachedKakaoLoadError = true
+          cachedKakaoLoadErrorTime = Date.now()
           setKakaoLoadError(true)
         }
       })
       .catch(() => {
-        cachedKakaoLoadError = true
+        cachedKakaoLoadErrorTime = Date.now()
         setKakaoLoadError(true)
       })
   }, [])
@@ -619,6 +638,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       }
     }
     script.onerror = () => {
+      cachedKakaoLoadErrorTime = Date.now()
       setKakaoLoadError(true)
     }
     document.head.appendChild(script)
@@ -631,7 +651,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
 
   // 초기 로딩 (한 번만 실행)
   useEffect(() => {
-    fetchCourse()
+    fetchCourse(undefined, selectedThemeRef.current)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDislike = useCallback((slotIndex: number) => {
@@ -640,12 +660,12 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     const namesToExclude = slot?.places?.map((p: any) => p.name) || []
     const next = [...new Set([...excludedNames, ...namesToExclude])]
     setExcludedNames(next)
-    fetchCourse(next)
+    fetchCourse(next, selectedThemeRef.current)
   }, [slots, excludedNames, fetchCourse])
 
   const handleResetExclusions = useCallback(() => {
     setExcludedNames([])
-    fetchCourse([])
+    fetchCourse([], selectedThemeRef.current)
   }, [fetchCourse])
 
   const typeLabel = useMemo(() => {
@@ -688,8 +708,8 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
 
   // Fetch real-time traffic directions asynchronously (Stale-While-Revalidate)
   useEffect(() => {
+    setRealtimeRoutes([])
     if (slots.length === 0) {
-      setRealtimeRoutes([])
       return
     }
 
@@ -804,18 +824,18 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
               <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-600 border border-amber-500/20">{copy.beta}</span>
               {customCourse && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-sky-blue/20 to-active-blue/20 px-2.5 py-0.5 text-[9px] font-black text-sky-blue border border-sky-blue/20 animate-pulse">
-                  AI 맞춤형
+                  {copy.customBadge}
                 </span>
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              {customCourse ? "나들AI 챗봇과 실시간 대화를 통해 맞춤 구성한 전주 나들이 코스입니다." : copy.description}
+              {customCourse ? copy.customDescription : copy.description}
             </p>
           </div>
         </div>
         <button
           type="button"
-          onClick={() => fetchCourse()}
+          onClick={() => fetchCourse(excludedNames, selectedThemeRef.current)}
           disabled={loading}
           className="inline-flex items-center gap-1.5 rounded-full border border-card-border/70 bg-background/75 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
         >
@@ -866,7 +886,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
             <span className="text-sm font-semibold text-danger">{error}</span>
             <button
               type="button"
-              onClick={() => fetchCourse()}
+              onClick={() => fetchCourse(excludedNames, selectedThemeRef.current)}
               className="rounded-full border border-danger/20 px-3 py-1 text-xs font-bold text-danger"
             >
               {copy.retry}
@@ -1141,7 +1161,11 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                 
                 {/* Floating capsule info */}
                 <div className="absolute left-[20px] top-1/2 -translate-y-1/2 ml-5 z-10 flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/90 px-3 py-1 text-[10.5px] font-bold text-muted-foreground shadow-sm backdrop-blur-md">
-                  <Car className="size-3 text-sky-blue" />
+                  {transitToHome.type === "walk" ? (
+                    <Footprints className="size-3 text-emerald-400" />
+                  ) : (
+                    <Car className="size-3 text-sky-blue" />
+                  )}
                   <span className="text-[10px] font-semibold text-sky-blue/80 mr-0.5">{copy.returnHome}:</span>
                   <span>{transitToHome.text}</span>
                   {transitToHome.source === "kakao" && (

@@ -634,6 +634,16 @@ export function DashboardChatPanel({
   const previousMessageCountRef = useRef(0)
   const shouldStickToBottomRef = useRef(true)
   const isComposingRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   const applyPayload = useCallback((payload: ChatStateResponse) => {
     // Keep all state slices sourced from one server payload to avoid partial-session mismatches.
@@ -876,9 +886,16 @@ export function DashboardChatPanel({
     focusInputWithoutScroll()
 
     startTransition(async () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+
       try {
         const response = await fetch("/api/chat", {
           method: "POST",
+          signal: controller.signal,
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
@@ -976,7 +993,8 @@ export function DashboardChatPanel({
 
         const payload = data as ChatStateResponse
         applyPayload(payload)
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === "AbortError") return
         console.error("Failed to send dashboard chat message:", error)
         setMessages((current) => current.filter((item) =>
           item.id !== optimisticUserMessage.id && item.id !== optimisticAssistantMessage.id
