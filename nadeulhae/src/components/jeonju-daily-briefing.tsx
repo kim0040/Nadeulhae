@@ -151,6 +151,13 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
             const body = (await res.json()) as { error?: string }
             if (body.error) msg = body.error
           } catch { /* ignore */ }
+
+          if (res.status === 429) {
+            setErrorMsg(msg)
+            setStatus("error")
+            fetchingRef.current = false
+            return
+          }
           throw new Error(msg)
         }
 

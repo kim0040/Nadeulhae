@@ -8,7 +8,7 @@
  */
 
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   CloudIcon,
   DropletsIcon,
@@ -102,6 +102,12 @@ export default function Home() {
   const { resolvedTheme } = useTheme();
   const { language, t } = useLanguage();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
   // ---- Custom hooks: data fetching ----
   const { weatherData } = useWeatherData();
   const { hourlyForecast, weatherImages, fireSummary } =
@@ -128,9 +134,21 @@ export default function Home() {
     );
   }, [weatherData?.metadata?.lastUpdate]);
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4";
-  const particleQuantity = useMemo(() => getParticleCount(20), []);
-  const meteorCount = useMemo(() => getMeteorCount(3), []);
-  const enableAnimations = useMemo(() => shouldRunRichAnimation(), []);
+  
+  const particleQuantity = useMemo(() => {
+    if (!mounted) return 0;
+    return getParticleCount(20);
+  }, [mounted]);
+
+  const meteorCount = useMemo(() => {
+    if (!mounted) return 0;
+    return getMeteorCount(3);
+  }, [mounted]);
+
+  const enableAnimations = useMemo(() => {
+    if (!mounted) return false;
+    return shouldRunRichAnimation();
+  }, [mounted]);
 
   // ---- Computed values (must be before early return for hook rules) ----
   const feelsLikeValue =

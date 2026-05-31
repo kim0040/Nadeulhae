@@ -287,11 +287,19 @@ export const dataService = {
 
       return await getOrFetchCached(cacheKey, 45_000, async () => {
         const query = hasCoords ? `?lat=${lat}&lon=${lon}` : "";
-        const response = await fetch(`${API_BASE}/current${query}`, {
-          next: { revalidate: 60 },
-        });
-        if (!response.ok) throw new Error("Weather API error");
-        return await response.json();
+        try {
+          const response = await fetch(`${API_BASE}/current${query}`, {
+            next: { revalidate: 60 },
+          });
+          if (!response.ok) {
+            console.warn(`[WeatherAPI] Returned status ${response.status}. Using fallback weather data.`);
+            return { ...mockWeatherData, isFallback: true };
+          }
+          return await response.json();
+        } catch (fetchErr) {
+          console.warn("[WeatherAPI] Fetch request failed. Returning fallback data. Details:", fetchErr);
+          return { ...mockWeatherData, isFallback: true };
+        }
       });
     } catch (error) {
       console.error("Failed to fetch weather data:", error);

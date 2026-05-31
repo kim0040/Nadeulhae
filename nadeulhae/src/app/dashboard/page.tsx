@@ -47,6 +47,19 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [customCourse, setCustomCourse] = useState<any[] | null>(null)
   const [showCourseRecommendation, setShowCourseRecommendation] = useState(false)
+  const safeSetCustomCourse = useCallback((nextCourse: any[] | null) => {
+    setCustomCourse((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(nextCourse)) {
+        return prev;
+      }
+      return nextCourse;
+    });
+    if (nextCourse && nextCourse.length > 0) {
+      setShowCourseRecommendation(true)
+    } else {
+      setShowCourseRecommendation(false)
+    }
+  }, []);
 
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
   const particleQuantity = useMemo(() => getParticleCount(30), [])
@@ -101,23 +114,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
     void refreshWeather()
   }, [refreshWeather])
 
-  // Smooth scroll to recommendation map when custom course is generated from chat
-  useEffect(() => {
-    if (customCourse) {
-      const timer = setTimeout(() => {
-        window.scrollTo({
-          top: document.body.scrollHeight,
-          behavior: "smooth",
-        })
-      }, 150)
-      return () => clearTimeout(timer)
-    }
-  }, [customCourse])
-
-  // Reset showCourseRecommendation when customCourse changes
-  useEffect(() => {
-    setShowCourseRecommendation(false)
-  }, [customCourse])
+  // Synchronized via safeSetCustomCourse to avoid synchronous set-state in effect warnings
 
 
 
@@ -248,7 +245,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
             <DashboardChatPanel 
               user={user} 
               weatherContext={chatWeatherContext} 
-              onCourseGenerated={setCustomCourse}
+              onCourseGenerated={safeSetCustomCourse}
               onCourseClick={() => setShowCourseRecommendation(true)}
             />
           </SectionCard>
@@ -269,7 +266,7 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
               userLat={weatherData?.metadata?.locationContext?.coordinates?.lat ?? null}
               userLon={weatherData?.metadata?.locationContext?.coordinates?.lon ?? null}
               customCourse={customCourse}
-              onCourseReset={() => setCustomCourse(null)}
+              onCourseReset={() => safeSetCustomCourse(null)}
             />
           </div>
         )}

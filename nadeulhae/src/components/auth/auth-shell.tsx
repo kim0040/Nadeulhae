@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { Sparkles } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -54,10 +54,29 @@ export function AuthShell({
 }: AuthShellProps) {
   const { resolvedTheme } = useTheme()
   const particleColor = resolvedTheme === "dark" ? "#d8ecff" : "#2f6fe4"
+  
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true)
+  }, [])
+
   const isFastMode = performanceMode === "fast"
-  const richAnimations = useMemo(() => shouldRunRichAnimation(), [])
-  const particleQuantity = useMemo(() => getParticleCount(18), [])
-  const meteorCount = useMemo(() => getMeteorCount(2), [])
+  const richAnimations = useMemo(() => {
+    if (!mounted) return false
+    return shouldRunRichAnimation()
+  }, [mounted])
+
+  const particleQuantity = useMemo(() => {
+    if (!mounted) return 0
+    return getParticleCount(18)
+  }, [mounted])
+
+  const meteorCount = useMemo(() => {
+    if (!mounted) return 0
+    return getMeteorCount(2)
+  }, [mounted])
+
   const useFastLayout = isFastMode || !richAnimations
   const hasBadge = Boolean(badge?.trim())
   const hasSidePanel =

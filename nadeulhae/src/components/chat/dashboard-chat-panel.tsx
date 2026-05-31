@@ -378,9 +378,7 @@ function InteractiveCourseWidget({
   isPending?: boolean
   language?: string
 }) {
-  const [course, setCourse] = useState<any>(null)
   const lastGeneratedRef = useRef<string>("")
-  const [isLoading, setIsLoading] = useState(true)
   const copy = getCopy(CHAT_PANEL_COPY, language ?? "ko")
 
   // Stable callbacks using refs to prevent dependency change infinite loops
@@ -399,20 +397,18 @@ function InteractiveCourseWidget({
   const parsed = useMemo(() => tryParsePartialJson(code), [code])
   const hasValidSlots = parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0
 
-  // Sync parsed course to state and notify parent
+  // Sync parsed course to parent
   useEffect(() => {
     if (hasValidSlots) {
       const courseStr = JSON.stringify(parsed.slots)
       if (lastGeneratedRef.current !== courseStr) {
         lastGeneratedRef.current = courseStr
-        setCourse(parsed)
-        setIsLoading(false)
         onCourseGeneratedRef.current?.(parsed.slots)
       }
     }
   }, [hasValidSlots, parsed])
 
-  if (isLoading && !course) {
+  if (!hasValidSlots) {
     return (
       <div className="my-2 rounded-2xl border border-nature-green/20 bg-nature-green/5 p-4 text-center backdrop-blur-sm">
         <div className="flex items-center justify-center gap-2 text-nature-green">
@@ -430,7 +426,7 @@ function InteractiveCourseWidget({
       if (courseElement) {
         courseElement.scrollIntoView({ behavior: 'smooth' })
       }
-    }, 100)
+    }, 200)
   }
 
   return (
@@ -629,6 +625,27 @@ export function DashboardChatPanel({
 }) {
   const { language } = useLanguage()
   const copy = getCopy(CHAT_PANEL_COPY, language)
+  
+  // Stable wrapper callbacks using Refs to prevent markdown re-mount infinite loops
+  const onCourseGeneratedRef = useRef(onCourseGenerated)
+  const onCourseClickRef = useRef(onCourseClick)
+
+  useEffect(() => {
+    onCourseGeneratedRef.current = onCourseGenerated
+  }, [onCourseGenerated])
+
+  useEffect(() => {
+    onCourseClickRef.current = onCourseClick
+  }, [onCourseClick])
+
+  const stableOnCourseGenerated = useCallback((course: any) => {
+    onCourseGeneratedRef.current?.(course)
+  }, [])
+
+  const stableOnCourseClick = useCallback(() => {
+    onCourseClickRef.current?.()
+  }, [])
+
   const [isPending, startTransition] = useTransition()
   const [isSessionPending, startSessionTransition] = useTransition()
   const [isLoading, setIsLoading] = useState(true)
@@ -1096,8 +1113,8 @@ export function DashboardChatPanel({
                         language={language}
                         isLastAssistant={message.role === "assistant" && messages.indexOf(message) === lastAssistantIndex}
                         groupPosition={groupPosition}
-                        onCourseGenerated={onCourseGenerated}
-                        onCourseClick={onCourseClick}
+                        onCourseGenerated={stableOnCourseGenerated}
+                        onCourseClick={stableOnCourseClick}
                       />
                     )
                   })}

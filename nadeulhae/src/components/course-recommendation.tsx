@@ -389,13 +389,15 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
     if (!kakaoKeyLoaded || loadError || !mapRef.current) return
 
     let isAborted = false
+    let timeoutId: any = null
+    let intervalId: any = null
 
     const initMap = () => {
       if (isAborted) return
       try {
         if (typeof window === "undefined" || !window.kakao || !window.kakao.maps) {
           // Wait for window namespace to settle
-          setTimeout(initMap, 150)
+          timeoutId = setTimeout(initMap, 150)
           return
         }
 
@@ -445,16 +447,18 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
         window.kakao.maps.load(initMap)
       }
     } else {
-      const interval = setInterval(() => {
+      intervalId = setInterval(() => {
         if (window.kakao && window.kakao.maps && window.kakao.maps.Map) {
-          clearInterval(interval)
+          clearInterval(intervalId)
           initMap()
         }
       }, 300)
-      return () => {
-        isAborted = true
-        clearInterval(interval)
-      }
+    }
+
+    return () => {
+      isAborted = true
+      if (timeoutId) clearTimeout(timeoutId)
+      if (intervalId) clearInterval(intervalId)
     }
   }, [lat, lon, kakaoKeyLoaded, loadError, placeName])
 
@@ -485,6 +489,14 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const { language } = useLanguage()
   const copy = useMemo(() => COPY[language as keyof typeof COPY] ?? COPY.ko, [language])
   const [slots, setSlots] = useState<CourseSlotData[]>([])
+  const safeSetSlots = useCallback((nextSlots: CourseSlotData[]) => {
+    setSlots((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(nextSlots)) {
+        return prev;
+      }
+      return nextSlots;
+    });
+  }, []);
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedSlot, setExpandedSlot] = useState<number | null>(0)
@@ -546,16 +558,16 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                 }
               })
             }))
-            setSlots(hydratedSlots)
+            safeSetSlots(hydratedSlots)
           } else {
-            setSlots(cc)
+            safeSetSlots(cc)
           }
         } else {
-          setSlots(cc)
+          safeSetSlots(cc)
         }
       } catch (err) {
         console.error("Custom course hydration failed:", err)
-        setSlots(cc)
+        safeSetSlots(cc)
       } finally {
         setLoading(false)
       }
@@ -582,14 +594,14 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      setSlots(Array.isArray(data) ? data : [])
+      safeSetSlots(Array.isArray(data) ? data : [])
     } catch (e) {
       setError(copy.error)
       console.error("Course fetch failed:", e)
     } finally {
       setLoading(false)
     }
-  }, [userLat, userLon, language, copy.error])
+  }, [userLat, userLon, language, copy.error, safeSetSlots])
 
   // Theme change handler
   const handleThemeChange = useCallback((theme: CourseTheme) => {
@@ -662,9 +674,16 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const originLon = userLon ?? 127.1480
   const hasGps = userLat != null && userLon != null
 
+  // customCourse 실제 내용 값 기반의 변화 감지를 위한 ref 사용 (주소 꼬리물기 방지)
+  const lastCustomCourseStrRef = useRef<string>("")
+
   // 초기 로딩 및 customCourse 변경 대응 (일반 코스 <-> AI 맞춤형 코스 원활한 연동)
   useEffect(() => {
-    fetchCourse(undefined, selectedThemeRef.current)
+    const currentCcStr = customCourse ? JSON.stringify(customCourse) : ""
+    if (lastCustomCourseStrRef.current !== currentCcStr) {
+      lastCustomCourseStrRef.current = currentCcStr
+      fetchCourse(undefined, selectedThemeRef.current)
+    }
   }, [customCourse, fetchCourse])
 
   const handleDislike = useCallback((slotIndex: number) => {
@@ -719,14 +738,20 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     return routes
   }, [slots, originLat, originLon, language])
 
-  // Fetch real-time traffic directions asynchronously (Stale-While-Revalidate)
+  // Fetch real-time traffic directions asynchronously (Stale-While-Revalidate with Debounce & Lock)
+  const realtimeFetchInFlightRef = useRef<boolean>(false)
   useEffect(() => {
+    // Clear previous routes immediately to avoid showing stale route info for new slots (Fixes Bug #3)
     setRealtimeRoutes([])
+
     if (slots.length === 0) {
       return
     }
 
-    const fetchRealtimeRoutes = async () => {
+    const timer = setTimeout(async () => {
+      if (realtimeFetchInFlightRef.current) return
+      realtimeFetchInFlightRef.current = true
+
       const transitions: any[] = []
 
       // 1. Starting Point ➔ Slot 1
@@ -745,57 +770,70 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       transitions.push({ lat1: pLast?.lat, lon1: pLast?.lon, lat2: originLat, lon2: originLon })
 
       try {
-        const promises = transitions.map(async (t) => {
+        const results: any[] = new Array(transitions.length).fill(null)
+        
+        // Sequential fetch with 100ms spacing to completely bypass throttle limit triggers
+        for (let idx = 0; idx < transitions.length; idx++) {
+          const t = transitions[idx]
           if (t.lat1 == null || t.lon1 == null || t.lat2 == null || t.lon2 == null) {
-            return null
+            continue
           }
-          const res = await fetch("/api/places/directions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat1: t.lat1, lon1: t.lon1, lat2: t.lat2, lon2: t.lon2 }),
-          })
 
-          if (res.ok) {
-            const data = await res.json()
-            const dist = data.distanceMeters / 1000 // KM
-            const timeMin = Math.round(data.durationSeconds / 60)
-            
-            let text = ""
-            let type: "walk" | "drive" = dist < 1.0 ? "walk" : "drive"
+          if (idx > 0) {
+            await new Promise((r) => setTimeout(r, 100))
+          }
 
-            if (dist < 0.05) {
-              text = language === "ko" ? "바로 인접 (도보 1분 이내)" 
-                    : language === "en" ? "Right next to it (walk < 1 min)"
-                    : language === "zh" ? "紧邻 (步行不到1分钟)"
-                    : "すぐ隣 (徒歩 1 分以内)"
-              type = "walk"
-            } else if (dist < 1.0) {
-              text = language === "ko" ? `도보 약 ${timeMin}분 (약 ${data.distanceMeters}m)`
-                    : language === "en" ? `Walk approx ${timeMin} min (approx ${data.distanceMeters}m)`
-                    : language === "zh" ? `步行约 ${timeMin} 分钟 (约 ${data.distanceMeters}米)`
-                    : `徒歩約 ${timeMin} 分 (約 ${data.distanceMeters}m)`
-              type = "walk"
-            } else {
-              text = language === "ko" ? `차량 약 ${timeMin}분 (${dist.toFixed(1)}km)`
-                    : language === "en" ? `Car approx ${timeMin} min (${dist.toFixed(1)}km)`
-                    : language === "zh" ? `乘车约 ${timeMin} 分钟 (${dist.toFixed(1)}公里)`
-                    : `車で約 ${timeMin} 分 (${dist.toFixed(1)}km)`
-              type = "drive"
+          try {
+            const res = await fetch("/api/places/directions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lat1: t.lat1, lon1: t.lon1, lat2: t.lat2, lon2: t.lon2 }),
+            })
+
+            if (res.ok) {
+              const data = await res.json()
+              const dist = data.distanceMeters / 1000 // KM
+              const timeMin = Math.round(data.durationSeconds / 60)
+              
+              let text = ""
+              let type: "walk" | "drive" = dist < 1.0 ? "walk" : "drive"
+
+              if (dist < 0.05) {
+                text = language === "ko" ? "바로 인접 (도보 1분 이내)" 
+                      : language === "en" ? "Right next to it (walk < 1 min)"
+                      : language === "zh" ? "紧邻 (步行不到1分钟)"
+                      : "すぐ隣 (徒歩 1 分以内)"
+                type = "walk"
+              } else if (dist < 1.0) {
+                text = language === "ko" ? `도보 약 ${timeMin}분 (약 ${data.distanceMeters}m)`
+                      : language === "en" ? `Walk approx ${timeMin} min (approx ${data.distanceMeters}m)`
+                      : language === "zh" ? `步行约 ${timeMin} 分钟 (约 ${data.distanceMeters}米)`
+                      : `徒歩約 ${timeMin} 分 (約 ${data.distanceMeters}m)`
+                type = "walk"
+              } else {
+                text = language === "ko" ? `차량 약 ${timeMin}분 (${dist.toFixed(1)}km)`
+                      : language === "en" ? `Car approx ${timeMin} min (${dist.toFixed(1)}km)`
+                      : language === "zh" ? `乘车约 ${timeMin} 分钟 (${dist.toFixed(1)}公里)`
+                      : `車で約 ${timeMin} 分 (${dist.toFixed(1)}km)`
+                type = "drive"
+              }
+
+              results[idx] = { text, dist, type, source: data.source }
             }
-
-            return { text, dist, type, source: data.source }
+          } catch (err) {
+            console.warn(`[DirectionsAPI] Transition ${idx} fetch failed:`, err)
           }
-          return null
-        })
+        }
 
-        const results = await Promise.all(promises)
         setRealtimeRoutes(results)
       } catch (err) {
         console.error("[KakaoMap] Asynchronous directions fetch failed:", err)
+      } finally {
+        realtimeFetchInFlightRef.current = false
       }
-    }
+    }, 600)
 
-    fetchRealtimeRoutes()
+    return () => clearTimeout(timer)
   }, [slots, originLat, originLon, language])
 
   if (loading) {
