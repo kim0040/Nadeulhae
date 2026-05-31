@@ -443,7 +443,7 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
       }, 300)
       return () => clearInterval(interval)
     }
-  }, [lat, lon, kakaoKeyLoaded, loadError])
+  }, [lat, lon, kakaoKeyLoaded, loadError, placeName])
 
   if (loadError) {
     return (
