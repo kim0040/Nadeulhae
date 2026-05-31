@@ -388,7 +388,10 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
   useEffect(() => {
     if (!kakaoKeyLoaded || loadError || !mapRef.current) return
 
+    let isAborted = false
+
     const initMap = () => {
+      if (isAborted) return
       try {
         if (typeof window === "undefined" || !window.kakao || !window.kakao.maps) {
           // Wait for window namespace to settle
@@ -396,7 +399,14 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
           return
         }
 
+        // Clean container innerHTML to prevent duplicate canvas mounting leaks
+        if (mapRef.current) {
+          mapRef.current.innerHTML = ""
+        }
+
         const container = mapRef.current
+        if (!container) return
+
         const options = {
           center: new window.kakao.maps.LatLng(lat, lon),
           level: 3,
@@ -441,7 +451,10 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
           initMap()
         }
       }, 300)
-      return () => clearInterval(interval)
+      return () => {
+        isAborted = true
+        clearInterval(interval)
+      }
     }
   }, [lat, lon, kakaoKeyLoaded, loadError, placeName])
 
@@ -649,10 +662,10 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const originLon = userLon ?? 127.1480
   const hasGps = userLat != null && userLon != null
 
-  // 초기 로딩 (한 번만 실행)
+  // 초기 로딩 및 customCourse 변경 대응 (일반 코스 <-> AI 맞춤형 코스 원활한 연동)
   useEffect(() => {
     fetchCourse(undefined, selectedThemeRef.current)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [customCourse, fetchCourse])
 
   const handleDislike = useCallback((slotIndex: number) => {
     if (slotIndex >= slots.length) return
@@ -1161,14 +1174,14 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                 
                 {/* Floating capsule info */}
                 <div className="absolute left-[20px] top-1/2 -translate-y-1/2 ml-5 z-10 flex items-center gap-1.5 rounded-full border border-card-border/60 bg-card/90 px-3 py-1 text-[10.5px] font-bold text-muted-foreground shadow-sm backdrop-blur-md">
-                  {transitToHome.type === "walk" ? (
+                  {transitToHome?.type === "walk" ? (
                     <Footprints className="size-3 text-emerald-400" />
                   ) : (
                     <Car className="size-3 text-sky-blue" />
                   )}
                   <span className="text-[10px] font-semibold text-sky-blue/80 mr-0.5">{copy.returnHome}:</span>
-                  <span>{transitToHome.text}</span>
-                  {transitToHome.source === "kakao" && (
+                  <span>{transitToHome?.text ?? "--"}</span>
+                  {transitToHome?.source === "kakao" && (
                     <span className="inline-flex items-center rounded bg-sky-blue/10 px-1 py-0.2 text-[8px] font-black text-sky-blue border border-sky-blue/15 scale-[0.9]">
                       {copy.realtimeTraffic}
                     </span>
