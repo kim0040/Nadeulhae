@@ -383,6 +383,18 @@ function InteractiveCourseWidget({
   const [isLoading, setIsLoading] = useState(true)
   const copy = getCopy(CHAT_PANEL_COPY, language ?? "ko")
 
+  // Stable callbacks using refs to prevent dependency change infinite loops
+  const onCourseGeneratedRef = useRef(onCourseGenerated)
+  const onCourseClickRef = useRef(onCourseClick)
+
+  useEffect(() => {
+    onCourseGeneratedRef.current = onCourseGenerated
+  }, [onCourseGenerated])
+
+  useEffect(() => {
+    onCourseClickRef.current = onCourseClick
+  }, [onCourseClick])
+
   // Parse course from code (derived state)
   const parsed = useMemo(() => tryParsePartialJson(code), [code])
   const hasValidSlots = parsed && Array.isArray(parsed.slots) && parsed.slots.length > 0
@@ -395,10 +407,10 @@ function InteractiveCourseWidget({
         lastGeneratedRef.current = courseStr
         setCourse(parsed)
         setIsLoading(false)
-        onCourseGenerated?.(parsed.slots)
+        onCourseGeneratedRef.current?.(parsed.slots)
       }
     }
-  }, [hasValidSlots, parsed, onCourseGenerated])
+  }, [hasValidSlots, parsed])
 
   if (isLoading && !course) {
     return (
@@ -412,7 +424,7 @@ function InteractiveCourseWidget({
   }
 
   const handleScrollToCourse = () => {
-    onCourseClick?.()
+    onCourseClickRef.current?.()
     setTimeout(() => {
       const courseElement = document.getElementById('course-recommendation-section')
       if (courseElement) {
