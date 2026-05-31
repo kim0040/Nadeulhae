@@ -5,6 +5,11 @@ import type { NextConfig } from "next";
 const appRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  typescript: {
+    // Skip heavy tsc type checking on the server during builds to prevent OOM (Out Of Memory)
+    // on memory-constrained systems (like 512MB/1GB VPS). We already verified types locally.
+    ignoreBuildErrors: true,
+  },
   turbopack: {
     root: appRoot,
   },
