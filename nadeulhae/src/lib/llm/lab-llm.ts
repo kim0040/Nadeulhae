@@ -3,7 +3,9 @@
  *
  * General-purpose AI assistant client with curated model selection,
  * reasoning-effort control, and daily quota enforcement.
- * Uses CrofAI API (OpenAI-compatible) for all lab chat completions.
+ * Uses the official DeepSeek API (OpenAI-compatible) for all lab chat
+ * completions, limited to the V4 Pro and V4 Flash models exposed by
+ * the configured API key.
  */
 import type { LlmCompletionResult, LlmRequestKind, LlmConfig, LlmModelOption } from "@/lib/llm/types"
 import {
@@ -46,7 +48,7 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
     slug: "deepseek-v4-pro",
     label: "DeepSeek V4 Pro",
-    description: "1.6T MoE (49B 활성). 하이브리드 어텐션으로 1M 컨텍스트 처리. MIT 라이선스. LiveCodeBench 93.5%·Codeforces 3206으로 코딩 최상위권. Claude Code 백엔드로도 사용 가능.",
+    description: "DeepSeek 공식 플래그십. 1.6T MoE (49B 활성)·하이브리드 어텐션으로 1M 컨텍스트 처리. 코딩·복잡한 추론·장기 워크플로에 최상위 성능. 사고 모드 지원.",
     candidates: ["deepseek-v4-pro"],
     quantization: "FP4+FP8 혼합",
     reasoningEffort: true,
@@ -54,123 +56,10 @@ const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
     slug: "deepseek-v4-flash",
     label: "DeepSeek V4 Flash",
-    description: "292B MoE (158B). V4 Pro 대비 1/10 비용으로 근접 성능. 빠른 추론 속도와 효율적인 토큰 처리. 일상 코딩·고처리량 워크로드에 최적.",
+    description: "DeepSeek 경량 모델. 292B MoE (158B 활성)·V4 Pro 대비 1/10 비용으로 근접 성능. 빠른 응답과 효율적인 토큰 처리. 일상 코딩·고처리량 워크로드에 최적. 사고 모드 지원.",
     candidates: ["deepseek-v4-flash"],
     quantization: "FP8",
     reasoningEffort: true,
-  },
-  {
-    slug: "glm-5.1",
-    label: "GLM 5.1",
-    description: "744B MoE·8전문가 활성. 세계 최초 8시간 연속 자율 작업 가능. SWE-Bench Pro 58.4로 GPT-5.4 추월. MIT 라이선스. 장기 에이전트 코딩의 새 패러다임.",
-    candidates: ["glm-5.1"],
-    quantization: "Q6_K",
-    reasoningEffort: true,
-  },
-  {
-    slug: "glm-5",
-    label: "GLM 5",
-    description: "754B MoE·화웨이 Ascend 학습. 시스템 설계·장기 에이전트 워크플로에 강점. 5.1 이전 세대의 안정적인 선택.",
-    candidates: ["glm-5"],
-    quantization: "Q4_0",
-    reasoningEffort: false,
-  },
-  {
-    slug: "kimi-k2.6",
-    label: "Kimi K2.6",
-    description: "1T MoE (32B 활성). 256K 컨텍스트·300 에이전트 스웜·4000단계 자율 실행. SWE-Bench Pro 58.6으로 Claude Opus 4.6 추월. 멀티모달 장기 코딩 최강.",
-    candidates: ["kimi-k2.6"],
-    quantization: "Q3_K_L",
-    reasoningEffort: true,
-  },
-  {
-    slug: "kimi-k2.5",
-    label: "Kimi K2.5",
-    description: "1T MoE (32B 활성). K2.6 이전 세대. 비전 지원 문서 분석·에이전트 작업에 안정적. Cursor의 Composer 2 내부 모델로도 사용됨.",
-    candidates: ["kimi-k2.5"],
-    quantization: "Q4_K_M",
-    reasoningEffort: true,
-  },
-  {
-    slug: "mimo-v2.5-pro",
-    label: "MiMo V2.5 Pro",
-    description: "Xiaomi 플래그십. SWE-Bench Pro·ClawEval 상위. 1000+ 도구 호출 자율 작업 가능. 아날로그 회로 설계부터 영상 편집까지 가능한 범위.",
-    candidates: ["mimo-v2.5-pro"],
-    quantization: "Q4_0",
-    reasoningEffort: true,
-  },
-  {
-    slug: "mimo-v2.5",
-    label: "MiMo V2.5",
-    description: "MiMo V2.5 시리즈의 범용 모델. 안정적인 성능과 빠른 응답. 일반 대화·코딩에 무난.",
-    candidates: ["mimo-v2.5"],
-    quantization: "Q4_0",
-    reasoningEffort: true,
-  },
-  {
-    slug: "mimo-v2-pro",
-    label: "MiMo V2 Pro",
-    description: "MiMo V2 시리즈의 프로 모델. 이전 세대 안정형. 검증된 성능.",
-    candidates: ["mimo-v2-pro"],
-    quantization: "Q4_0",
-    reasoningEffort: true,
-  },
-  {
-    slug: "mimo-v2-omni",
-    label: "MiMo V2 Omni",
-    description: "멀티모달 지원 MiMo 모델. 텍스트와 이미지 처리 가능. 비전 작업에 유용.",
-    candidates: ["mimo-v2-omni"],
-    quantization: "Q4_0",
-    reasoningEffort: true,
-  },
-  {
-    slug: "qwen3.7-max",
-    label: "Qwen 3.7 Max",
-    description: "Alibaba 최신 플래그십. 1M 컨텍스트. Chinese 모델 중 Artificial Analysis 최고 순위. GPT-5.4·Gemini 3.5 Flash와 경쟁. 복잡한 추론·장기 워크플로 특화.",
-    candidates: ["qwen3.7-max"],
-    quantization: "Q4_0",
-    reasoningEffort: true,
-  },
-  {
-    slug: "qwen3.6-plus",
-    label: "Qwen 3.6 Plus",
-    description: "Alibaba 27B MoE·비전. 빠른 범용 대화와 실무 코딩에 무난한 밸런스형. 256K 컨텍스트.",
-    candidates: ["qwen3.6-plus"],
-    quantization: "Q4_0",
-    reasoningEffort: true,
-  },
-  {
-    slug: "qwen3.5-plus",
-    label: "Qwen 3.5 Plus",
-    description: "Qwen 3.5 시리즈의 플러스 모델. 향상된 성능과 안정성. 범용 작업에 적합.",
-    candidates: ["qwen3.5-plus"],
-    quantization: "Q4_0",
-    reasoningEffort: true,
-  },
-  {
-    slug: "minimax-m2.7",
-    label: "MiniMax M2.7",
-    description: "세계 최초 자기 진화 모델. 자가 학습 파이프라인 참여 가능. 205K 컨텍스트. GDPval-AA 1495 ELO. 10B 파라미터로 GLM-5급 지능. 연구 워크플로 30-50% 자동화.",
-    candidates: ["minimax-m2.7"],
-    quantization: "awq",
-    reasoningEffort: false,
-  },
-  {
-    slug: "minimax-m2.5",
-    label: "MiniMax M2.5",
-    description: "가성비 최강 범용 모델. 205K 컨텍스트. 긴 대화·창작·요약에 부드러운 성능. Frontier 성능을 1/10 비용으로.",
-    candidates: ["minimax-m2.5"],
-    quantization: "awq",
-    reasoningEffort: false,
-  },
-  {
-    slug: "hy3-preview",
-    label: "HY3 Preview",
-    description: "실험적 프리뷰 모델. 최신 기능 테스트용. 검증되지 않은 성능.",
-    warning: "실험 모델이라 응답 품질이 불안정할 수 있어요.",
-    candidates: ["hy3-preview"],
-    quantization: "Q4_0",
-    reasoningEffort: false,
   },
 ]
 
@@ -192,13 +81,12 @@ function resolveApiKey(): string {
   )
 }
 
-/** Resolves the base URL. Defaults to the Nano-GPT API v1 endpoint. */
+/** Resolves the base URL. Defaults to the official DeepSeek API v1 endpoint. */
 function resolveBaseUrl(): string {
   return (
     process.env.LAB_LLM_BASE_URL
     || process.env.LLM_BASE_URL
-    || process.env.NANOGPT_BASE_URL
-    || "https://nano-gpt.com/api/v1"
+    || "https://api.deepseek.com/v1"
   ).replace(/\/$/, "")
 }
 
