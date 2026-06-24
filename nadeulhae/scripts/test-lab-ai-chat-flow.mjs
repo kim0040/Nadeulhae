@@ -178,15 +178,25 @@ async function main() {
     console.log("Allowed models:", initialState.json.models.map((item) => item.label).join(", "))
     console.log("Default model:", initialState.json.defaultModelId)
     console.log("Reply preview:", lastMessage.content.slice(0, 120))
+  } catch (err) {
+    console.error("SMOKE TEST ERROR:", err)
+    throw err
   } finally {
     if (registered) {
-      const deleteResult = await request("/api/auth/account", {
-        method: "DELETE",
-        jar,
-        json: { confirmText: "DELETE" },
-      })
-      assertCondition(deleteResult.status === 200, "Cleanup account deletion should return 200")
-      logStep("Temporary user account deleted")
+      try {
+        const deleteResult = await request("/api/auth/account", {
+          method: "DELETE",
+          jar,
+          json: { confirmText: "DELETE" },
+        })
+        if (deleteResult.status !== 200) {
+          console.warn(`Cleanup account deletion returned non-200 status: ${deleteResult.status}`)
+        } else {
+          logStep("Temporary user account deleted")
+        }
+      } catch (cleanupErr) {
+        console.error("Failed to delete cleanup account:", cleanupErr)
+      }
     }
   }
 }

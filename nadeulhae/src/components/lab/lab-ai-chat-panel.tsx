@@ -1013,7 +1013,7 @@ export function LabAiChatPanel() {
   const activeModelWarning = activeModel?.warning ?? null
 
   const remainingRequests = usage?.remainingRequests ?? policy?.dailyLimit ?? 0
-  const isLimitReached = !isLoading && remainingRequests <= 0
+  const isLimitReached = !isLoading && usage !== null && policy !== null && remainingRequests <= 0
   const canType = !isLoading && !isSessionPending && !isLimitReached && Boolean(resolvedActiveSessionId) && Boolean(resolvedModelId)
   const canSend = canType && !isPending
   const maxInputCharacters = policy?.maxInputCharacters ?? 16000
