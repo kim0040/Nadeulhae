@@ -535,11 +535,21 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const [savedToken, setSavedToken] = useState<string | null>(null)
   const [saveError, setSaveError] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+  const shareCopyTimerRef = useRef<number | null>(null)
   const [selectedTheme, setSelectedTheme] = useState<CourseTheme>("balanced")
   const selectedThemeRef = useRef<CourseTheme>(selectedTheme)
   useEffect(() => {
     selectedThemeRef.current = selectedTheme
   }, [selectedTheme])
+
+  useEffect(() => {
+    return () => {
+      if (shareCopyTimerRef.current != null) {
+        window.clearTimeout(shareCopyTimerRef.current)
+        shareCopyTimerRef.current = null
+      }
+    }
+  }, [])
   
   // Props를 useRef로 안정화
   const propsRef = useRef({ weatherContext, userProfile, customCourse, onThemeChange, onCourseReset })
@@ -695,13 +705,23 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
       // Clipboard may be unavailable (insecure context); the link is still shown.
     }
     setShareCopied(true)
-    setTimeout(() => setShareCopied(false), 1600)
+    if (shareCopyTimerRef.current != null) {
+      window.clearTimeout(shareCopyTimerRef.current)
+    }
+    shareCopyTimerRef.current = window.setTimeout(() => {
+      setShareCopied(false)
+      shareCopyTimerRef.current = null
+    }, 1600)
   }, [savedToken])
 
   // A new/changed course invalidates any previously-generated share link.
   useEffect(() => {
     setSavedToken(null)
     setSaveError(false)
+    if (shareCopyTimerRef.current != null) {
+      window.clearTimeout(shareCopyTimerRef.current)
+      shareCopyTimerRef.current = null
+    }
     setShareCopied(false)
   }, [slots])
 
@@ -832,17 +852,27 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
 
   // Fetch real-time traffic directions asynchronously (Stale-While-Revalidate with Debounce & Lock)
   const realtimeFetchInFlightRef = useRef<boolean>(false)
+  const realtimeFetchRunIdRef = useRef(0)
   useEffect(() => {
+    const runId = realtimeFetchRunIdRef.current + 1
+    realtimeFetchRunIdRef.current = runId
+    let cancelled = false
+    let controller: AbortController | null = null
+    const isCurrentRun = () => !cancelled && realtimeFetchRunIdRef.current === runId
+
     // Clear previous routes immediately to avoid showing stale route info for new slots (Fixes Bug #3)
     setRealtimeRoutes([])
 
     if (slots.length === 0) {
-      return
+      return () => {
+        cancelled = true
+      }
     }
 
-    const timer = setTimeout(async () => {
+    const timer = window.setTimeout(async () => {
       if (realtimeFetchInFlightRef.current) return
       realtimeFetchInFlightRef.current = true
+      controller = new AbortController()
 
       const transitions: any[] = []
 
@@ -879,6 +909,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
             const res = await fetch("/api/places/directions", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              signal: controller.signal,
               body: JSON.stringify({ lat1: t.lat1, lon1: t.lon1, lat2: t.lat2, lon2: t.lon2 }),
             })
 
@@ -913,19 +944,35 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
               results[idx] = { text, dist, type, source: data.source }
             }
           } catch (err) {
+            if (!isCurrentRun() || (err instanceof DOMException && err.name === "AbortError")) {
+              continue
+            }
             console.warn(`[DirectionsAPI] Transition ${idx} fetch failed:`, err)
           }
         }
 
-        setRealtimeRoutes(results)
+        if (isCurrentRun()) {
+          setRealtimeRoutes(results)
+        }
       } catch (err) {
-        console.error("[KakaoMap] Asynchronous directions fetch failed:", err)
+        if (isCurrentRun()) {
+          console.error("[KakaoMap] Asynchronous directions fetch failed:", err)
+        }
       } finally {
-        realtimeFetchInFlightRef.current = false
+        if (realtimeFetchRunIdRef.current === runId) {
+          realtimeFetchInFlightRef.current = false
+        }
       }
     }, 600)
 
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      if (realtimeFetchRunIdRef.current === runId) {
+        realtimeFetchInFlightRef.current = false
+      }
+      window.clearTimeout(timer)
+      controller?.abort()
+    }
   }, [slots, originLat, originLon, language])
 
   if (loading) {

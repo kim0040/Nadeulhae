@@ -176,11 +176,15 @@ export function startJeonjuBriefingScheduler(): void {
     console.error("[jeonju-scheduler] Initial check failed:", err?.message ?? err)
   )
 
-  setInterval(() => {
+  const interval = setInterval(() => {
     checkAndGenerate().catch((err) =>
       console.error("[jeonju-scheduler] Periodic check failed:", err?.message ?? err)
     )
   }, CHECK_INTERVAL_MS)
+
+  if (typeof interval.unref === "function") {
+    interval.unref()
+  }
 }
 
 // For admin/debug: force immediate generation

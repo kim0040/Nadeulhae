@@ -122,28 +122,57 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
   const [status, setStatus] = useState<FetchStatus>("idle")
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fetchingRef = useRef(false)
+  const mountedRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const retryTimersRef = useRef<number[]>([])
+  const requestGenerationRef = useRef(0)
 
   const t = language === "ko" ? KO : language === "zh" ? ZH : language === "ja" ? JA : EN
 
+  useEffect(() => {
+    mountedRef.current = true
+
+    return () => {
+      mountedRef.current = false
+      requestGenerationRef.current += 1
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
+      for (const timer of retryTimersRef.current) {
+        window.clearTimeout(timer)
+      }
+      retryTimersRef.current = []
+    }
+  }, [])
+
   const fetchBriefing = useCallback(
     async (force = false, attempt = 0) => {
-      if (fetchingRef.current) return
+      if (!mountedRef.current || fetchingRef.current) return
       fetchingRef.current = true
+      const requestGeneration = requestGenerationRef.current
+      const isStaleRequest = () => !mountedRef.current || requestGeneration !== requestGenerationRef.current
+      const scheduleRetry = (delayMs: number) => {
+        if (isStaleRequest()) return
+        const retryTimer = window.setTimeout(() => {
+          retryTimersRef.current = retryTimersRef.current.filter((timer) => timer !== retryTimer)
+          void fetchBriefing(force, attempt + 1)
+        }, delayMs)
+        retryTimersRef.current.push(retryTimer)
+      }
 
       if (!briefing) setStatus("loading")
       setErrorMsg(null)
 
-      try {
-        const controller = new AbortController()
-        const timer = window.setTimeout(() => controller.abort(), 90000)
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+      const timer = window.setTimeout(() => controller.abort(), 90000)
 
+      try {
         const params = new URLSearchParams({ locale: language })
         if (force) params.set("force", "true")
 
         const res = await fetch(`/api/jeonju/briefing?${params}`, {
           signal: controller.signal,
         })
-        window.clearTimeout(timer)
 
         if (!res.ok) {
           let msg = `HTTP ${res.status}`
@@ -153,9 +182,9 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
           } catch { /* ignore */ }
 
           if (res.status === 429) {
+            if (isStaleRequest()) return
             setErrorMsg(msg)
             setStatus("error")
-            fetchingRef.current = false
             return
           }
           throw new Error(msg)
@@ -163,40 +192,54 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
 
         const json = await res.json()
         if (!json.success || !json.data) throw new Error(json.error || "Invalid response")
+        if (isStaleRequest()) return
 
         const data: BriefingData = { ...json.data, fromCache: json.fromCache ?? false }
         writeCache(language, data)
         setBriefing(data)
         setStatus("success")
       } catch (err) {
+        if (isStaleRequest()) return
         // Aborted requests are expected when the component unmounts or timeout fires
         if (err instanceof DOMException && err.name === "AbortError") {
           if (attempt < 2) {
-            fetchingRef.current = false
-            setTimeout(() => fetchBriefing(force, attempt + 1), 2000)
+            scheduleRetry(2000)
             return
           }
           setErrorMsg(t.errorSub)
           setStatus("error")
-          fetchingRef.current = false
           return
         }
         console.error("[JeonjuBriefing] fetch failed:", err)
         if (attempt < 2) {
-          fetchingRef.current = false
-          setTimeout(() => fetchBriefing(force, attempt + 1), 1500 * (attempt + 1))
+          scheduleRetry(1500 * (attempt + 1))
           return
         }
         setErrorMsg(err instanceof Error ? err.message : t.errorSub)
         setStatus("error")
       } finally {
-        fetchingRef.current = false
+        window.clearTimeout(timer)
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null
+        }
+        if (!isStaleRequest()) {
+          fetchingRef.current = false
+        }
       }
     },
     [briefing, language, t.errorSub],
   )
 
   useEffect(() => {
+    requestGenerationRef.current += 1
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    fetchingRef.current = false
+    for (const timer of retryTimersRef.current) {
+      window.clearTimeout(timer)
+    }
+    retryTimersRef.current = []
+
     const cached = readCache(language)
     if (cached) {
       setBriefing(cached)
