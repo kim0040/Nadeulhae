@@ -7,7 +7,7 @@
  * daily usage limits. Fully i18n via LanguageContext.
  */
 
-import { Children, isValidElement, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { Children, isValidElement, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { Check, Copy, LoaderCircle, Plus, SendHorizonal, Sparkles, Trash2 } from "lucide-react"
 
 import ReactMarkdown, { type Components } from "react-markdown"
@@ -44,6 +44,29 @@ type ChatStateApiResponse = ChatStateResponse & {
   serverNow?: unknown
   error?: string
 }
+
+// Hoisted stable reference (a fresh [remarkGfm] literal per render would make
+// react-markdown re-run its plugin pipeline needlessly).
+const REMARK_PLUGINS = [remarkGfm]
+
+// Memoized markdown renderer — parsing markdown is the expensive part of a
+// message render, so isolating it behind memo lets settled messages skip
+// re-parsing when the panel re-renders for unrelated reasons (e.g. composer
+// keystrokes). Equal content strings compare true under Object.is; `components`
+// is a stable useMemo reference.
+const AssistantMarkdown = memo(function AssistantMarkdown({
+  content,
+  components,
+}: {
+  content: string
+  components: Components
+}) {
+  return (
+    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
+      {content}
+    </ReactMarkdown>
+  )
+})
 
 const TOKEN_CLASS_BY_KIND: Record<HighlightKind, string> = {
   plain: "text-slate-800 dark:text-slate-200",
@@ -285,7 +308,7 @@ const CHAT_SUGGESTIONS = {
         <button
           type="button"
           onClick={() => void handleCopy()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background/70 px-2.5 text-xs font-semibold text-foreground/85 transition hover:bg-muted active:scale-[0.98]"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background/70 px-2.5 text-xs font-semibold text-foreground/85 transition hover:bg-muted active:scale-[0.96]"
           aria-label={copied ? copiedLabel : copyLabel}
         >
           {copied ? <Check className="size-3.5 text-accent" /> : <Copy className="size-3.5" />}
@@ -433,7 +456,7 @@ function InteractiveCourseWidget({
     <button
       type="button"
       onClick={handleScrollToCourse}
-      className="my-2 w-full rounded-[1.3rem] border border-nature-green/20 bg-nature-green/5 p-4 shadow-md shadow-nature-green/5 backdrop-blur-md flex items-center justify-between gap-4 animate-in fade-in duration-300 hover:border-nature-green/40 hover:bg-nature-green/10 transition-all cursor-pointer"
+      className="my-2 flex w-full cursor-pointer items-center justify-between gap-4 rounded-[1.3rem] border border-nature-green/20 bg-nature-green/5 p-4 shadow-md shadow-nature-green/5 backdrop-blur-md animate-in fade-in duration-300 transition-[border-color,background-color,scale] hover:border-nature-green/40 hover:bg-nature-green/10 active:scale-[0.96]"
     >
       <div className="flex items-center gap-3">
         <div className="rounded-xl bg-gradient-to-br from-nature-green to-active-blue p-2.5 text-white shadow-md shadow-nature-green/20 animate-bounce" style={{ animationDuration: "2.5s" }}>
@@ -589,9 +612,7 @@ type MessageGroup = {
             <p className="whitespace-pre-wrap">{messageContent}</p>
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1.5 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {messageContent}
-              </ReactMarkdown>
+              <AssistantMarkdown content={messageContent} components={markdownComponents} />
             </div>
           )}
         </div>
@@ -1154,7 +1175,7 @@ export function DashboardChatPanel({
               {copy.limitReached}
             </div>
           )}
-          <div className="flex items-end gap-2 rounded-2xl border border-card-border/70 bg-card/80 px-3 py-2 transition-all duration-300 focus-within:border-sky-blue/50 focus-within:bg-background focus-within:shadow-[0_0_0_3px_rgba(47,111,228,0.12)]">
+          <div className="flex items-end gap-2 rounded-2xl border border-card-border/70 bg-card/80 px-3 py-2 transition-[border-color,background-color,box-shadow] duration-300 focus-within:border-sky-blue/50 focus-within:bg-background focus-within:shadow-[0_0_0_3px_rgba(47,111,228,0.12)]">
             <textarea
               ref={chatInputRef}
               value={chatInput}

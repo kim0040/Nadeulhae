@@ -8,6 +8,8 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
+import dynamic from "next/dynamic"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Sparkles,
@@ -16,13 +18,13 @@ import {
   Cloud,
   Sun,
   CloudRain,
+  Bookmark,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { Meteors } from "@/components/magicui/meteors"
 import { Particles } from "@/components/magicui/particles"
 import { getMeteorCount, getParticleCount } from "@/lib/performance"
-import { DashboardChatPanel } from "@/components/chat/dashboard-chat-panel"
 import { CourseRecommendation } from "@/components/course-recommendation"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
@@ -35,6 +37,20 @@ import { getCopy } from "@/lib/utils"
 import { DASHBOARD_COPY } from "./constants"
 import { SectionCard, StatusMetric } from "@/components/dashboard/ui"
 import { SettingsModal } from "@/components/dashboard/settings-modal"
+
+// The chat panel pulls in react-markdown + its plugin graph; load it on demand
+// so it stays out of the dashboard's initial JS. ssr:false — client-only.
+const DashboardChatPanel = dynamic(
+  () => import("@/components/chat/dashboard-chat-panel").then((m) => m.DashboardChatPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[16rem] items-center justify-center text-sm font-semibold text-muted-foreground">
+        <span className="animate-pulse">채팅 불러오는 중…</span>
+      </div>
+    ),
+  }
+)
 
 // ---- Memoized workspace (re-render only when derived key changes) ----
 
@@ -200,15 +216,15 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
                         <MapPin className="size-3 text-sky-blue shrink-0" />
                         {weatherData.metadata?.region || getOptionLabel(PRIMARY_REGION_OPTIONS, user.primaryRegion, language)}
                       </p>
-                      <h4 className="text-[17px] font-black tracking-tight text-foreground mt-0.5">
+                      <p className="text-[17px] font-black tracking-tight text-foreground mt-0.5 tabular-nums">
                         {weatherData.details.temp ?? "--"}°C
                         <span className="text-[11px] font-bold text-sky-blue ml-2">{t(weatherData.status, weatherData.status)}</span>
-                      </h4>
+                      </p>
                     </div>
                   </div>
                   <div className="text-right border-l border-card-border/50 pl-4 shrink-0">
                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">{copy.picnicIndex}</span>
-                    <p className="text-lg font-black tracking-tight text-active-blue mt-0.5">{weatherData.score}{copy.scoreUnit}</p>
+                    <p className="text-lg font-black tracking-tight text-active-blue mt-0.5 tabular-nums">{weatherData.score}{copy.scoreUnit}</p>
                   </div>
                 </div>
               ) : (
@@ -226,15 +242,30 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
                 className="group relative overflow-hidden rounded-[1.3rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-6 py-5 text-left transition hover:border-active-blue/40 hover:bg-active-blue/5"
               >
                 <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-gradient-to-br from-sky-blue to-active-blue p-3 text-white group-hover:rotate-45 group-hover:scale-110 transition-all duration-300 shadow-md shadow-active-blue/20">
+                  <div className="rounded-full bg-gradient-to-br from-sky-blue to-active-blue p-3 text-white shadow-md shadow-active-blue/20 transition-transform duration-300 group-hover:rotate-45 group-hover:scale-110">
                     <Settings className="size-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black tracking-widest text-sky-blue uppercase">{copy.profileTitle}</h3>
+                    <h2 className="text-lg font-black tracking-widest text-sky-blue uppercase">{copy.profileTitle}</h2>
                     <p className="mt-1 text-xs font-semibold text-sky-blue/80">{copy.profileActionHint}</p>
                   </div>
                 </div>
               </button>
+
+              <Link
+                href="/courses"
+                className="group relative overflow-hidden rounded-[1.3rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-6 py-5 text-left transition hover:border-active-blue/40 hover:bg-active-blue/5"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-gradient-to-br from-sky-blue to-active-blue p-3 text-white shadow-md shadow-active-blue/20 transition-transform duration-300 group-hover:scale-110">
+                    <Bookmark className="size-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black tracking-widest text-sky-blue uppercase">{copy.savedCourses}</h2>
+                    <p className="mt-1 text-xs font-semibold text-sky-blue/80">{copy.savedCoursesHint}</p>
+                  </div>
+                </div>
+              </Link>
             </div>
           </div>
         </SectionCard>

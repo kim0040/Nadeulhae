@@ -324,7 +324,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
             </div>
             <button
               onClick={() => fetchBriefing(true)}
-              className="p-2 rounded-xl border border-[var(--interactive-border)] bg-[var(--interactive)] text-muted-foreground hover:text-foreground hover:border-foreground/20 active:scale-95 transition-all duration-200"
+              className="rounded-xl border border-[var(--interactive-border)] bg-[var(--interactive)] p-2 text-muted-foreground transition-[border-color,color,scale] duration-200 hover:border-foreground/20 hover:text-foreground active:scale-[0.96]"
               title={t.retry}
               aria-label={t.retry}
             >
@@ -415,7 +415,7 @@ export function JeonjuDailyBriefing({ language }: JeonjuDailyBriefingProps) {
               </span>
               {sourceCount > 0 && (
                 <span className="rounded-full border border-sky-blue/15 bg-sky-blue/8 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-sky-blue shadow-sm">
-                  {language === "ko" ? `${sourceCount}개 출처` : language === "zh" ? `${sourceCount}个来源` : language === "ja" ? `${sourceCount}件의소스` : `${sourceCount} sources`}
+                  {language === "ko" ? `${sourceCount}개 출처` : language === "zh" ? `${sourceCount}个来源` : language === "ja" ? `${sourceCount}件のソース` : `${sourceCount} sources`}
                 </span>
               )}
             </div>

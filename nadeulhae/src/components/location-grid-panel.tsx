@@ -89,8 +89,8 @@ export function LocationGridPanel({ weatherData }: LocationGridPanelProps) {
       <MagicCard
         className="rounded-[2.5rem] border border-card-border p-6 sm:p-8"
         gradientSize={260}
-        gradientFrom="#0b7d71"
-        gradientTo="#2f6fe4"
+        gradientFrom="var(--beam-from)"
+        gradientTo="var(--beam-to)"
       >
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>

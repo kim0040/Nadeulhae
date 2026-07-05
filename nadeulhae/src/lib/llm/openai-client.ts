@@ -24,6 +24,29 @@ export class OpenAiClientError extends Error {
   }
 }
 
+/**
+ * Classifies an LLM failure as transient/provider-side (worth refunding the
+ * reserved quota slot for) vs. deterministic (client/auth/payment — keep the
+ * slot consumed so repeated bad requests are still rate-limited).
+ *
+ * Transient: timeouts/aborts, low-level network errors, provider 5xx (incl.
+ * our synthetic 502 "empty_content"), and provider-side 429 throttling.
+ */
+export function isRetryableLlmError(error: unknown): boolean {
+  if (error instanceof OpenAiClientError) {
+    return error.statusCode >= 500 || error.statusCode === 429
+  }
+  // AbortSignal.timeout → "TimeoutError"; manual controller.abort() → "AbortError".
+  if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+    return true
+  }
+  // undici surfaces network failures ("fetch failed") as TypeError.
+  if (error instanceof TypeError) {
+    return true
+  }
+  return false
+}
+
 /** Shape of an OpenAI-compatible error response body. */
 interface OpenAiErrorPayload {
   error?: {

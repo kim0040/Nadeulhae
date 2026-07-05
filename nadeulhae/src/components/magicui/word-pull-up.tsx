@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 interface WordPullUpProps {
@@ -28,10 +28,13 @@ export function WordPullUp({
   },
   className,
 }: WordPullUpProps) {
+  // Respect prefers-reduced-motion: render the heading in its final state with
+  // no enter/stagger animation.
+  const shouldReduceMotion = useReducedMotion()
   return (
     <motion.h1
       variants={wrapperFramerProps}
-      initial="hidden"
+      initial={shouldReduceMotion ? false : "hidden"}
       animate="show"
       className={cn(
         "font-display text-center text-4xl font-bold leading-[5rem] tracking-[-0.02em] drop-shadow-sm",
@@ -41,7 +44,7 @@ export function WordPullUp({
       {words.split(" ").map((word, i) => (
         <motion.span
           key={i}
-          variants={framerProps}
+          variants={shouldReduceMotion ? undefined : framerProps}
           style={{ display: "inline-block", paddingRight: "8px" }}
         >
           {word === "" ? "\u00A0" : word}

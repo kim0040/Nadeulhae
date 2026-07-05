@@ -687,7 +687,10 @@ async function handlePOST(request: NextRequest) {
 
     let placeContext: string | null = null
     try {
-      const topPlaces = await getTopPlacesForChat({ profile: userProfile, weatherMood, limit: 12 })
+      // A multi-slot course needs enough distinct real venues to compose from;
+      // too few forces the model to repeat or invent places (which then fail to
+      // hydrate). 16 balances variety against prompt-token cost.
+      const topPlaces = await getTopPlacesForChat({ profile: userProfile, weatherMood, limit: 16 })
       if (topPlaces.length > 0) {
         placeContext = topPlaces.map(p => {
           let line = `- ${p.name} (${p.category}, 평점 ${p.rating ?? "?"}${p.menuSummary ? `, 메뉴: ${p.menuSummary}` : ""}${p.interestMatch ? ` [취향: ${p.interestMatch}]` : ""})`

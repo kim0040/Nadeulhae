@@ -9,6 +9,8 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise"
 import { MAX_ACTIVE_SESSIONS_PER_USER } from "@/lib/auth/guardrails"
 import { ensureAuthSchema } from "@/lib/auth/schema"
 import type { AuthUser } from "@/lib/auth/types"
+import { ensureCodeShareSchema } from "@/lib/code-share/schema"
+import { ensureSavedCoursesSchema } from "@/lib/saved-courses/repository"
 import { executeStatement, getDbPool, queryRows } from "@/lib/db"
 import {
   createBlindIndex,
@@ -678,6 +680,10 @@ export async function updateUserAnalyticsConsent(input: {
 /** Permanently deletes a user and all associated data across related tables, in a transaction. */
 export async function deleteUserAccount(userId: string) {
   await ensureAuthSchema()
+  // Ensure optional/self-migrating tables exist so their DELETE below can't
+  // abort the erasure transaction with a "table doesn't exist" error.
+  await ensureSavedCoursesSchema().catch(() => {})
+  await ensureCodeShareSchema().catch(() => {})
 
   const connection = await getDbPool().getConnection()
   try {
@@ -696,6 +702,12 @@ export async function deleteUserAccount(userId: string) {
     await connection.execute("DELETE FROM lab_cards WHERE user_id = ?", [userId])
     await connection.execute("DELETE FROM lab_decks WHERE user_id = ?", [userId])
     await connection.execute("DELETE FROM lab_daily_usage WHERE user_id = ?", [userId])
+
+    // Right-to-erasure: user-owned content with public/shareable surfaces.
+    // saved_courses carries a public share_token; code_share_sessions is
+    // owner-scoped. /terms promises these are cascade-deleted on account close.
+    await connection.execute("DELETE FROM saved_courses WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM code_share_sessions WHERE owner_user_id = ?", [userId])
 
     await connection.execute("DELETE FROM user_sessions WHERE user_id = ?", [userId])
     await connection.execute("DELETE FROM users WHERE id = ?", [userId])

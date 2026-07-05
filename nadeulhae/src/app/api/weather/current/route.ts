@@ -648,9 +648,18 @@ function logFetchError(label: string, err: unknown) {
   }
 }
 
+// Upstream weather providers (KMA/AirKorea) occasionally hang. Without a bound,
+// a single stalled provider blocks the whole current-weather Promise.all
+// indefinitely. Cap each external call so a hung endpoint degrades to cached/
+// partial data instead of freezing the request.
+const EXTERNAL_FETCH_TIMEOUT_MS = 5000
+
 async function fetchJsonSafely(url: string) {
   try {
-    const response = await fetch(url, { cache: "no-store" })
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(EXTERNAL_FETCH_TIMEOUT_MS),
+    })
     if (!response.ok) return null
     const text = await response.text()
     if (!text || text.trim().startsWith("<")) return null
@@ -667,7 +676,10 @@ async function fetchJsonSafely(url: string) {
 
 async function fetchTextSafely(url: string) {
   try {
-    const response = await fetch(url, { cache: "no-store" })
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(EXTERNAL_FETCH_TIMEOUT_MS),
+    })
     if (!response.ok) return ""
     return await response.text()
   } catch (error) {
@@ -1151,8 +1163,11 @@ async function handleGET(req: Request) {
       nx: Number(process.env.KMA_NX ?? 63),
       ny: Number(process.env.KMA_NY ?? 89),
     })
+  // Keyed by region/grid/coordinates only — the response is identical for every
+  // session at the same location, so including sessionId here would give each
+  // session its own entry (near-zero hit rate + constant eviction churn).
+  // Session identity is applied separately via the cookie and usage proof below.
   const userCacheKey = [
-    sessionId,
     profile.key,
     grid.nx,
     grid.ny,

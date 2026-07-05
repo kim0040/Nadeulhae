@@ -30,19 +30,29 @@ async function handlePOST(request: Request) {
 
     // Query the database for these exact place names.
     // Limit to 30 to prevent huge requests, although standard courses have 2-5 places.
-    const uniqueNames = Array.from(new Set(names.filter(Boolean))).slice(0, 30)
+    const uniqueNames = Array.from(new Set(names.filter(Boolean).map((n: unknown) => String(n)))).slice(0, 30)
     if (uniqueNames.length === 0) {
       return NextResponse.json({ places: [] })
     }
 
-    const placeholders = uniqueNames.map(() => "?").join(",")
+    // The LLM's place names often drift slightly from the DB (extra/missing
+    // spaces, casing). Match on the exact name OR on a whitespace-stripped
+    // form so near-miss names still hydrate (otherwise the card/map/route
+    // silently render empty). The whitespace-stripped variants are compared
+    // case-insensitively via the column collation.
+    const strippedNames = Array.from(
+      new Set(uniqueNames.map((n) => n.replace(/\s+/g, "")).filter(Boolean))
+    )
+    const exactPlaceholders = uniqueNames.map(() => "?").join(",")
+    const strippedPlaceholders = strippedNames.map(() => "?").join(",")
     const sql = `
       SELECT name, category, lat, lon, address, rating, kakao_url, menu_summary, review_summary, review_keywords, review_picks
       FROM places
-      WHERE name IN (${placeholders})
+      WHERE name IN (${exactPlaceholders})
+         OR REPLACE(name, ' ', '') IN (${strippedPlaceholders})
     `
 
-    const rows = await queryRows<PlaceRow[]>(sql, uniqueNames)
+    const rows = await queryRows<PlaceRow[]>(sql, [...uniqueNames, ...strippedNames])
 
     // Map database properties back to the client structure
     const hydrated = rows.map((r) => {

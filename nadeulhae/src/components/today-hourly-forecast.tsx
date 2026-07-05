@@ -149,7 +149,7 @@ export function TodayHourlyForecast({ items }: TodayHourlyForecastProps) {
                       )}
                     >
                       <div className={cn(
-                        "min-h-[238px] rounded-[1.7rem] border px-4 py-5 transition-all hover:scale-[1.02] duration-300 sm:min-h-[220px] sm:px-3 sm:py-3",
+                        "min-h-[238px] rounded-[1.7rem] border px-4 py-5 transition-[scale,border-color,box-shadow] duration-300 hover:scale-[1.02] sm:min-h-[220px] sm:px-3 sm:py-3",
                         isLead
                           ? "border-card-border bg-card shadow-[0_18px_44px_-34px_rgba(47,111,228,0.24)]"
                           : night

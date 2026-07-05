@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MapPin, Clock, Star, Utensils, Coffee, Sparkles, RefreshCcw, ChevronRight, LoaderCircle, CloudAlert, Shuffle, Home, Car, Footprints, Navigation, Palette } from "lucide-react"
+import { MapPin, Clock, Star, Utensils, Coffee, Sparkles, RefreshCcw, ChevronRight, LoaderCircle, CloudAlert, Shuffle, Home, Car, Footprints, Navigation, Palette, Bookmark, Check, Link2 } from "lucide-react"
 import { useLanguage } from "@/context/LanguageContext"
 import { cn } from "@/lib/utils"
 import type { ChatWeatherContext } from "@/lib/chat/prompt"
@@ -65,6 +65,12 @@ const COPY = {
     excludedCount: "제외됨",
     customBadge: "AI 맞춤형",
     customDescription: "나들AI 챗봇과 실시간 대화를 통해 맞춤 구성한 전주 나들이 코스입니다.",
+    save: "코스 저장",
+    saving: "저장 중...",
+    saved: "저장됨! 공유 링크가 준비됐어요.",
+    saveError: "코스를 저장하지 못했어요.",
+    shareCopy: "링크 복사",
+    shareCopied: "복사됨",
     
     // Theme selector
     themeSelect: "코스 테마",
@@ -122,6 +128,12 @@ const COPY = {
     excludedCount: "excluded",
     customBadge: "AI Custom",
     customDescription: "A personalized Jeonju course customized through real-time chat with NadeulAI.",
+    save: "Save course",
+    saving: "Saving...",
+    saved: "Saved! Your share link is ready.",
+    saveError: "Failed to save the course.",
+    shareCopy: "Copy link",
+    shareCopied: "Copied",
 
     // Theme selector
     themeSelect: "Course Theme",
@@ -179,6 +191,12 @@ const COPY = {
     excludedCount: "已排除",
     customBadge: "AI 定制",
     customDescription: "通过与 NadeulAI 实时对话定制的个性化全州路线。",
+    save: "保存路线",
+    saving: "保存中...",
+    saved: "已保存！分享链接已就绪。",
+    saveError: "保存路线失败。",
+    shareCopy: "复制链接",
+    shareCopied: "已复制",
 
     // Theme selector
     themeSelect: "路线主题",
@@ -236,6 +254,12 @@ const COPY = {
     excludedCount: "除外済",
     customBadge: "AI カスタマイズ",
     customDescription: "ナ들AI チャットボットとのリアルタイム対話を通じてカスタマイズされた全州お出かけコースです。",
+    save: "コースを保存",
+    saving: "保存中...",
+    saved: "保存しました！共有リンクの準備ができました。",
+    saveError: "コースを保存できませんでした。",
+    shareCopy: "リンクをコピー",
+    shareCopied: "コピー済み",
 
     // Theme selector
     themeSelect: "コーステーマ",
@@ -298,6 +322,8 @@ interface CourseRecommendationProps {
   customCourse?: any[] | null
   onThemeChange?: (theme: CourseTheme) => void
   onCourseReset?: () => void
+  /** Read-only public view (shared link): hides save/refresh/swap controls. */
+  readOnly?: boolean
 }
 
 // Haversine distance calculator on client
@@ -473,8 +499,11 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
   }
 
   return (
-    <div className={cn("relative mt-3 w-full overflow-hidden rounded-2xl border border-card-border/60 bg-muted/20 shadow-md group transition-all duration-300 hover:border-sky-blue/30", heightClass || "h-52 sm:h-64")}>
-      <div ref={mapRef} className="w-full h-full transition-transform duration-500 group-hover:scale-[1.01]" />
+    <div className={cn("relative mt-3 w-full overflow-hidden rounded-2xl border border-card-border/60 bg-muted/20 shadow-md group transition-[border-color] duration-300 hover:border-sky-blue/30", heightClass || "h-52 sm:h-64")}>
+      {/* Kakao map tiles are always light; in dark mode invert + hue-rotate the
+          tile layer only (not the themed overlays below) so the map blends with
+          the dark theme instead of glaring bright. No effect in light mode. */}
+      <div ref={mapRef} className="w-full h-full transition-transform duration-500 group-hover:scale-[1.01] dark:[filter:invert(0.9)_hue-rotate(180deg)_brightness(1.05)]" />
       {!mapInitialized && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-[2.5px] gap-2">
           <LoaderCircle className="size-4 animate-spin text-sky-blue" />
@@ -485,7 +514,7 @@ export function KakaoPlaceMap({ placeName, lat, lon, kakaoKeyLoaded, loadError, 
   )
 }
 
-export function CourseRecommendation({ weatherContext, userProfile, userLat, userLon, className, customCourse, onThemeChange, onCourseReset }: CourseRecommendationProps) {
+export function CourseRecommendation({ weatherContext, userProfile, userLat, userLon, className, customCourse, onThemeChange, onCourseReset, readOnly = false }: CourseRecommendationProps) {
   const { language } = useLanguage()
   const copy = useMemo(() => COPY[language as keyof typeof COPY] ?? COPY.ko, [language])
   const [slots, setSlots] = useState<CourseSlotData[]>([])
@@ -501,6 +530,11 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   const [error, setError] = useState<string | null>(null)
   const [expandedSlot, setExpandedSlot] = useState<number | null>(0)
   const [excludedNames, setExcludedNames] = useState<string[]>([])
+  // Save & share state
+  const [saving, setSaving] = useState(false)
+  const [savedToken, setSavedToken] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
   const [selectedTheme, setSelectedTheme] = useState<CourseTheme>("balanced")
   const selectedThemeRef = useRef<CourseTheme>(selectedTheme)
   useEffect(() => {
@@ -536,14 +570,20 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
           })
           if (res.ok) {
             const data = await res.json()
+            // Match on a normalized key (lowercased, whitespace-stripped) so a
+            // slight name drift between the LLM output and the DB row still
+            // resolves — mirrors the server-side matching in /api/places/hydrate.
+            const normalizeName = (value: string) => value.toLowerCase().replace(/\s+/g, "")
             const placeMap = new Map<string, any>()
             if (Array.isArray(data?.places)) {
-              data.places.forEach((p: any) => placeMap.set(p.name, p))
+              data.places.forEach((p: any) => {
+                if (p?.name) placeMap.set(normalizeName(String(p.name)), p)
+              })
             }
             const hydratedSlots = cc.map((slot: any) => ({
               ...slot,
               places: (slot.places || []).map((p: any) => {
-                const db = placeMap.get(p.name)
+                const db = p?.name ? placeMap.get(normalizeName(String(p.name))) : undefined
                 return {
                   ...p,
                   lat: db?.lat ?? p.lat ?? null,
@@ -612,6 +652,58 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
     }
     fetchCourse([], theme)
   }, [fetchCourse])
+
+  // Save the current course and get a shareable link.
+  const handleSaveCourse = useCallback(async () => {
+    if (saving || slots.length === 0) return
+    setSaving(true)
+    setSaveError(false)
+    try {
+      const title = propsRef.current.customCourse ? copy.customBadge : copy.title
+      const res = await fetch("/api/courses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          slots,
+          weatherSnapshot: propsRef.current.weatherContext ?? null,
+          isPublic: true,
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (data?.shareToken) {
+        setSavedToken(String(data.shareToken))
+        setShareCopied(false)
+      } else {
+        setSaveError(true)
+      }
+    } catch (err) {
+      console.error("Save course failed:", err)
+      setSaveError(true)
+    } finally {
+      setSaving(false)
+    }
+  }, [saving, slots, copy.customBadge, copy.title])
+
+  const handleCopyShareLink = useCallback(async () => {
+    if (!savedToken || typeof window === "undefined") return
+    const url = `${window.location.origin}/courses/${savedToken}`
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      // Clipboard may be unavailable (insecure context); the link is still shown.
+    }
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 1600)
+  }, [savedToken])
+
+  // A new/changed course invalidates any previously-generated share link.
+  useEffect(() => {
+    setSavedToken(null)
+    setSaveError(false)
+    setShareCopied(false)
+  }, [slots])
 
   // Fetch Kakao Maps JS Key
   useEffect(() => {
@@ -862,7 +954,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
   }
 
   return (
-    <div className={cn("rounded-[2rem] border border-card-border/70 bg-card/90 p-5 sm:p-6 backdrop-blur-2xl transition-all duration-500", customCourse && "border-sky-blue/30 ring-1 ring-sky-blue/10 shadow-lg shadow-sky-blue/5", className)}>
+    <div className={cn("rounded-[2rem] border border-card-border/70 bg-card/90 p-5 sm:p-6 backdrop-blur-2xl transition-[border-color,box-shadow] duration-500", customCourse && "border-sky-blue/30 ring-1 ring-sky-blue/10 shadow-lg shadow-sky-blue/5", className)}>
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
@@ -884,16 +976,57 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => fetchCourse(excludedNames, selectedThemeRef.current)}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-full border border-card-border/70 bg-background/75 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
-        >
-          <RefreshCcw className={cn("size-3", loading && "animate-spin")} />
-          <span className="hidden sm:inline">{copy.refreshHint}</span>
-        </button>
+        {!readOnly && (
+          <div className="flex items-center gap-2">
+            {slots.length > 0 && !loading && (
+              <button
+                type="button"
+                onClick={() => void handleSaveCourse()}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-full border border-sky-blue/30 bg-sky-blue/10 px-3 py-1.5 text-xs font-semibold text-sky-blue transition hover:border-sky-blue/50 hover:bg-sky-blue/15 disabled:opacity-60"
+              >
+                {saving ? <LoaderCircle className="size-3 animate-spin" /> : <Bookmark className="size-3" />}
+                <span className="hidden sm:inline">{saving ? copy.saving : copy.save}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fetchCourse(excludedNames, selectedThemeRef.current)}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-full border border-card-border/70 bg-background/75 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-sky-blue/30 hover:text-sky-blue"
+            >
+              <RefreshCcw className={cn("size-3", loading && "animate-spin")} />
+              <span className="hidden sm:inline">{copy.refreshHint}</span>
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Save result / share link */}
+      {saveError && (
+        <div role="alert" className="mt-3 rounded-[1rem] border border-danger/20 bg-danger/10 px-3 py-2 text-xs font-semibold text-danger">
+          {copy.saveError}
+        </div>
+      )}
+      {savedToken && typeof window !== "undefined" && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[1rem] border border-sky-blue/20 bg-sky-blue/5 px-3 py-2">
+          <Check className="size-3.5 shrink-0 text-sky-blue" />
+          <span className="text-xs font-semibold text-foreground">{copy.saved}</span>
+          <div className="ml-auto flex items-center gap-2">
+            <code className="max-w-[46vw] truncate rounded bg-background/70 px-2 py-1 text-[11px] text-muted-foreground sm:max-w-xs">
+              {`${window.location.origin}/courses/${savedToken}`}
+            </code>
+            <button
+              type="button"
+              onClick={() => void handleCopyShareLink()}
+              className="inline-flex items-center gap-1 rounded-full border border-sky-blue/30 bg-sky-blue/10 px-2.5 py-1 text-[11px] font-bold text-sky-blue transition hover:bg-sky-blue/15"
+            >
+              {shareCopied ? <Check className="size-3" /> : <Link2 className="size-3" />}
+              {shareCopied ? copy.shareCopied : copy.shareCopy}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Theme Selector */}
       {!customCourse && (
@@ -909,7 +1042,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                 type="button"
                 onClick={() => handleThemeChange(themeKey)}
                 className={cn(
-                  "rounded-full px-3 py-1 text-[10px] font-bold transition-all duration-200",
+                  "rounded-full px-3 py-1 text-[10px] font-bold transition-[background-color,color,box-shadow,scale] duration-200 active:scale-[0.96]",
                   selectedTheme === themeKey
                     ? "bg-sky-blue text-white shadow-md shadow-sky-blue/20"
                     : "bg-muted/50 text-muted-foreground hover:bg-sky-blue/10 hover:text-sky-blue"
@@ -1022,7 +1155,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
 
                   <div
                     className={cn(
-                      "relative rounded-[1.4rem] border bg-background/80 p-4 transition-all duration-300",
+                      "relative rounded-[1.4rem] border bg-background/80 p-4 transition-[border-color,box-shadow,scale] duration-300",
                       isExpanded
                         ? "border-sky-blue/40 ring-1 ring-sky-blue/10 shadow-lg shadow-sky-blue/5 scale-[1.004]"
                         : "border-card-border/70 hover:border-sky-blue/25 hover:shadow-md hover:shadow-sky-blue/5",
@@ -1071,7 +1204,7 @@ export function CourseRecommendation({ weatherContext, userProfile, userLat, use
                         {slot.places?.map((place, pi) => (
                           <div
                             key={`${place.name}-${pi}`}
-                            className="flex flex-col gap-3 rounded-[1.2rem] border border-card-border/40 bg-card/45 backdrop-blur-[2px] px-4 py-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] hover:scale-[1.01] hover:border-sky-blue/30 hover:shadow-md transition-all duration-300"
+                            className="flex flex-col gap-3 rounded-[1.2rem] border border-card-border/40 bg-card/45 backdrop-blur-[2px] px-4 py-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] transition-[border-color,box-shadow,scale] duration-300 hover:scale-[1.01] hover:border-sky-blue/30 hover:shadow-md"
                           >
                             <div className="flex items-start gap-3 w-full">
                               <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-blue/10 text-sky-blue">

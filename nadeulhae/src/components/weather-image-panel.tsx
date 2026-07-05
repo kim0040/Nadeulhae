@@ -67,7 +67,7 @@ function ImageBlock({
       </div>
       {image?.url ? (
         <div className="space-y-3">
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="overflow-hidden rounded-2xl bg-card outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
             <Image
               src={image.url}
               alt={image.name || title}
@@ -277,8 +277,8 @@ export function WeatherImagePanel({ data, weather }: WeatherImagePanelProps) {
       <MagicCard
         className="rounded-[2.5rem] border border-card-border p-6 sm:p-8"
         gradientSize={260}
-        gradientFrom="#0b7d71"
-        gradientTo="#2f6fe4"
+        gradientFrom="var(--beam-from)"
+        gradientTo="var(--beam-to)"
       >
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>

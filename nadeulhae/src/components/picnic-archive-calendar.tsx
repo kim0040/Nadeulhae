@@ -288,13 +288,13 @@ export function PicnicArchiveCalendar() {
         <div className="flex gap-4">
           <button
             onClick={prevMonth}
-            className="p-4 rounded-2xl bg-card hover:bg-sky-blue/10 hover:text-sky-blue transition-all active:scale-95 shadow-lg border border-card-border"
+            className="rounded-2xl border border-card-border bg-card p-4 shadow-lg transition-[background-color,color,scale] hover:bg-sky-blue/10 hover:text-sky-blue active:scale-[0.96]"
           >
             <ChevronLeft size={28} />
           </button>
           <button
             onClick={nextMonth}
-            className="p-4 rounded-2xl bg-card hover:bg-sky-blue/10 hover:text-sky-blue transition-all active:scale-95 shadow-lg border border-card-border"
+            className="rounded-2xl border border-card-border bg-card p-4 shadow-lg transition-[background-color,color,scale] hover:bg-sky-blue/10 hover:text-sky-blue active:scale-[0.96]"
           >
             <ChevronRight size={28} />
           </button>
@@ -371,7 +371,7 @@ export function PicnicArchiveCalendar() {
                   onClick={() => handleDateClick(day)}
                   disabled={!isCurrentMonth}
                   className={cn(
-                    "relative aspect-square sm:aspect-[4/3] flex flex-col items-center justify-between p-1.5 sm:p-3 rounded-xl sm:rounded-[2rem] text-sm font-black transition-all border cursor-pointer",
+                    "relative flex aspect-square cursor-pointer flex-col items-center justify-between rounded-xl border p-1.5 text-sm font-black transition-[background-color,border-color,color,box-shadow,scale] sm:aspect-[4/3] sm:rounded-[2rem] sm:p-3",
                     !isCurrentMonth &&
                       "text-muted/40 border-transparent opacity-30 cursor-default",
                     isCurrentMonth &&

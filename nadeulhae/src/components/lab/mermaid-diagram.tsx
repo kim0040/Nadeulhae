@@ -96,13 +96,19 @@ export function MermaidDiagram({
     const currentRenderId = ++renderIdRef.current
     let cancelled = false
 
-    async function render() {
-      if (isUnsupportedUseCaseDiagram) {
-        setSvg(null)
-        setError("`useCaseDiagram` is not supported in Mermaid 11.14.0. Please rewrite it as `flowchart` or `classDiagram`.")
-        return
-      }
+    if (isUnsupportedUseCaseDiagram) {
+      setSvg(null)
+      setError("`useCaseDiagram` is not supported in Mermaid 11.14.0. Please rewrite it as `flowchart` or `classDiagram`.")
+      return
+    }
 
+    // The `code` prop grows token-by-token while the assistant streams. Rendering
+    // every partial snapshot flashes parse errors for half-written diagrams, so
+    // debounce: only attempt a render once the code has stopped changing for a
+    // beat (which, during streaming, effectively defers rendering to completion).
+    const RENDER_DEBOUNCE_MS = 320
+
+    async function render() {
       try {
         const mermaid = (await import("mermaid")).default
         mermaid.initialize({
@@ -129,32 +135,43 @@ export function MermaidDiagram({
               },
         })
 
+        // Validate first (suppressErrors → resolves false instead of throwing),
+        // so incomplete/invalid diagrams never throw or inject error DOM.
+        const parseOk = await mermaid.parse(code, { suppressErrors: true })
+        if (cancelled || currentRenderId !== renderIdRef.current) return
+        if (!parseOk) {
+          setSvg(null)
+          setError("Mermaid syntax error. Please check the diagram type and syntax.")
+          return
+        }
+
         const id = `mermaid-${currentRenderId}-${Date.now()}`
         const { svg: renderedSvg } = await mermaid.render(id, code)
         const safeSvg = sanitizeRenderedSvg(renderedSvg)
 
-        if (!cancelled) {
-          if (MERMAID_ERROR_SVG_RE.test(safeSvg)) {
-            setSvg(null)
-            setError("Mermaid syntax error. Please check the diagram type and syntax.")
-            return
-          }
-          setSvg(safeSvg)
-          setError(null)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          const message = err instanceof Error ? err.message : "Failed to render Mermaid diagram."
-          setError(normalizeMermaidErrorMessage(message))
+        if (cancelled || currentRenderId !== renderIdRef.current) return
+        if (MERMAID_ERROR_SVG_RE.test(safeSvg)) {
           setSvg(null)
+          setError("Mermaid syntax error. Please check the diagram type and syntax.")
+          return
         }
+        setSvg(safeSvg)
+        setError(null)
+      } catch (err) {
+        if (cancelled || currentRenderId !== renderIdRef.current) return
+        const message = err instanceof Error ? err.message : "Failed to render Mermaid diagram."
+        setError(normalizeMermaidErrorMessage(message))
+        setSvg(null)
       }
     }
 
-    render()
+    const debounceTimer = window.setTimeout(() => {
+      void render()
+    }, RENDER_DEBOUNCE_MS)
 
     return () => {
       cancelled = true
+      window.clearTimeout(debounceTimer)
     }
   }, [code, isDarkTheme, isUnsupportedUseCaseDiagram])
 
@@ -172,7 +189,7 @@ export function MermaidDiagram({
         <button
           type="button"
           onClick={() => void handleCopy()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background/70 px-2.5 text-xs font-semibold text-foreground/85 transition hover:bg-muted active:scale-[0.98]"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background/70 px-2.5 text-xs font-semibold text-foreground/85 transition hover:bg-muted active:scale-[0.96]"
           aria-label={copied ? copiedLabel : copyLabel}
         >
           {copied ? <Check className="size-3.5 text-accent" /> : <Copy className="size-3.5" />}
@@ -181,9 +198,16 @@ export function MermaidDiagram({
       </div>
       <div ref={containerRef} className="overflow-auto bg-card p-4 min-w-0">
         {error ? (
-          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <pre className="whitespace-pre-wrap break-words font-mono">{error}</pre>
+          <div className="space-y-2">
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <pre className="whitespace-pre-wrap break-words font-mono">{error}</pre>
+            </div>
+            {/* Fallback: the diagram couldn't render, so show the raw Mermaid
+                source instead of nothing — the content is still readable/copyable. */}
+            <pre className="max-h-72 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-xs leading-5 text-foreground/80">
+              <code className="font-mono">{code}</code>
+            </pre>
           </div>
         ) : svg ? (
           <div

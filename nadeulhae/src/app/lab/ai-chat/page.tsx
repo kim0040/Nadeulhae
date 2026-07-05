@@ -1,15 +1,29 @@
 "use client"
 
 import { useEffect } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Bot } from "lucide-react"
 
 import { SectionCard } from "@/components/dashboard/ui"
-import { LabAiChatPanel } from "@/components/lab/lab-ai-chat-panel"
 import { useAuth } from "@/context/AuthContext"
 import { useLanguage } from "@/context/LanguageContext"
 import { getCopy } from "@/lib/utils"
+
+// react-markdown + mermaid/codemirror wrappers live inside this panel; load it
+// on demand so /lab/ai-chat's initial JS stays lean. ssr:false — client-only.
+const LabAiChatPanel = dynamic(
+  () => import("@/components/lab/lab-ai-chat-panel").then((m) => m.LabAiChatPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-1 items-center justify-center text-sm font-bold text-sky-blue">
+        <span className="animate-pulse">채팅을 불러오는 중...</span>
+      </div>
+    ),
+  }
+)
 
 const PAGE_COPY = {
   ko: {

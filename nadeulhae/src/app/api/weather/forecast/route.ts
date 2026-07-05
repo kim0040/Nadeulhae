@@ -170,7 +170,12 @@ async function fetchMidData(profile: any, serviceKey: string) {
 
 async function fetchJsonSafely(url: string) {
   try {
-    const response = await fetch(url, { cache: "no-store" })
+    // Bound the upstream KMA call so a hung endpoint can't stall the forecast
+    // request; on timeout we degrade to cached/partial data.
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    })
     if (!response.ok) return null
     const text = await response.text()
     if (!text || text.trim().startsWith("<")) return null

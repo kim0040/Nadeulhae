@@ -1000,6 +1000,57 @@ export async function reserveLabAiChatWebSearchCall(input: {
   }
 }
 
+/**
+ * Refund a previously-reserved web-search call. Reverses exactly what
+ * `reserveLabAiChatWebSearchCall` incremented (session + optional fallback +
+ * monthly counters), clamped at 0. Call this when the search fails to return a
+ * usable result (e.g. Tavily error) so a provider failure doesn't consume the
+ * user's session/monthly search quota.
+ */
+export async function refundLabAiChatWebSearchCall(input: {
+  userId: string
+  sessionId: number
+  metricMonth: string
+  isFallback?: boolean
+}) {
+  await ensureLabAiChatSchema()
+
+  const isFallback = Boolean(input.isFallback)
+  const connection = await getDbPool().getConnection()
+  try {
+    await connection.beginTransaction()
+
+    await connection.execute(
+      `
+        UPDATE lab_ai_chat_web_search_state
+        SET session_call_count = GREATEST(0, session_call_count - 1),
+            fallback_call_count = GREATEST(0, fallback_call_count - ?),
+            updated_at = NOW()
+        WHERE user_id = ?
+          AND session_id = ?
+      `,
+      [isFallback ? 1 : 0, input.userId, input.sessionId]
+    )
+
+    await connection.execute(
+      `
+        UPDATE lab_ai_chat_web_search_usage_monthly
+        SET request_count = GREATEST(0, request_count - 1),
+            last_used_at = NOW()
+        WHERE metric_month = ?
+      `,
+      [input.metricMonth]
+    )
+
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+}
+
 /** Record a web-search call as success or failure in the monthly rollup. */
 export async function recordLabAiChatWebSearchOutcome(input: {
   metricMonth: string

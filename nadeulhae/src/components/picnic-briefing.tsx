@@ -703,7 +703,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
               className={cn(
-                "min-w-0 rounded-[1.5rem] border px-5 py-4 transition-all",
+                "min-w-0 rounded-[1.5rem] border px-5 py-4 transition-[background-color,border-color,color]",
                 quote.fullWidth && "lg:col-span-2",
                 quote.type === "success" ? "bg-teal-400/5 border-teal-400/20 text-teal-600 dark:text-teal-400" :
                 quote.type === "warning" ? "bg-orange-400/5 border-orange-400/20 text-orange-600 dark:text-orange-400" :

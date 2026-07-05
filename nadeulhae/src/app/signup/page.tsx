@@ -275,16 +275,48 @@ const SIGNUP_COPY = {
   },
 } as const
 
-const SIGNUP_MARQUEE = [
-  "전주 기준 브리핑",
-  "취미 맞춤 코스",
-  "가족/반려동물 나들이",
-  "황사·비 민감도 반영",
-  "선호 시간대 기억",
-  "현재 위치 우선 판단",
-  "캠퍼스/공원 산책",
-  "해질녘 산책 루트",
-]
+const SIGNUP_MARQUEE = {
+  ko: [
+    "전주 기준 브리핑",
+    "취미 맞춤 코스",
+    "가족/반려동물 나들이",
+    "황사·비 민감도 반영",
+    "선호 시간대 기억",
+    "현재 위치 우선 판단",
+    "캠퍼스/공원 산책",
+    "해질녘 산책 루트",
+  ],
+  en: [
+    "Jeonju-based briefing",
+    "Hobby-tailored courses",
+    "Family & pet outings",
+    "Dust & rain sensitivity",
+    "Remembers preferred hours",
+    "Prioritizes your location",
+    "Campus & park strolls",
+    "Sunset walking routes",
+  ],
+  zh: [
+    "全州基准简报",
+    "兴趣定制路线",
+    "家庭/宠物出行",
+    "沙尘·降雨敏感度",
+    "记住偏好时段",
+    "优先判断当前位置",
+    "校园/公园散步",
+    "日落散步路线",
+  ],
+  ja: [
+    "全州基準のブリーフィング",
+    "趣味に合わせたコース",
+    "家族・ペットのお出かけ",
+    "黄砂・雨の敏感度を反映",
+    "好みの時間帯を記憶",
+    "現在地を優先して判断",
+    "キャンパス・公園の散歩",
+    "夕暮れの散歩ルート",
+  ],
+}
 
 async function readAuthErrorMessage(response: Response, fallback: string) {
   try {
@@ -438,7 +470,11 @@ export default function SignupPage() {
         setMessage(
           language === "ko"
             ? `취미는 최대 ${MAX_INTEREST_SELECTIONS}개까지 선택할 수 있습니다.`
-            : `You can select up to ${MAX_INTEREST_SELECTIONS} hobbies.`
+            : language === "zh"
+              ? `兴趣最多可选择 ${MAX_INTEREST_SELECTIONS} 个。`
+              : language === "ja"
+                ? `趣味は最大 ${MAX_INTEREST_SELECTIONS} 個まで選択できます。`
+                : `You can select up to ${MAX_INTEREST_SELECTIONS} hobbies.`
         )
         return current
       }
@@ -518,7 +554,7 @@ export default function SignupPage() {
       sideEyebrow={copy.sideEyebrow}
       sideTitle={copy.sideTitle}
       sideDescription={copy.sideDescription}
-      marqueeItems={SIGNUP_MARQUEE}
+      marqueeItems={getCopy(SIGNUP_MARQUEE, language)}
       statItems={copy.stats}
       footer={(
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-card-border/70 pt-6">

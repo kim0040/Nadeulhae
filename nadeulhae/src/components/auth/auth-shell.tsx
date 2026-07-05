@@ -121,9 +121,9 @@ export function AuthShell({
                   <p className="text-sm font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                     Nadeulhae Auth Flow
                   </p>
-                  <h1 className="text-3xl font-black tracking-tight text-foreground lg:text-5xl">
+                  <p className="text-3xl font-black tracking-tight text-foreground lg:text-5xl">
                     {sideTitle}
-                  </h1>
+                  </p>
                   <p className="max-w-xl text-sm leading-7 text-muted-foreground lg:text-base">
                     {sideDescription}
                   </p>
@@ -192,9 +192,11 @@ export function AuthShell({
                       {badge}
                     </span>
                   ) : null}
-                  <AnimatedGradientText className="!block text-2xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">
-                    {title}
-                  </AnimatedGradientText>
+                  <h1 className="m-0">
+                    <AnimatedGradientText className="!block text-2xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">
+                      {title}
+                    </AnimatedGradientText>
+                  </h1>
                 </div>
 
                 <div className="relative z-10">{children}</div>
@@ -226,9 +228,11 @@ export function AuthShell({
                       {badge}
                     </span>
                   ) : null}
-                  <AnimatedGradientText className="!block text-2xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">
-                    {title}
-                  </AnimatedGradientText>
+                  <h1 className="m-0">
+                    <AnimatedGradientText className="!block text-2xl font-black leading-[1.08] tracking-tight sm:text-3xl lg:text-4xl">
+                      {title}
+                    </AnimatedGradientText>
+                  </h1>
                 </BlurFade>
 
                 <BlurFade delay={0.15} inView className="relative z-10">

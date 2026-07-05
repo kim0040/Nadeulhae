@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useState, useMemo } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import {
@@ -57,6 +57,46 @@ export function SettingsModal({
   const [deleteConfirm, setDeleteConfirm] = useState("")
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
+
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+
+  // Dialog behavior: close on Escape, move focus into the panel on open and
+  // restore it on close, and trap Tab focus within the dialog while it is open.
+  useEffect(() => {
+    if (!isOpen) return
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    const node = dialogRef.current
+    node?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        onClose()
+        return
+      }
+      if (event.key !== "Tab" || !node) return
+      const focusable = node.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+      previouslyFocused?.focus?.()
+    }
+  }, [isOpen, onClose])
 
   const weatherSensitivityLabels = useMemo(() => {
     return form.weatherSensitivity.length > 0
@@ -220,11 +260,16 @@ export function SettingsModal({
 
           {/* Bottom Sheet */}
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
             initial={{ y: "100%", opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 260 }}
-            className="fixed inset-x-0 bottom-0 z-50 overflow-x-hidden px-3 pb-3 sm:px-6 sm:pb-6"
+            className="fixed inset-x-0 bottom-0 z-50 overflow-x-hidden px-3 pb-3 outline-none sm:px-6 sm:pb-6"
           >
             <div className="mx-auto h-[min(92dvh,960px)] w-full max-w-5xl min-w-0">
               <MagicCard className="h-full w-full overflow-hidden rounded-[2rem] border border-card-border/70" gradientSize={280} gradientOpacity={0.72}>
@@ -243,13 +288,14 @@ export function SettingsModal({
                     <Sparkles className="size-3.5" />
                     {copy.accountTitle}
                   </span>
-                  <h2 className="break-words text-3xl font-black tracking-tight text-foreground sm:text-4xl">{copy.profileTitle}</h2>
+                  <h2 id={titleId} className="break-words text-3xl font-black tracking-tight text-foreground sm:text-4xl">{copy.profileTitle}</h2>
                   <p className="max-w-2xl break-words text-sm leading-6 text-muted-foreground">{copy.profileDescription}</p>
                 </div>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-full border border-card-border/70 bg-card/70 p-2.5 text-muted-foreground transition hover:border-sky-blue/25 hover:text-foreground"
+                  aria-label={language === "ko" ? "닫기" : language === "zh" ? "关闭" : language === "ja" ? "閉じる" : "Close"}
+                  className="rounded-full border border-card-border/70 bg-card/70 p-2.5 text-muted-foreground transition hover:border-sky-blue/25 hover:text-foreground focus-visible:ring-2 focus-visible:ring-sky-blue/40"
                 >
                   <X className="size-5" />
                 </button>
@@ -451,6 +497,8 @@ export function SettingsModal({
                     <AnimatePresence>
                       {saveMessage && (
                         <motion.div
+                          role={saveMessage.type === "success" ? "status" : "alert"}
+                          aria-live={saveMessage.type === "success" ? "polite" : "assertive"}
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
@@ -526,7 +574,7 @@ export function SettingsModal({
                       className="w-full rounded-[1.3rem] border border-danger/20 bg-background/80 px-4 py-3 text-sm font-medium text-foreground outline-none transition focus:border-danger/40"
                     />
                     {deleteMessage && (
-                      <div className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
+                      <div role="alert" aria-live="assertive" className="rounded-[1.3rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
                         {deleteMessage}
                       </div>
                     )}

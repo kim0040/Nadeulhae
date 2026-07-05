@@ -95,12 +95,24 @@ export function useWeatherData(coords?: { lat: number; lon: number }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Apply a successful result. dataService may return mock data flagged with
+    // `isFallback` (instead of throwing) when the upstream API is unavailable,
+    // so treat that as an error state too — otherwise the UI would silently
+    // present fabricated weather as if it were real.
+    const applyResult = (data: WeatherData) => {
+      setWeatherData(data);
+      setError(
+        (data as { isFallback?: boolean }).isFallback
+          ? "Weather data is using estimated fallback values"
+          : null,
+      );
+    };
+
     // Fixed coordinates — skip geolocation
     if (coords) {
       const load = async () => {
         try {
-          const data = await dataService.getWeatherData(coords.lat, coords.lon);
-          setWeatherData(data);
+          applyResult(await dataService.getWeatherData(coords.lat, coords.lon));
         } catch (err) {
           console.error("Fixed-coords weather load failed:", err);
           setError("Failed to load weather data");
@@ -114,8 +126,7 @@ export function useWeatherData(coords?: { lat: number; lon: number }) {
     // Browser geolocation path
     const loadFallback = async () => {
       try {
-        const data = await dataService.getWeatherData();
-        setWeatherData(data);
+        applyResult(await dataService.getWeatherData());
       } catch (err) {
         console.error("Initial data load failed:", err);
         setError("Failed to load weather data");
@@ -131,11 +142,12 @@ export function useWeatherData(coords?: { lat: number; lon: number }) {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          const data = await dataService.getWeatherData(
-            position.coords.latitude,
-            position.coords.longitude,
+          applyResult(
+            await dataService.getWeatherData(
+              position.coords.latitude,
+              position.coords.longitude,
+            ),
           );
-          setWeatherData(data);
         } catch (err) {
           console.error("Location-based load failed:", err);
           await loadFallback();

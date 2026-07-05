@@ -12,12 +12,14 @@ export { OpenAiClientError } from "@/lib/llm/openai-client"
 import {
   OpenAiClientError,
   fetchModels,
+  isRetryableLlmError,
   pickModelCandidate,
   requestCompletion,
   requestCompletionStream,
 } from "@/lib/llm/openai-client"
 import {
   recordGlobalLlmRequestOutcome,
+  refundGlobalLlmDailyRequest,
   reserveGlobalLlmDailyRequest,
 } from "@/lib/llm/quota"
 
@@ -163,6 +165,11 @@ async function doCompletion(input: {
     return result
   } catch (error) {
     await recordGlobalLlmRequestOutcome({ metricDate: reservation.usage.metricDate, success: false }).catch(() => {})
+    // Transient/provider-side failure yielded no usable answer — refund the
+    // reserved slot so a flaky provider can't drain the global daily budget.
+    if (isRetryableLlmError(error)) {
+      await refundGlobalLlmDailyRequest({ metricDate: reservation.usage.metricDate }).catch(() => {})
+    }
     throw error
   }
 }
@@ -192,6 +199,11 @@ async function doCompletionStream(input: {
     return result
   } catch (error) {
     await recordGlobalLlmRequestOutcome({ metricDate: reservation.usage.metricDate, success: false }).catch(() => {})
+    // See doCompletion: refund transient failures so retries/fallback don't
+    // permanently burn quota on requests that produced no answer.
+    if (isRetryableLlmError(error)) {
+      await refundGlobalLlmDailyRequest({ metricDate: reservation.usage.metricDate }).catch(() => {})
+    }
     throw error
   }
 }

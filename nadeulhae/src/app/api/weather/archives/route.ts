@@ -262,17 +262,22 @@ async function handleGET(request: Request) {
     return NextResponse.json(payload);
   } catch (error) {
     console.error("Archive API error:", error);
+    // Keep HTTP 200 so the calendar still renders (with the note), but flag the
+    // response as degraded so clients/monitoring can distinguish a real DB
+    // failure from a genuinely empty month.
     return NextResponse.json({
       month,
       highlightedDays: [],
       daySummaries: [],
       availableYears,
+      degraded: true,
       metadata: {
         dataSource: "기상청 ASOS",
         lastUpdate: "--:--",
         mode: "historical" as const,
         coverage: `${Math.min(...availableYears)}-01 ~ ${Math.max(...availableYears)}-12`,
         note: "데이터를 불러오지 못했습니다.",
+        degraded: true,
       },
     });
   }

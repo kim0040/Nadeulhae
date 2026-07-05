@@ -30,15 +30,33 @@ import { getCodeShareSessionById } from "@/lib/code-share/repository"
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const CODE_SHARE_ACTOR_COOKIE_NAME = process.env.CODE_SHARE_ACTOR_COOKIE_NAME ?? "nadeulhae_code_share_actor"
 const CODE_SHARE_ALIAS_COOKIE_NAME = process.env.CODE_SHARE_ALIAS_COOKIE_NAME ?? "nadeulhae_code_share_alias"
-const PING_INTERVAL_MS = 30_000   // How often the server pings clients.
-const PING_TIMEOUT_MS = 60_000    // How long to wait for a pong before terminating.
+const PING_INTERVAL_MS = 30_000   // How often the server pings clients; a client that misses one interval without a pong is terminated.
 const CODE_SHARE_TYPING_TIMEOUT_MS = 7_500  // Auto-clear typing after inactivity.
-const WS_ORIGIN_ALLOWLIST = new Set([
-  process.env.APP_BASE_URL,
-  "https://nadeulhae.space",
-  "https://www.nadeulhae.space",
-  "http://localhost:3000",
-].filter(Boolean))
+const IS_PRODUCTION = process.env.NODE_ENV === "production"
+
+function normalizeOrigin(value: string | null | undefined) {
+  if (!value) return null
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+const WS_ORIGIN_ALLOWLIST = new Set(
+  [
+    process.env.APP_BASE_URL,
+    ...(process.env.WS_ALLOWED_ORIGINS ?? "").split(","),
+    "https://nadeulhae.space",
+    "https://www.nadeulhae.space",
+    ...(!IS_PRODUCTION ? [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+    ] : []),
+  ]
+    .map((origin) => normalizeOrigin(origin?.trim()))
+    .filter((origin): origin is string => Boolean(origin))
+)
 
 /** Tracks a single participant's presence state within a code-share session. */
 type CodeSharePresenceActor = {
@@ -72,9 +90,13 @@ function parseCookie(cookieHeader: string | undefined): Record<string, string> {
  * WebSocket does not use CORS preflight. Origin allowlist is explicit server-side protection.
  */
 function validateOrigin(req: IncomingMessage): boolean {
-  const origin = req.headers.origin
-  if (!origin) return true
-  return WS_ORIGIN_ALLOWLIST.has(origin)
+  const rawOrigin = Array.isArray(req.headers.origin)
+    ? req.headers.origin[0]
+    : req.headers.origin
+  if (!rawOrigin) return !IS_PRODUCTION
+
+  const origin = normalizeOrigin(rawOrigin)
+  return Boolean(origin && WS_ORIGIN_ALLOWLIST.has(origin))
 }
 
 /**
@@ -294,49 +316,49 @@ function broadcastCodeSharePresence(sessionId: string) {
   broadcastToRoom(room, "code_share_presence", buildCodeSharePresencePayload(sessionId))
 }
 
-/** Start periodic ping and pong timeout monitoring for a single client. */
+/**
+ * Start periodic ping/pong liveness monitoring for a single client.
+ *
+ * Uses the standard `isAlive` flag pattern: every tick, a socket that has not
+ * ponged since the previous ping is considered dead and terminated. This
+ * guarantees dead/half-open sockets are reaped within one ping interval,
+ * instead of lingering until the OS TCP timeout (hours).
+ */
 function setupHeartbeat(ws: WebSocket) {
-  let timeoutTimer: ReturnType<typeof setTimeout> | null = null
+  let isAlive = true
 
-  const clearTimers = () => {
-    if (timeoutTimer) {
-      clearTimeout(timeoutTimer)
-      timeoutTimer = null
-    }
-  }
+  ws.on("pong", () => {
+    isAlive = true
+  })
 
   const pingTimer = setInterval(() => {
     if (ws.readyState !== WebSocket.OPEN) {
       clearInterval(pingTimer)
-      clearTimers()
       return
     }
 
+    // No pong received since the last ping — the connection is dead.
+    if (!isAlive) {
+      ws.terminate()
+      clearInterval(pingTimer)
+      return
+    }
+
+    isAlive = false
     try {
       ws.ping()
-      clearTimers()
-      timeoutTimer = setTimeout(() => {
-        ws.terminate()
-      }, PING_TIMEOUT_MS)
     } catch {
       ws.terminate()
       clearInterval(pingTimer)
-      clearTimers()
     }
   }, PING_INTERVAL_MS)
 
-  ws.on("pong", () => {
-    clearTimers()
-  })
-
   ws.on("close", () => {
     clearInterval(pingTimer)
-    clearTimers()
   })
 
   ws.on("error", () => {
     clearInterval(pingTimer)
-    clearTimers()
   })
 }
 
@@ -435,6 +457,14 @@ export function createWebSocketServer(server: import("node:http").Server) {
       const room = toCodeShareRoomName(sessionId)
 
       if (parsed.type === "code_share_subscribe") {
+        // Ignore duplicate subscribes on the same socket. Presence cleanup is
+        // keyed on this per-socket Set and only decrements once, so counting a
+        // repeat subscribe would permanently inflate the connection count and
+        // leak the session's presence entry (it would never reach zero / GC).
+        if (subscribedCodeShareSessions.has(sessionId)) {
+          return
+        }
+
         const session = await getCodeShareSessionById(sessionId).catch(() => null)
         if (!session) {
           return

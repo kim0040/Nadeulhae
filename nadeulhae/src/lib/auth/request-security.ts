@@ -15,6 +15,12 @@ import {
 const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
   process.env.TRUST_PROXY_HEADERS ?? ""
 )
+const IS_PRODUCTION = process.env.NODE_ENV === "production"
+const DEFAULT_AUTH_ALLOWED_ORIGINS = [
+  "https://nadeulhae.space",
+  "https://www.nadeulhae.space",
+]
+const LOCALHOST_HOST_RE = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i
 
 /** Extracts the client IP from proxy headers (Cloudflare, X-Real-IP, X-Forwarded-For). Falls back to "anonymous". */
 export function getClientIp(request: NextRequest) {
@@ -62,42 +68,62 @@ export function createAuthJsonResponse(
   return response
 }
 
-// Builds a set of allowed origins from request URL, app config, and host headers.
+function normalizeOrigin(value: string | null | undefined) {
+  if (!value) return null
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+function pickHeaderToken(value: string | null) {
+  if (!value) return ""
+  return value.split(",")[0]?.trim() ?? ""
+}
+
+function isLocalHost(value: string) {
+  return LOCALHOST_HOST_RE.test(value)
+}
+
+function parseConfiguredOrigins() {
+  return [
+    process.env.APP_BASE_URL,
+    ...(process.env.AUTH_ALLOWED_ORIGINS ?? "").split(","),
+    ...DEFAULT_AUTH_ALLOWED_ORIGINS,
+  ]
+}
+
+// Builds a set of allowed origins from trusted config and local dev hosts.
 function getAllowedOrigins(request: NextRequest) {
   const allowedOrigins = new Set<string>()
 
   const addOrigin = (value: string | null | undefined) => {
-    if (!value) return
-    try {
-      const normalized = new URL(value).origin
-      if (normalized) {
-        allowedOrigins.add(normalized)
-      }
-    } catch {
-      // Ignore invalid origin candidates.
+    const normalized = normalizeOrigin(value)
+    if (normalized) {
+      allowedOrigins.add(normalized)
     }
   }
 
-  const pickHeaderToken = (value: string | null) => {
-    if (!value) return ""
-    return value.split(",")[0]?.trim() ?? ""
+  for (const origin of parseConfiguredOrigins()) {
+    addOrigin(origin)
   }
 
-  const normalizeProtocol = (value: string) => value.replace(/:$/, "").toLowerCase()
+  if (!IS_PRODUCTION) {
+    addOrigin(request.nextUrl.origin)
 
-  addOrigin(request.nextUrl.origin)
-  addOrigin(process.env.APP_BASE_URL)
+    const host = pickHeaderToken(request.headers.get("host"))
+    if (host && isLocalHost(host)) {
+      addOrigin(`http://${host}`)
+      addOrigin(`https://${host}`)
+    }
 
-  const forwardedHost = pickHeaderToken(request.headers.get("x-forwarded-host"))
-  const host = forwardedHost || pickHeaderToken(request.headers.get("host"))
-  const forwardedProto = pickHeaderToken(request.headers.get("x-forwarded-proto"))
-  const requestProtocol = normalizeProtocol(request.nextUrl.protocol)
-  const protocol = normalizeProtocol(forwardedProto || requestProtocol)
-
-  if (host) {
-    const protocolCandidates = new Set<string>([protocol, "https", "http"])
-    for (const candidateProtocol of protocolCandidates) {
-      addOrigin(`${candidateProtocol}://${host}`)
+    if (TRUST_PROXY_HEADERS) {
+      const forwardedHost = pickHeaderToken(request.headers.get("x-forwarded-host"))
+      if (forwardedHost && isLocalHost(forwardedHost)) {
+        addOrigin(`http://${forwardedHost}`)
+        addOrigin(`https://${forwardedHost}`)
+      }
     }
   }
 
@@ -118,26 +144,20 @@ export function validateSameOriginRequest(request: NextRequest, locale?: AuthLoc
   const origin = (() => {
     if (!originHeader) return null
     if (originHeader === "null") return "null"
-    try {
-      return new URL(originHeader).origin
-    } catch {
-      return null
-    }
+    return normalizeOrigin(originHeader)
   })()
 
   if (originHeader === "null") {
     const refererHeader = request.headers.get("referer")
-    const refererOrigin = (() => {
-      if (!refererHeader) return null
-      try {
-        return new URL(refererHeader).origin
-      } catch {
-        return null
-      }
-    })()
+    const refererOrigin = normalizeOrigin(refererHeader)
     if (refererOrigin && allowedOrigins.has(refererOrigin)) {
       return null
     }
+
+    return createAuthJsonResponse(
+      { error: getAuthMessage(resolvedLocale, "invalidRequestOrigin") },
+      { status: 403 }
+    )
   }
 
   if (originHeader && origin !== "null" && !origin) {
@@ -148,6 +168,14 @@ export function validateSameOriginRequest(request: NextRequest, locale?: AuthLoc
   }
 
   if (origin && origin !== "null" && !allowedOrigins.has(origin)) {
+    return createAuthJsonResponse(
+      { error: getAuthMessage(resolvedLocale, "invalidRequestOrigin") },
+      { status: 403 }
+    )
+  }
+
+  const refererOrigin = normalizeOrigin(request.headers.get("referer"))
+  if (!originHeader && refererOrigin && !allowedOrigins.has(refererOrigin)) {
     return createAuthJsonResponse(
       { error: getAuthMessage(resolvedLocale, "invalidRequestOrigin") },
       { status: 403 }

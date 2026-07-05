@@ -330,7 +330,7 @@ export default function AboutPage() {
                 cta={feature.pending ? t("about_status_pending") : t("about_feature_cta")} 
                 className={cn(
                   feature.className, 
-                  "rounded-[2.5rem] border-sky-blue/5 dark:border-white/5 shadow-2xl transition-all hover:scale-[1.01] hover:shadow-sky-blue/5",
+                  "rounded-[2.5rem] border-sky-blue/5 shadow-2xl transition-[scale,box-shadow] hover:scale-[1.01] hover:shadow-sky-blue/5 dark:border-white/5",
                   feature.pending && "opacity-80 grayscale-[0.3]"
                 )} 
               />
@@ -617,7 +617,7 @@ export default function AboutPage() {
 
               <div className="relative z-10 flex h-full w-full flex-col items-center justify-between p-8 sm:p-14">
                 <div className="flex w-full flex-col items-center">
-                  <div className="mb-10 flex size-28 sm:size-36 items-center justify-center rounded-[2.5rem] sm:rounded-[3rem] border border-sky-blue/15 bg-[var(--interactive)] text-sky-blue shadow-[inset_0_4px_10px_rgba(0,0,0,0.04)] transition-all duration-300 group-hover:border-sky-blue/30 group-hover:bg-sky-blue/10">
+                  <div className="mb-10 flex size-28 items-center justify-center rounded-[2.5rem] border border-sky-blue/15 bg-[var(--interactive)] text-sky-blue shadow-[inset_0_4px_10px_rgba(0,0,0,0.04)] transition-[border-color,background-color] duration-300 group-hover:border-sky-blue/30 group-hover:bg-sky-blue/10 sm:size-36 sm:rounded-[3rem]">
                     <person.icon size={48} className="sm:size-16 transition-transform duration-300 group-hover:scale-105" strokeWidth={1.25} />
                   </div>
 
@@ -634,7 +634,7 @@ export default function AboutPage() {
                     </span>
                   </div>
 
-                  <div className="mb-8 h-1.5 w-14 rounded-full bg-sky-blue/20 transition-all duration-300 group-hover:w-20 group-hover:bg-sky-blue/50" />
+                  <div className="mb-8 h-1.5 w-14 rounded-full bg-sky-blue/20 transition-[width,background-color] duration-300 group-hover:w-20 group-hover:bg-sky-blue/50" />
 
                   <p className="px-4 text-center text-sm sm:text-base font-semibold leading-relaxed break-words text-neutral-800 dark:text-neutral-400">
                     {t(person.descKey)}

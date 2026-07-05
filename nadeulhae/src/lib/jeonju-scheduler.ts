@@ -16,6 +16,7 @@
  */
 
 import { generateJeonjuBriefing } from "@/lib/jeonju-briefing/service"
+import { getJeonjuBriefingByDateAndLocale } from "@/lib/jeonju-briefing/repository"
 
 const SCHEDULE_HOUR_KST = 7
 const CHECK_INTERVAL_MS = 5 * 60 * 1000 // Check every 5 minutes
@@ -62,6 +63,23 @@ async function generateForToday(): Promise<void> {
   const d = new Date(`${p.year}-${p.month}-${p.day}T00:00:00+09:00`)
   d.setDate(d.getDate() - offset)
   const dateStr = d.toISOString().slice(0, 10)
+
+  // Restart-safety: the "already generated today" guard lives in memory, so a
+  // process restart after 07:00 KST would otherwise re-run the full (expensive)
+  // Tavily + 4× LLM generation. If today's briefing is already persisted, skip.
+  try {
+    const existing = await getJeonjuBriefingByDateAndLocale(dateStr, "ko")
+    if (existing) {
+      console.log(`[jeonju-scheduler] Briefing for ${dateStr} already persisted — skipping regeneration.`)
+      _lastGeneratedDate = todayDate
+      _retryCount = 0
+      _retryAfterMs = 0
+      return
+    }
+  } catch (err) {
+    // If the existence check fails (e.g. DB hiccup), fall through and generate.
+    console.warn("[jeonju-scheduler] Existing-briefing check failed; proceeding to generate:", err instanceof Error ? err.message : err)
+  }
 
   try {
     console.log(`[jeonju-scheduler] Starting auto-generation for ${dateStr}...`)

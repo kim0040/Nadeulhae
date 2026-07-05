@@ -34,7 +34,7 @@ const JEONJU_COORDS = {
 export default function JeonjuPage() {
   const { language } = useLanguage();
   const { resolvedTheme } = useTheme();
-  const { weatherData } = useWeatherData(JEONJU_COORDS);
+  const { weatherData, error: weatherError } = useWeatherData(JEONJU_COORDS);
   const fireSummary = useFireSummary(weatherData);
 
   // Derived visual settings
@@ -55,6 +55,7 @@ export default function JeonjuPage() {
         marqueeTitle: string;
         yesterdayTitle: string;
         yesterdayDesc: string;
+        weatherFallbackNotice: string;
       }
     > = {
       ko: {
@@ -69,6 +70,8 @@ export default function JeonjuPage() {
         yesterdayTitle: "어제의 전주",
         yesterdayDesc:
           "나들AI가 어제의 전주 소식을 매일 아침 따뜻하게 브리핑해 드립니다.",
+        weatherFallbackNotice:
+          "실시간 날씨를 불러오지 못해 예시(추정) 데이터를 표시하고 있어요. 잠시 후 새로고침하면 최신 정보로 갱신됩니다.",
       },
       en: {
         heroTag: "Jeonju Special Service",
@@ -82,6 +85,8 @@ export default function JeonjuPage() {
         yesterdayTitle: "Yesterday's Jeonju",
         yesterdayDesc:
           "NadeulAI delivers a warm morning briefing of yesterday's Jeonju news, every day.",
+        weatherFallbackNotice:
+          "Live weather couldn't be loaded, so estimated sample data is shown. Refresh in a moment to get the latest.",
       },
       zh: {
         heroTag: "全州特色服务",
@@ -94,6 +99,8 @@ export default function JeonjuPage() {
         marqueeTitle: "全州人常去的地方",
         yesterdayTitle: "昨日全州",
         yesterdayDesc: "NadeulAI每天早上为您温馨播报昨日的全州新闻。",
+        weatherFallbackNotice:
+          "无法加载实时天气，正在显示示例（估算）数据。请稍后刷新以获取最新信息。",
       },
       ja: {
         heroTag: "全州特化サービス",
@@ -107,6 +114,8 @@ export default function JeonjuPage() {
         yesterdayTitle: "昨日の全州",
         yesterdayDesc:
           "NadeulAIが昨日の全州のニュースを毎朝暖かくブリーフィングします。",
+        weatherFallbackNotice:
+          "リアルタイムの天気を取得できず、サンプル（推定）データを表示しています。しばらくして再読み込みすると最新情報に更新されます。",
       },
     };
     return map[language] ?? map.en;
@@ -294,6 +303,14 @@ export default function JeonjuPage() {
             {texts.fixedDesc}
           </p>
         </div>
+        {weatherError && (
+          <div
+            role="status"
+            className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-sm font-semibold text-amber-700 dark:text-amber-300"
+          >
+            {texts.weatherFallbackNotice}
+          </div>
+        )}
         {weatherData && (
           <div className="pb-12">
             <PicnicBriefing weatherData={weatherData} />

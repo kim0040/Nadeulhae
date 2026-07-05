@@ -2243,7 +2243,7 @@ export default function LabPage() {
           <button
             onClick={() => setViewMode("study")}
             className={cn(
-              "rounded-full px-5 py-2.5 text-sm font-black transition-all sm:text-base",
+              "rounded-full px-5 py-2.5 text-sm font-black transition-[background-color,color,scale] active:scale-[0.96] sm:text-base",
               viewMode === "study"
                 ? "bg-sky-blue/15 text-sky-blue"
                 : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
@@ -2254,7 +2254,7 @@ export default function LabPage() {
           <button
             onClick={() => setViewMode("generate")}
             className={cn(
-              "rounded-full px-5 py-2.5 text-sm font-black transition-all sm:text-base",
+              "rounded-full px-5 py-2.5 text-sm font-black transition-[background-color,color,scale] active:scale-[0.96] sm:text-base",
               viewMode === "generate"
                 ? "bg-sky-blue/15 text-sky-blue"
                 : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
@@ -2265,7 +2265,7 @@ export default function LabPage() {
           <button
             onClick={() => setViewMode("manage")}
             className={cn(
-              "rounded-full px-5 py-2.5 text-sm font-black transition-all sm:text-base",
+              "rounded-full px-5 py-2.5 text-sm font-black transition-[background-color,color,scale] active:scale-[0.96] sm:text-base",
               viewMode === "manage"
                 ? "bg-sky-blue/15 text-sky-blue"
                 : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
@@ -2277,7 +2277,7 @@ export default function LabPage() {
             type="button"
             onClick={() => setViewMode("report")}
             className={cn(
-              "rounded-full px-5 py-2.5 text-sm font-black transition-all sm:text-base",
+              "rounded-full px-5 py-2.5 text-sm font-black transition-[background-color,color,scale] active:scale-[0.96] sm:text-base",
               viewMode === "report"
                 ? "bg-sky-blue/15 text-sky-blue"
                 : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
@@ -2600,7 +2600,7 @@ export default function LabPage() {
                             <div className="mt-auto shrink-0 space-y-6">
                               <div className="h-1.5 w-full overflow-hidden rounded-full bg-card-border/50 shadow-inner">
                                 <div
-                                  className="h-full rounded-full bg-linear-to-r from-[#0b7d71] to-[#2f6fe4] transition-all duration-500"
+                                  className="h-full rounded-full bg-linear-to-r from-[var(--beam-from)] to-[var(--beam-to)] transition-[width] duration-500"
                                   style={{ width: `${stageProgress}%` }}
                                 />
                               </div>

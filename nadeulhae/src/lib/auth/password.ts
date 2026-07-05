@@ -14,6 +14,16 @@ const DUMMY_PASSWORD_SALT = randomBytes(16).toString("hex")
 
 export const PASSWORD_ALGORITHM = "scrypt-v1"
 
+// Warn once at startup if the pepper is missing in production. We deliberately
+// do NOT throw (unlike DATA_PROTECTION_KEY) to stay backward-compatible with
+// existing deploys, but a missing pepper silently drops the "a DB leak alone
+// can't crack hashes" property, so it should be loud in the logs.
+if (process.env.NODE_ENV === "production" && !process.env.AUTH_PEPPER) {
+  console.warn(
+    "[auth] AUTH_PEPPER is not set in production — password hashes lose the server-side pepper (defense-in-depth). Set AUTH_PEPPER to restore it."
+  )
+}
+
 // Appends the server-side pepper to the password before hashing.
 // The pepper is stored in an env variable and is not in the DB,
 // so a DB leak alone is insufficient to crack passwords.

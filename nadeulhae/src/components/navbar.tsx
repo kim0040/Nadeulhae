@@ -173,7 +173,7 @@ export function Navbar() {
   return (
     <header
       className={cn(
-        "pointer-events-none fixed left-0 right-0 top-0 z-50 flex items-center px-2 py-2 transition-all duration-500 sm:px-4 sm:py-3 md:px-5 md:py-3.5 lg:px-6 lg:py-4",
+        "pointer-events-none fixed left-0 right-0 top-0 z-50 flex items-center px-2 py-2 transition-[transform,opacity,padding] duration-500 sm:px-4 sm:py-3 md:px-5 md:py-3.5 lg:px-6 lg:py-4",
         isVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0",
       )}
     >
@@ -203,10 +203,10 @@ export function Navbar() {
         </div>
       </Link>
 
-      <nav className="pointer-events-auto relative z-50 mx-auto flex max-w-full justify-center transition-all">
+      <nav className="pointer-events-auto relative z-50 mx-auto flex max-w-full justify-center transition-[max-width]">
         <div
           className={cn(
-            "flex max-w-full shrink items-center rounded-full border border-[var(--card-border)] bg-[var(--card)] shadow-xl shadow-active-blue/10 backdrop-blur-2xl transition-all",
+            "flex max-w-full shrink items-center rounded-full border border-[var(--card-border)] bg-[var(--card)] shadow-xl shadow-active-blue/10 backdrop-blur-2xl transition-[gap,padding,background-color,box-shadow]",
             language === "en"
               ? "gap-0.5 px-2 py-1 sm:gap-1.5 sm:px-3 sm:py-1.5 md:gap-2 md:px-3.5 md:py-2 lg:gap-3 lg:px-4 lg:py-2 xl:gap-4 xl:px-5 xl:py-2.5"
               : "gap-1 px-2 py-1 sm:gap-2 sm:px-3 sm:py-1.5 md:gap-2.5 md:px-3.5 md:py-2 lg:gap-3 lg:px-4 lg:py-2 xl:gap-4 xl:px-5 xl:py-2.5",
@@ -218,7 +218,7 @@ export function Navbar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full py-1 transition-all duration-300 hover:text-sky-blue sm:gap-1.5 sm:text-[13px] md:gap-2 md:text-sm lg:text-sm xl:text-[15px] xl:font-black",
+                  "relative flex min-h-10 shrink-0 items-center gap-1 whitespace-nowrap rounded-full py-1 transition-[background-color,color,scale] duration-300 hover:text-sky-blue active:scale-[0.96] sm:gap-1.5 sm:text-[13px] md:gap-2 md:text-sm lg:text-sm xl:text-[15px] xl:font-black",
                   pathname === item.href
                     ? "text-sky-blue"
                     : "text-neutral-500 hover:scale-105 dark:text-neutral-400",
@@ -245,7 +245,7 @@ export function Navbar() {
                 onClick={handleLogout}
                 disabled={isPending}
                 aria-label={copy.logout}
-                className="flex items-center gap-1 p-1.5 text-[11px] font-bold text-muted-foreground transition-all hover:text-sky-blue disabled:opacity-50 sm:gap-1.5 sm:p-2 sm:text-xs md:text-[13px] xl:text-[13px]"
+                className="flex min-h-10 items-center gap-1 p-1.5 text-[11px] font-bold text-muted-foreground transition-[color,scale] hover:text-sky-blue active:scale-[0.96] disabled:opacity-50 sm:gap-1.5 sm:p-2 sm:text-xs md:text-[13px] xl:text-[13px]"
                 title={copy.logout}
               >
                 <LogOutIcon size={16} className="sm:size-[17px]" />
@@ -264,7 +264,7 @@ export function Navbar() {
                   setTheme(THEME_MODES[nextIndex]);
                 }}
                 aria-label={copy.themeToggle}
-                className="flex items-center gap-1 p-1.5 text-muted-foreground transition-all hover:text-sky-blue sm:p-2"
+                className="flex min-h-10 items-center gap-1 p-1.5 text-muted-foreground transition-[color,scale] hover:text-sky-blue active:scale-[0.96] sm:p-2"
                 title={copy.themeToggle}
               >
                 {theme === "light" && (
@@ -290,7 +290,7 @@ export function Navbar() {
                 setLanguage(cycle[(idx + 1) % 4] ?? "ko");
               }}
               aria-label={copy.languageToggle}
-              className="flex items-center gap-1 p-1.5 text-[11px] font-black text-muted-foreground transition-all hover:text-sky-blue sm:p-2 sm:text-xs md:text-[13px]"
+              className="flex min-h-10 items-center gap-1 p-1.5 text-[11px] font-black text-muted-foreground transition-[color,scale] hover:text-sky-blue active:scale-[0.96] sm:p-2 sm:text-xs md:text-[13px]"
               title={copy.languageToggle}
             >
               <Languages size={16} className="sm:size-[17px]" />

@@ -429,7 +429,7 @@ export function VocabReportPanel() {
                         const height = Math.max(6, Math.round((point.reviewCount / maxTrend.maxReview) * 100))
                         return (
                           <div key={`${point.metricDate}-review`} className="flex min-w-0 flex-col items-center gap-1" title={`${point.reviewCount}`}>
-                            <div className="w-full rounded-t bg-sky-blue/70 transition-all" style={{ height: `${height}%` }} />
+                            <div className="w-full rounded-t bg-sky-blue/70 transition-[height] duration-300" style={{ height: `${height}%` }} />
                             <span className="text-[10px] text-muted-foreground">{formatMetricDate(point.metricDate, language)}</span>
                           </div>
                         )
@@ -451,7 +451,7 @@ export function VocabReportPanel() {
                         const height = Math.max(6, Math.round((point.generationCount / maxTrend.maxGeneration) * 100))
                         return (
                           <div key={`${point.metricDate}-generate`} className="flex min-w-0 flex-col items-center gap-1" title={`${point.generationCount}`}>
-                            <div className="w-full rounded-t bg-emerald-500/65 transition-all" style={{ height: `${height}%` }} />
+                            <div className="w-full rounded-t bg-emerald-500/65 transition-[height] duration-300" style={{ height: `${height}%` }} />
                             <span className="text-[10px] text-muted-foreground">{formatMetricDate(point.metricDate, language)}</span>
                           </div>
                         )
@@ -483,7 +483,7 @@ export function VocabReportPanel() {
                     : item.state === "learning"
                       ? "from-amber-400 to-amber-500"
                       : item.state === "review"
-                        ? "from-[#0b7d71] to-[#2f6fe4]"
+                        ? "from-[var(--beam-from)] to-[var(--beam-to)]"
                         : "from-rose-400 to-rose-500"
                   return (
                     <div key={item.state} className="space-y-1.5">

@@ -112,6 +112,18 @@ export function getDbPool() {
 }
 
 /**
+ * Gracefully closes the shared connection pool (drains in-flight queries and
+ * ends all connections). Safe to call when no pool exists. Used on process
+ * shutdown so a deploy/restart releases DB connections cleanly.
+ */
+export async function closeDbPool() {
+  const pool = globalThis.__nadeulhaeDbPool
+  if (!pool) return
+  globalThis.__nadeulhaeDbPool = undefined
+  await pool.end()
+}
+
+/**
  * Runs a SELECT-style query and returns the result rows.
  * Uses `pool.query()` which prepares + executes in one round trip.
  */

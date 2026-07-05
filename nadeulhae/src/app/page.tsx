@@ -306,7 +306,7 @@ export default function Home() {
             gradientTo={scoreColors.secondary}
           >
             <div
-              className="relative flex size-64 sm:size-80 items-center justify-center rounded-full bg-card shadow-2xl transition-all hover:scale-105 duration-500"
+              className="relative flex size-64 items-center justify-center rounded-full bg-card shadow-2xl transition-[scale,box-shadow] duration-500 hover:scale-105 sm:size-80"
               style={
                 !enableAnimations
                   ? {
@@ -366,7 +366,7 @@ export default function Home() {
             {quickMetrics.map((item) => (
               <div
                 key={item.label}
-                className="flex flex-col items-center basis-1/2 sm:basis-1/3 xl:basis-auto transition-transform hover:scale-105 active:scale-95 duration-300 max-w-[180px]"
+                className="flex max-w-[180px] basis-1/2 flex-col items-center transition-transform duration-300 hover:scale-105 active:scale-[0.96] sm:basis-1/3 xl:basis-auto"
               >
                 <item.icon className={cn(item.tone, "mb-2 size-6 sm:size-8")} />
                 <span className="text-[10px] sm:text-[12px] text-neutral-400 uppercase tracking-widest font-black leading-none mb-1 text-center">

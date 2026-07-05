@@ -14,6 +14,7 @@
 import {
   getLabAiChatWebSearchCache,
   recordLabAiChatWebSearchOutcome,
+  refundLabAiChatWebSearchCall,
   reserveLabAiChatWebSearchCall,
   persistLabAiChatWebSearchCache,
 } from "@/lib/lab-ai-chat/repository"
@@ -352,6 +353,13 @@ function isGreeting(question: string) {
   return /^(안녕|안녕하세요|반가워|하이|ㅎㅇ|hi|hello|hey|thanks|감사|고마워|ㄱㅅ)[\s!.?~]*$/i.test(normalized)
 }
 
+/** Short acknowledgments / chit-chat that never require a web search. */
+function isNoSearchAck(question: string) {
+  const normalized = question.trim()
+  if (normalized.length > 20) return false
+  return /^(ok(ay)?|k|응|웅|그래|알겠어|알겠습니다|좋아|좋아요|네|넵|예|yes|yep|sure|nice|great|good|👍|👌|🙏)[\s!.?~]*$/i.test(normalized)
+}
+
 /** Build a truncated conversation snippet for the planner LLM to use as context. */
 function buildConversationHint(
   recentMessages: Array<{ role: string; content: string }> | undefined
@@ -413,9 +421,11 @@ async function buildSearchPlan(input: {
   cachePreview: string | null
   conversationHint: string | null
   requestedYear: number | null
+  cacheRelevant: boolean
 }) {
-  // Fast-path: greetings never need search
-  if (isGreeting(input.question)) {
+  // Fast-path: greetings and short acknowledgments never need search — skip the
+  // planner LLM entirely.
+  if (isGreeting(input.question) || isNoSearchAck(input.question)) {
     return {
       needSearch: false,
       useCacheFirst: true,
@@ -430,6 +440,20 @@ async function buildSearchPlan(input: {
       includeDomains: [] as string[],
       excludeDomains: [] as string[],
     } satisfies SearchPlan
+  }
+
+  // Fast-path: a clear, self-contained explicit search request with no reusable
+  // cache — the heuristic plan's query is good enough, so skip the extra planner
+  // LLM round-trip (saves latency + an LLM quota slot). Follow-ups and
+  // cache-eligible turns still go through the planner, which is where its
+  // query-rewriting and cache-usability judgment actually matter.
+  if (
+    !input.cacheRelevant &&
+    !isFollowUpCue(input.question) &&
+    isExplicitSearchRequest(input.question) &&
+    input.question.trim().length >= 12
+  ) {
+    return buildFallbackPlan(input.question, input.conversationHint, input.requestedYear)
   }
 
   const localeName = input.locale === "ko" ? "Korean" : "English"
@@ -662,6 +686,7 @@ export async function resolveLabAiChatWebSearchContext(input: {
     cachePreview: cachedResult?.slice(0, 1200) ?? null,
     conversationHint,
     requestedYear,
+    cacheRelevant,
   })
 
   // Planner agrees cache is usable → skip live search.
@@ -762,6 +787,15 @@ export async function resolveLabAiChatWebSearchContext(input: {
       await recordLabAiChatWebSearchOutcome({
         metricMonth: reservation.metricMonth,
         success: false,
+      }).catch(() => {})
+
+      // The search produced no usable result — refund the reserved slot so a
+      // Tavily/provider failure doesn't burn the user's session/monthly quota.
+      await refundLabAiChatWebSearchCall({
+        userId: input.userId,
+        sessionId: input.sessionId,
+        metricMonth: reservation.metricMonth,
+        isFallback,
       }).catch(() => {})
 
       if (!(error instanceof TavilyError)) {

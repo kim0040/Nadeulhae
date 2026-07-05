@@ -7,7 +7,7 @@
  * thinking-panel UI, and per-user daily limits.  Fully i18n.
  */
 
-import { Children, isValidElement, type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { Children, isValidElement, memo, type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
   AlertTriangle,
   ArrowDown,
@@ -51,6 +51,30 @@ type LabAiChatStateApiResponse = LabAiChatStateResponse & {
   serverNow?: unknown
   error?: string
 }
+
+// Hoisted so it's a stable reference across renders (a fresh [remarkGfm] literal
+// per render would make react-markdown re-run its plugin pipeline needlessly).
+const REMARK_PLUGINS = [remarkGfm]
+
+// Memoized markdown renderer. Parsing markdown (+ GFM) is the expensive part of
+// a message render. Isolating it behind memo means that when the panel
+// re-renders for an unrelated reason (e.g. every keystroke in the composer, or
+// the once-a-render relative-time recompute), settled messages — whose `content`
+// string is unchanged — skip re-parsing entirely. `components` is a stable
+// useMemo reference, and equal content strings compare true under Object.is.
+const AssistantMarkdown = memo(function AssistantMarkdown({
+  content,
+  components,
+}: {
+  content: string
+  components: Components
+}) {
+  return (
+    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
+      {content}
+    </ReactMarkdown>
+  )
+})
 
 const MODEL_STORAGE_KEY = "nadeulhae:lab-ai-chat:model-id"
 const THINKING_PANEL_STORAGE_KEY = "nadeulhae:lab-ai-chat:thinking-panel-open"
@@ -433,7 +457,7 @@ function MessageCopyButton({ text, copyLabel, copiedLabel }: { text: string; cop
     <button
       type="button"
       onClick={() => void handleClick()}
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground/60 transition hover:bg-muted hover:text-foreground active:scale-[0.97]"
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground/60 transition hover:bg-muted hover:text-foreground active:scale-[0.96]"
       aria-label={copied ? copiedLabel : copyLabel}
     >
       {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -478,7 +502,7 @@ function MarkdownCodeBlock({
         <button
           type="button"
           onClick={() => void handleCopy()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background/70 px-2.5 text-xs font-semibold text-foreground/85 transition hover:bg-muted active:scale-[0.98]"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background/70 px-2.5 text-xs font-semibold text-foreground/85 transition hover:bg-muted active:scale-[0.96]"
           aria-label={copied ? copiedLabel : copyLabel}
         >
           {copied ? <Check className="size-3.5 text-accent" /> : <Copy className="size-3.5" />}
@@ -741,7 +765,7 @@ function ThinkingProgressPanel({
       <button
         type="button"
         onClick={onToggle}
-        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card/70 px-3 py-2 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground active:scale-[0.98]"
+        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card/70 px-3 py-2 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground active:scale-[0.96]"
       >
         <Lightbulb className="size-4 text-accent" />
         {showLabel}
@@ -1445,7 +1469,7 @@ export function LabAiChatPanel() {
             type="button"
             onClick={handleCreateSession}
             disabled={isSessionPending}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-foreground px-3 text-sm font-semibold text-background transition duration-200 hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-foreground px-3 text-sm font-semibold text-background transition duration-200 hover:opacity-90 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSessionPending ? <LoaderCircle className="size-4 animate-spin" /> : <MessageSquarePlus className="size-4" />}
             {copy.newChat}
@@ -1515,7 +1539,7 @@ export function LabAiChatPanel() {
               type="button"
               onClick={handleCreateSession}
               disabled={isSessionPending}
-              className="ml-auto inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card/75 text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:hidden"
+              className="ml-auto inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card/75 text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 sm:hidden"
               aria-label={copy.newChat}
               title={copy.newChat}
             >
@@ -1529,7 +1553,7 @@ export function LabAiChatPanel() {
                 type="button"
                 onClick={() => setIsModelMenuOpen((current) => !current)}
                 disabled={models.length === 0 || isPending}
-                className="inline-flex h-9 w-full max-w-none items-center justify-center gap-1.5 rounded-lg border border-border bg-card/75 px-2.5 text-sm font-semibold text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:max-w-[14rem] sm:px-3"
+                className="inline-flex h-9 w-full max-w-none items-center justify-center gap-1.5 rounded-lg border border-border bg-card/75 px-2.5 text-sm font-semibold text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:max-w-[14rem] sm:px-3"
                 aria-expanded={isModelMenuOpen}
                 title={`${activeModelLabel}: ${activeModelDescription}`}
               >
@@ -1596,7 +1620,7 @@ export function LabAiChatPanel() {
               onClick={handleWebSearchToggle}
               disabled={!resolvedActiveSessionId || isPending}
               className={cn(
-                "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-auto sm:gap-1.5 sm:px-2.5",
+                "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition duration-200 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-auto sm:gap-1.5 sm:px-2.5",
                 isWebSearchEnabled
                   ? "border-accent/35 bg-accent/10 text-accent dark:bg-accent/15"
                   : "border-border bg-card/75 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -1611,7 +1635,7 @@ export function LabAiChatPanel() {
               type="button"
               onClick={handleCreateSession}
               disabled={isSessionPending}
-              className="hidden h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-card/75 px-3 text-sm font-semibold text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
+              className="hidden h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-card/75 px-3 text-sm font-semibold text-foreground shadow-sm transition duration-200 hover:bg-muted active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
             >
               {isSessionPending ? <LoaderCircle className="size-4 animate-spin" /> : <MessageSquarePlus className="size-4" />}
               <span>{copy.newChat}</span>
@@ -1691,9 +1715,7 @@ export function LabAiChatPanel() {
                               <div className="flex flex-col gap-1">
                                 <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base xl:text-lg">
                                   <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                                      {assistantContent}
-                                    </ReactMarkdown>
+                                    <AssistantMarkdown content={assistantContent} components={markdownComponents} />
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-end">
@@ -1711,9 +1733,7 @@ export function LabAiChatPanel() {
                           <div className="flex flex-col gap-1">
                             <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base xl:text-lg">
                               <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                                  {assistantContent}
-                                </ReactMarkdown>
+                                <AssistantMarkdown content={assistantContent} components={markdownComponents} />
                               </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -1742,7 +1762,7 @@ export function LabAiChatPanel() {
                       key={suggestion}
                       type="button"
                       onClick={() => handleSuggestionSelect(suggestion)}
-                      className="lab-chat-suggestion rounded-lg border border-border bg-card/75 px-4 py-3 text-left text-sm font-medium leading-6 text-foreground shadow-sm transition duration-200 hover:border-accent/35 hover:bg-muted active:scale-[0.98]"
+                      className="lab-chat-suggestion rounded-lg border border-border bg-card/75 px-4 py-3 text-left text-sm font-medium leading-6 text-foreground shadow-sm transition duration-200 hover:border-accent/35 hover:bg-muted active:scale-[0.96]"
                     >
                       {suggestion}
                     </button>
@@ -1756,7 +1776,7 @@ export function LabAiChatPanel() {
             <button
               type="button"
               onClick={() => scrollToBottom("smooth")}
-              className="absolute bottom-20 right-3 z-20 inline-flex size-9 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-lg shadow-foreground/10 backdrop-blur transition duration-200 hover:bg-muted active:scale-[0.95]"
+              className="absolute bottom-20 right-3 z-20 inline-flex size-9 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-lg shadow-foreground/10 backdrop-blur transition duration-200 hover:bg-muted active:scale-[0.96]"
               aria-label={copy.scrollBottom}
             >
               <ArrowDown className="size-4" />
@@ -1791,7 +1811,7 @@ export function LabAiChatPanel() {
                 type="button"
                 onClick={handleAttachmentClick}
                 disabled={!canType}
-                className="mb-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition duration-200 hover:bg-muted hover:text-foreground active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-45"
+                className="mb-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition duration-200 hover:bg-muted hover:text-foreground active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
                 aria-label={copy.attachFile}
                 title={copy.attachFile}
               >
@@ -1825,7 +1845,7 @@ export function LabAiChatPanel() {
                 onMouseDown={(event) => event.preventDefault()}
                 disabled={!chatInput.trim() || !canSend}
                 className={cn(
-                  "mb-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg transition duration-200 active:scale-[0.94] disabled:cursor-not-allowed",
+                  "mb-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg transition duration-200 active:scale-[0.96] disabled:cursor-not-allowed",
                   chatInput.trim() && canSend
                     ? "bg-accent text-accent-foreground shadow-sm hover:opacity-90"
                     : "bg-muted text-muted-foreground/50"

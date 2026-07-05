@@ -49,6 +49,14 @@ async function handlePOST(request: NextRequest) {
     const nLat2 = Number(lat2)
     const nLon2 = Number(lon2)
 
+    // Reject non-finite / out-of-range coordinates. Number("abc") === NaN passes
+    // the null check above and would otherwise flow into haversine as NaN.
+    const isValidLat = (v: number) => Number.isFinite(v) && v >= -90 && v <= 90
+    const isValidLon = (v: number) => Number.isFinite(v) && v >= -180 && v <= 180
+    if (!isValidLat(nLat1) || !isValidLat(nLat2) || !isValidLon(nLon1) || !isValidLon(nLon2)) {
+      return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 })
+    }
+
     // 1. Get Kakao Key: prefer REST API Key for server-side REST calls, fallback to JS key
     const restKey = process.env.KAKAO_REST_KEY
     const jsKey = process.env.KAKAO_JS_KEY
@@ -82,7 +90,10 @@ async function handlePOST(request: NextRequest) {
       const res = await fetch(url, {
         method: "GET",
         headers,
-        next: { revalidate: 600 } // Cache results for 10 minutes to protect quota
+        next: { revalidate: 600 }, // Cache results for 10 minutes to protect quota
+        // Bound the call so a hung Kakao endpoint can't stall the (serial) course
+        // routing chain; on timeout we fall through to the heuristic fallback below.
+        signal: AbortSignal.timeout(5000),
       })
 
       if (res.ok) {

@@ -7,6 +7,7 @@
  * read-only mode for closed sessions.  Fully i18n via LanguageContext.
  */
 
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -25,8 +26,22 @@ import { BorderBeam } from "@/components/magicui/border-beam"
 import { MagicCard } from "@/components/magicui/magic-card"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { SectionCard } from "@/components/dashboard/ui"
-import { CodeMirrorEditor } from "@/components/lab/code-mirror-editor"
 import { useLanguage } from "@/context/LanguageContext"
+
+// The CodeMirror editor (core + view) is heavy; load it on demand so it stays
+// out of the code-share route's initial JS. ssr:false because the editor is
+// client-only and needs no server render.
+const CodeMirrorEditor = dynamic(
+  () => import("@/components/lab/code-mirror-editor").then((m) => m.CodeMirrorEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full min-h-[40vh] items-center justify-center text-sm font-semibold text-muted-foreground">
+        <span className="animate-pulse">에디터 불러오는 중…</span>
+      </div>
+    ),
+  }
+)
 import { useWebSocket } from "@/lib/websocket/use-websocket"
 import { cn, getCopy } from "@/lib/utils"
 

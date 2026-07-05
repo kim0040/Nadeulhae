@@ -243,7 +243,7 @@ export function PicnicDetailDrawer({
                 </div>
                 <button
                   onClick={onClose}
-                  className="rounded-full border border-card-border/70 bg-card/70 p-2 text-muted-foreground transition hover:border-sky-blue/25 hover:text-foreground active:scale-95"
+                  className="rounded-full border border-card-border/70 bg-card/70 p-2 text-muted-foreground transition hover:border-sky-blue/25 hover:text-foreground active:scale-[0.96]"
                 >
                   <X size={20} />
                 </button>

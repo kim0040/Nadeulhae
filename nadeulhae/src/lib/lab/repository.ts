@@ -1399,9 +1399,21 @@ export async function applyLabCardReview(input: {
 export async function deleteLabDataForUser(userId: string) {
   await ensureLabSchema()
 
-  await executeStatement("DELETE FROM lab_cards WHERE user_id = ?", [userId])
-  await executeStatement("DELETE FROM lab_decks WHERE user_id = ?", [userId])
-  await executeStatement("DELETE FROM lab_daily_usage WHERE user_id = ?", [userId])
+  // Wrap all three deletes in a single transaction so a mid-way failure can't
+  // leave the account partially deleted (mirrors the auth/chat deletion paths).
+  const connection = await getDbPool().getConnection()
+  try {
+    await connection.beginTransaction()
+    await connection.execute("DELETE FROM lab_cards WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM lab_decks WHERE user_id = ?", [userId])
+    await connection.execute("DELETE FROM lab_daily_usage WHERE user_id = ?", [userId])
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
 }
 /** Apply a batch of card reviews in a single transaction. Fetches all due cards with a single query, processes each review, and bulk-updates the daily usage counter. */
 export async function applyLabCardReviewBatch(input: {
