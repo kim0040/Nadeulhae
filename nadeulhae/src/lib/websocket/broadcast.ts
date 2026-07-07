@@ -18,6 +18,14 @@ type ClientMeta = {
   rooms: Set<string>
 }
 
+export type BroadcastClientMeta = Readonly<{
+  userId: string | null
+  actorId: string | null
+  actorAlias: string | null
+  connectedAt: number
+  rooms: ReadonlySet<string>
+}>
+
 /**
  * Union of message shapes the server will accept from a client.
  * Anything outside this list is silently dropped.
@@ -319,6 +327,30 @@ export function broadcast(type: string, payload: unknown, excludeWs?: WebSocket)
   const snapshot = [...clients.keys()]
   for (const ws of snapshot) {
     if (ws === excludeWs) continue
+    if (!safeSend(ws, data)) {
+      ws.close()
+    }
+  }
+}
+
+/**
+ * Send a message to every connected client with a per-client payload. Use this
+ * when the same event needs viewer-specific fields such as `isMine`.
+ */
+export function broadcastToEach(
+  type: string,
+  createPayload: (client: BroadcastClientMeta) => unknown,
+  excludeWs?: WebSocket
+) {
+  const snapshot = [...clients.entries()]
+  for (const [ws, meta] of snapshot) {
+    if (ws === excludeWs) continue
+
+    const data = JSON.stringify({
+      type,
+      payload: createPayload(meta),
+    })
+
     if (!safeSend(ws, data)) {
       ws.close()
     }

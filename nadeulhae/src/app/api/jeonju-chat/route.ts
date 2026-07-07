@@ -8,7 +8,7 @@ import {
   getMessagesSince,
   getRecentMessages,
 } from "@/lib/jeonju-chat/repository"
-import { broadcast } from "@/lib/websocket/broadcast"
+import { broadcastToEach } from "@/lib/websocket/broadcast"
 
 export const runtime = "nodejs"
 
@@ -195,7 +195,10 @@ export async function POST(request: NextRequest) {
       isAnonymous,
     })
 
-    broadcast("jeonju_chat_message", created)
+    broadcastToEach("jeonju_chat_message", (client) => ({
+      ...created,
+      isMine: client.userId === user.id,
+    }))
 
     return NextResponse.json(
       {
