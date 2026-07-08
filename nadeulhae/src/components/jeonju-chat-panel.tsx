@@ -37,6 +37,22 @@ interface ChatMessage {
   createdAt: string
 }
 
+// The server may broadcast a sender's own message with isMine: false if the
+// websocket's auth patch hasn't resolved yet (see jeonju-chat/route.ts). Never
+// let a later, more authoritative isMine: true be discarded by dedup.
+function mergeIncomingMessage(prev: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
+  const index = prev.findIndex((m) => m.id === incoming.id)
+  if (index === -1) {
+    return [...prev, incoming]
+  }
+  if (!prev[index].isMine && incoming.isMine) {
+    const next = [...prev]
+    next[index] = { ...next[index], isMine: true }
+    return next
+  }
+  return prev
+}
+
 const COPY = {
   ko: {
     sectionTag: "전주 소통",
@@ -290,10 +306,7 @@ export function JeonjuChatPanel() {
     const unsubscribe = subscribe("jeonju_chat_message", (payload: unknown) => {
       const msg = payload as ChatMessage | null
       if (!msg || typeof msg !== "object" || !("id" in msg)) return
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev
-        return [...prev, msg]
-      })
+      setMessages((prev) => mergeIncomingMessage(prev, msg))
     })
     return unsubscribe
   }, [subscribe])
@@ -406,10 +419,7 @@ export function JeonjuChatPanel() {
       }
 
       if (data?.message) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === data.message!.id)) return prev
-          return [...prev, data.message!]
-        })
+        setMessages((prev) => mergeIncomingMessage(prev, data.message!))
       }
     } catch {
       setInput(msgText)

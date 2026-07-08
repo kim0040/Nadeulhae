@@ -447,7 +447,8 @@ export function CodeShareWorkspace({
   const router = useRouter()
   const { language } = useLanguage()
   const copy = getCopy(CODE_SHARE_COPY, language)
-  const { connected: wsConnected, subscribe, send } = useWebSocket()
+  const { connected: wsConnected, subscribe, send, reconnect } = useWebSocket()
+  const actorCookieReconciledRef = useRef(false)
 
   const [viewer, setViewer] = useState<ViewerIdentity | null>(null)
   const [participants, setParticipants] = useState<PresenceParticipant[]>([])
@@ -501,7 +502,17 @@ export function CodeShareWorkspace({
     }
 
     setViewer(identity)
-  }, [])
+
+    // On a first-ever visit, the actor-id cookie doesn't exist yet when this
+    // component mounts, so the websocket upgrade (which reads the cookie) and
+    // this REST call race and can each mint a different guest actor id. This
+    // API response is what sets the cookie, so once we've seen it, force one
+    // reconnect so the socket re-reads the now-set cookie and matches `identity`.
+    if (!actorCookieReconciledRef.current) {
+      actorCookieReconciledRef.current = true
+      reconnect()
+    }
+  }, [reconnect])
 
   // Keep local list cache fresh when this editor receives updates from API or websocket.
   const upsertSessionSummary = useCallback((summary: CodeShareSessionSummary) => {
@@ -589,9 +600,14 @@ export function CodeShareWorkspace({
       applyViewerIfPresent(payload.viewer)
       applySessionDetail(payload.session)
       setError(null)
-      // Presence is room-scoped; reset until ws presence event arrives for this session.
-      setParticipants([])
-      setPresenceCount(1)
+      if (!options?.silent) {
+        // Presence is room-scoped; reset until ws presence event arrives for this session.
+        // Silent refreshes (polling fallback, remote-save reconciliation) don't
+        // rejoin the room, so resetting here would just flicker the count to 1
+        // with nothing to repopulate it until the next real presence event.
+        setParticipants([])
+        setPresenceCount(1)
+      }
     } catch (loadError) {
       console.error("Failed to load code-share session:", loadError)
       setSessionDetail(null)
@@ -1037,7 +1053,7 @@ export function CodeShareWorkspace({
       } finally {
         setIsSaving(false)
       }
-    }, 520)
+    }, 2_500)
 
     return () => {
       window.clearTimeout(timer)

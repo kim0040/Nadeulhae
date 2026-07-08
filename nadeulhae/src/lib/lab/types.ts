@@ -99,6 +99,7 @@ export interface LabReportDeckSummary {
   title: string
   cardCount: number
   dueCount: number
+  masteredCount: number
   totalReviews: number
   avgDifficulty: number
   avgStabilityDays: number

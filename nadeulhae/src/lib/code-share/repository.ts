@@ -358,6 +358,46 @@ function isOwner(owner: CodeShareOwnerRow, actorId: string, userId: string | nul
 }
 
 /**
+ * Same ownership check as `isOwner`, but takes plain owner fields so callers
+ * (e.g. per-client WebSocket broadcast) that already loaded them separately
+ * don't need a `RowDataPacket`-shaped value.
+ */
+export function matchesCodeShareOwner(
+  owner: { ownerActorId: string; ownerUserId: string | null },
+  actorId: string,
+  userId: string | null
+) {
+  if (owner.ownerUserId) {
+    return Boolean(userId && owner.ownerUserId === userId)
+  }
+
+  return owner.ownerActorId === actorId
+}
+
+/** Fetches just the owner identity fields for a session, or `null` if it doesn't exist. */
+export async function getCodeShareSessionOwner(sessionId: string) {
+  await ensureCodeShareSchema()
+
+  const rows = await queryRows<CodeShareOwnerRow[]>(
+    `SELECT owner_actor_id, owner_user_id
+      FROM code_share_sessions
+      WHERE session_id = ?
+      LIMIT 1`,
+    [sessionId]
+  )
+
+  const ownerRow = rows[0]
+  if (!ownerRow) {
+    return null
+  }
+
+  return {
+    ownerActorId: ownerRow.owner_actor_id,
+    ownerUserId: ownerRow.owner_user_id,
+  }
+}
+
+/**
  * Deletes a session by ID, but only when the requester is the session owner.
  * Non-owners receive a `forbidden` result; missing sessions return `not_found`.
  */

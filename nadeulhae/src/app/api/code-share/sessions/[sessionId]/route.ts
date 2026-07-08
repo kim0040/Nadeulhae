@@ -36,11 +36,13 @@ import {
   closeInactiveCodeShareSessions,
   deleteCodeShareSessionById,
   getCodeShareSessionById,
+  getCodeShareSessionOwner,
   isCodeShareSessionOwner,
+  matchesCodeShareOwner,
   touchCodeShareSessionActivity,
   updateCodeShareSession,
 } from "@/lib/code-share/repository"
-import { broadcastToRoom } from "@/lib/websocket/broadcast"
+import { broadcastToRoom, broadcastToRoomEach } from "@/lib/websocket/broadcast"
 
 export const runtime = "nodejs"
 
@@ -454,16 +456,22 @@ async function handlePATCH(
     })
 
     // Broadcast full snapshot so connected peers can update immediately.
-    broadcastToRoom(
+    // isOwner is computed per-recipient so the session owner's other sockets
+    // don't lose their delete permission just because a peer made the edit.
+    const ownerInfo = await getCodeShareSessionOwner(sessionId)
+    broadcastToRoomEach(
       toCodeShareRoomName(sessionId),
       "code_share_patch",
-      {
-        session: withSessionPermissions(updateResult.session, false),
+      (client) => ({
+        session: withSessionPermissions(
+          updateResult.session!,
+          ownerInfo ? matchesCodeShareOwner(ownerInfo, client.actorId ?? "", client.userId) : false
+        ),
         actor: {
           actorId: identity.actorId,
           alias: identity.alias,
         },
-      }
+      })
     )
 
     const response = createAuthJsonResponse({

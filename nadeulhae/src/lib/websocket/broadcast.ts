@@ -380,6 +380,44 @@ export function broadcastToRoom(room: string, type: string, payload: unknown, ex
   }
 }
 
+/**
+ * Send a message to all clients subscribed to a specific room, with a
+ * per-client payload. Use this when recipients need viewer-specific fields
+ * (e.g. `isOwner`) instead of one payload broadcast verbatim to everyone.
+ */
+export function broadcastToRoomEach(
+  room: string,
+  type: string,
+  createPayload: (client: BroadcastClientMeta) => unknown,
+  excludeWs?: WebSocket
+) {
+  const roomClients = rooms.get(room)
+  if (!roomClients) {
+    return
+  }
+
+  const snapshot = [...roomClients]
+  for (const ws of snapshot) {
+    if (ws === excludeWs) {
+      continue
+    }
+
+    const meta = clients.get(ws)
+    if (!meta) {
+      continue
+    }
+
+    const data = JSON.stringify({
+      type,
+      payload: createPayload(meta),
+    })
+
+    if (!safeSend(ws, data)) {
+      ws.close()
+    }
+  }
+}
+
 /** Send a message to every socket owned by a specific user ID. */
 export function broadcastToUser(userId: string, type: string, payload: unknown) {
   const data = JSON.stringify({ type, payload })

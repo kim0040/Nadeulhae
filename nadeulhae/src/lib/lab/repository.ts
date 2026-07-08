@@ -119,6 +119,7 @@ interface LabDeckSummaryRow extends RowDataPacket {
   title_text: string
   card_count: number
   due_count: number
+  mastered_count: number
   total_reviews: number
   avg_difficulty: number | null
   avg_stability_days: number | null
@@ -1032,6 +1033,7 @@ export async function getLabReportSnapshot(input: {
           d.title_text,
           COUNT(c.id) AS card_count,
           SUM(CASE WHEN c.next_review_at <= NOW() THEN 1 ELSE 0 END) AS due_count,
+          COUNT(CASE WHEN c.learning_state = 'review' AND c.stage >= 4 THEN 1 END) AS mastered_count,
           SUM(COALESCE(c.total_reviews, 0)) AS total_reviews,
           AVG(c.difficulty) AS avg_difficulty,
           AVG(c.stability_days) AS avg_stability_days
@@ -1114,6 +1116,7 @@ export async function getLabReportSnapshot(input: {
     title: decryptLabText(row.title_text, "lab.deck.title", "Lab Deck") ?? "Lab Deck",
     cardCount: Math.max(0, Number(row.card_count ?? 0)),
     dueCount: Math.max(0, Number(row.due_count ?? 0)),
+    masteredCount: Math.max(0, Number(row.mastered_count ?? 0)),
     totalReviews: Math.max(0, Number(row.total_reviews ?? 0)),
     avgDifficulty: clampNumber(Number(row.avg_difficulty ?? 0), 0, 10),
     avgStabilityDays: Math.max(0, Number(row.avg_stability_days ?? 0)),
@@ -1193,8 +1196,8 @@ export async function getLabReportSnapshot(input: {
       reviewedToday: Math.max(0, Number(usage?.review_count ?? 0)),
       avgDifficulty: clampNumber(Number(totals?.avg_difficulty ?? 0), 0, 10),
       avgStabilityDays: Math.max(0, Number(totals?.avg_stability_days ?? 0)),
-      avgRetrievability: Number.isFinite(Number(totals?.avg_retrievability))
-        ? clampNumber(Number(totals?.avg_retrievability), 0, 1)
+      avgRetrievability: totals?.avg_retrievability != null && Number.isFinite(Number(totals.avg_retrievability))
+        ? clampNumber(Number(totals.avg_retrievability), 0, 1)
         : null,
       totalReviews: totalReviewsSum,
       totalLapses: totalLapsesSum,

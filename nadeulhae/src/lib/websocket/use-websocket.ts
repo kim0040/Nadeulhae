@@ -186,6 +186,41 @@ export function useWebSocket() {
     }
   }, [])
 
+  /**
+   * Force an immediate reconnect, bypassing backoff. Useful when server-side
+   * identity (e.g. an actor-id cookie minted by a REST call after this socket
+   * already connected) has changed and the connection needs to pick it up.
+   */
+  const reconnect = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
+    reconnectAttemptsRef.current = 0
+
+    if (pingTimerRef.current) {
+      clearInterval(pingTimerRef.current)
+      pingTimerRef.current = null
+    }
+
+    const ws = wsRef.current
+    wsRef.current = null
+    if (ws) {
+      // Detach handlers first so the old socket's onclose doesn't also schedule a reconnect.
+      ws.onopen = null
+      ws.onclose = null
+      ws.onerror = null
+      ws.onmessage = null
+      try {
+        ws.close()
+      } catch {
+        // no-op
+      }
+    }
+
+    connect()
+  }, [connect])
+
   // Establish the connection on mount and tear down on unmount.
   useEffect(() => {
     mountedRef.current = true
@@ -205,5 +240,5 @@ export function useWebSocket() {
     }
   }, [connect])
 
-  return { connected, subscribe, send }
+  return { connected, subscribe, send, reconnect }
 }

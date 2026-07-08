@@ -53,6 +53,7 @@ type LabReportSnapshot = {
     title: string
     cardCount: number
     dueCount: number
+    masteredCount: number
     totalReviews: number
     avgDifficulty: number
     avgStabilityDays: number
@@ -325,6 +326,23 @@ const PERIOD_OPTIONS = [7, 14, 30] as const
 
 function formatMetricDate(value: string, language: string) {
   const parsed = new Date(`${value}T00:00:00+09:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  const localeMap: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" }
+  return new Intl.DateTimeFormat(localeMap[language] ?? "en-US", {
+    month: "numeric",
+    day: "numeric",
+    timeZone: "Asia/Seoul",
+  }).format(parsed)
+}
+
+// Unlike formatMetricDate, this takes a full ISO timestamp (not a pre-bucketed
+// KST date string) and must not be re-anchored to +09:00T00:00:00 — the instant
+// itself already carries the correct UTC offset, so we just render it in KST.
+function formatInstantDateInKst(value: string, language: string) {
+  const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
     return value
   }
@@ -718,7 +736,7 @@ export default function LabVocabReportPage() {
                   ) : (
                     report.deckSummaries.map((deck) => {
                       const deckMasteryPercent = deck.cardCount > 0
-                        ? Math.round(((deck.cardCount - deck.dueCount) / deck.cardCount) * 100)
+                        ? Math.round((deck.masteredCount / deck.cardCount) * 100)
                         : 0
                       return (
                         <div key={deck.deckId} className="rounded-[1.1rem] border border-card-border/70 bg-background/70 px-3 py-2.5">
@@ -775,7 +793,7 @@ export default function LabVocabReportPage() {
                             {copy.lapses} {card.lapses}
                           </span>
                           <span className="inline-flex items-center rounded-full border border-card-border/70 bg-background/70 px-2 py-1">
-                            {formatMetricDate(card.nextReviewAt.slice(0, 10), language)}
+                            {formatInstantDateInKst(card.nextReviewAt, language)}
                           </span>
                         </div>
                       </div>
