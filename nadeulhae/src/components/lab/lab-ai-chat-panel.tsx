@@ -81,6 +81,7 @@ const THINKING_PANEL_STORAGE_KEY = "nadeulhae:lab-ai-chat:thinking-panel-open"
 const WEB_SEARCH_STORAGE_KEY_PREFIX = "nadeulhae:lab-ai-chat:web-search:"
 const TEXT_ATTACHMENT_ACCEPT = ".txt,.md,.markdown,text/plain,text/markdown"
 const TEXT_ATTACHMENT_MAX_BYTES = 256 * 1024
+const STREAM_RENDER_INTERVAL_MS = 50
 
 const COPY = {
   ko: {
@@ -522,6 +523,71 @@ function MarkdownCodeBlock({
   )
 }
 
+function createAssistantMarkdownComponents(input: {
+  copyLabel: string
+  copiedLabel: string
+  language: string
+  renderMermaid: boolean
+}): Components {
+  return {
+    pre({ children, node, ...props }) {
+      void node
+      const childArray = Children.toArray(children).filter(
+        (child) => !(typeof child === "string" && child.trim() === "")
+      )
+      if (
+        childArray.length === 1
+        && isValidElement(childArray[0])
+        && (childArray[0].type === MarkdownCodeBlock || childArray[0].type === MermaidDiagram)
+      ) {
+        return <>{childArray[0]}</>
+      }
+
+      return <pre {...props}>{children}</pre>
+    },
+    code({ children, className, node, ...props }) {
+      void node
+      const codeText = Children.toArray(children).join("").replace(/\n$/, "")
+      const codeLanguage = /language-([A-Za-z0-9_+#.-]+)/.exec(className ?? "")?.[1] ?? null
+      const isBlock = Boolean(codeLanguage) || codeText.includes("\n")
+
+      if (isBlock && codeLanguage?.toLowerCase() === "mermaid" && input.renderMermaid) {
+        return (
+          <MermaidDiagram
+            code={codeText}
+            language={input.language}
+            copyLabel={input.copyLabel}
+            copiedLabel={input.copiedLabel}
+          />
+        )
+      }
+
+      if (isBlock) {
+        return (
+          <MarkdownCodeBlock
+            code={codeText}
+            language={codeLanguage}
+            copyLabel={input.copyLabel}
+            copiedLabel={input.copiedLabel}
+          />
+        )
+      }
+
+      return (
+        <code
+          {...props}
+          className={cn(
+            "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground",
+            className
+          )}
+        >
+          {children}
+        </code>
+      )
+    },
+  }
+}
+
 function TypingDots() {
   return (
     <span className="inline-flex items-center gap-1 py-1" aria-hidden="true">
@@ -845,6 +911,15 @@ export function LabAiChatPanel() {
   const shouldStickToBottomRef = useRef(true)
   const isComposingRef = useRef(false)
   const modelMenuRef = useRef<HTMLDivElement | null>(null)
+  const streamRenderTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (streamRenderTimerRef.current != null) {
+        window.clearTimeout(streamRenderTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!isModelMenuOpen) return
@@ -1273,58 +1348,87 @@ export function LabAiChatPanel() {
           const decoder = new TextDecoder()
           let buffer = ""
           let streamAcc = ""
+          let scheduledSnapshot = ""
+          let receivedTerminalEvent = false
 
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buffer += decoder.decode(value, { stream: true })
-            const parts = buffer.split("\n\n")
-            buffer = parts.pop() ?? ""
-
-            for (const part of parts) {
-              let eventType = ""
-              let eventData = ""
-              for (const line of part.split("\n")) {
-                if (line.startsWith("event: ")) eventType = line.slice(7)
-                else if (line.startsWith("data: ")) eventData = line.slice(6)
-              }
-              if (!eventType || !eventData) continue
-
-              try {
-                const parsed = JSON.parse(eventData)
-                if (eventType === "token" && typeof parsed.content === "string") {
-                  streamAcc += parsed.content
-                  const snapshot = streamAcc
-                  setMessages((current) => current.map((message) => (
-                    message.id === optimisticAssistant.id
-                      ? { ...message, content: snapshot, pending: true }
-                      : message
-                  )))
-                } else if (eventType === "status" && typeof parsed.message === "string") {
-                  if (streamAcc.trim().length > 0) {
-                    continue
-                  }
-                  const statusText = parsed.message.replace(/\s+/g, " ").trim()
-                  setMessages((current) => current.map((message) => (
-                    message.id === optimisticAssistant.id
-                      ? { ...message, content: statusText, pending: true }
-                      : message
-                  )))
-                } else if (eventType === "done") {
-                  syncServerClock((parsed as { serverNow?: unknown })?.serverNow)
-                  applyPayload(parsed as LabAiChatStateResponse)
-                } else if (eventType === "error") {
-                  setMessages((current) => current.filter((message) => (
-                    message.id !== optimisticUser.id && message.id !== optimisticAssistant.id
-                  )))
-                  setChatInput(rawInput)
-                  setErrorMessage(parsed.error ?? copy.sendError)
-                }
-              } catch {
-                // Ignore malformed stream chunks from an interrupted response.
-              }
+          const clearScheduledStreamRender = () => {
+            if (streamRenderTimerRef.current != null) {
+              window.clearTimeout(streamRenderTimerRef.current)
+              streamRenderTimerRef.current = null
             }
           }
+
+          const flushStreamRender = () => {
+            streamRenderTimerRef.current = null
+            const snapshot = scheduledSnapshot
+            if (!snapshot) return
+            setMessages((current) => current.map((message) => (
+              message.id === optimisticAssistant.id
+                ? { ...message, content: snapshot, pending: true }
+                : message
+            )))
+          }
+
+          const scheduleStreamRender = () => {
+            scheduledSnapshot = streamAcc
+            if (streamRenderTimerRef.current != null) return
+            streamRenderTimerRef.current = window.setTimeout(flushStreamRender, STREAM_RENDER_INTERVAL_MS)
+          }
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              buffer += decoder.decode(value, { stream: true })
+              const parts = buffer.split("\n\n")
+              buffer = parts.pop() ?? ""
+
+              for (const part of parts) {
+                let eventType = ""
+                let eventData = ""
+                for (const line of part.split("\n")) {
+                  if (line.startsWith("event: ")) eventType = line.slice(7)
+                  else if (line.startsWith("data: ")) eventData = line.slice(6)
+                }
+                if (!eventType || !eventData) continue
+
+                try {
+                  const parsed = JSON.parse(eventData)
+                  if (eventType === "token" && typeof parsed.content === "string") {
+                    streamAcc += parsed.content
+                    scheduleStreamRender()
+                  } else if (eventType === "status" && typeof parsed.message === "string") {
+                    if (streamAcc.trim().length > 0) continue
+                    const statusText = parsed.message.replace(/\s+/g, " ").trim()
+                    setMessages((current) => current.map((message) => (
+                      message.id === optimisticAssistant.id
+                        ? { ...message, content: statusText, pending: true }
+                        : message
+                    )))
+                  } else if (eventType === "done") {
+                    receivedTerminalEvent = true
+                    clearScheduledStreamRender()
+                    syncServerClock((parsed as { serverNow?: unknown })?.serverNow)
+                    applyPayload(parsed as LabAiChatStateResponse)
+                  } else if (eventType === "error") {
+                    receivedTerminalEvent = true
+                    clearScheduledStreamRender()
+                    setMessages((current) => current.filter((message) => (
+                      message.id !== optimisticUser.id && message.id !== optimisticAssistant.id
+                    )))
+                    setChatInput(rawInput)
+                    setErrorMessage(parsed.error ?? copy.sendError)
+                  }
+                } catch {
+                  // Ignore malformed stream chunks from an interrupted response.
+                }
+              }
+            }
+          } finally {
+            clearScheduledStreamRender()
+          }
+
+          if (!receivedTerminalEvent) throw new Error("Stream ended without a terminal event")
           return
         }
 
@@ -1375,62 +1479,18 @@ export function LabAiChatPanel() {
   const webSearchQuotaLabel = webSearch
     ? `${webSearch.sessionRemaining}/${webSearch.sessionLimit} (R ${webSearch.primaryRemaining}/${webSearch.primaryLimit}, F ${webSearch.fallbackRemaining}/${webSearch.fallbackLimit}) · ${webSearch.monthRemaining}/${webSearch.monthLimit}`
     : null
-  const markdownComponents = useMemo<Components>(() => ({
-    pre({ children, node, ...props }) {
-      void node
-      const childArray = Children.toArray(children).filter(
-        (child) => !(typeof child === "string" && child.trim() === "")
-      )
-      if (
-        childArray.length === 1 &&
-        isValidElement(childArray[0]) &&
-        (childArray[0].type === MarkdownCodeBlock || childArray[0].type === MermaidDiagram)
-      ) {
-        return <>{childArray[0]}</>
-      }
-
-      return <pre {...props}>{children}</pre>
-    },
-    code({ children, className, node, ...props }) {
-      void node
-      const codeText = Children.toArray(children).join("").replace(/\n$/, "")
-      const language = /language-([A-Za-z0-9_+#.-]+)/.exec(className ?? "")?.[1] ?? null
-      const isBlock = Boolean(language) || codeText.includes("\n")
-
-      if (isBlock && language?.toLowerCase() === "mermaid") {
-        return (
-          <MermaidDiagram
-            code={codeText}
-            copyLabel={copy.copyCode}
-            copiedLabel={copy.copiedCode}
-          />
-        )
-      }
-
-      if (isBlock) {
-        return (
-          <MarkdownCodeBlock
-            code={codeText}
-            language={language}
-            copyLabel={copy.copyCode}
-            copiedLabel={copy.copiedCode}
-          />
-        )
-      }
-
-      return (
-        <code
-          {...props}
-          className={cn(
-            "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground",
-            className
-          )}
-        >
-          {children}
-        </code>
-      )
-    },
-  }), [copy.copiedCode, copy.copyCode])
+  const markdownComponents = useMemo<Components>(() => createAssistantMarkdownComponents({
+    copyLabel: copy.copyCode,
+    copiedLabel: copy.copiedCode,
+    language,
+    renderMermaid: true,
+  }), [copy.copiedCode, copy.copyCode, language])
+  const streamingMarkdownComponents = useMemo<Components>(() => createAssistantMarkdownComponents({
+    copyLabel: copy.copyCode,
+    copiedLabel: copy.copiedCode,
+    language,
+    renderMermaid: false,
+  }), [copy.copiedCode, copy.copyCode, language])
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 overflow-hidden bg-background text-foreground">
@@ -1672,7 +1732,7 @@ export function LabAiChatPanel() {
                     language,
                     userMessage: previousUserMessage,
                     modelLabel: activeModelLabel,
-                      isThinkingEnabled: true,
+                    isThinkingEnabled: Boolean(activeModel?.reasoningEffort),
                   })
                   return (
                     <div
@@ -1715,7 +1775,7 @@ export function LabAiChatPanel() {
                               <div className="flex flex-col gap-1">
                                 <div className="rounded-lg border border-transparent px-0 py-1 text-[15px] leading-7 text-foreground transition-colors duration-300 sm:text-base xl:text-lg">
                                   <div className="prose prose-sm max-w-none break-words text-foreground dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/70 prose-pre:text-foreground prose-code:text-foreground prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-foreground dark:prose-pre:bg-black/25">
-                                    <AssistantMarkdown content={assistantContent} components={markdownComponents} />
+                                    <AssistantMarkdown content={assistantContent} components={streamingMarkdownComponents} />
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-end">

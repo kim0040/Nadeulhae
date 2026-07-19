@@ -14,6 +14,7 @@
     "test:auth": "node scripts/test-auth-flows.mjs",
     "test:chat": "node scripts/test-chat-flow.mjs",
     "test:lab-ai-chat": "node scripts/test-lab-ai-chat-flow.mjs",
+    "test:mermaid": "tsx scripts/test-mermaid-source.ts",
     "test:lab": "node scripts/test-lab-features.mjs",
     "test:code-share": "node scripts/test-code-share-ws.mjs"
   },

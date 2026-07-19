@@ -48,19 +48,19 @@ type AllowedModelSpec = {
 
 const ALLOWED_MODEL_SPECS: AllowedModelSpec[] = [
   {
-    slug: "deepseek-v4-pro",
-    label: "DeepSeek V4 Pro",
-    description: "DeepSeek 공식 플래그십. 1.6T MoE (49B 활성)·하이브리드 어텐션으로 1M 컨텍스트 처리. 코딩·복잡한 추론·장기 워크플로에 최상위 성능. 사고 모드 지원.",
-    candidates: ["deepseek-v4-pro", "deepseek-reasoner"],
-    quantization: "FP4+FP8 혼합",
-    reasoningEffort: true,
-  },
-  {
     slug: "deepseek-v4-flash",
     label: "DeepSeek V4 Flash",
-    description: "DeepSeek 경량 모델. 292B MoE (158B 활성)·V4 Pro 대비 1/10 비용으로 근접 성능. 빠른 응답과 효율적인 토큰 처리. 일상 코딩·고처리량 워크로드에 최적. 사고 모드 지원.",
+    description: "빠른 응답과 효율적인 토큰 처리에 맞춘 기본 모델. 일반 대화·요약·간단한 코딩 작업에 적합합니다.",
     candidates: ["deepseek-v4-flash", "deepseek-chat"],
     quantization: "FP8",
+    reasoningEffort: false,
+  },
+  {
+    slug: "deepseek-v4-pro",
+    label: "DeepSeek V4 Pro",
+    description: "복잡한 코딩·추론·장기 워크플로를 더 신중하게 처리하는 정밀 모델. 사고 모드를 사용합니다.",
+    candidates: ["deepseek-v4-pro", "deepseek-reasoner"],
+    quantization: "FP4+FP8 혼합",
     reasoningEffort: true,
   },
 ]

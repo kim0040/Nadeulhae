@@ -47,6 +47,8 @@ import {
 
 export const runtime = "nodejs"
 
+const LAB_AI_CHAT_STREAM_EVENT_BATCH_MS = 35
+
 const LAB_AI_CHAT_ERRORS = {
   ko: {
     unauthorized: "로그인이 필요합니다.",
@@ -884,6 +886,8 @@ async function handlePOST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           let clientDisconnected = false
+          let pendingVisibleTokens = ""
+          let tokenFlushTimer: ReturnType<typeof setTimeout> | null = null
 
           const sendEvent = (event: string, data: unknown) => {
             if (clientDisconnected) {
@@ -895,6 +899,23 @@ async function handlePOST(request: NextRequest) {
             } catch {
               clientDisconnected = true
             }
+          }
+
+          const flushVisibleTokens = () => {
+            if (tokenFlushTimer) {
+              clearTimeout(tokenFlushTimer)
+              tokenFlushTimer = null
+            }
+            if (!pendingVisibleTokens) return
+            const content = pendingVisibleTokens
+            pendingVisibleTokens = ""
+            sendEvent("token", { content })
+          }
+
+          const queueVisibleToken = (token: string) => {
+            pendingVisibleTokens += token
+            if (tokenFlushTimer) return
+            tokenFlushTimer = setTimeout(flushVisibleTokens, LAB_AI_CHAT_STREAM_EVENT_BATCH_MS)
           }
 
           const checkAlive = () => !clientDisconnected && !abortController.signal.aborted
@@ -954,19 +975,21 @@ async function handlePOST(request: NextRequest) {
                 }
 
                 accumulated += visibleToken
-                sendEvent("token", { content: visibleToken })
+                queueVisibleToken(visibleToken)
               },
             })
 
             if (!checkAlive()) {
+              pendingVisibleTokens = ""
               return
             }
 
             const visibleTail = reasoningFilter.flush()
             if (visibleTail) {
               accumulated += visibleTail
-              sendEvent("token", { content: visibleTail })
+              queueVisibleToken(visibleTail)
             }
+            flushVisibleTokens()
 
             const assistantMessage = finalizeAssistantMessage(
               accumulated || completionResult.content,
@@ -1016,6 +1039,9 @@ async function handlePOST(request: NextRequest) {
                 ? getErrorMessage(locale, "providerFailure")
                 : getErrorMessage(locale, "unexpected")
 
+            if (tokenFlushTimer) clearTimeout(tokenFlushTimer)
+            tokenFlushTimer = null
+            pendingVisibleTokens = ""
             sendEvent("error", { error: errorMessage })
 
             await markDailyLabAiChatFailure({
@@ -1032,6 +1058,9 @@ async function handlePOST(request: NextRequest) {
 
             controller.close()
           } finally {
+            if (tokenFlushTimer) clearTimeout(tokenFlushTimer)
+            tokenFlushTimer = null
+            pendingVisibleTokens = ""
             lockReleased = true
             releaseChatUserLock(lockedUserId)
           }

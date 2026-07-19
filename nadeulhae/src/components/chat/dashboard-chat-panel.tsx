@@ -38,6 +38,7 @@ if (typeof window !== "undefined") {
 
 type UiChatMessage = ChatConversationMessage & {
   pending?: boolean
+  streaming?: boolean
 }
 
 type ChatStateApiResponse = ChatStateResponse & {
@@ -545,7 +546,24 @@ type MessageGroup = {
         return <InteractiveCourseWidget code={codeText} onCourseGenerated={onCourseGenerated} onCourseClick={onCourseClick} isPending={message.pending} language={language} />
       }
       if (lang?.toLowerCase() === "mermaid") {
-        return <MermaidDiagram code={codeText} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} />
+        if (message.streaming) {
+          return (
+            <DashboardMarkdownCodeBlock
+              code={codeText}
+              language={lang}
+              copyLabel={copy.copyCode}
+              copiedLabel={copy.copiedCode}
+            />
+          )
+        }
+        return (
+          <MermaidDiagram
+            code={codeText}
+            language={language}
+            copyLabel={copy.copyCode}
+            copiedLabel={copy.copiedCode}
+          />
+        )
       }
       if (isBlock) {
         return (
@@ -566,7 +584,7 @@ type MessageGroup = {
         </code>
       )
     },
-    }), [language, copy.copyCode, copy.copiedCode, onCourseGenerated, onCourseClick, message.pending])
+    }), [language, copy.copyCode, copy.copiedCode, onCourseGenerated, onCourseClick, message.pending, message.streaming])
 
   const roundedClass = isUser
     ? groupPosition === "only"
@@ -929,6 +947,7 @@ export function DashboardChatPanel({
       createdAt: now,
       resolvedModel: null,
       pending: true,
+      streaming: true,
     }
 
     setMessages((current) => [...current, optimisticUserMessage, optimisticAssistantMessage])
@@ -995,7 +1014,7 @@ export function DashboardChatPanel({
                   setMessages((current) =>
                     current.map((item) =>
                       item.id === optimisticAssistantMessage.id
-                        ? { ...item, content: accumulatedSoFar, pending: false }
+                        ? { ...item, content: accumulatedSoFar, pending: false, streaming: true }
                         : item
                     )
                   )
