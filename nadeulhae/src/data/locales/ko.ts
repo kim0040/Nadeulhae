@@ -311,9 +311,9 @@ export const ko = {
   about_structure_calendar_title: "달력",
   about_structure_calendar_desc: "10일 예보 흐름과 날짜별 점수를 집중해서 보는 전용 화면입니다. 지역 예보 캘린더는 이 페이지에서만 제공합니다.",
   about_structure_jeonju_title: "전주 특화",
-  about_structure_jeonju_desc: "전주 로컬 맥락, 전용 안내, 향후 장소 DB와 코스 기능 로드맵을 모아두는 별도 공간입니다.",
-  about_structure_future_title: "추후 오픈",
-  about_structure_future_desc: "과거 통계, 음식점·카페·야외 스팟 DB, AI 반나절 코스는 백엔드와 DB 연결 이후 단계적으로 열 예정입니다.",
+  about_structure_jeonju_desc: "전주 로컬 맥락, 전용 안내, 장소 데이터와 AI 코스 경험을 한데 모아두는 별도 공간입니다.",
+  about_structure_future_title: "확장 서비스",
+  about_structure_future_desc: "피크닉 아카이브·통계, 전주 장소 데이터와 길찾기, AI 코스 생성·저장·공유까지 현재 서비스에서 이용할 수 있습니다.",
 
   // Technical Labels & Briefing UI
   brief_station_engine: "상황 분석 엔진",
@@ -393,11 +393,11 @@ export const ko = {
 
   // Contributors & Status
   about_status_pending: "백엔드 연결 준비 중",
-  about_contributors_desc: "전북대학교 소프트웨어공학과 3학년(24학번) 동기 3명이 함께 만든 데이터베이스 팀 프로젝트입니다. 모든 팀원이 데이터베이스 설계 및 구축에 핵심적으로 참여했습니다.",
+  about_contributors_desc: "나들해는 전북대학교 소프트웨어공학과 24학번 동기 3명이 함께 만든 데이터베이스 팀 프로젝트에서 시작했습니다. 현재 서비스의 유지보수와 업데이트는 김현민이 단독으로 담당합니다.",
   
   con_hm_name: "김현민",
-  con_hm_role: "전북대학교 소프트웨어공학과 24학번",
-   con_hm_desc: "프론트엔드, 백엔드, UI/UX 디자인, 서버 구축, DB 설계, 실시간 API 연동을 담당했습니다.",
+  con_hm_role: "현재 단독 유지보수 · 전북대학교 소프트웨어공학과 24학번",
+   con_hm_desc: "현재 서비스의 유지보수·업데이트와 함께 프론트엔드, 백엔드, UI/UX 디자인, 서버 운영, DB 설계, 실시간 API 연동을 담당합니다.",
   
   con_es_name: "김은수",
   con_es_role: "전북대학교 소프트웨어공학과 24학번",
@@ -410,8 +410,8 @@ export const ko = {
   con_university: "전북대학교",
   con_department: "소프트웨어공학과 24학번",
 
-  about_philosophy_title: "나들해를 만든 사람들",
-  about_philosophy_desc: "전북대학교 소프트웨어공학과 24학번 동기 3명이 함께 기획하고 개발했습니다. 서비스의 화려함보다는 데이터가 어떻게 흐르고 저장되는지, 데이터베이스의 기본에 집중하며 만들었습니다.",
+  about_philosophy_title: "나들해의 시작과 현재",
+  about_philosophy_desc: "전북대학교 소프트웨어공학과 24학번 동기 3명이 함께 기획하고 개발한 프로젝트에서 출발했습니다. 지금은 김현민이 단독으로 서비스를 유지보수하며, 데이터가 신뢰도 있게 흐르고 저장되는 경험을 계속 다듬고 있습니다.",
 
   // Statistics Page Extra
   cal_archive_title: "피크닉 아카이브",

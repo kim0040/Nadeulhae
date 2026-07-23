@@ -257,34 +257,6 @@ export default function LabHubPage() {
               >
                 <div className="relative rounded-[1.8rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
                   {!reduceVisualEffects ? (
-                    <BorderBeam size={170} duration={11.8} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
-                  ) : null}
-                  <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="space-y-2">
-                      <span className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
-                        <Braces className="size-3.5" />
-                        {copy.algorithmTitle}
-                      </span>
-                      <p className="max-w-2xl text-base leading-8 text-muted-foreground">{copy.algorithmDescription}</p>
-                    </div>
-                    <ShimmerButton
-                      type="button"
-                      onClick={() => router.push("/lab/algorithm")}
-                      className="rounded-[1.1rem] px-5 py-3 text-base font-black sm:shrink-0"
-                    >
-                      {copy.openFeature}
-                    </ShimmerButton>
-                  </div>
-                </div>
-              </MagicCard>
-
-              <MagicCard
-                className="overflow-hidden rounded-[1.8rem]"
-                gradientSize={reduceVisualEffects ? 150 : 210}
-                gradientOpacity={reduceVisualEffects ? 0.55 : 0.72}
-              >
-                <div className="relative rounded-[1.8rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
-                  {!reduceVisualEffects ? (
                     <BorderBeam size={170} duration={10.5} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
                   ) : null}
                   <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -354,6 +326,34 @@ export default function LabHubPage() {
                     <ShimmerButton
                       type="button"
                       onClick={() => router.push("/lab/code-share")}
+                      className="rounded-[1.1rem] px-5 py-3 text-base font-black sm:shrink-0"
+                    >
+                      {copy.openFeature}
+                    </ShimmerButton>
+                  </div>
+                </div>
+              </MagicCard>
+
+              <MagicCard
+                className="overflow-hidden rounded-[1.8rem]"
+                gradientSize={reduceVisualEffects ? 150 : 210}
+                gradientOpacity={reduceVisualEffects ? 0.55 : 0.72}
+              >
+                <div className="relative rounded-[1.8rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
+                  {!reduceVisualEffects ? (
+                    <BorderBeam size={170} duration={11.8} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
+                  ) : null}
+                  <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="space-y-2">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
+                        <Braces className="size-3.5" />
+                        {copy.algorithmTitle}
+                      </span>
+                      <p className="max-w-2xl text-base leading-8 text-muted-foreground">{copy.algorithmDescription}</p>
+                    </div>
+                    <ShimmerButton
+                      type="button"
+                      onClick={() => router.push("/lab/algorithm")}
                       className="rounded-[1.1rem] px-5 py-3 text-base font-black sm:shrink-0"
                     >
                       {copy.openFeature}

@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react"
 import {
   ArrowRight,
   BookMarked,
+  BookOpen,
   BrainCircuit,
   Bot,
   Check,
@@ -20,6 +21,7 @@ import {
   Clock3,
   FlaskConical,
   GraduationCap,
+  Lightbulb,
   ListChecks,
   RotateCcw,
   Route,
@@ -65,6 +67,12 @@ type StudyCoachAction = {
   title: string
   description: string
   request: string
+}
+
+type ConceptNote = {
+  mentalModel: string
+  miniExample: string
+  commonMistake: string
 }
 
 type ExamTrack = {
@@ -505,6 +513,134 @@ const STUDY_MODULES: StudyModule[] = [
   },
 ]
 
+const CONCEPT_NOTES: Record<string, ConceptNote> = {
+  "learning-map": {
+    mentalModel: "알고리즘은 이름을 고르는 문제가 아니라, 문제에서 필요한 연산과 계속 지켜야 할 규칙을 연결하는 과정입니다.",
+    miniExample: "‘최소 이동 횟수’와 ‘모든 이동 비용이 같다’가 보이면, 가까운 상태부터 처리하는 큐 기반 BFS로 이어집니다.",
+    commonMistake: "BFS·스택처럼 이름만 외우고, 왜 그 자료구조가 필요한지는 설명하지 못하는 상태를 피하세요.",
+  },
+  "python-model": {
+    mentalModel: "파이썬 변수는 값을 담은 상자보다 객체를 가리키는 이름표에 가깝습니다. 같은 변경 가능 객체를 함께 가리키면 한쪽 수정이 다른 쪽에도 보입니다.",
+    miniExample: "rows = [[0] * 3] * 3 뒤 rows[0][0] = 1을 하면 세 행이 함께 바뀝니다. 내부 리스트 하나를 세 번 참조했기 때문입니다.",
+    commonMistake: "큐에서 list.pop(0)을 쓰거나, 얕은 복사를 깊은 복사처럼 생각하지 마세요.",
+  },
+  complexity: {
+    mentalModel: "복잡도는 코드 줄 수가 아니라 입력 크기가 커질 때 반복 범위와 저장 공간이 어떻게 늘어나는지 읽는 기준입니다.",
+    miniExample: "i가 1, 2, 4, 8처럼 두 배가 되면 n에 닿기까지 약 log₂n번 반복합니다.",
+    commonMistake: "중첩 반복문이라고 무조건 O(n²)라고 하거나, 연속된 루프를 곱해서 계산하지 마세요.",
+  },
+  array: {
+    mentalModel: "배열은 인덱스로 바로 접근하는 대신, 중간에 끼워 넣거나 빼면 뒤 원소를 옮겨야 합니다.",
+    miniExample: "리스트 끝 append는 보통 빠르지만, list.insert(0, x)는 모든 원소를 한 칸씩 밀 수 있습니다.",
+    commonMistake: "파이썬 list의 모든 연산이 O(1)이라고 생각하지 마세요.",
+  },
+  "linked-list": {
+    mentalModel: "연결 리스트는 값과 다음 연결을 가진 노드를 이어 놓습니다. 삽입 위치를 이미 알면 연결만 바꿉니다.",
+    miniExample: "뒤집기에서는 current.next를 바꾸기 전에 next_node에 저장해야 남은 리스트 연결을 잃지 않습니다.",
+    commonMistake: "‘삽입·삭제 O(1)’에는 먼저 해당 노드 위치를 알고 있다는 조건이 붙는다는 점을 놓치지 마세요.",
+  },
+  stack: {
+    mentalModel: "스택은 가장 최근에 쌓인 상태부터 다시 꺼내는 LIFO 규칙입니다.",
+    miniExample: "괄호를 읽으며 여는 괄호는 push하고, 닫는 괄호가 나오면 가장 최근 여는 괄호를 pop해 짝을 확인합니다.",
+    commonMistake: "비어 있는 스택에서 pop할 수 있는 경계 조건을 빼먹지 마세요.",
+  },
+  "queue-deque": {
+    mentalModel: "큐는 먼저 들어온 상태를 먼저 처리하는 FIFO 구조이고, 덱은 양쪽에서 넣고 뺄 수 있는 큐입니다.",
+    miniExample: "BFS는 시작점에서 거리가 같은 정점을 먼저 처리해야 하므로 deque에 발견 순서대로 넣고 왼쪽에서 꺼냅니다.",
+    commonMistake: "BFS에서 방문 처리를 꺼낼 때 늦게 하면 같은 정점이 여러 번 큐에 들어갈 수 있습니다.",
+  },
+  "hash-table": {
+    mentalModel: "해시 테이블은 키를 저장 위치로 바꿔 평균적으로 빠른 검색을 제공합니다. dict는 값까지, set은 존재 여부를 다룹니다.",
+    miniExample: "중복을 막을 때는 seen = set()에 넣고, 이름으로 점수를 찾을 때는 scores[name]처럼 dict를 씁니다.",
+    commonMistake: "리스트처럼 변경 가능한 객체를 dict 키나 set 원소로 넣을 수 있다고 생각하지 마세요.",
+  },
+  recursion: {
+    mentalModel: "재귀는 문제를 더 작은 같은 문제로 부르되, 반드시 멈추는 기준과 돌아온 값을 연결하는 단계가 있어야 합니다.",
+    miniExample: "팩토리얼은 n == 0에서 1로 멈추고, 그 외에는 n * factorial(n - 1)로 한 단계씩 줄어듭니다.",
+    commonMistake: "종료 조건 없이 호출하거나, 파이썬 재귀 깊이 제한을 무시하지 마세요.",
+  },
+  tree: {
+    mentalModel: "트리는 부모-자식 관계로 계층을 표현하며, 순회 순서는 ‘언제 현재 노드를 처리하느냐’로 이해합니다.",
+    miniExample: "중위 순회는 왼쪽 → 현재 → 오른쪽 순서라서, BST에서는 값을 오름차순으로 얻습니다.",
+    commonMistake: "전위·중위·후위를 이름만 외우지 말고 현재 노드 처리 시점을 표시해 보세요.",
+  },
+  "bst-trie": {
+    mentalModel: "BST는 값의 대소 관계를, 트라이는 문자열의 접두사 경로를 이용해 탐색 범위를 줄입니다.",
+    miniExample: "BST에서 8보다 작은 값은 왼쪽, 큰 값은 오른쪽으로 내려갑니다. 트라이는 ‘ca’ 같은 접두사 노드를 따라갑니다.",
+    commonMistake: "BST가 항상 O(log n)이라고 생각하지 마세요. 한쪽으로 치우치면 연결 리스트처럼 O(n)입니다.",
+  },
+  heap: {
+    mentalModel: "힙은 전체 정렬이 아니라, 가장 작은 값 또는 가장 큰 값을 빠르게 꺼내기 위한 부분 정렬 구조입니다.",
+    miniExample: "최소 힙에서는 부모가 자식보다 작거나 같고, heapq.heappop은 현재 최소값을 꺼냅니다.",
+    commonMistake: "형제 노드까지 정렬돼 있다고 생각하거나, 힙 배열 전체가 정렬됐다고 보지 마세요.",
+  },
+  graph: {
+    mentalModel: "그래프는 정점과 간선으로 관계를 표현합니다. 저장 방식은 정점을 빠르게 확인할지, 연결을 빠르게 순회할지에 따라 고릅니다.",
+    miniExample: "간선 수가 적은 그래프는 인접 리스트로 각 정점의 이웃만 저장해 DFS·BFS를 O(V + E)에 수행합니다.",
+    commonMistake: "인접 행렬과 인접 리스트의 공간·순회 비용을 같은 것으로 보지 마세요.",
+  },
+  "dfs-bfs": {
+    mentalModel: "DFS는 한 경로를 끝까지 탐색하고, BFS는 같은 거리의 상태를 차례로 탐색합니다.",
+    miniExample: "가중치 없는 격자 최단 이동은 시작점에서 가까운 칸부터 큐에 넣는 BFS가 첫 도착 거리를 보장합니다.",
+    commonMistake: "가중치가 다른 그래프에도 일반 BFS를 그대로 쓰지 마세요.",
+  },
+  sorting: {
+    mentalModel: "정렬은 비교·교환·병합·분할 방식에 따라 시간, 추가 공간, 안정성이 달라집니다.",
+    miniExample: "병합 정렬은 반으로 나눈 뒤 정렬된 두 구간을 합쳐 항상 O(n log n)을 보장합니다.",
+    commonMistake: "평균 복잡도와 최악 복잡도, 안정 정렬과 제자리 정렬을 한 속성으로 섞지 마세요.",
+  },
+  "binary-search": {
+    mentalModel: "이진 탐색은 정렬된 범위에서 정답이 있을 수 있는 후보 구간을 계속 절반으로 줄이는 알고리즘입니다.",
+    miniExample: "mid 값이 목표보다 작으면 left = mid + 1로 왼쪽 절반을 버리고, 후보 구간 불변식을 유지합니다.",
+    commonMistake: "정렬 조건 없이 이진 탐색을 쓰거나, left <= right 경계 조건을 바꾸며 후보를 잃지 마세요.",
+  },
+  "range-patterns": {
+    mentalModel: "투 포인터와 슬라이딩 윈도우는 범위를 다시 처음부터 계산하지 않고, 양 끝이나 창의 상태를 조금씩 움직입니다.",
+    miniExample: "합이 큰 구간은 왼쪽을 줄이고, 작은 구간은 오른쪽을 늘리며 같은 원소를 여러 번 새로 세지 않습니다.",
+    commonMistake: "포인터를 움직일 근거가 되는 정렬 조건이나 윈도우 불변식을 정의하지 않고 시작하지 마세요.",
+  },
+  "backtracking-divide": {
+    mentalModel: "백트래킹은 선택하고 되돌리며 가능한 경우를 탐색하고, 분할 정복은 독립적인 작은 문제를 풀어 결과를 합칩니다.",
+    miniExample: "순열에서는 path에 선택을 넣고 재귀한 뒤 pop으로 원래 상태를 복구해야 다음 선택이 깨지지 않습니다.",
+    commonMistake: "재귀 호출 뒤 상태 복구를 빼먹거나, 결과 리스트에 같은 가변 객체 참조를 저장하지 마세요.",
+  },
+  "greedy-dp": {
+    mentalModel: "그리디는 지금의 최선이 전체 최선임을 증명해야 하고, DP는 겹치는 부분 문제의 답을 상태로 저장합니다.",
+    miniExample: "DP에서는 dp[i]가 무엇을 뜻하는지 먼저 문장으로 정한 뒤 점화식과 초기값을 만듭니다.",
+    commonMistake: "그리디 선택이 왜 안전한지 증명 없이 적용하거나, DP 상태 의미가 없는 점화식을 쓰지 마세요.",
+  },
+  topological: {
+    mentalModel: "위상 정렬은 선행 조건이 있는 작업을 가능한 순서로 나열하는 방법이며, 사이클이 있으면 완성할 수 없습니다.",
+    miniExample: "진입 차수 0인 과목부터 큐에 넣고 꺼낼 때마다 다음 과목의 진입 차수를 하나 줄입니다.",
+    commonMistake: "결과 개수가 정점 수보다 적으면 일부만 정렬된 것이 아니라 의존성 사이클이 있다는 신호입니다.",
+  },
+  "shortest-path": {
+    mentalModel: "최단 경로 알고리즘은 간선 가중치 조건으로 고릅니다. 모든 비용이 같으면 BFS, 음수가 없으면 다익스트라를 검토합니다.",
+    miniExample: "다익스트라는 가장 짧은 후보를 힙에서 꺼내고, 더 긴 오래된 힙 항목은 건너뜁니다.",
+    commonMistake: "음수 간선이 있는데 다익스트라의 거리를 확정하거나, 오래된 힙 항목을 다시 처리하지 마세요.",
+  },
+  "union-mst": {
+    mentalModel: "유니온 파인드는 같은 집합인지 빠르게 확인하고 합치며, MST는 모든 정점을 최소 비용으로 연결하는 간선을 고릅니다.",
+    miniExample: "크루스칼은 비용이 낮은 간선부터 보고, 두 끝 정점의 대표가 다를 때만 선택해 사이클을 막습니다.",
+    commonMistake: "MST를 두 정점 사이 최단 경로 문제로 혼동하지 마세요.",
+  },
+  "code-reading": {
+    mentalModel: "코드 독해는 결과를 맞히는 일이 아니라 함수 계약과 상태 변수가 한 번의 반복에서 어떻게 변하는지 읽는 일입니다.",
+    miniExample: "먼저 입력·출력·원본 수정 여부를 적고, 작은 입력을 넣어 변수 값 변화를 표로 그립니다.",
+    commonMistake: "변수 이름만 번역하고 종료 조건·경계 처리·반환값의 의미를 건너뛰지 마세요.",
+  },
+  "python-pitfalls": {
+    mentalModel: "파이썬 구현 실수는 알고리즘 자체보다 객체 공유, 경계, 기본 인자, 비교 연산자에서 반복됩니다.",
+    miniExample: "기본 인자는 def f(items=None)처럼 두고 함수 안에서 새 리스트를 만들어 호출 간 공유를 막습니다.",
+    commonMistake: "값 비교 ==와 같은 객체인지 보는 is를 바꾸어 쓰거나, 얕은 복사를 독립 복사로 보지 마세요.",
+  },
+  "engineer-path": {
+    mentalModel: "정보처리기사 대비는 용어 암기와 코드 독해를 분리하지 않고, 문제 조건·연산·규칙·복잡도를 하나의 답변으로 묶는 연습입니다.",
+    miniExample: "BFS를 설명할 때 ‘무가중치 최단 거리 → 큐 → 방문 처리 → O(V + E)’까지 연결해 말합니다.",
+    commonMistake: "기출 키워드만 외우고 작은 코드·반례·복잡도로 검증하지 마세요.",
+  },
+}
+
 const PHASE_QUIZZES: Record<PhaseId, Quiz[]> = {
   foundation: [
     {
@@ -781,6 +917,11 @@ export default function AlgorithmStudyPage() {
   const activeQuiz = phaseQuizzes[quizIndex % phaseQuizzes.length]
   const selectedPracticeSteps = progress.practiceStepsByModule[selectedModule.id] ?? []
   const practicePercent = Math.round((selectedPracticeSteps.length / PRACTICE_STEPS.length) * 100)
+  const selectedConceptNote = CONCEPT_NOTES[selectedModule.id] ?? {
+    mentalModel: selectedModule.summary,
+    miniExample: selectedModule.focus,
+    commonMistake: selectedModule.checkpoint,
+  }
   const quizAccuracy = progress.quizAttemptCount > 0
     ? Math.round((progress.quizCorrectCount / progress.quizAttemptCount) * 100)
     : null
@@ -799,6 +940,10 @@ export default function AlgorithmStudyPage() {
     setQuizChecked(false)
     setProgress((previous) => ({ ...previous, lastStudiedId: moduleId }))
     window.requestAnimationFrame(() => document.getElementById("study-focus")?.scrollIntoView({ behavior: "smooth", block: "start" }))
+  }
+
+  const scrollToStudySection = (sectionId: string) => {
+    window.requestAnimationFrame(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" }))
   }
 
   const toggleModuleCompletion = (moduleId: string) => {
@@ -963,6 +1108,37 @@ export default function AlgorithmStudyPage() {
           </div>
         </SectionCard>
 
+        <SectionCard panelClassName="overflow-hidden">
+          <div className="relative space-y-4">
+            <div className="pointer-events-none absolute -right-12 top-0 size-36 rounded-full bg-active-blue/8 blur-3xl" />
+            <div className="relative flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">start here</p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-foreground sm:text-2xl">막막하면, 이 순서대로 시작하세요.</h2>
+              </div>
+              <p className="max-w-xl text-sm leading-6 text-muted-foreground">지금 선택된 <span className="font-black text-foreground">{selectedModule.title}</span> 단원을 기준으로 이동합니다.</p>
+            </div>
+            <nav className="relative grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="학습 빠른 이동">
+              <button type="button" onClick={() => scrollToStudySection("concept-note")} className="group flex min-h-24 items-center gap-3 rounded-[1.3rem] border border-sky-blue/25 bg-sky-blue/7 p-3.5 text-left shadow-[0_8px_22px_rgba(47,111,228,0.06)] transition-[background-color,border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-sky-blue/45 hover:bg-sky-blue/12 hover:shadow-[0_12px_26px_rgba(47,111,228,0.1)] active:scale-[0.96]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-[0.95rem] bg-sky-blue/12 text-sky-blue"><BookOpen className="size-5" /></span>
+                <span><span className="block text-xs font-black text-sky-blue">01 · 먼저</span><span className="mt-0.5 block text-sm font-black text-foreground">개념 노트 읽기</span><span className="mt-1 block text-[11px] font-semibold leading-4 text-muted-foreground">핵심 원리·예시·실수를 확인</span></span>
+              </button>
+              <button type="button" onClick={() => scrollToStudySection("learning-pattern")} className="group flex min-h-24 items-center gap-3 rounded-[1.3rem] border border-card-border/70 bg-background/65 p-3.5 text-left shadow-[0_8px_22px_rgba(17,32,39,0.04)] transition-[background-color,border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-nature-green/35 hover:bg-nature-green/7 hover:shadow-[0_12px_26px_rgba(11,125,113,0.08)] active:scale-[0.96]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-[0.95rem] bg-nature-green/10 text-nature-green"><Lightbulb className="size-5" /></span>
+                <span><span className="block text-xs font-black text-nature-green">02 · 이어서</span><span className="mt-0.5 block text-sm font-black text-foreground">손으로 한 번 해보기</span><span className="mt-1 block text-[11px] font-semibold leading-4 text-muted-foreground">추적·회상·구현으로 이해 고정</span></span>
+              </button>
+              <button type="button" onClick={() => scrollToStudySection("concept-quiz")} className="group flex min-h-24 items-center gap-3 rounded-[1.3rem] border border-card-border/70 bg-background/65 p-3.5 text-left shadow-[0_8px_22px_rgba(17,32,39,0.04)] transition-[background-color,border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-active-blue/35 hover:bg-active-blue/7 hover:shadow-[0_12px_26px_rgba(47,111,228,0.08)] active:scale-[0.96]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-[0.95rem] bg-active-blue/10 text-active-blue"><BrainCircuit className="size-5" /></span>
+                <span><span className="block text-xs font-black text-active-blue">03 · 마지막</span><span className="mt-0.5 block text-sm font-black text-foreground">개념 점검 풀기</span><span className="mt-1 block text-[11px] font-semibold leading-4 text-muted-foreground">규칙을 스스로 설명할 수 있는지 확인</span></span>
+              </button>
+              <button type="button" onClick={() => scrollToStudySection("learning-map")} className="group flex min-h-24 items-center gap-3 rounded-[1.3rem] border border-card-border/70 bg-background/65 p-3.5 text-left shadow-[0_8px_22px_rgba(17,32,39,0.04)] transition-[background-color,border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-warning/35 hover:bg-warning/7 hover:shadow-[0_12px_26px_rgba(164,102,0,0.08)] active:scale-[0.96]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-[0.95rem] bg-warning/10 text-warning"><Route className="size-5" /></span>
+                <span><span className="block text-xs font-black text-warning">언제든</span><span className="mt-0.5 block text-sm font-black text-foreground">다른 파트 고르기</span><span className="mt-1 block text-[11px] font-semibold leading-4 text-muted-foreground">원하는 단계의 단원으로 바로 이동</span></span>
+              </button>
+            </nav>
+          </div>
+        </SectionCard>
+
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="학습 현황">
           <StatusMetric label="전체 진도" value={`${completionPercent}%`} meta={`${completedSet.size}/${STUDY_MODULES.length} 단원 완료`} compact icon={<Target className="size-4" />} />
           <StatusMetric label="다음 단원" value={nextModule.chapter} meta={nextModule.title} compact icon={<Route className="size-4" />} />
@@ -1027,9 +1203,33 @@ export default function AlgorithmStudyPage() {
                 <p className="max-w-2xl text-base leading-8 text-muted-foreground">{selectedModule.summary}</p>
               </div>
 
+              <section id="concept-note" className="scroll-mt-28 rounded-[1.65rem] border border-sky-blue/20 bg-sky-blue/5 p-3.5 shadow-[0_10px_28px_rgba(47,111,228,0.06)] sm:p-4" aria-label={`${selectedModule.title} 개념 노트`}>
+                <div className="flex flex-col gap-2 border-b border-sky-blue/15 px-1 pb-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-blue">concept note · 여기서 개념을 읽어요</p>
+                    <h3 className="mt-1 text-lg font-black text-foreground">이 단원을 이해하는 세 가지 연결</h3>
+                  </div>
+                  <span className="inline-flex self-start rounded-full border border-sky-blue/20 bg-background/70 px-2.5 py-1 text-xs font-black text-sky-blue sm:self-auto">읽기 약 5분</span>
+                </div>
+                <div className="grid gap-2 pt-3 sm:grid-cols-3">
+                  <div className="rounded-[1.2rem] border border-card-border/70 bg-background/75 p-3.5">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-blue">핵심 원리</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-foreground/90">{selectedConceptNote.mentalModel}</p>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-nature-green/20 bg-nature-green/7 p-3.5">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-nature-green">작은 예시로 보기</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-foreground/90">{selectedConceptNote.miniExample}</p>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-warning/20 bg-warning/7 p-3.5">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-warning">자주 헷갈리는 지점</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-foreground/90">{selectedConceptNote.commonMistake}</p>
+                  </div>
+                </div>
+              </section>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[1.35rem] border border-card-border/70 bg-background/75 p-4 shadow-[0_8px_24px_rgba(17,32,39,0.04)]">
-                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">오늘 볼 것</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">다음으로 해 볼 것</p>
                   <p className="mt-2 text-sm font-semibold leading-6 text-foreground/90">{selectedModule.focus}</p>
                 </div>
                 <div className="rounded-[1.35rem] border border-nature-green/20 bg-nature-green/7 p-4 shadow-[0_8px_24px_rgba(11,125,113,0.05)]">
@@ -1038,7 +1238,7 @@ export default function AlgorithmStudyPage() {
                 </div>
               </div>
 
-              <section className="rounded-[1.6rem] border border-card-border/70 bg-background/55 p-3.5 shadow-[0_10px_28px_rgba(17,32,39,0.04)] sm:p-4" aria-label="학습 패턴">
+              <section id="learning-pattern" className="scroll-mt-28 rounded-[1.6rem] border border-card-border/70 bg-background/55 p-3.5 shadow-[0_10px_28px_rgba(17,32,39,0.04)] sm:p-4" aria-label="학습 패턴">
                 <div className="flex flex-wrap items-end justify-between gap-2 px-1 pb-3">
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">active learning pattern</p>
@@ -1086,10 +1286,11 @@ export default function AlgorithmStudyPage() {
             </div>
           </SectionCard>
 
-          <MagicCard className="overflow-hidden rounded-[2rem] xl:sticky xl:top-28 xl:self-start" gradientSize={220} gradientOpacity={0.64}>
-            <div className="relative rounded-[2rem] border border-card-border/70 bg-card/90 p-4 backdrop-blur-2xl sm:p-6">
-              <BorderBeam size={160} duration={12} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
-              <div className="relative z-10 flex flex-col space-y-4 sm:space-y-5">
+          <div id="concept-quiz" className="scroll-mt-28 xl:sticky xl:top-28 xl:self-start">
+            <MagicCard className="overflow-hidden rounded-[2rem]" gradientSize={220} gradientOpacity={0.64}>
+              <div className="relative rounded-[2rem] border border-card-border/70 bg-card/90 p-4 backdrop-blur-2xl sm:p-6">
+                <BorderBeam size={160} duration={12} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
+                <div className="relative z-10 flex flex-col space-y-4 sm:space-y-5">
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <span className="inline-flex items-center gap-2 rounded-full border border-active-blue/25 bg-active-blue/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-active-blue"><BrainCircuit className="size-3.5" /> concept check</span>
@@ -1133,9 +1334,10 @@ export default function AlgorithmStudyPage() {
                     <button type="button" disabled={selectedOption == null} onClick={checkQuiz} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[1rem] border border-active-blue/30 bg-active-blue px-4 py-2.5 text-sm font-black text-active-blue-foreground transition-[background-color,opacity,transform] hover:bg-active-blue/90 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100 sm:col-span-2"><Check className="size-4" /> 답 확인하기</button>
                   )}
                 </div>
+                </div>
               </div>
-            </div>
-          </MagicCard>
+            </MagicCard>
+          </div>
         </section>
 
         <SectionCard panelClassName="overflow-hidden">
@@ -1193,8 +1395,9 @@ export default function AlgorithmStudyPage() {
           </div>
         </SectionCard>
 
-        <SectionCard>
-          <div className="space-y-5">
+        <div id="learning-map" className="scroll-mt-28">
+          <SectionCard>
+            <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="space-y-2">
                 <p className="text-xs font-black uppercase tracking-[0.28em] text-muted-foreground">학습 지도</p>
@@ -1251,6 +1454,7 @@ export default function AlgorithmStudyPage() {
             </div>
           </div>
         </SectionCard>
+        </div>
 
         <SectionCard panelClassName="bg-card/80">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

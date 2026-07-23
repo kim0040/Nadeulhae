@@ -311,9 +311,9 @@ export const zh = {
   about_structure_calendar_title: "日历",
   about_structure_calendar_desc: "专注展示10日预报趋势和每日评分的专用页面。区域预报日历仅在此页面提供。",
   about_structure_jeonju_title: "全州特色",
-  about_structure_jeonju_desc: "汇集全州本地特色、专用指南、未来地点数据库和路线功能路线图的独立空间。",
-  about_structure_future_title: "后续开放",
-  about_structure_future_desc: "历史统计、餐饮店·咖啡馆·户外地点数据库、AI半日路线将在后端和数据库连接后逐步开放。",
+  about_structure_jeonju_desc: "汇集全州本地特色、专用指南、地点数据和AI路线体验的独立空间。",
+  about_structure_future_title: "扩展服务",
+  about_structure_future_desc: "野餐档案与统计、全州地点数据和路线，以及AI路线生成、保存和分享现已在服务中可用。",
 
   // Technical Labels & Briefing UI
   brief_station_engine: "情景分析引擎",
@@ -393,11 +393,11 @@ export const zh = {
 
   // Contributors & Status
   about_status_pending: "后端连接准备中",
-  about_contributors_desc: "由全北大学软件工程系三年级(24级)的3名同学共同创建的数据库团队项目。所有团队成员都核心参与了数据库设计及构建。",
+  about_contributors_desc: "나들해起源于全北大学软件工程系24级3名同学共同完成的数据库团队项目。目前服务的维护与更新由金贤珉独立负责。",
 
   con_hm_name: "金贤珉",
-  con_hm_role: "全北大学 软件工程系 24级",
-   con_hm_desc: "负责前端、后端、UI/UX设计、服务器搭建、数据库设计、实时API集成。",
+  con_hm_role: "当前独立维护者 · 全北大学软件工程系24级",
+   con_hm_desc: "负责当前服务的维护与更新，同时承担前端、后端、UI/UX设计、服务器运营、数据库设计和实时API集成。",
 
   con_es_name: "金恩秀",
   con_es_role: "全北大学 软件工程系 24级",
@@ -410,8 +410,8 @@ export const zh = {
   con_university: "全北大学",
   con_department: "软件工程系 24级",
 
-  about_philosophy_title: "나들해的创建者",
-  about_philosophy_desc: "由全北大学软件工程系24级的3名同学共同策划和开发。比起服务的华丽，我们更专注于数据如何流动和存储这些数据库的基础。",
+  about_philosophy_title: "나들해的起点与现在",
+  about_philosophy_desc: "项目由全北大学软件工程系24级3名同学共同策划和开发。如今金贤珉独立维护服务，持续打磨可靠的数据流与存储体验。",
 
   // Statistics Page Extra
   cal_archive_title: "野餐档案",

@@ -1,11 +1,12 @@
 "use client"
 
 /**
- * About Page — introduces the Nadeulhae service, its feature roadmap, tech stack,
- * environmental metric guide, live Jeonju features, future pipeline, and contributors.
+ * About Page — introduces the Nadeulhae service, its live capabilities, tech stack,
+ * environmental metric guide, operating data flow, and project stewardship.
  * Fully i18n — supports ko/en/zh/ja via the shared LanguageContext.
  */
 
+import Link from "next/link"
 import { useCallback, useMemo } from "react"
 import { 
   AlertTriangle,
@@ -23,7 +24,8 @@ import {
   Zap,
   ShieldCheck,
   CloudRain,
-  Database
+  Database,
+  Wrench
 } from "lucide-react"
 
 import { Particles } from "@/components/magicui/particles"
@@ -112,7 +114,7 @@ export default function AboutPage() {
   const particleQuantity = useMemo(() => getParticleCount(30), [])
   const enableAnimations = useMemo(() => shouldRunRichAnimation(), [])
 
-  const devSteps = ["01", "02", "03", "04", "05"]
+  const serviceSteps = ["DATA", "CACHE", "ARCHIVE", "ROUTE", "AI"]
 
   /** Inline locale helper: returns the first match in priority order ko > zh > ja > en */
   const locale = useCallback((ko: string, en = ko, zh = en, ja = zh) => {
@@ -122,103 +124,103 @@ export default function AboutPage() {
     return en
   }, [language])
   
-  const futureContent = useMemo(() => [
+  const expandedContent = useMemo(() => [
     {
       icon: Database,
-      title: locale("과거 날씨 통계 DB", "Historical weather DB", "历史天气统计数据库", "過去の天気統計DB"),
+      title: locale("날씨 아카이브와 통계", "Weather archive and statistics", "天气档案与统计", "天気アーカイブと統計"),
       desc: locale(
-        "수년치 전주 기상 데이터, 평균값, 월별/요일별 통계를 적재해 과거 아카이브와 인사이트를 엽니다.",
-        "Stores Jeonju's multi-year weather history, averages, and weekday/monthly stats for archive and insight views.",
-        "存储全州多年气象数据、平均值及按月份/星期的统计信息，用于历史存档和洞察分析。",
-        "全州の長年の気象データ、平均値、月別・曜日別統計を蓄積し、過去のアーカイブとインサイトを提供します。"
+        "실시간 예보 캘린더와 피크닉 아카이브를 함께 제공해, 날짜별 흐름과 기록을 한 화면에서 확인할 수 있습니다.",
+        "Pairs the live forecast calendar with a picnic archive so date-by-date patterns and records stay visible in one place.",
+        "结合实时预报日历与野餐档案，在一个页面中查看按日期变化的趋势和记录。",
+        "リアルタイム予報カレンダーとピクニックアーカイブを組み合わせ、日付ごとの流れと記録を一画面で確認できます。"
       ),
     },
     {
       icon: MapIcon,
-      title: locale("전주 장소 DB", "Jeonju place DB", "全州地点数据库", "全州スポットDB"),
+      title: locale("전주 장소 데이터와 길찾기", "Jeonju places and directions", "全州地点数据与路线", "全州スポットデータと経路"),
       desc: locale(
-        "음식점, 카페, 야외 스팟을 실내/야외 유형과 위치 태그까지 가공해 반나절 코스 추천에 연결합니다.",
-        "Builds restaurants, cafes, and outdoor spots with indoor/outdoor types and location tags for routing.",
-        "将餐厅、咖啡馆、户外地点按室内/室外类型和位置标签进行整理，用于半日路线推荐。",
-        "飲食店、カフェ、屋外スポットを屋内/屋外タイプと位置タグ付きで整理し、半日コースの提案に活用します。"
+        "장소 데이터에 실내·야외 성격과 위치 정보를 연결하고, 선택한 장소 사이의 이동 경로까지 이어집니다.",
+        "Connects place data with indoor/outdoor traits and location details, then continues into directions between chosen stops.",
+        "将地点数据与室内/室外属性及位置信息连接，并提供所选地点之间的路线。",
+        "スポットデータに屋内・屋外の特性と位置情報を結び、選んだ場所同士の経路までつなげます。"
       ),
     },
     {
       icon: Route,
-      title: locale("AI 반나절 코스", "AI half-day course", "AI 半日路线", "AI半日コース"),
+      title: locale("AI 코스 생성·저장·공유", "AI course creation, saving, and sharing", "AI路线生成、保存与分享", "AIコースの生成・保存・共有"),
       desc: locale(
-        "시간대별 날씨 흐름과 장소 DB를 묶어 야외에서 실내로 이어지는 전주 맞춤 동선을 생성합니다.",
-        "Combines time-based weather flow and the place DB to generate Jeonju-specific half-day routes.",
-        "结合各时段天气变化和地点数据库，生成从户外到室内的全州专属半日路线。",
-        "時間帯ごとの天気の流れとスポットDBを組み合わせ、屋外から屋内へつながる全州カスタマイズの動線を生成します。"
+        "날씨 흐름과 장소 정보를 바탕으로 코스를 만들고, 내 코스로 저장하거나 링크로 공유할 수 있습니다.",
+        "Builds courses from weather flow and place data, then lets you save them or share them by link.",
+        "基于天气变化和地点信息生成路线，并可保存为我的路线或通过链接分享。",
+        "天気の流れとスポット情報からコースを作り、自分のコースとして保存したりリンクで共有したりできます。"
       ),
     },
   ], [locale])
 
   const stepContent = useMemo(() => [
     {
-      title: locale("기획 구체화 및 DB 설계", "Planning and DB design", "规划细化与数据库设计", "企画具体化とDB設計"),
+      title: locale("공공 데이터 수집", "Public data collection", "公共数据采集", "公共データ収集"),
       desc: locale(
-        "날씨 테이블, 장소 테이블, API 키 점검, 전주 스팟 초기 데이터 정리를 먼저 합니다.",
-        "Start with weather tables, place tables, API key checks, and seed data for Jeonju spots.",
-        "首先进行天气表、地点表的设计、API密钥检查以及全州地点初始数据整理。",
-        "天気テーブル、場所テーブル、APIキーの確認、全州スポットの初期データ整理から始めます。"
+        "기상청·AirKorea·공식 통보 데이터를 서비스 목적에 맞는 입력으로 정리합니다.",
+        "Normalizes KMA, AirKorea, and official bulletin data into service-ready inputs.",
+        "将气象厅、AirKorea和官方通报数据整理为适合服务使用的输入。",
+        "気象庁・AirKorea・公式通報のデータをサービスに合う入力として整えます。"
       ),
     },
     {
-      title: locale("데이터 수집 파이프라인", "Data collection pipeline", "数据采集管道", "データ収集パイプライン"),
+      title: locale("지역 판별과 캐시", "Region resolution and cache", "区域识别与缓存", "地域判定とキャッシュ"),
       desc: locale(
-        "배치와 스케줄러로 기상 데이터와 실시간 예보를 DB와 캐시에 채웁니다.",
-        "Use batch jobs and schedulers to populate the DB and cache with historical and live weather.",
-        "使用批处理和调度器将气象数据和实时预报填充到数据库和缓存中。",
-        "バッチとスケジューラーで気象データとリアルタイム予報をDBとキャッシュに格納します。"
+        "지역별 관측소·예보 권역을 연결하고, 같은 요청이 반복돼도 외부 API 호출을 절제합니다.",
+        "Maps local stations and forecast zones while limiting duplicate external API calls through caching.",
+        "连接各地区观测站与预报区域，并通过缓存限制重复的外部API调用。",
+        "地域ごとの観測所・予報圏域を結び、キャッシュで重複する外部API呼び出しを抑えます。"
       ),
     },
     {
-      title: locale("기본 API 및 화면 연동", "Base API and UI integration", "基本API与界面联动", "基本APIと画面連携"),
+      title: locale("아카이브와 통계", "Archive and statistics", "档案与统计", "アーカイブと統計"),
       desc: locale(
-        "피크닉 점수와 통계 데이터를 API로 내려주고 UI와 연결합니다.",
-        "Expose picnic score and statistics APIs, then connect them to the UI.",
-        "通过API提供野餐评分和统计数据，并与UI界面连接。",
-        "ピクニックスコアと統計データをAPIで提供し、UIと連携します。"
+        "실시간 예보와 날짜별 피크닉 기록을 캘린더·아카이브 화면에서 읽기 쉽게 보여줍니다.",
+        "Makes live forecasts and date-level picnic records easy to read in calendar and archive views.",
+        "在日历和档案页面中清晰展示实时预报与按日期记录的野餐指数。",
+        "リアルタイム予報と日付ごとのピクニック記録をカレンダー・アーカイブ画面で読みやすく見せます。"
       ),
     },
     {
-      title: locale("시간대별 날씨-장소 매칭", "Time-based weather-place matching", "按时段的天气-地点匹配", "時間帯別の天気-場所マッチング"),
+      title: locale("장소와 이동 경로", "Places and directions", "地点与路线", "スポットと経路"),
       desc: locale(
-        "비가 오기 전 야외, 바람이 강해진 뒤 실내처럼 룰 기반 1차 매칭을 수행합니다.",
-        "Do first-pass rule matching such as outdoors before rain, indoors after strong winds.",
-        "执行基于规则的一级匹配，例如下雨前推荐户外、强风后推荐室内。",
-        "雨が降る前は屋外、風が強まった後は屋内といったルールベースの一次マッチングを行います。"
+        "전주 장소 데이터에 위치·유형을 더하고, 선택한 목적지 사이 이동 정보를 코스와 연결합니다.",
+        "Enriches Jeonju places with type and location data, then connects movement between stops to a course.",
+        "为全州地点补充类型和位置信息，并将目的地之间的移动连接到路线中。",
+        "全州スポットに種類と位置情報を加え、目的地間の移動をコースにつなげます。"
       ),
     },
     {
-      title: locale("RAG 기반 LLM 고도화", "RAG-based LLM layer", "基于RAG的LLM增强层", "RAGベースLLM高度化"),
+      title: locale("AI 코스와 저장", "AI courses and saving", "AI路线与保存", "AIコースと保存"),
       desc: locale(
-        "정리된 날씨/장소 데이터를 바탕으로 자연스러운 전주 반나절 코스 문장을 생성합니다.",
-        "Generate natural Jeonju half-day course text from structured weather and place data.",
-        "基于整理好的天气/地点数据，生成自然的全州半日路线文本。",
-        "整理された天気/場所データをもとに、自然な全州半日コースの文章を生成します。"
+        "AI가 만든 코스를 저장하고 공유 링크로 이어, 다음 방문 때도 다시 확인할 수 있게 합니다.",
+        "Keeps AI-created courses available through saved records and shareable links for later visits.",
+        "通过保存记录和可分享链接保留AI生成的路线，方便下次再次查看。",
+        "AIが作ったコースを保存と共有リンクで残し、次の訪問時にも確認できるようにします。"
       ),
     },
   ], [locale])
 
   const texts = useMemo(() => ({
-    futureTitle: locale("추후 열릴 전주 전용 기능", "Jeonju features opening later", "即将推出的全州专属功能", "今後オープン予定の全州専用機能"),
-    futureDesc: locale(
-      "전주만의 깊이 있는 경험을 위해, 서버 시스템과 데이터베이스 구축 단계에 맞춰 다음 기능들을 순차적으로 선보일 예정입니다.",
-      "To provide a deeper Jeonju experience, we will sequentially roll out the following features as we complete our server-side and database architecture.",
-      "为了提供更深层次的全州体验，我们将在服务器系统和数据库建设阶段依次推出以下功能。",
-      "全州ならではの深い体験のために、サーバーシステムとデータベース構築の段階に合わせて、以下の機能を順次公開予定です。"
+    expandedTitle: locale("현재 제공 중인 확장 기능", "Expanded features available now", "当前提供的扩展功能", "現在提供中の拡張機能"),
+    expandedDesc: locale(
+      "처음의 로드맵으로 소개했던 아카이브, 장소 데이터, AI 코스 기능은 현재 서비스 안에서 실제로 사용할 수 있습니다.",
+      "The archive, place data, and AI course capabilities once shown on the roadmap are now available in the service.",
+      "曾在路线图中介绍的档案、地点数据和AI路线功能现已在服务中可用。",
+      "以前ロードマップとして紹介していたアーカイブ、スポットデータ、AIコース機能は現在サービス内で利用できます。"
     ),
-    pipelineTitle: locale("개발 순서와 데이터 흐름", "Development sequence and data flow", "开发顺序与数据流", "開発手順とデータフロー"),
+    pipelineTitle: locale("현재 서비스 구성과 데이터 흐름", "Current service structure and data flow", "当前服务结构与数据流", "現在のサービス構成とデータフロー"),
     pipelineDesc: locale(
-      "나들해의 진화는 단순히 화면을 늘리는 것이 아닙니다. 데이터 수집부터 체계적인 저장, 서버 처리, 그리고 AI 생성에 이르는 철저한 데이터 파이프라인을 구축해 나갑니다.",
-      "Nadeulhae's evolution is more than just UI. We are building a robust data pipeline that encompasses everything from collection and structured storage to server-side processing and AI generation.",
-      "나들해的进化不仅仅是增加页面。我们正在构建一条从数据采集、结构化存储、服务器处理到AI生成的完整数据管道。",
-      "나들해의進化は単に画面を増やすことではありません。データ収集から体系的な保存、サーバー処理、AI生成に至る徹底したデータパイプラインを構築しています。"
+      "화면의 판단은 공공 데이터 수집, 지역별 정리와 캐시, 기록·장소 데이터, AI 코스 생성 순서로 이어집니다.",
+      "Every on-screen decision connects public-data intake, regional normalization and caching, records and place data, and AI course generation.",
+      "界面上的判断连接了公共数据采集、区域整理与缓存、记录和地点数据以及AI路线生成。",
+      "画面上の判断は、公共データ収集、地域別の整理とキャッシュ、記録・スポットデータ、AIコース生成へとつながります。"
     ),
-    openLater: locale("추후 오픈", "Opens Later", "即将开放", "今後オープン"),
+    availableNow: locale("현재 제공 중", "Available now", "当前可用", "現在利用可能"),
     liveTitle: locale("지금 가능한 전주 기능", "What is already live for Jeonju", "当前可用的全州功能", "現在利用可能な全州機能"),
     liveDesc: locale(
       "현재는 전주 기준 실시간 점수, 브리핑, 예보 캘린더까지 동작합니다.",
@@ -290,9 +292,9 @@ export default function AboutPage() {
       <section className="py-24 relative overflow-hidden">
         <Marquee pauseOnHover className="[--duration:40s]">
           {[
-            "Next.js 16", "React 19+", "TypeScript", "Tailwind CSS", 
-            "Prisma ORM", "MySQL", "Lucide Icons", "Magic UI", 
-            "Framer Motion", "Shadcn UI", "Vultr", "i18n"
+            "Next.js 16", "React 19", "TypeScript", "Tailwind CSS",
+            "TiDB / MySQL", "WebSocket", "Lucide Icons", "Magic UI",
+            "Framer Motion", "PM2", "Vultr", "i18n"
           ].map((tech, i) => (
             <div key={i} className="mx-16 flex items-center gap-4 group">
               <CodeIcon size={24} className="text-sky-blue opacity-50 group-hover:opacity-100 transition-opacity" />
@@ -525,21 +527,21 @@ export default function AboutPage() {
       <section className="container mx-auto px-4 pb-20 pt-10">
         <div className="mb-8 max-w-4xl mx-auto text-center">
           <AnimatedGradientText className="text-4xl md:text-5xl font-black tracking-tight">
-            {texts.futureTitle}
+            {texts.expandedTitle}
           </AnimatedGradientText>
           <p className="mt-4 text-base sm:text-lg font-semibold leading-relaxed break-words text-neutral-800 dark:text-neutral-400">
-            {texts.futureDesc}
+            {texts.expandedDesc}
           </p>
         </div>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 max-w-6xl mx-auto">
-          {futureContent.map((item) => (
+          {expandedContent.map((item) => (
             <div key={item.title} className="rounded-[2.5rem] border border-card-border bg-card p-8 shadow-[0_18px_42px_-32px_rgba(47,111,228,0.18)]">
               <div className="inline-flex rounded-2xl border border-nature-green/20 bg-nature-green/10 p-4 text-nature-green">
                 <item.icon size={24} />
               </div>
               <div className="mt-6">
                 <span className="inline-flex rounded-full border border-active-blue/20 bg-active-blue/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-active-blue">
-                  {texts.openLater}
+                  {texts.availableNow}
                 </span>
                 <h3 className="mt-4 text-2xl font-black tracking-tight text-foreground break-words">{item.title}</h3>
               </div>
@@ -564,7 +566,7 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
             {stepContent.map((step, index) => (
               <div key={step.title} className="rounded-[2rem] border border-[var(--interactive-border)] bg-[var(--interactive)] px-5 py-5 min-w-0">
-                <div className="text-sm font-black uppercase tracking-[0.24em] text-sky-blue">{devSteps[index]}</div>
+                <div className="text-sm font-black uppercase tracking-[0.24em] text-sky-blue">{serviceSteps[index]}</div>
                 <h3 className="mt-3 text-xl sm:text-2xl font-black leading-tight text-foreground break-words">{step.title}</h3>
                 <p className="mt-3 text-base font-bold leading-relaxed text-neutral-900 dark:text-neutral-300 break-words">
                   {step.desc}
@@ -573,10 +575,42 @@ export default function AboutPage() {
             ))}
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="/statistics/calendar" className="inline-flex items-center gap-2 rounded-full border border-card-border bg-[var(--interactive)] px-5 py-3 text-sm font-black text-foreground transition-colors hover:bg-[var(--interactive-border)]">
+            <Link href="/statistics/calendar" className="inline-flex items-center gap-2 rounded-full border border-card-border bg-[var(--interactive)] px-5 py-3 text-sm font-black text-foreground transition-colors hover:bg-[var(--interactive-border)]">
               <CalendarClock size={16} />
               {locale("통계 달력 보기", "Open Calendar", "查看统计日历", "統計カレンダーを見る")}
-            </a>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="maintenance" className="container mx-auto px-4 pb-28">
+        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2.75rem] border border-sky-blue/20 bg-[linear-gradient(135deg,rgba(47,111,228,0.12),rgba(255,255,255,0.02)_52%,rgba(11,125,113,0.1))] p-6 shadow-[0_28px_80px_-52px_rgba(47,111,228,0.48)] sm:p-10 lg:p-12">
+          <div className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-sky-blue/12 blur-3xl" />
+          <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)] lg:items-end">
+            <div className="space-y-5">
+              <span className="inline-flex items-center gap-2 rounded-full border border-sky-blue/25 bg-background/60 px-3.5 py-2 text-xs font-black uppercase tracking-[0.2em] text-sky-blue">
+                <Wrench className="size-4" />
+                {locale("project maintenance", "project maintenance", "项目维护", "プロジェクト保守")}
+              </span>
+              <div className="space-y-3">
+                <h2 className="max-w-3xl break-keep text-balance text-3xl font-black tracking-tight text-foreground sm:text-4xl">{locale("완성된 나들해는 이제 김현민이 단독으로 유지보수합니다.", "Nadeulhae is now maintained independently by Hyeonmin Kim.", "现已由金贤珉独立维护。", "現在のナドゥルヘはキム・ヒョンミンが単独で保守しています。")}</h2>
+                <p className="max-w-3xl text-base font-semibold leading-8 text-muted-foreground sm:text-lg">{locale("초기 팀 프로젝트의 기반 위에서, 현재 기능 개선·장애 대응·서버 운영·데이터 품질 점검과 업데이트는 김현민이 책임지고 이어갑니다.", "Building on the original team project, Hyeonmin Kim now owns feature improvements, incident response, server operations, data-quality checks, and updates.", "在最初团队项目的基础上，功能改进、故障处理、服务器运营、数据质量检查和更新现由金贤珉负责。", "初期チームプロジェクトの基盤の上で、現在は機能改善・障害対応・サーバー運用・データ品質確認・更新をキム・ヒョンミンが担っています。")}</p>
+              </div>
+              <p className="rounded-[1.35rem] border border-card-border/70 bg-background/55 px-4 py-3 text-sm font-bold leading-6 text-foreground/90">{locale("프로젝트는 구축 단계를 마쳤고, 앞으로는 사용 경험과 신뢰도를 높이는 유지보수 중심으로 운영합니다.", "The build phase is complete; future work is maintenance-led, focused on a more reliable and useful experience.", "项目已完成构建阶段，后续将以提升使用体验和可靠性的维护工作为主。", "プロジェクトは構築段階を完了し、今後は使いやすさと信頼性を高める保守を中心に運用します。")}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              {[
+                { label: locale("기능 개선", "Feature care", "功能优化", "機能改善"), detail: locale("사용 흐름과 접근성", "Flows and accessibility", "使用流程与可访问性", "導線とアクセシビリティ"), icon: SparklesIcon },
+                { label: locale("서비스 운영", "Service operations", "服务运营", "サービス運用"), detail: locale("서버·배포·장애 대응", "Server, deploys, incidents", "服务器、部署与故障处理", "サーバー・デプロイ・障害対応"), icon: CpuIcon },
+                { label: locale("데이터 품질", "Data quality", "数据质量", "データ品質"), detail: locale("공공 데이터와 결과 점검", "Public data and outcome checks", "公共数据与结果检查", "公共データと結果確認"), icon: ShieldCheck },
+              ].map((item) => (
+                <div key={item.label} className="rounded-[1.4rem] border border-card-border/70 bg-background/60 p-4 shadow-[0_12px_28px_rgba(17,32,39,0.05)]">
+                  <item.icon className="size-5 text-sky-blue" />
+                  <p className="mt-3 text-sm font-black text-foreground">{item.label}</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">{item.detail}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

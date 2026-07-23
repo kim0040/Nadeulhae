@@ -311,9 +311,9 @@ export const en = {
   about_structure_calendar_title: "Calendar",
   about_structure_calendar_desc: "A dedicated screen for the 10-day forecast flow and day-by-day scoring. The region-aware forecast calendar now lives only there.",
   about_structure_jeonju_title: "Jeonju Special",
-  about_structure_jeonju_desc: "A separate space for Jeonju-specific context, local guidance, and the roadmap for future place-DB and course features.",
-  about_structure_future_title: "Opening Later",
-  about_structure_future_desc: "Historical statistics, cafe and restaurant DB, outdoor spots, and AI half-day courses will open step by step after backend and DB integration.",
+  about_structure_jeonju_desc: "A dedicated space that brings together Jeonju-specific context, local guidance, place data, and the AI course experience.",
+  about_structure_future_title: "Expanded services",
+  about_structure_future_desc: "Picnic archive and statistics, Jeonju place data and directions, plus AI course creation, saving, and sharing are available in the service now.",
 
   // Technical Labels & Briefing UI
   brief_station_engine: "Situational Analysis Engine",
@@ -393,11 +393,11 @@ export const en = {
 
   // Contributors & Status
   about_status_pending: "Backend Sync Pending",
-  about_contributors_desc: "A database team project created by three juniors (Class of '24) from Jeonbuk National University, Software Engineering. All members actively participated in core DB design and construction.",
+  about_contributors_desc: "Nadeulhae began as a database team project by three Software Engineering classmates from Jeonbuk National University (Class of '24). Hyeonmin Kim now independently maintains and updates the service.",
   
   con_hm_name: "Hyeonmin Kim",
-  con_hm_role: "JNU Software Engineering ('24)",
-   con_hm_desc: "Handled frontend, backend, UI/UX design, server setup, DB design, and real-time API integration.",
+  con_hm_role: "Current sole maintainer · JNU Software Engineering ('24)",
+   con_hm_desc: "Maintains and updates the current service while handling frontend, backend, UI/UX design, server operations, DB design, and real-time API integration.",
   
   con_es_name: "Eunsu Kim",
   con_es_role: "JNU Software Engineering ('24)",
@@ -410,8 +410,8 @@ export const en = {
   con_university: "JBNU",
   con_department: "Software Engineering '24",
 
-  about_philosophy_title: "The Minds Behind Nadeulhae",
-  about_philosophy_desc: "Three Software Engineering juniors ('24) from JNU planned and developed this together. We focused on the basics of databases—how data flows and is stored—rather than just UI flashy features.",
+  about_philosophy_title: "How Nadeulhae began — and continues",
+  about_philosophy_desc: "Nadeulhae began as a project planned and developed by three JNU Software Engineering classmates ('24). Hyeonmin Kim now maintains it independently, continually refining how dependable data flows through the service and is stored.",
 
   // Statistics Page Extra
   cal_archive_title: "Picnic Archive",

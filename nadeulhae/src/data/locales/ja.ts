@@ -311,9 +311,9 @@ export const ja = {
   about_structure_calendar_title: "カレンダー",
   about_structure_calendar_desc: "10日間予報の流れと日付別スコアを集中して見る専用画面です。地域予報カレンダーはこのページでのみ提供します。",
   about_structure_jeonju_title: "全州特化",
-  about_structure_jeonju_desc: "全州ローカルコンテキスト、専用案内、今後場所DBとコース機能ロードマップをまとめる別途空間です。",
-  about_structure_future_title: "今後オープン",
-  about_structure_future_desc: "過去統計、飲食店・カフェ・屋外スポットDB、AI半日コースはバックエンドとDB接続後に段階的に公開予定です。",
+  about_structure_jeonju_desc: "全州ローカルコンテキスト、専用案内、スポットデータ、AIコース体験をまとめる別途空間です。",
+  about_structure_future_title: "拡張サービス",
+  about_structure_future_desc: "ピクニックアーカイブ・統計、全州スポットデータと経路、AIコースの生成・保存・共有を現在サービス内で利用できます。",
 
   // Technical Labels & Briefing UI
   brief_station_engine: "状況分析エンジン",
@@ -393,11 +393,11 @@ export const ja = {
 
   // Contributors & Status
   about_status_pending: "バックエンド接続準備中",
-  about_contributors_desc: "全北大学校ソフトウェア工学科3年生(24学番)の同期3名が一緒に作成したデータベースチームプロジェクトです。すべてのチームメンバーがデータベース設計および構築に中核的に参加しました。",
+  about_contributors_desc: "ナドゥルヘは全北大学校ソフトウェア工学科24学番の同期3名が作ったデータベースチームプロジェクトから始まりました。現在のサービス保守と更新はキム・ヒョンミンが単独で担当しています。",
 
   con_hm_name: "キム・ヒョンミン",
-  con_hm_role: "全北大学校 ソフトウェア工学科 24学番",
-   con_hm_desc: "フロントエンド、バックエンド、UI/UXデザイン、サーバー構築、DB設計、リアルタイムAPI連携を担当しました。",
+  con_hm_role: "現在の単独メンテナー · 全北大学校ソフトウェア工学科24学番",
+   con_hm_desc: "現在のサービス保守・更新とともに、フロントエンド、バックエンド、UI/UXデザイン、サーバー運用、DB設計、リアルタイムAPI連携を担当しています。",
 
   con_es_name: "キム・ウンス",
   con_es_role: "全北大学校 ソフトウェア工学科 24学番",
@@ -410,8 +410,8 @@ export const ja = {
   con_university: "全北大学校",
   con_department: "ソフトウェア工学科 24学番",
 
-  about_philosophy_title: "나들해を作った人々",
-  about_philosophy_desc: "全北大学校ソフトウェア工学科24学番の同期3名が一緒に企画し開発しました。サービスの華やかさよりも、データがどのように流れ保存されるか、データベースの基本に集中して作りました。",
+  about_philosophy_title: "ナドゥルヘの始まりと現在",
+  about_philosophy_desc: "全北大学校ソフトウェア工学科24学番の同期3名が一緒に企画・開発したプロジェクトから始まりました。現在はキム・ヒョンミンが単独で保守し、信頼できるデータの流れと保存体験を磨き続けています。",
 
   // Statistics Page Extra
   cal_archive_title: "ピクニックアーカイブ",
