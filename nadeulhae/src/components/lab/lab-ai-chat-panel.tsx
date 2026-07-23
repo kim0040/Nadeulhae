@@ -42,6 +42,7 @@ import { highlightCode, normalizeCodeLanguage, type HighlightKind } from "@/lib/
 import { sanitizeAssistantMarkdown } from "@/lib/markdown/sanitize-assistant-markdown"
 import { cn, getCopy } from "@/lib/utils"
 import { MermaidDiagram } from "@/components/lab/mermaid-diagram"
+import { takeLabAiChatStudyDraft } from "@/lib/lab-ai-chat/study-draft"
 
 type UiChatMessage = LabAiChatConversationMessage & {
   pending?: boolean
@@ -912,6 +913,7 @@ export function LabAiChatPanel() {
   const isComposingRef = useRef(false)
   const modelMenuRef = useRef<HTMLDivElement | null>(null)
   const streamRenderTimerRef = useRef<number | null>(null)
+  const didApplyStudyDraftRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -1146,6 +1148,19 @@ export function LabAiChatPanel() {
       }
     })
   }, [])
+
+  // The study path writes a short-lived draft only. Consuming it sets the
+  // composer value and focus, never sends a request or creates a session.
+  useEffect(() => {
+    if (didApplyStudyDraftRef.current || typeof window === "undefined") return
+    didApplyStudyDraftRef.current = true
+
+    const draft = takeLabAiChatStudyDraft(window.sessionStorage)
+    if (!draft) return
+
+    setChatInput((current) => current.trim() ? current : draft.slice(0, maxInputCharacters))
+    focusInput()
+  }, [focusInput, maxInputCharacters])
 
   const handleCreateSession = useCallback(() => {
     setErrorMessage(null)

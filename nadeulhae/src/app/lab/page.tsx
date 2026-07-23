@@ -9,7 +9,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { BookOpenCheck, Bot, Code2, FlaskConical, Sparkles } from "lucide-react"
+import { BookOpenCheck, Bot, Braces, Code2, FlaskConical, Sparkles } from "lucide-react"
 
 import { BorderBeam } from "@/components/magicui/border-beam"
 import { MagicCard } from "@/components/magicui/magic-card"
@@ -43,6 +43,9 @@ const LAB_HUB_COPY = {
     codeShareTitle: "코드공유 실험실",
     codeShareDescription:
       "링크 하나로 여러 명이 동시에 코드를 편집하고, 1시간 비활동 시 자동 종료되어 기록으로 남는 협업 기능입니다.",
+    algorithmTitle: "알고리즘 학습 경로",
+    algorithmDescription:
+      "파이썬 자료구조·알고리즘 개념서를 4단계 학습 경로, 단원별 완료 기준, 개념 점검으로 이어가는 개인 학습 기능입니다.",
     openFeature: "기능 열기",
   },
   en: {
@@ -68,6 +71,9 @@ const LAB_HUB_COPY = {
     codeShareTitle: "Code Share Lab",
     codeShareDescription:
       "Collaborate on code in real time through a shared link, with auto-close after 1 hour of inactivity and archived history.",
+    algorithmTitle: "Algorithm Study Path",
+    algorithmDescription:
+      "Turn the Python data-structures and algorithms concept book into a four-stage path with completion checks and concept reviews.",
     openFeature: "Open feature",
   },
   zh: {
@@ -87,6 +93,8 @@ const LAB_HUB_COPY = {
     vocabDescription: "基于个人资料生成学习卡片，通过间隔重复复习保持记忆。",
     codeShareTitle: "代码共享实验室",
     codeShareDescription: "通过一个链接让多人同时编辑代码，1小时无活动自动关闭，记录保留。",
+    algorithmTitle: "算法学习路径",
+    algorithmDescription: "将 Python 数据结构与算法概念书转化为四阶段学习路径，并提供完成检查与概念测验。",
     openFeature: "打开功能",
   },
   ja: {
@@ -106,6 +114,8 @@ const LAB_HUB_COPY = {
     vocabDescription: "プロフィールベースのテーマでカードを作成し、間隔反復復習で記憶を維持する学習機能です。",
     codeShareTitle: "コード共有ラボ",
     codeShareDescription: "リンク一つで複数人が同時にコードを編集でき、1時間の無活動で自動終了、記録として残るコラボレーション機能です。",
+    algorithmTitle: "アルゴリズム学習パス",
+    algorithmDescription: "Pythonのデータ構造・アルゴリズム概念書を、4段階の学習パスと完了チェック・理解度確認に変換します。",
     openFeature: "機能を開く",
   },
 } as const
@@ -240,6 +250,34 @@ export default function LabHubPage() {
           <div className="space-y-4">
             <p className="text-xs font-black uppercase tracking-[0.28em] text-muted-foreground">{copy.availableTitle}</p>
             <div className="grid gap-4">
+              <MagicCard
+                className="overflow-hidden rounded-[1.8rem]"
+                gradientSize={reduceVisualEffects ? 150 : 210}
+                gradientOpacity={reduceVisualEffects ? 0.55 : 0.72}
+              >
+                <div className="relative rounded-[1.8rem] border border-card-border/70 bg-background/80 p-5 sm:p-6">
+                  {!reduceVisualEffects ? (
+                    <BorderBeam size={170} duration={11.8} colorFrom="var(--beam-from)" colorTo="var(--beam-to)" />
+                  ) : null}
+                  <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="space-y-2">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-card/80 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
+                        <Braces className="size-3.5" />
+                        {copy.algorithmTitle}
+                      </span>
+                      <p className="max-w-2xl text-base leading-8 text-muted-foreground">{copy.algorithmDescription}</p>
+                    </div>
+                    <ShimmerButton
+                      type="button"
+                      onClick={() => router.push("/lab/algorithm")}
+                      className="rounded-[1.1rem] px-5 py-3 text-base font-black sm:shrink-0"
+                    >
+                      {copy.openFeature}
+                    </ShimmerButton>
+                  </div>
+                </div>
+              </MagicCard>
+
               <MagicCard
                 className="overflow-hidden rounded-[1.8rem]"
                 gradientSize={reduceVisualEffects ? 150 : 210}

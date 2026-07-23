@@ -4,6 +4,7 @@ const baseUrlArg = process.argv.find((arg) => arg.startsWith("--base-url="))
 const baseUrl = (baseUrlArg?.split("=")[1] ?? "http://127.0.0.1:3000").replace(/\/$/, "")
 const origin = new URL(baseUrl).origin
 const clientIp = `198.51.100.${Math.floor(Math.random() * 150) + 30}`
+const TEST_PASSWORD = "nadeulhae2026"
 
 function createJar() {
   return { cookies: new Map() }
@@ -133,7 +134,7 @@ async function main() {
       json: {
         ...buildProfilePayload(),
         email,
-        password: "nadeulhae2026",
+        password: TEST_PASSWORD,
         termsAccepted: true,
         privacyAccepted: true,
         ageConfirmed: true,
@@ -151,6 +152,16 @@ async function main() {
     assertCondition(profileResult.status === 200, "Profile update should return 200 when enabling lab access")
     assertCondition(profileResult.json?.user?.labEnabled === true, "Profile update should enable lab access")
     logStep("Enabled lab access on the temporary test user")
+
+    // Profile changes intentionally invalidate existing sessions. Sign in once more
+    // so this test continues with the same authenticated state as a real user.
+    const loginResult = await request("/api/auth/login", {
+      method: "POST",
+      jar,
+      json: { email, password: TEST_PASSWORD },
+    })
+    assertCondition(loginResult.status === 200, "Login should restore the session after profile update")
+    logStep("Restored the temporary test user's session")
 
     const initialState = await request("/api/lab/ai-chat", { jar })
     assertCondition(initialState.status === 200, "GET /api/lab/ai-chat should return 200")
