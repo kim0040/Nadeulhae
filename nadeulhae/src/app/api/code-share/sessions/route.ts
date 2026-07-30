@@ -26,6 +26,7 @@ import {
   createCodeShareSession,
   listCodeShareSessionsByOwner,
 } from "@/lib/code-share/repository"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 export const runtime = "nodejs"
 
@@ -78,6 +79,7 @@ declare global {
 
 const CODE_SHARE_CREATE_WINDOW_MS = 60_000
 const CODE_SHARE_CREATE_WINDOW_LIMIT = 5
+const CODE_SHARE_CREATE_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000
 const CODE_SHARE_CREATE_DAILY_LIMIT = 20
 const RATE_LIMIT_MAX_ENTRIES = 4000
 
@@ -132,11 +134,7 @@ function checkFixedWindow(
 }
 
 function getClientKey(request: NextRequest) {
-  const ua = request.headers.get("user-agent")?.trim().slice(0, 120) || "unknown"
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || "anon"
-  return `${ip}:${ua}`
+  return getTrustedClientIp(request.headers)
 }
 
 function getLocale(request: NextRequest): CodeShareLocale {
@@ -290,7 +288,7 @@ async function handlePOST(request: NextRequest) {
     const windowMap = getWindowMap()
     const dailyMap = getDailyMap()
     cleanupRateLimitMap(windowMap, CODE_SHARE_CREATE_WINDOW_MS, nowMs)
-    cleanupRateLimitMap(dailyMap, CODE_SHARE_CREATE_WINDOW_MS, nowMs)
+    cleanupRateLimitMap(dailyMap, CODE_SHARE_CREATE_DAILY_WINDOW_MS, nowMs)
 
     if (!checkFixedWindow(windowMap, clientKey, CODE_SHARE_CREATE_WINDOW_LIMIT, CODE_SHARE_CREATE_WINDOW_MS, nowMs).allowed) {
       return createAuthJsonResponse(
@@ -299,7 +297,7 @@ async function handlePOST(request: NextRequest) {
       )
     }
 
-    if (!checkFixedWindow(dailyMap, `${clientKey}:daily`, CODE_SHARE_CREATE_DAILY_LIMIT, 24 * 60 * 60 * 1000, nowMs).allowed) {
+    if (!checkFixedWindow(dailyMap, `${clientKey}:daily`, CODE_SHARE_CREATE_DAILY_LIMIT, CODE_SHARE_CREATE_DAILY_WINDOW_MS, nowMs).allowed) {
       return createAuthJsonResponse(
         { error: CODE_SHARE_ERRORS[locale].dailyLimit },
         { status: 429 }

@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Vocab Lab Page — FSRS-based spaced-repetition vocabulary study tool.
+ * Vocab Lab Page — adaptive spaced-repetition vocabulary study tool.
  * Features: AI-generated flashcard decks, SRS review queue, generation
  * progress tracking over WebSocket, deck import/export (JSON), card editing,
  * and per-user usage limits.  Fully i18n via LanguageContext.

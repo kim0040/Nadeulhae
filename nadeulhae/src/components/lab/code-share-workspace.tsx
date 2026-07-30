@@ -320,6 +320,10 @@ const CODE_SHARE_LANGUAGE_PRESETS = [
   "css",
   "bash",
 ]
+const AUTO_SAVE_DEBOUNCE_MS = 2_500
+const AUTO_SAVE_MAX_FAILURES = 3
+const AUTO_SAVE_MAX_RETRY_DELAY_MS = 20_000
+const SESSION_POLL_INTERVAL_MS = 10_000
 
 function formatDateLabel(value: string, locale: string) {
   const parsed = new Date(value)
@@ -470,6 +474,7 @@ export function CodeShareWorkspace({
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
+  const [autoSaveFailureCount, setAutoSaveFailureCount] = useState(0)
 
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -544,6 +549,7 @@ export function CodeShareWorkspace({
     setLanguageDraft(detail.language)
     setCodeDraft(detail.code)
     setIsDirty(false)
+    setAutoSaveFailureCount(0)
     setQueuedRemoteDetail(null)
     setNeedsRemoteRefresh(false)
     upsertSessionSummary(toSummaryFromDetail(detail))
@@ -961,7 +967,13 @@ export function CodeShareWorkspace({
   }, [isDirty, isSaving, loadSessionDetail, needsRemoteRefresh, selectedSessionId])
 
   useEffect(() => {
-    if (!selectedSessionId || !sessionDetail || !isDirty || isSaving) {
+    if (
+      !selectedSessionId
+      || !sessionDetail
+      || !isDirty
+      || isSaving
+      || autoSaveFailureCount >= AUTO_SAVE_MAX_FAILURES
+    ) {
       return
     }
 
@@ -974,7 +986,12 @@ export function CodeShareWorkspace({
     const titleToSave = titleDraft
     const languageToSave = languageDraft
 
-    // User-requested debounce duration: wait 2.5s after typing stops before auto-saving.
+    // Retry transient failures with a bounded exponential delay instead of
+    // issuing a PATCH on every render while the editor remains dirty.
+    const saveDelayMs = Math.min(
+      AUTO_SAVE_DEBOUNCE_MS * 2 ** autoSaveFailureCount,
+      AUTO_SAVE_MAX_RETRY_DELAY_MS
+    )
     const timer = window.setTimeout(async () => {
       setIsSaving(true)
 
@@ -1046,20 +1063,23 @@ export function CodeShareWorkspace({
         })
         setError(null)
         setMessage(copy.saved)
+        setAutoSaveFailureCount(0)
       } catch (saveError) {
         console.error("Failed to save code-share session:", saveError)
         setError(saveError instanceof Error ? saveError.message : copy.saveFailed)
         setMessage(null)
+        setAutoSaveFailureCount((current) => current + 1)
       } finally {
         setIsSaving(false)
       }
-    }, 2_500)
+    }, saveDelayMs)
 
     return () => {
       window.clearTimeout(timer)
     }
   }, [
     applySessionDetail,
+    autoSaveFailureCount,
     applyViewerIfPresent,
     codeDraft,
     copy.closedByInactivity,
@@ -1081,13 +1101,14 @@ export function CodeShareWorkspace({
       return
     }
 
-    // Lightweight polling fallback improves eventual consistency under unstable WS conditions.
+    // Polling is only a fallback for missed WebSocket events; a 10-second
+    // cadence keeps the editor responsive without creating constant traffic.
     const interval = window.setInterval(() => {
       if (isDirty || isSaving) {
         return
       }
       void loadSessionDetail(selectedSessionId, { silent: true })
-    }, 2_500)
+    }, SESSION_POLL_INTERVAL_MS)
 
     return () => {
       window.clearInterval(interval)
@@ -1106,6 +1127,7 @@ export function CodeShareWorkspace({
   const handleTitleChange = (value: string) => {
     setTitleDraft(value)
     setIsDirty(true)
+    setAutoSaveFailureCount(0)
     setMessage(null)
   }
 
@@ -1113,12 +1135,14 @@ export function CodeShareWorkspace({
     const normalized = value.toLowerCase().replace(/[^a-z0-9#+._-]/g, "").slice(0, 40)
     setLanguageDraft(normalized)
     setIsDirty(true)
+    setAutoSaveFailureCount(0)
     setMessage(null)
   }
 
   const handleCodeChange = (value: string) => {
     setCodeDraft(value)
     setIsDirty(true)
+    setAutoSaveFailureCount(0)
     setMessage(null)
 
     const now = Date.now()

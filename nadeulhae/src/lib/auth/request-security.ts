@@ -11,6 +11,7 @@ import {
   getAuthMessage,
   resolveAuthLocale,
 } from "@/lib/auth/messages"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
   process.env.TRUST_PROXY_HEADERS ?? ""
@@ -22,18 +23,9 @@ const DEFAULT_AUTH_ALLOWED_ORIGINS = [
 ]
 const LOCALHOST_HOST_RE = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i
 
-/** Extracts the client IP from proxy headers (Cloudflare, X-Real-IP, X-Forwarded-For). Falls back to "anonymous". */
+/** Extracts the IP from the configured proxy-overwritten header, or "anonymous". */
 export function getClientIp(request: NextRequest) {
-  if (!TRUST_PROXY_HEADERS) {
-    return "anonymous"
-  }
-
-  return (
-    request.headers.get("cf-connecting-ip")
-    || request.headers.get("x-real-ip")
-    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || "anonymous"
-  ).slice(0, 64)
+  return getTrustedClientIp(request.headers)
 }
 
 /** Extracts the User-Agent header, truncated to 255 characters. */

@@ -20,12 +20,13 @@
  * - **Immutable extensions** (.js, .css, .woff2, etc.): 1-year immutable (fingerprinted assets)
  *
  * ## IP extraction
- * Uses `CF-Connecting-IP` → `X-Real-IP` → `X-Forwarded-For` → `"anonymous"`.
- * When `TRUST_PROXY_HEADERS` env var is falsy, ALL requests are identified as
- * `"anonymous"`, making rate limiting coarser but safer behind untrusted proxies.
+ * Uses only the explicitly configured, proxy-overwritten trusted IP header
+ * (default: `X-Real-IP`). When `TRUST_PROXY_HEADERS` is falsy, ALL requests
+ * use the conservative `"anonymous"` bucket.
  */
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 /** Maximum entries in each rate-limit Map. Beyond this, LRU eviction kicks in. */
 const MAX_RATE_LIMIT_ENTRIES = 10_000
@@ -33,11 +34,6 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production"
 
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
 const authRateLimitMap = new Map<string, { count: number; lastReset: number }>()
-
-/** When false, all requests are identified as "anonymous" for rate limiting. Safer behind untrusted proxies. */
-const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
-  process.env.TRUST_PROXY_HEADERS ?? ""
-)
 
 /** General API: max 60 requests per minute per IP. */
 const LIMIT = 60
@@ -134,16 +130,7 @@ function ensurePeriodicPruning() {
 }
 
 function getClientKey(request: NextRequest) {
-  if (!TRUST_PROXY_HEADERS) {
-    return "anonymous"
-  }
-
-  return (
-    request.headers.get("cf-connecting-ip")
-    || request.headers.get("x-real-ip")
-    || request.headers.get("x-forwarded-for")?.split(",")![0]?.trim()
-    || "anonymous"
-  ).slice(0, 64)
+  return getTrustedClientIp(request.headers)
 }
 
 const SECURITY_HEADERS: Record<string, string> = {

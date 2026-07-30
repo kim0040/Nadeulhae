@@ -29,6 +29,7 @@ import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { wgs84ToTm } from "@/lib/coords-utils"
 import { broadcast } from "@/lib/websocket/broadcast"
 import { canCallKmaApi, recordKmaApiCall } from "@/lib/kma-quota"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 interface WeatherAlertPayload {
   alertType: string
@@ -297,20 +298,8 @@ function getKstCompactTime() {
   return `${hour}${minute}`
 }
 
-const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
-  process.env.TRUST_PROXY_HEADERS ?? ""
-)
-
 function getClientIp(req: Request) {
-  if (!TRUST_PROXY_HEADERS) {
-    return "anonymous"
-  }
-  const forwarded = req.headers.get("x-forwarded-for")
-  if (forwarded) {
-    return forwarded.split(",")[0].trim()
-  }
-  const realIp = req.headers.get("x-real-ip")
-  return realIp?.trim() || "anonymous"
+  return getTrustedClientIp(req.headers)
 }
 
 function cleanupLastUpdateCache<T>(map: Map<string, CacheEntry<T>>, maxAgeMs: number, now: number) {

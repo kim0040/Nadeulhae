@@ -609,18 +609,9 @@ async function handlePOST(request: NextRequest) {
     })
     resolvedSessionId = resolvedSession.activeSessionId
 
-    const sessionMemory = await getChatSessionMemorySnapshot({
-      userId: authenticatedSession.user.id,
-      sessionId: resolvedSession.activeSessionId,
-    })
-
-    await compactUserMemory({
-      userId: authenticatedSession.user.id,
-      sessionId: resolvedSession.activeSessionId,
-      locale,
-      memorySummary: sessionMemory?.summary ?? null,
-    })
-
+    // Reserve the user's chat budget before any optional memory compaction.
+    // Compaction is itself an LLM request, so doing it first allowed users who
+    // had exhausted their daily allowance to keep consuming provider capacity.
     const reservation = await reserveDailyChatRequest(authenticatedSession.user.id)
     if (!reservation.allowed) {
       await logChatRequestEvent({
@@ -654,6 +645,18 @@ async function handlePOST(request: NextRequest) {
         authenticatedSession
       )
     }
+
+    const sessionMemory = await getChatSessionMemorySnapshot({
+      userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
+    })
+
+    await compactUserMemory({
+      userId: authenticatedSession.user.id,
+      sessionId: resolvedSession.activeSessionId,
+      locale,
+      memorySummary: sessionMemory?.summary ?? null,
+    })
 
     // === 3. CONTEXT LOADING ===
     const [latestSessionMemory, profileMemory, contextMessages] = await Promise.all([
@@ -826,7 +829,7 @@ async function handlePOST(request: NextRequest) {
         },
       })
 
-      return new Response(stream, {
+      const response = new Response(stream, {
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache, no-store",
@@ -834,6 +837,11 @@ async function handlePOST(request: NextRequest) {
           "X-Accel-Buffering": "no",
         },
       })
+      // The stream now owns the per-user lock and releases it in its own
+      // finally block. Mark the transfer only after the response exists, so
+      // the outer finally remains responsible if construction ever throws.
+      lockReleased = true
+      return response
     }
 
     // === 5. NON-STREAMING COMPLETION ===

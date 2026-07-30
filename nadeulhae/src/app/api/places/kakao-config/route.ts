@@ -1,31 +1,26 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { getAuthenticatedUserFromRequest } from "@/lib/auth/session"
-import { executeStatement, queryRows } from "@/lib/db"
+import { executeStatement } from "@/lib/db"
 import { withApiAnalytics } from "@/lib/analytics/route"
-import type { RowDataPacket } from "mysql2"
+import {
+  createAuthJsonResponse,
+  validateSameOriginRequest,
+} from "@/lib/auth/request-security"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
+import { createBlindIndex } from "@/lib/security/data-protection"
 
 export const runtime = "nodejs"
 
-interface UsageRow extends RowDataPacket {
-  request_count: number
+const KAKAO_MAP_DAILY_LIMIT = 50
+const KAKAO_USAGE_ACTOR_CONTEXT = "kakao-map-usage"
+
+declare global {
+  var __nadeulhaeKakaoUsageSchemaPromise: Promise<void> | undefined
 }
 
-async function handleGET(request: NextRequest) {
-  try {
-    // 1. Resolve actor key: try authenticated user, fallback to IP address hash
-    const user = await getAuthenticatedUserFromRequest(request)
-    let actorKey = ""
-    
-    if (user?.id) {
-      actorKey = `user_${user.id}`
-    } else {
-      const forwarded = request.headers.get("x-forwarded-for")
-      const clientIp = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1"
-      actorKey = `ip_${clientIp}`
-    }
-
-    // 2. Ensure the API usage table exists (self-migrating)
-    await executeStatement(`
+function ensureKakaoUsageSchema() {
+  if (!globalThis.__nadeulhaeKakaoUsageSchemaPromise) {
+    globalThis.__nadeulhaeKakaoUsageSchemaPromise = executeStatement(`
       CREATE TABLE IF NOT EXISTS kakao_api_usage_daily (
         metric_date DATE NOT NULL,
         actor_key VARCHAR(64) NOT NULL,
@@ -33,54 +28,74 @@ async function handleGET(request: NextRequest) {
         last_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (metric_date, actor_key)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `)
+    `).then(() => undefined).catch((error) => {
+      // Allow a later request to retry schema initialization after a transient DB failure.
+      globalThis.__nadeulhaeKakaoUsageSchemaPromise = undefined
+      throw error
+    })
+  }
 
-    // 3. Query the actor's usage for today
-    const rows = await queryRows<UsageRow[]>(
-      `SELECT request_count FROM kakao_api_usage_daily WHERE metric_date = CURRENT_DATE() AND actor_key = ?`,
-      [actorKey]
-    )
+  return globalThis.__nadeulhaeKakaoUsageSchemaPromise
+}
 
-    const currentCount = rows[0]?.request_count ?? 0
-    const DAILY_LIMIT = 50 // Limit: 50 loads per user/IP per day
-
-    if (currentCount >= DAILY_LIMIT) {
-      console.warn(`[kakao-config] Quota exceeded for ${actorKey}: ${currentCount}/${DAILY_LIMIT}`)
-      return NextResponse.json(
-        { 
-          error: "Daily Kakao Map API quota exceeded for your session.", 
-          kakaoKey: null,
-          limitExceeded: true 
-        },
-        { status: 429 }
-      )
+async function handleGET(request: NextRequest) {
+  try {
+    const requestViolation = validateSameOriginRequest(request)
+    if (requestViolation) {
+      return requestViolation
     }
 
-    // 4. Increment usage in the database
-    await executeStatement(`
-      INSERT INTO kakao_api_usage_daily (metric_date, actor_key, request_count, last_used_at)
-      VALUES (CURRENT_DATE(), ?, 1, NOW())
-      ON DUPLICATE KEY UPDATE request_count = request_count + 1, last_used_at = NOW()
-    `, [actorKey])
-
-    // 5. Retrieve key from environment
+    // Kakao JavaScript keys are intentionally delivered to browsers. Domain
+    // restrictions in Kakao Developers remain the primary key protection;
+    // this endpoint prevents cross-site use and limits abusive page loads.
     const key = process.env.KAKAO_JS_KEY
     if (!key) {
       console.error("[kakao-config] KAKAO_JS_KEY is not defined in environment variables.")
-      return NextResponse.json(
+      return createAuthJsonResponse(
         { error: "Map configuration not available" },
         { status: 500 }
       )
     }
 
-    return NextResponse.json({
+    // Resolve an opaque quota key: authenticated user first, otherwise a
+    // blinded proxy-verified IP. Never persist raw visitor addresses.
+    const user = await getAuthenticatedUserFromRequest(request)
+    const actorKey = user?.id
+      ? `user_${user.id}`
+      // HMAC-SHA256 is 64 hex characters, exactly fitting actor_key VARCHAR(64).
+      : createBlindIndex(getTrustedClientIp(request.headers), KAKAO_USAGE_ACTOR_CONTEXT)
+
+    await ensureKakaoUsageSchema()
+
+    // The conditional upsert is atomic. A SELECT-then-increment race could
+    // otherwise let concurrent requests run beyond the daily ceiling.
+    const result = await executeStatement(`
+      INSERT INTO kakao_api_usage_daily (metric_date, actor_key, request_count, last_used_at)
+      VALUES (CURRENT_DATE(), ?, 1, NOW())
+      ON DUPLICATE KEY UPDATE
+        request_count = IF(request_count < ?, request_count + 1, request_count),
+        last_used_at = IF(request_count < ?, NOW(), last_used_at)
+    `, [actorKey, KAKAO_MAP_DAILY_LIMIT, KAKAO_MAP_DAILY_LIMIT])
+
+    if (result.affectedRows === 0) {
+      return createAuthJsonResponse(
+        {
+          error: "Daily Kakao Map API quota exceeded for your session.",
+          kakaoKey: null,
+          limitExceeded: true,
+          dailyLimit: KAKAO_MAP_DAILY_LIMIT,
+        },
+        { status: 429 }
+      )
+    }
+
+    return createAuthJsonResponse({
       kakaoKey: key,
-      usageCount: currentCount + 1,
-      dailyLimit: DAILY_LIMIT
+      dailyLimit: KAKAO_MAP_DAILY_LIMIT,
     })
   } catch (error) {
     console.error("[kakao-config] Failed to resolve Kakao JS Key:", error)
-    return NextResponse.json(
+    return createAuthJsonResponse(
       { error: "Failed to load map configuration" },
       { status: 500 }
     )

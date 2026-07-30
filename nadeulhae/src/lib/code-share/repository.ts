@@ -49,6 +49,11 @@ interface CodeShareOwnerRow extends RowDataPacket {
   owner_user_id: string | null
 }
 
+/** Minimal projection for inactivity cleanup; never load code bodies just to close sessions. */
+interface CodeShareSessionIdRow extends RowDataPacket {
+  session_id: string
+}
+
 /**
  * Normalizes database timestamps (Date or string) into stable ISO-8601 strings.
  * Falls back to the current time on parse failure;
@@ -174,8 +179,8 @@ export async function closeInactiveCodeShareSessions() {
   // Inactivity auto-close is evaluated on read/write entrypoints to avoid a separate cron dependency.
   const cutoff = new Date(Date.now() - CODE_SHARE_INACTIVITY_MS)
 
-  const staleRows = await queryRows<CodeShareSessionRow[]>(
-    `SELECT ${CODE_SHARE_SELECT_COLUMNS}
+  const staleRows = await queryRows<CodeShareSessionIdRow[]>(
+    `SELECT session_id
       FROM code_share_sessions
       WHERE status = 'active'
         AND last_activity_at < ?`,
@@ -234,8 +239,9 @@ export async function createCodeShareSession(input: CodeShareCreateInput) {
 }
 
 /**
- * Lists sessions owned by a given actor (or user). When `userId` is provided,
- * matches both `owner_actor_id` and `owner_user_id` for broader scope.
+ * Lists sessions owned by a given actor or authenticated user. Authenticated
+ * lists must use only the durable user ID, never the client-controlled actor
+ * cookie that is exposed to collaborators for presence.
  * Results are ordered by most-recently-updated, capped at 300 entries.
  */
 export async function listCodeShareSessionsByOwner(params: {
@@ -252,10 +258,10 @@ export async function listCodeShareSessionsByOwner(params: {
     rows = await queryRows<CodeShareSessionRow[]>(
       `SELECT ${CODE_SHARE_SELECT_COLUMNS}
         FROM code_share_sessions
-        WHERE owner_actor_id = ? OR owner_user_id = ?
+        WHERE owner_user_id = ?
         ORDER BY updated_at DESC
         LIMIT ?`,
-      [params.actorId, params.userId, limit]
+      [params.userId, limit]
     )
   } else {
     rows = await queryRows<CodeShareSessionRow[]>(

@@ -6,7 +6,7 @@
 
 ## 1. Project Overview
 
-**Nadeulhae** (a portmanteau of "Nadeuri" meaning outing + "Hae" meaning sun/sea) is a **weather-based outdoor activity scoring service + AI Chat + code sharing platform**. Centered on Jeonju city, it combines real-time data from KMA, AirKorea, and APIHub to compute a 0-100 picnic score, along with OpenAI-compatible LLM-based AI chat, FSRS-algorithm vocabulary learning (Lab), and a WebSocket-based real-time collaborative code editor.
+**Nadeulhae** (a portmanteau of "Nadeuri" meaning outing + "Hae" meaning sun/sea) is a **weather-based outdoor activity scoring service + AI Chat + code sharing platform**. Centered on Jeonju city, it combines real-time data from KMA, AirKorea, and APIHub to compute a 0-100 picnic score, along with OpenAI-compatible LLM-based AI chat, stability- and difficulty-based adaptive spaced-repetition vocabulary learning (Lab), and a WebSocket-based real-time collaborative code editor.
 
 ---
 
@@ -307,13 +307,13 @@ erDiagram
         string tip_text "Tips / notes"
         string learning_state "Indexed [IDX]: new or learning or review or relearning"
         int consecutive_correct
-        int stage "FSRS stage (0-8)"
-        double stability_days "FSRS stability"
-        double difficulty "FSRS difficulty (1-10)"
+        int stage "SRS stage (0-8)"
+        double stability_days "memory stability"
+        double difficulty "difficulty (1-10)"
         int total_reviews
         int lapses
         int last_review_outcome "0 equals again, 1 equals hard, 2 equals good, 3 equals easy"
-        datetime next_review_at "Indexed [IDX]: FSRS scheduled review time"
+        datetime next_review_at "Indexed [IDX]: scheduled review time"
         datetime last_reviewed_at
         datetime created_at
         datetime updated_at
@@ -940,7 +940,7 @@ stateDiagram-v2
 
 ---
 
-## 9. FSRS Spaced Repetition — Card State Machine
+## 9. Adaptive Spaced Repetition — Card State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -968,14 +968,14 @@ stateDiagram-v2
     ReviewFromLearning --> Review : Transition to review state
 
     state Review {
-        ReviewScheduled : FSRS schedules next_review_at
+        ReviewScheduled : Algorithm schedules next_review_at
         ReviewAgain : outcome again (lapse, goes to relearning)
         ReviewPassed : outcome hard/good/easy (passed)
 
         [*] --> ReviewScheduled
         ReviewScheduled --> ReviewAgain
         ReviewScheduled --> ReviewPassed
-        ReviewPassed --> ReviewScheduled : FSRS recalculates (total_reviews++)
+        ReviewPassed --> ReviewScheduled : Interval recalculates (total_reviews++)
     }
 
     ReviewAgain --> Relearning : learning_state becomes relearning
@@ -1009,7 +1009,7 @@ graph LR
     subgraph Backend["Backend Logic"]
         AUTH_LIB["lib/auth/ (10 files)"]
         CHAT_LIB["lib/chat/ (7 files)"]
-        LAB_LIB["lib/lab/ (7 files, FSRS)"]
+        LAB_LIB["lib/lab/ (7 files, adaptive SRS)"]
         LAB_AI_LIB["lib/lab-ai-chat/ (6 files)"]
         CODE_SHARE_LIB["lib/code-share/ (5 files)"]
         WS_LIB["lib/websocket/ (3 files)"]
@@ -1387,7 +1387,7 @@ sequenceDiagram
 | **AI** | OpenAI-compatible LLM (General + Lab), SSE Streaming, Prompt Injection with Weather Context | `src/lib/llm/`, `src/lib/chat/`, `src/lib/lab-ai-chat/` |
 | **Rate Limit** | 3-Layer: In-Memory (proxy.ts), DB Attempt Buckets, LLM Quota (FOR UPDATE) | `src/proxy.ts`, `src/lib/llm/quota.ts`, `src/lib/auth/repository.ts` |
 | **WebSocket** | ws library, Room-based Pub/Sub, Presence Tracking, Heartbeat, Typing Indicators | `src/lib/websocket/` |
-| **Spaced Repetition** | FSRS v5 Algorithm (stability, difficulty, state machine) | `src/lib/lab/` |
+| **Spaced Repetition** | Stability- and difficulty-based adaptive SRS (state machine) | `src/lib/lab/` |
 | **Search** | Tavily API, Cached Results, Monthly Quota | `src/lib/tavily/`, `src/lib/lab-ai-chat/` |
 | **i18n** | 4 Languages (ko/en/zh/ja), Deterministic Array Variant Selection | `src/context/LanguageContext.tsx`, `src/data/locales/` |
 | **Analytics** | Privacy-First, Consent-Gated, Multi-Dimensional Metrics | `src/lib/analytics/` |

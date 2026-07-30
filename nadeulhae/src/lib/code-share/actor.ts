@@ -17,7 +17,7 @@ const ALWAYS_SECURE_COOKIES = /^(1|true|yes)$/i.test(
   process.env.ALWAYS_SECURE_COOKIES ?? process.env.NODE_ENV ?? ""
 )
 
-const ACTOR_ID_PATTERN = /^[a-f0-9-]{36}$/i
+const ACTOR_ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
 const ALIAS_PATTERN = /^[A-Za-z0-9가-힣\-_\s]{2,40}$/
 
 const ALIAS_ADJECTIVES = [

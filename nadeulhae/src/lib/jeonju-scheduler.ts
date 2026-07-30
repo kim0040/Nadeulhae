@@ -27,6 +27,7 @@ let _lastGeneratedDate = ""
 let _retryCount = 0
 let _retryAfterMs = 0
 let _schedulerStarted = false
+let _generationInFlight: Promise<void> | null = null
 
 function parseKstParts(tsMs = Date.now()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -154,8 +155,26 @@ async function checkAndGenerate(): Promise<void> {
   // Not yet 7 AM KST
   if (nowHour < SCHEDULE_HOUR_KST) return
 
-  // Generate
-  await generateForToday()
+  // Generate. A run may take longer than the five-minute polling interval,
+  // so all callers share one promise instead of starting duplicate LLM work.
+  await generateOnce()
+}
+
+async function generateOnce() {
+  if (_generationInFlight) {
+    return _generationInFlight
+  }
+
+  const generation = generateForToday()
+  _generationInFlight = generation
+
+  try {
+    await generation
+  } finally {
+    if (_generationInFlight === generation) {
+      _generationInFlight = null
+    }
+  }
 }
 
 /**
@@ -192,7 +211,7 @@ export async function forceJeonjuBriefingGeneration(): Promise<void> {
   _lastGeneratedDate = ""
   _retryCount = 0
   _retryAfterMs = 0
-  await generateForToday()
+  await generateOnce()
 }
 
 // For monitoring

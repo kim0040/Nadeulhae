@@ -26,12 +26,17 @@ import { getSessionTokenHash } from "@/lib/auth/session"
 import { findUserBySessionTokenHash } from "@/lib/auth/repository"
 import { isValidCodeShareSessionId, toCodeShareRoomName } from "@/lib/code-share/constants"
 import { getCodeShareSessionById } from "@/lib/code-share/repository"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const CODE_SHARE_ACTOR_COOKIE_NAME = process.env.CODE_SHARE_ACTOR_COOKIE_NAME ?? "nadeulhae_code_share_actor"
 const CODE_SHARE_ALIAS_COOKIE_NAME = process.env.CODE_SHARE_ALIAS_COOKIE_NAME ?? "nadeulhae_code_share_alias"
 const PING_INTERVAL_MS = 30_000   // How often the server pings clients; a client that misses one interval without a pong is terminated.
 const CODE_SHARE_TYPING_TIMEOUT_MS = 7_500  // Auto-clear typing after inactivity.
+const WS_MAX_PAYLOAD_BYTES = 16 * 1024
+const WS_MESSAGE_WINDOW_MS = 10_000
+const WS_MESSAGE_LIMIT_PER_WINDOW = 80
+const WS_MAX_CONNECTIONS_PER_TRUSTED_IP = 24
 const IS_PRODUCTION = process.env.NODE_ENV === "production"
 
 function normalizeOrigin(value: string | null | undefined) {
@@ -70,6 +75,47 @@ type CodeSharePresenceActor = {
 const codeSharePresenceBySession = new Map<string, Map<string, CodeSharePresenceActor>>()
 // Typing-auto-clear timers keyed by `${sessionId}:${actorId}`.
 const codeShareTypingTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+// The limit is only active when an upstream proxy provides a configured,
+// verified client IP. Without that setup the existing global cap is safer than
+// accidentally treating every visitor as one address.
+const connectionsByTrustedClientIp = new Map<string, number>()
+
+function getTrustedClientIpFromUpgrade(req: IncomingMessage) {
+  return getTrustedClientIp({
+    get(name: string) {
+      const value = req.headers[name]
+      return Array.isArray(value) ? value[0] ?? null : value ?? null
+    },
+  })
+}
+
+function reserveTrustedClientConnection(clientIp: string) {
+  if (clientIp === "anonymous") {
+    return true
+  }
+
+  const count = connectionsByTrustedClientIp.get(clientIp) ?? 0
+  if (count >= WS_MAX_CONNECTIONS_PER_TRUSTED_IP) {
+    return false
+  }
+
+  connectionsByTrustedClientIp.set(clientIp, count + 1)
+  return true
+}
+
+function releaseTrustedClientConnection(clientIp: string) {
+  if (clientIp === "anonymous") {
+    return
+  }
+
+  const count = connectionsByTrustedClientIp.get(clientIp) ?? 0
+  if (count <= 1) {
+    connectionsByTrustedClientIp.delete(clientIp)
+    return
+  }
+
+  connectionsByTrustedClientIp.set(clientIp, count - 1)
+}
 
 /** Minimal cookie parser. Extracts a flat key/value map from a Cookie header string. */
 function parseCookie(cookieHeader: string | undefined): Record<string, string> {
@@ -137,7 +183,7 @@ function getActorIdFromRequest(req: IncomingMessage) {
   }
 
   const normalized = actorId.trim()
-  if (!/^[a-f0-9-]{36}$/i.test(normalized)) {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(normalized)) {
     return null
   }
 
@@ -372,7 +418,11 @@ function setupHeartbeat(ws: WebSocket) {
  * - Broadcasts presence and user-count updates to connected clients.
  */
 export function createWebSocketServer(server: import("node:http").Server) {
-  const wss = new WebSocketServer({ server, path: "/ws" })
+  const wss = new WebSocketServer({
+    server,
+    path: "/ws",
+    maxPayload: WS_MAX_PAYLOAD_BYTES,
+  })
 
   wss.on("connection", (ws, req) => {
     if (!validateOrigin(req)) {
@@ -385,6 +435,12 @@ export function createWebSocketServer(server: import("node:http").Server) {
       return
     }
 
+    const clientIp = getTrustedClientIpFromUpgrade(req)
+    if (!reserveTrustedClientConnection(clientIp)) {
+      ws.close(4429, "Too many connections from this network")
+      return
+    }
+
     const actorId = getActorIdFromRequest(req) ?? `guest-${randomUUID()}`
     const actorAlias = getActorAliasFromRequest(req) ?? `Guest-${actorId.slice(-4)}`
     const subscribedCodeShareSessions = new Set<string>()
@@ -394,6 +450,7 @@ export function createWebSocketServer(server: import("node:http").Server) {
     // userId is set to null here and updated once authenticateWs resolves.
     const added = addClient(ws, null, actorId, actorAlias)
     if (!added) {
+      releaseTrustedClientConnection(clientIp)
       ws.close(4429, "Too many connections")
       return
     }
@@ -412,6 +469,7 @@ export function createWebSocketServer(server: import("node:http").Server) {
       }
 
       removeClient(ws)
+      releaseTrustedClientConnection(clientIp)
       broadcast("user_count", { count: getConnectedCount() })
 
       for (const sessionId of affectedSessionIds) {
@@ -437,7 +495,26 @@ export function createWebSocketServer(server: import("node:http").Server) {
 
     setupHeartbeat(ws)
 
+    let messageWindowStartedAt = Date.now()
+    let messageCountInWindow = 0
+
+    const isMessageRateLimited = () => {
+      const now = Date.now()
+      if (now - messageWindowStartedAt >= WS_MESSAGE_WINDOW_MS) {
+        messageWindowStartedAt = now
+        messageCountInWindow = 0
+      }
+
+      messageCountInWindow += 1
+      return messageCountInWindow > WS_MESSAGE_LIMIT_PER_WINDOW
+    }
+
     ws.on("message", async (data) => {
+      if (isMessageRateLimited()) {
+        ws.close(4429, "Message rate limit exceeded")
+        return
+      }
+
       const str = typeof data === "string" ? data : data.toString("utf-8")
       const parsed = parseAllowedClientMessage(str)
       if (!parsed) {

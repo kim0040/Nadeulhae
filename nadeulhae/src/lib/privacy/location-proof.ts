@@ -10,10 +10,7 @@ import { createHash } from "node:crypto"
 
 import { getSessionTokenHash } from "@/lib/auth/session"
 import { executeStatement, getDbPool } from "@/lib/db"
-
-const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
-  process.env.TRUST_PROXY_HEADERS ?? ""
-)
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const REQUEST_SESSION_COOKIE_NAME = "nadeulhae_sid"
@@ -76,20 +73,11 @@ function hashValue(value: string) {
 
 /**
  * Extracts the client IP from a Request, respecting trusted proxy headers
- * (Cloudflare CF-Connecting-IP, X-Real-IP, X-Forwarded-For).
+ * (the configured proxy-overwritten header only).
  * Falls back to "anonymous" when headers are not trusted or absent.
  */
 function getClientIp(request: Request) {
-  if (!TRUST_PROXY_HEADERS) {
-    return "anonymous"
-  }
-
-  return (
-    request.headers.get("cf-connecting-ip")
-    || request.headers.get("x-real-ip")
-    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || "anonymous"
-  ).slice(0, 64)
+  return getTrustedClientIp(request.headers)
 }
 
 /** Normalises and truncates a route path for safe DB insertion. Ensures it starts with "/" and does not exceed 191 characters. */

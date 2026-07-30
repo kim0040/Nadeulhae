@@ -25,6 +25,7 @@ import { resolveNearestForecastLocationPoint } from "@/lib/forecast-location/rep
 import { recordLocationUsageProofSafely } from "@/lib/privacy/location-proof"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
 import { recordKmaApiCall } from "@/lib/kma-quota"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 type CacheEntry<T> = {
   data: T
@@ -67,12 +68,7 @@ function getSmartCachedValue<T>(map: Map<string, CacheEntry<T>>, key: string, ty
 }
 
 function getClientIp(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for")
-  if (forwarded) {
-    return forwarded.split(",")[0].trim()
-  }
-  const realIp = request.headers.get("x-real-ip")
-  return realIp?.trim() || "127.0.0.1"
+  return getTrustedClientIp(request.headers)
 }
 
 function cleanupLastUpdateCache<T>(map: Map<string, CacheEntry<T>>, maxAgeMs: number, now: number) {

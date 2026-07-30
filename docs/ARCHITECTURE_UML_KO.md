@@ -6,7 +6,7 @@
 
 ## 1. 프로젝트 개요
 
-**나들해**("나들이" + "해")는 **날씨 기반 야외활동 점수 서비스 + AI 채팅 + 코드 공유 플랫폼**이다. 전주시를 중심으로 기상청(KMA), 한국환경공단(AirKorea), APIHub의 실시간 데이터를 결합해 0~100점의 피크닉 지수를 산출하고, OpenAI 호환 LLM 기반의 AI 채팅, FSRS 알고리즘을 활용한 어휘 암기(랩), 그리고 WebSocket 기반 실시간 협업 코드 에디터를 제공한다.
+**나들해**("나들이" + "해")는 **날씨 기반 야외활동 점수 서비스 + AI 채팅 + 코드 공유 플랫폼**이다. 전주시를 중심으로 기상청(KMA), 한국환경공단(AirKorea), APIHub의 실시간 데이터를 결합해 0~100점의 피크닉 지수를 산출하고, OpenAI 호환 LLM 기반의 AI 채팅, 안정도·난이도 기반 적응형 간격 반복 어휘 학습(랩), 그리고 WebSocket 기반 실시간 협업 코드 에디터를 제공한다.
 
 ---
 
@@ -308,13 +308,13 @@ erDiagram
         string tip_text "팁 / 비고"
         string learning_state "인덱스 [IDX]: 신규 | 학습중 | 복습 | 재학습"
         int consecutive_correct "연속 정답"
-        int stage "FSRS 단계 (0-8)"
-        double stability_days "FSRS 안정도"
-        double difficulty "FSRS 난이도 (1-10)"
+        int stage "SRS 단계 (0-8)"
+        double stability_days "기억 안정도"
+        double difficulty "난이도 (1-10)"
         int total_reviews "총 복습 횟수"
         int lapses "망각 횟수"
         int last_review_outcome "0=다시, 1=어려움, 2=좋음, 3=쉬움"
-        datetime next_review_at "인덱스 [IDX]: FSRS 예정 복습일시"
+        datetime next_review_at "인덱스 [IDX]: 예정 복습일시"
         datetime last_reviewed_at "마지막 복습일시"
         datetime created_at
         datetime updated_at
@@ -941,7 +941,7 @@ stateDiagram-v2
 
 ---
 
-## 9. FSRS 간격 반복 학습 — 카드 상태 머신
+## 9. 적응형 간격 반복 학습 — 카드 상태 머신
 
 ```mermaid
 stateDiagram-v2
@@ -969,14 +969,14 @@ stateDiagram-v2
     복습전환 --> 복습 : 복습 상태로 전환
 
     state 복습 {
-        복습예정 : FSRS가 next_review_at 계산
+        복습예정 : 알고리즘이 next_review_at 계산
         다시복습 : 결과 다시 (망각, 재학습으로 이동)
         복습통과 : 결과 어려움/좋음/쉬움 (통과)
 
         [*] --> 복습예정
         복습예정 --> 다시복습
         복습예정 --> 복습통과
-        복습통과 --> 복습예정 : FSRS 재계산 (total_reviews++)
+        복습통과 --> 복습예정 : 간격 재계산 (total_reviews++)
     }
 
     다시복습 --> 재학습 : learning_state가 relearning으로 변경
@@ -1010,7 +1010,7 @@ graph LR
     subgraph Backend["백엔드 로직"]
         AUTH_LIB["lib/auth/ (10개 파일)"]
         CHAT_LIB["lib/chat/ (7개 파일)"]
-        LAB_LIB["lib/lab/ (7개 파일, FSRS)"]
+        LAB_LIB["lib/lab/ (7개 파일, 적응형 SRS)"]
         LAB_AI_LIB["lib/lab-ai-chat/ (6개 파일)"]
         CODE_SHARE_LIB["lib/code-share/ (5개 파일)"]
         WS_LIB["lib/websocket/ (3개 파일)"]
@@ -1388,7 +1388,7 @@ sequenceDiagram
 | **AI** | OpenAI 호환 LLM (범용 + 실험실), SSE 스트리밍, 날씨 컨텍스트 프롬프트 주입 | `src/lib/llm/`, `src/lib/chat/`, `src/lib/lab-ai-chat/` |
 | **속도 제한** | 3계층: 인메모리 (proxy.ts) → DB 시도 버킷 → LLM 할당량 (FOR UPDATE) | `src/proxy.ts`, `src/lib/llm/quota.ts`, `src/lib/auth/repository.ts` |
 | **WebSocket** | ws 라이브러리, 방 기반 Pub/Sub, 접속현황 추적, 하트비트, 타이핑 표시 | `src/lib/websocket/` |
-| **간격 반복 학습** | FSRS v5 알고리즘 (안정도, 난이도, 상태 머신) | `src/lib/lab/` |
+| **간격 반복 학습** | 안정도·난이도 기반 적응형 SRS (상태 머신) | `src/lib/lab/` |
 | **검색** | Tavily API, 결과 캐싱, 월간 할당량 | `src/lib/tavily/`, `src/lib/lab-ai-chat/` |
 | **다국어** | 4개 언어 (한국어/영어/중국어/일본어), 결정적 배열 변형 선택 | `src/context/LanguageContext.tsx`, `src/data/locales/` |
 | **분석** | 개인정보보호 우선, 동의 기반, 다차원 메트릭 | `src/lib/analytics/` |

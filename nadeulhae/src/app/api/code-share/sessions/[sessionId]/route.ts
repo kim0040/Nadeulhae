@@ -43,6 +43,7 @@ import {
   updateCodeShareSession,
 } from "@/lib/code-share/repository"
 import { broadcastToRoom, broadcastToRoomEach } from "@/lib/websocket/broadcast"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 export const runtime = "nodejs"
 
@@ -114,6 +115,7 @@ const PATCH_WINDOW_MS = 5_000
 const PATCH_WINDOW_LIMIT = 10
 const DELETE_WINDOW_MS = 60_000
 const DELETE_WINDOW_LIMIT = 3
+const DELETE_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000
 const DELETE_DAILY_LIMIT = 20
 const RATE_LIMIT_MAX_ENTRIES = 4000
 
@@ -160,11 +162,7 @@ function checkFixedWindow(map: Map<string, RateLimitEntry>, key: string, limit: 
 }
 
 function getClientKey(request: NextRequest) {
-  const ua = request.headers.get("user-agent")?.trim().slice(0, 120) || "unknown"
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || "anon"
-  return `${ip}:${ua}`
+  return getTrustedClientIp(request.headers)
 }
 
 function getLocale(request: NextRequest): CodeShareLocale {
@@ -536,7 +534,7 @@ async function handleDELETE(
     const deleteWindowMap = getDeleteWindowMap()
     const deleteDailyMap = getDeleteDailyMap()
     cleanupRateLimitMap(deleteWindowMap, DELETE_WINDOW_MS, nowMs)
-    cleanupRateLimitMap(deleteDailyMap, DELETE_WINDOW_MS, nowMs)
+    cleanupRateLimitMap(deleteDailyMap, DELETE_DAILY_WINDOW_MS, nowMs)
 
     if (!checkFixedWindow(deleteWindowMap, deleteClientKey, DELETE_WINDOW_LIMIT, DELETE_WINDOW_MS, nowMs).allowed) {
       return createAuthJsonResponse(
@@ -545,7 +543,7 @@ async function handleDELETE(
       )
     }
 
-    if (!checkFixedWindow(deleteDailyMap, `${deleteClientKey}:daily`, DELETE_DAILY_LIMIT, 24 * 60 * 60 * 1000, nowMs).allowed) {
+    if (!checkFixedWindow(deleteDailyMap, `${deleteClientKey}:daily`, DELETE_DAILY_LIMIT, DELETE_DAILY_WINDOW_MS, nowMs).allowed) {
       return createAuthJsonResponse(
         { error: CODE_SHARE_DETAIL_ERRORS[locale].deleteDailyLimit },
         { status: 429 }

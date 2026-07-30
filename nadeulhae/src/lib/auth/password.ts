@@ -2,7 +2,7 @@
  * Password hashing and verification using scrypt with a server-side pepper.
  * Provides constant-time comparison to mitigate timing attacks.
  */
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto"
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto"
 
 const SCRYPT_KEY_LENGTH = 64
 const SCRYPT_COST = 16384
@@ -31,29 +31,40 @@ function getPepperedPassword(password: string) {
   return `${password}${process.env.AUTH_PEPPER ?? ""}`
 }
 
+function derivePasswordKey(password: string, salt: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(
+      getPepperedPassword(password),
+      salt,
+      SCRYPT_KEY_LENGTH,
+      {
+        N: SCRYPT_COST,
+        r: SCRYPT_BLOCK_SIZE,
+        p: SCRYPT_PARALLELIZATION,
+        maxmem: SCRYPT_MAX_MEMORY,
+      },
+      (error, derivedKey) => {
+        if (error) {
+          reject(error)
+          return
+        }
+        resolve(Buffer.from(derivedKey))
+      }
+    )
+  })
+}
+
 // Pre-computed dummy hash for constant-time comparison on unknown accounts.
 // Prevents user-enumeration via timing differences.
-const DUMMY_PASSWORD_HASH = scryptSync(
-  getPepperedPassword("nadeulhae_dummy_password"),
-  DUMMY_PASSWORD_SALT,
-  SCRYPT_KEY_LENGTH,
-  {
-    N: SCRYPT_COST,
-    r: SCRYPT_BLOCK_SIZE,
-    p: SCRYPT_PARALLELIZATION,
-    maxmem: SCRYPT_MAX_MEMORY,
-  }
+const DUMMY_PASSWORD_HASH = derivePasswordKey(
+  "nadeulhae_dummy_password",
+  DUMMY_PASSWORD_SALT
 )
 
 /** Generates a random salt and returns a scrypt-derived password hash. */
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex")
-  const derivedKey = scryptSync(getPepperedPassword(password), salt, SCRYPT_KEY_LENGTH, {
-    N: SCRYPT_COST,
-    r: SCRYPT_BLOCK_SIZE,
-    p: SCRYPT_PARALLELIZATION,
-    maxmem: SCRYPT_MAX_MEMORY,
-  })
+  const derivedKey = await derivePasswordKey(password, salt)
 
   return {
     hash: derivedKey.toString("hex"),
@@ -68,12 +79,7 @@ export async function verifyPassword(
   expectedHash: string,
   salt: string
 ) {
-  const derivedKey = scryptSync(getPepperedPassword(password), salt, SCRYPT_KEY_LENGTH, {
-    N: SCRYPT_COST,
-    r: SCRYPT_BLOCK_SIZE,
-    p: SCRYPT_PARALLELIZATION,
-    maxmem: SCRYPT_MAX_MEMORY,
-  })
+  const derivedKey = await derivePasswordKey(password, salt)
 
   const expectedBuffer = Buffer.from(expectedHash, "hex")
   return (
@@ -87,17 +93,8 @@ export async function verifyPassword(
  * Returns a constant result so the caller spends similar CPU time as a real verification.
  */
 export async function verifyPasswordAgainstDummy(password: string) {
-  const attemptedDerived = scryptSync(
-    getPepperedPassword(password),
-    DUMMY_PASSWORD_SALT,
-    SCRYPT_KEY_LENGTH,
-    {
-      N: SCRYPT_COST,
-      r: SCRYPT_BLOCK_SIZE,
-      p: SCRYPT_PARALLELIZATION,
-      maxmem: SCRYPT_MAX_MEMORY,
-    }
-  )
+  const attemptedDerived = await derivePasswordKey(password, DUMMY_PASSWORD_SALT)
+  const dummyHash = await DUMMY_PASSWORD_HASH
 
-  return timingSafeEqual(DUMMY_PASSWORD_HASH, attemptedDerived)
+  return timingSafeEqual(dummyHash, attemptedDerived)
 }

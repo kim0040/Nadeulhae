@@ -37,6 +37,7 @@ import {
   type DailyQuotaReservation,
 } from "@/lib/llm/quota"
 import { withApiAnalytics } from "@/lib/analytics/route"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 export const runtime = "nodejs"
 
@@ -190,12 +191,7 @@ function setCache(cacheKey: string, data: string) {
 }
 
 function getClientIp(request: NextRequest) {
-  return (
-    request.headers.get("cf-connecting-ip")
-    || request.headers.get("x-real-ip")
-    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || "anon"
-  ).slice(0, 48)
+  return getTrustedClientIp(request.headers)
 }
 
 function checkIpRateLimit(ip: string): boolean {

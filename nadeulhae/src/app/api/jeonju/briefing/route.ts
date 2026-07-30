@@ -13,6 +13,7 @@ import { ensureJeonjuBriefingSchema } from "@/lib/jeonju-briefing/schema"
 import { generateJeonjuBriefing, purgeJeonjuBriefingCache } from "@/lib/jeonju-briefing/service"
 import { getJeonjuBriefingByDateAndLocale, deleteJeonjuBriefingsForDate } from "@/lib/jeonju-briefing/repository"
 import type { JeonjuBriefingLocale } from "@/lib/jeonju-briefing/service"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 export const runtime = "nodejs"
 const BRIEFING_PUBLIC_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=1800"
@@ -32,9 +33,6 @@ declare global {
   var __nadeulhaeJeonjuBriefingForceCooldownMap: Map<string, CooldownEntry> | undefined
 }
 
-const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
-  process.env.TRUST_PROXY_HEADERS ?? ""
-)
 const FORCE_WINDOW_MS = 15 * 60 * 1000
 const FORCE_WINDOW_LIMIT = 2
 const FORCE_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000
@@ -92,20 +90,7 @@ function cleanupCooldownMap(map: Map<string, CooldownEntry>, nowMs: number) {
 }
 
 function getClientKey(request: NextRequest) {
-  const ua = request.headers.get("user-agent")?.trim().slice(0, 120) || "unknown"
-  if (!TRUST_PROXY_HEADERS) {
-    return `anon:${ua}`
-  }
-
-  const ip = (
-    request.headers.get("cf-connecting-ip")
-    || request.headers.get("x-real-ip")
-    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || "anonymous"
-  ).slice(0, 64)
-
-  if (ip === "anonymous") return `anon:${ua}`
-  return `ip:${ip}`
+  return getTrustedClientIp(request.headers)
 }
 
 /** Fixed-window rate limiter with retry-after calculation. */

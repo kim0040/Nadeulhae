@@ -94,7 +94,7 @@ const POLICY_CONTENT: Record<
         eyebrow: "ai & llm",
         title: "2. AI/LLM 기반 서비스 이용약관",
         items: [
-          "나들해는 다음 AI·LLM 서비스를 제공합니다: (가) 대시보드 AI 챗봇 — 날씨 기반 야외활동 어시스턴트, (나) 실험실 AI 챗 — Tavily 웹검색 연동 지식 챗봇, (다) 실험실 단어 생성 — FSRS 단어장 AI 자동 생성·번역·예문 작성, (라) 전주 AI 데일리 브리핑 — 지역 뉴스·이벤트 AI 요약.",
+          "나들해는 다음 AI·LLM 서비스를 제공합니다: (가) 대시보드 AI 챗봇 — 날씨 기반 야외활동 어시스턴트, (나) 실험실 AI 챗 — Tavily 웹검색 연동 지식 챗봇, (다) 실험실 단어 생성 — 적응형 간격 반복 단어장 AI 자동 생성·번역·예문 작성, (라) 전주 AI 데일리 브리핑 — 지역 뉴스·이벤트 AI 요약.",
           "AI 서비스는 타사 LLM API 제공사를 통해 처리되며, 제공사는 서비스 품질·비용·가용성에 따라 사전 고지 없이 변경되거나 대체될 수 있습니다. 사용자가 AI 챗봇에 입력한 대화 내용은 해당 제공사에 일시적으로 전송되어 응답 생성에만 사용되며, 제공사의 모델 학습 데이터로 활용되지 않습니다.",
           "AI가 생성한 모든 응답(날씨 추천, 챗봇 답변, 단어 뜻·예문, 뉴스 요약)은 머신러닝 기반 추론 결과로, 사실과 다를 수 있습니다. 특히 전주 AI 브리핑의 뉴스 요약, 실험실 AI 챗의 웹검색 기반 답변은 참고용이며, 중요한 의사결정은 공식 출처를 직접 확인하시기 바랍니다.",
           "AI 서비스는 일일 사용량 제한(LLM 전역 5,000회/일, 사용자별 100~200회/일, 웹검색 월 800회)이 적용되며, 제한 초과 시 해당 기능이 일시 차단될 수 있습니다. 악의적 반복 호출은 AI 기능 영구 제한 사유가 됩니다.",
@@ -222,7 +222,7 @@ const POLICY_CONTENT: Record<
         eyebrow: "service terms",
         title: "1. Nadeulhae Terms of Service",
         items: [
-          "Nadeulhae is a comprehensive outdoor activity platform that aggregates public data (KMA, AirKorea, APIHub) to provide real-time weather, air quality, UV, weather alerts, and a 0-100 outdoor suitability score, together with an AI-powered dashboard chatbot, a Lab hub (vocabulary/FSRS, AI web-search chat, code sharing), and Jeonju AI daily briefing and community chat.",
+          "Nadeulhae is a comprehensive outdoor activity platform that aggregates public data (KMA, AirKorea, APIHub) to provide real-time weather, air quality, UV, weather alerts, and a 0-100 outdoor suitability score, together with an AI-powered dashboard chatbot, a Lab hub (adaptive spaced-repetition vocabulary, AI web-search chat, code sharing), and Jeonju AI daily briefing and community chat.",
           "Access is generally free, but users must register with true and accurate information. Disruption through hate speech, profanity, spam, malicious AI prompt injection, or traffic attacks is prohibited and may result in account suspension or AI feature restriction without warning.",
           "Service downtime may occur due to public API instability, LLM API provider outages, changes, or discontinuation, or scheduled maintenance. LLM API providers may be changed or replaced without prior notice at the operator's discretion. The operator is not liable for indirect damages except in cases of gross negligence.",
         ],
@@ -232,7 +232,7 @@ const POLICY_CONTENT: Record<
         eyebrow: "ai & llm",
         title: "2. AI/LLM Services Terms",
         items: [
-          "Nadeulhae provides these AI services: (a) Dashboard AI chatbot — weather-aware outdoor activity assistant, (b) Lab AI chat — Tavily web-search integrated knowledge chatbot, (c) Lab vocabulary generator — FSRS flashcard AI auto-generation with translations and examples, (d) Jeonju AI daily briefing — local news and event AI summary.",
+          "Nadeulhae provides these AI services: (a) Dashboard AI chatbot — weather-aware outdoor activity assistant, (b) Lab AI chat — Tavily web-search integrated knowledge chatbot, (c) Lab vocabulary generator — adaptive spaced-repetition flashcard AI auto-generation with translations and examples, (d) Jeonju AI daily briefing — local news and event AI summary.",
           "AI services are processed through third-party LLM API providers, which may be changed or replaced without prior notice based on service quality, cost, and availability. User input to AI chatbots is temporarily transmitted to these providers solely for response generation and is never used for model training.",
           "All AI-generated content (weather recommendations, chatbot answers, vocabulary definitions, news summaries) is machine learning inference output and may be inaccurate. The Jeonju briefing news summaries and Lab AI chat web-search results are for reference only; verify critical decisions with official sources.",
           "AI services have daily usage limits (LLM global: 5,000 req/day, per-user: 100-200 req/day, web-search: 800/month). Exceeding limits may temporarily block AI features. Malicious repetitive calls may result in permanent AI feature restriction.",
@@ -334,12 +334,12 @@ const POLICY_CONTENT: Record<
     ],
     sections: [
       { id: "service", eyebrow: "服务条款", title: "1. Nadeulhae 服务条款", items: [
-        "Nadeulhae 是一项综合性户外活动平台，汇总公共数据(KMA、AirKorea、APIHub)提供实时天气、空气质量、紫外线、天气警报和0-100户外适宜性评分，以及AI驱动的仪表板聊天机器人、实验室中心(词汇/FSRS、AI网络搜索聊天、代码共享)和全州AI每日简报及社区聊天。",
+        "Nadeulhae 是一项综合性户外活动平台，汇总公共数据(KMA、AirKorea、APIHub)提供实时天气、空气质量、紫外线、天气警报和0-100户外适宜性评分，以及AI驱动的仪表板聊天机器人、实验室中心(自适应间隔重复词汇、AI网络搜索聊天、代码共享)和全州AI每日简报及社区聊天。",
         "访问通常是免费的，但用户必须注册真实准确的信息。禁止通过仇恨言论、辱骂、垃圾邮件、恶意AI提示注入或流量攻击扰乱社区运营，违者可能导致账号暂停或AI功能限制。",
          "服务可能因公共API不稳定、LLM API提供商服务中断·变更·终止或定期维护而停机。LLM API提供商可能因内部原因未经事先通知而更改或替换。运营方不对不可预见的服务中断造成的间接损失承担责任，重大过失除外。",
       ]},
       { id: "ai-services", eyebrow: "AI & LLM", title: "2. AI/LLM 服务条款", items: [
-        "Nadeulhae 提供以下AI服务: (a) 仪表板AI聊天机器人 — 天气感知户外活动助手，(b) 实验室AI聊天 — Tavily网络搜索集成知识聊天机器人，(c) 实验室词汇生成器 — FSRS闪卡AI自动生成含翻译和例句，(d) 全州AI每日简报 — 本地新闻和事件AI摘要。",
+        "Nadeulhae 提供以下AI服务: (a) 仪表板AI聊天机器人 — 天气感知户外活动助手，(b) 实验室AI聊天 — Tavily网络搜索集成知识聊天机器人，(c) 实验室词汇生成器 — 自适应间隔重复闪卡AI自动生成含翻译和例句，(d) 全州AI每日简报 — 本地新闻和事件AI摘要。",
          "AI服务通过第三方LLM API提供商处理，提供商可能根据服务质量·成本·可用性未经事先通知而更改或替换。用户输入仅暂时传输用于响应生成，绝不用于模型训练。",
         "所有AI生成内容(天气推荐、聊天机器人回答、词汇定义、新闻摘要)均为机器学习推理输出，可能不准确。全州简报新闻摘要和实验室AI聊天网络搜索结果仅供参考；关键决策请核实官方来源。",
         "AI服务设有每日使用限制(LLM全局: 5,000次/天，每用户: 100-200次/天，网络搜索: 800次/月)。超出限制可能导致AI功能暂时受限。恶意重复调用可能导致AI功能永久限制。",
@@ -405,12 +405,12 @@ const POLICY_CONTENT: Record<
     ],
     sections: [
       { id: "service", eyebrow: "利用規約", title: "1. Nadeulhae 利用規約", items: [
-        "Nadeulhaeは、公共データ(KMA、AirKorea、APIHub)を集約してリアルタイムの天気、空気質、UV、気象警報、0-100の屋外適性スコアを提供し、AI搭載のダッシュボードチャットボット、ラボハブ(語彙/FSRS、AI Web検索チャット、コード共有)、全州AIデイリーブリーフィングとコミュニティチャットを統合した包括的なアウトドア活動プラットフォームです。",
+        "Nadeulhaeは、公共データ(KMA、AirKorea、APIHub)を集約してリアルタイムの天気、空気質、UV、気象警報、0-100の屋外適性スコアを提供し、AI搭載のダッシュボードチャットボット、ラボハブ(適応型の間隔反復語彙学習、AI Web検索チャット、コード共有)、全州AIデイリーブリーフィングとコミュニティチャットを統合した包括的なアウトドア活動プラットフォームです。",
         "アクセスは基本的に無料ですが、ユーザーは正確な情報で登録する必要があります。ヘイトスピーチ、悪用、スパム、悪意のあるAIプロンプト注入、トラフィック攻撃によるコミュニティ運営の妨害は禁止されており、アカウント停止やAI機能制限の対象となります。",
         "公共APIの不安定性、LLM APIプロバイダーの障害·変更·終了、または定期メンテナンスによりサービスが停止する場合があります。LLM APIプロバイダーは内部事情により事前通知なく変更·代替されることがあります。運営者は、重大な過失がない限り、予期せぬ中断による間接的な損害について責任を負いません。",
       ]},
       { id: "ai-services", eyebrow: "AI & LLM", title: "2. AI/LLM サービス利用規約", items: [
-        "Nadeulhaeは以下のAIサービスを提供します: (a) ダッシュボードAIチャットボット — 天気認識型アウトドアアシスタント、(b) ラボAIチャット — Tavily Web検索統合型知識チャットボット、(c) ラボ語彙ジェネレーター — 翻訳と例文付きFSRSフラッシュカードAI自動生成、(d) 全州AIデイリーブリーフィング — ローカルニュースとイベントのAIサマリー。",
+        "Nadeulhaeは以下のAIサービスを提供します: (a) ダッシュボードAIチャットボット — 天気認識型アウトドアアシスタント、(b) ラボAIチャット — Tavily Web検索統合型知識チャットボット、(c) ラボ語彙ジェネレーター — 翻訳と例文付き適応型間隔反復フラッシュカードAI自動生成、(d) 全州AIデイリーブリーフィング — ローカルニュースとイベントのAIサマリー。",
         "AIサービスはサードパーティLLM APIプロバイダーを通じて処理され、プロバイダーはサービス品質·コスト·可用性に応じて事前通知なく変更·代替されることがあります。ユーザー入力は応答生成の目的でのみ一時的に送信され、モデル学習には一切使用されません。",
         "すべてのAI生成コンテンツ(天気推奨、チャットボット回答、語彙定義、ニュースサマリー)は機械学習推論の出力であり、不正確な場合があります。全州ブリーフィングのニュースサマリーとラボAIチャットのWeb検索結果は参考用です。重要な判断は公式ソースで確認してください。",
         "AIサービスには1日の使用制限があります(LLMグローバル: 5,000回/日、ユーザーあたり: 100-200回/日、Web検索: 800回/月)。制限を超えるとAI機能が一時的に制限される場合があります。悪意のある繰り返し呼び出しは、AI機能の永続的な制限につながる場合があります。",

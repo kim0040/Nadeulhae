@@ -6,6 +6,7 @@ import {
   validateSameOriginRequest,
 } from "@/lib/auth/request-security"
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 export const runtime = "nodejs"
 
@@ -13,13 +14,13 @@ const PAGE_VIEW_RATE_LIMIT_WINDOW_MS = 10_000
 const pageViewRateLimitMap = new Map<string, number>()
 const PAGE_VIEW_RATE_LIMIT_MAX_KEYS = 4_000
 
-function isPageViewRateLimited(sessionId: string): boolean {
+function isPageViewRateLimited(clientKey: string): boolean {
   const now = Date.now()
-  const lastSent = pageViewRateLimitMap.get(sessionId)
+  const lastSent = pageViewRateLimitMap.get(clientKey)
   if (lastSent && now - lastSent < PAGE_VIEW_RATE_LIMIT_WINDOW_MS) {
     return true
   }
-  pageViewRateLimitMap.set(sessionId, now)
+  pageViewRateLimitMap.set(clientKey, now)
   if (pageViewRateLimitMap.size > PAGE_VIEW_RATE_LIMIT_MAX_KEYS) {
     const overflow = pageViewRateLimitMap.size - PAGE_VIEW_RATE_LIMIT_MAX_KEYS
     let removed = 0
@@ -211,7 +212,9 @@ export async function POST(request: NextRequest) {
   )
   const { sessionId, shouldSetCookie } = getOrCreateSessionId(request)
 
-  if (isPageViewRateLimited(sessionId)) {
+  // Do not use the client-controlled session cookie as a rate-limit key:
+  // callers without a cookie could otherwise mint a new session per request.
+  if (isPageViewRateLimited(getTrustedClientIp(request.headers))) {
     return attachSessionCookie(
       createAuthJsonResponse({ success: true, throttled: true }),
       sessionId,

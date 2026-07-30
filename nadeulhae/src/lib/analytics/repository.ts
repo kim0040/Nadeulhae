@@ -29,6 +29,7 @@ import {
 } from "@/lib/analytics/consent"
 import { ensureAnalyticsSchema } from "@/lib/analytics/schema"
 import { getDbPool } from "@/lib/db"
+import { getTrustedClientIp } from "@/lib/request/client-ip"
 
 // ---------------------------------------------------------------------------
 // Environment-dependent constants
@@ -36,10 +37,6 @@ import { getDbPool } from "@/lib/db"
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "nadeulhae_auth"
 const REQUEST_SESSION_COOKIE_NAME = "nadeulhae_sid"
-const TRUST_PROXY_HEADERS = /^(1|true|yes)$/i.test(
-  process.env.TRUST_PROXY_HEADERS ?? ""
-)
-
 /** Discriminates a request as either a page navigation or an API call. */
 type RouteKind = "page" | "api"
 /** Whether the requesting actor has an authenticated user session. */
@@ -226,19 +223,11 @@ function getStatusGroup(statusCode: number) {
  * Resolves the client IP address from proxy-aware headers.
  * Respects the TRUST_PROXY_HEADERS env-var — when falsy, always returns
  * "anonymous" to avoid ingesting untrusted header values.
- * Resolution order: cf-connecting-ip → x-real-ip → x-forwarded-for (first) → "anonymous"
+ * Only the configured proxy-overwritten header is trusted; otherwise the
+ * conservative shared "anonymous" key is used.
  */
 function getClientIp(request: Request) {
-  if (!TRUST_PROXY_HEADERS) {
-    return "anonymous"
-  }
-
-  return (
-    request.headers.get("cf-connecting-ip")
-    || request.headers.get("x-real-ip")
-    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || "anonymous"
-  ).slice(0, 64)
+  return getTrustedClientIp(request.headers)
 }
 
 /**

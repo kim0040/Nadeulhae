@@ -147,7 +147,9 @@ AUTH_MAX_SESSIONS_PER_USER=5
 
 # ---- Server ----
 APP_BASE_URL=https://your-domain.example
+# Trust only this nginx-overwritten header for application rate limits.
 TRUST_PROXY_HEADERS=true
+TRUSTED_IP_HEADER=x-real-ip
 ```
 
 > **Generate strong secrets:** `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`
@@ -253,6 +255,8 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto https;
+        # This header is overwritten by nginx and is the only client-IP
+        # header trusted by the application (TRUSTED_IP_HEADER=x-real-ip).
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_read_timeout 86400s;
@@ -265,6 +269,8 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto https;
+        # This header is overwritten by nginx and is the only client-IP
+        # header trusted by the application (TRUSTED_IP_HEADER=x-real-ip).
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_read_timeout 300s;
@@ -287,6 +293,8 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto https;
+        # This header is overwritten by nginx and is the only client-IP
+        # header trusted by the application (TRUSTED_IP_HEADER=x-real-ip).
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header Upgrade $http_upgrade;
