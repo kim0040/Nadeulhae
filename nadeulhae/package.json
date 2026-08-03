@@ -7,6 +7,7 @@
     "build": "NODE_OPTIONS='--max-old-space-size=2048' next build",
     "start": "tsx server.ts",
     "lint": "eslint",
+    "security:scan": "gitleaks git --no-banner --redact --log-opts=--all",
     "data:forecast-grid": "node scripts/generate-forecast-location-grid.mjs",
     "db:forecast-grid:init": "node scripts/bootstrap-forecast-location-db.mjs",
     "db:forecast-grid:verify": "node scripts/verify-forecast-location-db.mjs",
