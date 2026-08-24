@@ -53,8 +53,10 @@ const nextConfig: NextConfig = {
           key: "Permissions-Policy",
           value: "camera=(), microphone=(), geolocation=(self)",
         },
-        // CSP and Cross-Origin-Resource-Policy are set in src/middleware.ts
-        // to bypass Next.js Turbopack dev mode CSP override.
+        // CSP and Cross-Origin-Resource-Policy are set in src/proxy.ts
+        // (Next.js 16 middleware entry) to bypass Turbopack dev mode CSP override.
+        // VPS `next build` skips tsc via ignoreBuildErrors to avoid OOM; run
+        // `npm run typecheck` locally or in CI before shipping.
       ],
     },
   ],

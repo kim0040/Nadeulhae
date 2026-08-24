@@ -1,12 +1,21 @@
 import { Suspense } from "react";
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { cookies, headers } from "next/headers";
+import { Geist, Geist_Mono, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/context/AuthContext";
 import { AnalyticsConsentBanner } from "@/components/analytics/analytics-consent-banner";
 import { PageViewTracker } from "@/components/analytics/page-view-tracker";
 import { PageTransition } from "@/components/page-transition";
+import { Navbar } from "@/components/navbar";
+import { LanguageProvider } from "@/context/LanguageContext";
+import {
+  LANGUAGE_COOKIE_NAME,
+  SKIP_TO_CONTENT_COPY,
+  resolvePreferredLanguage,
+  type AppLanguage,
+} from "@/lib/language";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +25,13 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const notoSansKr = Noto_Sans_KR({
+  variable: "--font-noto-sans-kr",
+  subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
+  display: "swap",
 });
 
 const siteUrl = process.env.APP_BASE_URL ?? "https://nadeulhae.space";
@@ -50,8 +66,6 @@ export const metadata: Metadata = {
   },
 };
 
-import type { Viewport } from "next";
-
 // Prevent iOS Safari auto-zoom on input focus while keeping pinch-zoom accessible.
 export const viewport: Viewport = {
   width: "device-width",
@@ -64,23 +78,27 @@ export const viewport: Viewport = {
   ],
 };
 
-import { Navbar } from "@/components/navbar";
-
-import { LanguageProvider } from "@/context/LanguageContext";
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const headerStore = await headers();
+  const initialLanguage = resolvePreferredLanguage({
+    stored: cookieStore.get(LANGUAGE_COOKIE_NAME)?.value,
+    acceptLanguage: headerStore.get("accept-language"),
+    fallback: "ko",
+  }) as AppLanguage;
+
   return (
     <html
-      lang="ko"
+      lang={initialLanguage}
       suppressHydrationWarning
       className="h-full antialiased bg-background text-foreground"
     >
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-full flex flex-col bg-background text-foreground transition-colors duration-300`}>
-        <LanguageProvider>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${notoSansKr.variable} min-h-full flex flex-col bg-background text-foreground transition-colors duration-300`}>
+        <LanguageProvider initialLanguage={initialLanguage}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -92,7 +110,7 @@ export default function RootLayout({
                 href="#main-content"
                 className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-card focus:px-5 focus:py-2.5 focus:text-sm focus:font-bold focus:text-foreground focus:shadow-lg focus:ring-2 focus:ring-sky-blue/50"
               >
-                본문으로 건너뛰기
+                {SKIP_TO_CONTENT_COPY[initialLanguage]}
               </a>
               <Suspense fallback={null}>
                 <PageViewTracker />

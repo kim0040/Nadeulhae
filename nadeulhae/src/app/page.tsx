@@ -27,6 +27,7 @@ import {
   shouldRunRichAnimation,
 } from "@/lib/performance";
 import { parseServerTimestamp } from "@/lib/time/server-time";
+import { localizeUvLabel } from "@/lib/weather-presentation";
 import { useLanguage } from "@/context/LanguageContext";
 import { useDerivedWeatherData, useWeatherData } from "@/hooks/use-weather";
 import { Particles } from "@/components/magicui/particles";
@@ -72,29 +73,6 @@ const TodayHourlyForecast = dynamic(
     ),
   },
 );
-
-/** Translate Korean UV level labels to English; pass through for other locales */
-function localizeUvLabel(value: string | undefined, language: string) {
-  if (!value) return "--";
-  if (language === "ko") return value;
-
-  // Trim leading/trailing whitespace, then normalize internal spaces for robust matching
-  const normalized = value.trim().replace(/\s+/g, "");
-  switch (normalized) {
-    case "낮음":
-      return "Low";
-    case "보통":
-      return "Moderate";
-    case "높음":
-      return "High";
-    case "매우높음":
-      return "Very High";
-    case "위험":
-      return "Extreme";
-    default:
-      return value;
-  }
-}
 
 // ---- Component ----
 
@@ -198,7 +176,7 @@ export default function Home() {
             {
               icon: SunIcon,
               label: t("hero_uv"),
-              value: localizeUvLabel(weatherData.details.uv, language),
+              value: localizeUvLabel(weatherData.details.uv, language, t),
               tone: "text-yellow-400",
             },
           ]

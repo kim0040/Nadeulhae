@@ -32,6 +32,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
+import { classifyForecastWeatherIcon } from "@/lib/weather-presentation";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -362,8 +363,10 @@ export function PicnicArchiveCalendar() {
               const score = summary ? summary.score : null;
               const clr = score != null ? scoreColors(score) : null;
 
-              const isRainy = summary?.knockout === "rain" || summary?.sky?.includes("비") || summary?.sky?.includes("눈");
-              const isSunny = summary?.sky?.includes("맑음");
+              const skyIcon = classifyForecastWeatherIcon({
+                sky: summary?.sky,
+                knockout: summary?.knockout,
+              });
 
               return (
                 <button
@@ -408,9 +411,9 @@ export function PicnicArchiveCalendar() {
                       "flex items-center gap-0.5 sm:gap-1 text-[8px] sm:text-xs font-black px-1 sm:px-1.5 py-0.5 rounded-full shadow-inner w-full sm:w-auto justify-center",
                       isSelected ? "bg-white/20 text-white" : "bg-background/40"
                     )}>
-                      {isRainy ? (
+                      {skyIcon === "rain" ? (
                         <CloudRain className="size-2 sm:size-3 shrink-0" />
-                      ) : isSunny ? (
+                      ) : skyIcon === "sun" ? (
                         <Sun className="size-2 sm:size-3 shrink-0 animate-spin-slow" />
                       ) : (
                         <Cloud className="size-2 sm:size-3 shrink-0" />

@@ -14,6 +14,7 @@ import {
   LogOutIcon,
   Monitor,
   Moon,
+  Bookmark,
   Sparkles,
   Sun,
 } from "lucide-react";
@@ -31,24 +32,36 @@ const NAVBAR_COPY = {
     logoutError: "로그아웃에 실패했어요. 다시 시도해 주세요.",
     themeToggle: "테마 변경",
     languageToggle: "언어 변경",
+    themeLight: "라이트",
+    themeDark: "다크",
+    themeSystem: "시스템",
   },
   en: {
     logout: "Log out",
     logoutError: "Failed to log out. Please try again.",
     themeToggle: "Toggle theme",
     languageToggle: "Change language",
+    themeLight: "Light",
+    themeDark: "Dark",
+    themeSystem: "System",
   },
   zh: {
     logout: "登出",
     logoutError: "登出失败，请重试。",
     themeToggle: "切换主题",
     languageToggle: "更改语言",
+    themeLight: "浅色",
+    themeDark: "深色",
+    themeSystem: "系统",
   },
   ja: {
     logout: "ログアウト",
     logoutError: "ログアウトに失敗しました。もう一度お試しください。",
     themeToggle: "テーマ切り替え",
     languageToggle: "言語を変更",
+    themeLight: "ライト",
+    themeDark: "ダーク",
+    themeSystem: "システム",
   },
 } as const;
 
@@ -128,6 +141,14 @@ export function Navbar() {
       }
     : null;
 
+  const coursesItem = user
+    ? {
+        name: t("nav_courses"),
+        href: "/courses",
+        icon: Bookmark,
+      }
+    : null;
+
   const navItems = [
     { name: t("nav_about"), href: "/about", icon: InfoIcon },
     {
@@ -136,6 +157,7 @@ export function Navbar() {
       icon: CalendarIcon,
     },
     { name: t("nav_jeonju"), href: "/jeonju", icon: Sparkles },
+    ...(coursesItem ? [coursesItem] : []),
     ...(labItem ? [labItem] : []),
     authItem,
   ];
@@ -277,7 +299,11 @@ export function Navbar() {
                   <Monitor size={16} className="sm:size-[17px]" />
                 )}
                 <span className="hidden text-[10px] font-black uppercase lg:inline">
-                  {theme}
+                  {theme === "dark"
+                    ? copy.themeDark
+                    : theme === "system"
+                      ? copy.themeSystem
+                      : copy.themeLight}
                 </span>
               </button>
             )}

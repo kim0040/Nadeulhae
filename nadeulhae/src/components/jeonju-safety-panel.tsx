@@ -32,7 +32,7 @@ interface JeonjuSafetyPanelProps {
 type Tone = "safe" | "info" | "caution" | "danger"
 
 // Regex patterns to filter out non-actionable bulletin messages
-const NON_BULLETIN_MESSAGE_PATTERN = /(전주 기준 대기질 데이터를 표시 중입니다|showing fallback air quality data)/i
+const NON_BULLETIN_MESSAGE_PATTERN = /(aq_fallback_warning|전주 기준 대기질 데이터를 표시 중입니다|전주 기본 대기질 데이터를 표시 중입니다|showing fallback air quality data|showing default jeonju air-quality data)/i
 const EMPTY_BULLETIN_PATTERN = /^(?:[oO○◯●□■▪︎ㆍ·\-\*\s]*)?(?:없음|없\s*음|none|no\s*alerts?|n\/a)(?:[\s.)\]]*)$/i
 
 /** Format YYYYMMDD → YYYY.MM.DD */ function formatDateLabel(date: string) {

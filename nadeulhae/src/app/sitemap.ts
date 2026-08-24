@@ -3,7 +3,8 @@ import type { MetadataRoute } from "next"
 const siteUrl = process.env.APP_BASE_URL ?? "https://nadeulhae.space"
 
 // Public, indexable routes. Authenticated/utility routes (dashboard, account,
-// code-share, api) are intentionally excluded (see robots.ts).
+// /courses listing, code-share, api) are intentionally excluded (see robots.ts).
+// Logged-in users reach saved courses via the navbar "내 코스" item and dashboard.
 const routes: Array<{ path: string; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"]; priority: number }> = [
   { path: "/", changeFrequency: "daily", priority: 1 },
   { path: "/jeonju", changeFrequency: "daily", priority: 0.9 },

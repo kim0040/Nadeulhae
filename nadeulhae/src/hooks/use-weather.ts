@@ -6,6 +6,7 @@ import type { WeatherImageData } from "@/components/weather-image-panel";
 import type { FireSummaryData, WeatherData } from "@/services/dataService";
 import { dataService } from "@/services/dataService";
 import { mockWeatherData } from "@/data/mockData";
+import { BROWSER_GEOLOCATION_OPTIONS } from "@/lib/weather-presentation";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -157,9 +158,9 @@ export function useWeatherData(coords?: { lat: number; lon: number }) {
         await loadFallback();
       },
       {
-        enableHighAccuracy: false,
-        timeout: 10_000,
-        maximumAge: 300_000,
+        enableHighAccuracy: BROWSER_GEOLOCATION_OPTIONS.enableHighAccuracy,
+        timeout: BROWSER_GEOLOCATION_OPTIONS.timeout,
+        maximumAge: BROWSER_GEOLOCATION_OPTIONS.maximumAge,
       },
     );
   }, [coords]);

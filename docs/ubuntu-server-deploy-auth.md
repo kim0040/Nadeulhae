@@ -10,7 +10,9 @@ This guide covers a complete production deployment on Ubuntu 22.04/24.04 LTS wit
 ```bash
 cd nadeulhae
 npm run lint         # must pass
+npm run typecheck    # local/CI typecheck (VPS `next build` skips tsc to avoid OOM)
 npm run build        # must pass
+npm run test:weather # weather fallback / icon regressions
 npm run test:auth -- --base-url=http://127.0.0.1:3000   # must pass with app running
 ```
 
@@ -122,9 +124,16 @@ GENERAL_LLM_BASE_URL=https://nano-gpt.com/api/v1
 GENERAL_LLM_MODEL=deepseek/deepseek-v4-flash
 GENERAL_LLM_FALLBACK_MODEL=deepseek/deepseek-v4-pro
 
-# ---- 나들 실험실 LLM (실험실 AI 채팅, 웹검색) ----
+# ---- 나들 실험실 LLM (실험실 AI 채팅, 웹검색) — CrofAI, not nano-gpt ----
 LAB_LLM_API_KEY=your-lab-llm-api-key
-LAB_LLM_BASE_URL=https://nano-gpt.com/api/v1
+LAB_LLM_BASE_URL=https://crof.ai/v1
+
+# ---- Kakao Maps (JS key is exposed to same-origin clients via /api/places/kakao-config) ----
+KAKAO_JS_KEY=
+KAKAO_REST_KEY=
+
+# ---- Public WebSocket URL (leave empty to derive from the page host, wss://<host>/ws) ----
+NEXT_PUBLIC_WS_URL=
 
 # ---- 웹 검색 ----
 TAVILY_API_KEY=your-tavily-api-key
@@ -209,6 +218,18 @@ sudo apt install -y certbot python3-certbot-nginx
 
 ### 5.2 Create Nginx config
 
+`limit_req_zone` is valid only in the `http` context (not inside `server`). Create the zones first, then reference them with `limit_req` in the site config.
+
+```bash
+sudo nano /etc/nginx/conf.d/nadeulhae-limit.conf
+```
+
+```nginx
+# http context (loaded from nginx.conf)
+limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
+limit_req_zone $binary_remote_addr zone=auth:10m rate=20r/m;
+```
+
 ```bash
 sudo nano /etc/nginx/sites-available/nadeulhae
 ```
@@ -234,10 +255,6 @@ server {
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    # Rate limiting
-    limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
-    limit_req_zone $binary_remote_addr zone=auth:10m rate=20r/m;
 
     # Static asset caching
     location /_next/static {

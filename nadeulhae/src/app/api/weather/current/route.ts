@@ -54,6 +54,11 @@ function broadcastWeatherAlertOnce(payload: WeatherAlertPayload) {
   broadcast("weather_alert", payload)
 }
 import { attachSessionCookie, getOrCreateSessionId } from "@/lib/request-session"
+import {
+  AIR_QUALITY_FALLBACK_WARNING_KEY,
+  resolveObservedRegionPresentation,
+  scoreToBand,
+} from "@/lib/weather-presentation"
 
 // Simple in-memory cache for nearest stations based on coords (lat_lon -> stationName)
 type NearbyStationCandidate = {
@@ -1283,7 +1288,6 @@ async function handleGET(req: Request) {
   const isTsunami = safeTsunami.active
   const isVolcano = safeVolcano.active
   const isWeatherWarning = warning.active || bulletin.hasAlert
-  const isHomeRegion = isFallback || profile.key === HOME_REGION.key
   const scoreBreakdown: ScoreBreakdown = {
     air: 0,
     temperature: 0,
@@ -1295,14 +1299,12 @@ async function handleGET(req: Request) {
 
   let score = 100
   let statusKey = "status_good"
-  let messageKey = isHomeRegion ? "msg_home_good" : "msg_away_good"
 
   if (isRain || isSevereEarthquake || isWeatherWarning || isTsunami || isVolcano) {
     score = isRain ? 10 : 0
     scoreBreakdown.knockout = isRain ? "rain" : "warning"
     scoreBreakdown.total = score
     statusKey = "status_poor"
-    messageKey = isHomeRegion ? "msg_home_poor" : "msg_away_poor"
   } else {
     scoreBreakdown.air = getAirScore(airQuality.khaiGrade)
     scoreBreakdown.temperature = getTemperatureScore(weatherData.temp)
@@ -1319,22 +1321,26 @@ async function handleGET(req: Request) {
 
     if (score >= 86) {
       statusKey = "status_excellent"
-      messageKey = isHomeRegion ? "msg_home_excellent" : "msg_away_excellent"
     } else if (score >= 66) {
       statusKey = "status_good"
-      messageKey = isHomeRegion ? "msg_home_good" : "msg_away_good"
     } else if (score >= 36) {
       statusKey = "status_fair"
-      messageKey = isHomeRegion ? "msg_home_fair" : "msg_away_fair"
     } else {
       statusKey = "status_poor"
-      messageKey = isHomeRegion ? "msg_home_poor" : "msg_away_poor"
     }
   }
 
+  const regionPresentation = resolveObservedRegionPresentation({
+    isAirQualityFallback: isFallback,
+    profile,
+    homeRegion: HOME_REGION,
+    scoreBand: scoreToBand(score),
+  })
+  const messageKey = regionPresentation.messageKey
+
   let warningMessage = bulletin.summary
   if (isFallback) {
-    warningMessage = "전주 기준 대기질 데이터를 표시 중입니다."
+    warningMessage = AIR_QUALITY_FALLBACK_WARNING_KEY
   }
   if (isWeatherWarning) {
     warningMessage = warning.title || bulletin.warningStatus || bulletin.summary
@@ -1377,8 +1383,8 @@ async function handleGET(req: Request) {
   ]
 
   // === 5. RESPONSE BUILDING ===
-  const locationLabel = isFallback ? HOME_REGION.displayName : profile.displayName
-  const locationLabelEn = isFallback ? HOME_REGION.englishName : profile.englishName
+  const locationLabel = regionPresentation.locationLabel
+  const locationLabelEn = regionPresentation.locationLabelEn
   const feelsLike = calculateFeelsLike(weatherData.temp, weatherData.humidity, weatherData.wind)
   const thermalKrLevel = getKrThermalLevel(feelsLike)
   const thermalWhoLevel = getWhoThermalLevel(feelsLike)
@@ -1410,7 +1416,7 @@ async function handleGET(req: Request) {
       station: airQuality.station || process.env.AIRKOREA_STATION_NAME || "덕진동",
       region: locationLabel,
       regionEn: locationLabelEn,
-      regionKey: isFallback ? HOME_REGION.key : profile.key,
+      regionKey: regionPresentation.regionKey,
       lastUpdate: { kma: weatherData.lastUpdate, air: airQuality.lastUpdate },
       intervals: { kma: "interval_45m", air: "interval_60m" },
       cachePolicy: {

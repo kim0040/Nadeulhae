@@ -1,4 +1,4 @@
-/** Lab data access layer: SRS review logic, deck/card CRUD, daily usage tracking, and report generation. */
+/** Lab data access layer: FSRS-inspired custom SRS review logic (not a full FSRS v5 port), deck/card CRUD, daily usage tracking, and report generation. */
 
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise"
 
@@ -287,7 +287,7 @@ function deriveStageFromStabilityDays(stabilityDays: number) {
   return clampStage(stage)
 }
 
-/** Calculate retrievability (R) using exponential decay: R = exp(ln(target) * elapsed / stability). */
+/** Calculate retrievability (R) using FSRS-inspired exponential decay: R = exp(ln(target) * elapsed / stability). Not Anki/open-spaced-repetition FSRS v5. */
 function calculateRetrievability(stabilityDays: number, elapsedDays: number) {
   const safeStability = clampNumber(stabilityDays, LAB_MIN_STABILITY_DAYS, LAB_MAX_STABILITY_DAYS)
   const safeElapsed = Math.max(0, elapsedDays)

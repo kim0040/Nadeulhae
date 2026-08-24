@@ -15,7 +15,7 @@ export default function CalendarPage() {
   const particleQuantity = useMemo(() => getParticleCount(48), [])
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-64 pt-24 sm:pt-28">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-24 sm:pt-28">
       <Particles
         className="absolute inset-0 z-0"
         quantity={particleQuantity}

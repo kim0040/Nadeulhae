@@ -9,21 +9,26 @@
  * selected language, falling back to Korean, then to the raw key.
  *
  * ## Language detection priority
- * 1. `localStorage` key `nadeulhae_language`
- * 2. Browser `navigator.language` (first segment, e.g., `"zh"` from `"zh-CN"`)
+ * 1. Cookie / `localStorage` key `nadeulhae_language` (server reads the cookie
+ *    so `html lang` matches before hydration)
+ * 2. Browser `Accept-Language` / `navigator.language`
  * 3. Default: Korean (`"ko"`)
  *
  * ## Adding a new language
  * See `src/data/locales/index.ts` for the full step-by-step guide.
  *
  * ## State persistence
- * The selected language is synced to `localStorage` and `document.documentElement.lang`
- * (for accessibility/screen-reader support) on every change.
+ * The selected language is synced to `localStorage`, a first-party cookie, and
+ * `document.documentElement.lang` on every change.
  */
-import React, { createContext, useContext, useState, useEffect } from "react"
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { translations, type Language } from "@/data/locales"
-
-const LANGUAGE_STORAGE_KEY = "nadeulhae_language"
+import {
+  buildLanguageCookie,
+  LANGUAGE_STORAGE_KEY,
+  parseLanguage,
+  resolvePreferredLanguage,
+} from "@/lib/language"
 
 interface LanguageContextType {
   language: Language
@@ -34,41 +39,49 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>("ko")
+function persistLanguage(language: Language) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
+    document.cookie = buildLanguageCookie(language)
+  }
+
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = language
+  }
+}
+
+export function LanguageProvider({
+  children,
+  initialLanguage = "ko",
+}: {
+  children: React.ReactNode
+  initialLanguage?: Language
+}) {
+  const [language, setLanguageState] = useState<Language>(initialLanguage)
 
   useEffect(() => {
     const savedLanguage = typeof window !== "undefined"
-      ? window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
+      ? parseLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY))
       : null
 
-    if (savedLanguage === "ko" || savedLanguage === "en" || savedLanguage === "zh" || savedLanguage === "ja") {
-      // Safe setState in effect: runs once on mount, only re-applies previously persisted value
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLanguage(savedLanguage)
-      return
+    const resolved = resolvePreferredLanguage({
+      stored: savedLanguage,
+      acceptLanguage: typeof navigator !== "undefined" ? navigator.language : null,
+      fallback: initialLanguage,
+    })
+
+    if (resolved !== language) {
+      setLanguageState(resolved)
     }
-
-    const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'ko'
-    const targetLang: Language = (() => {
-      if (browserLang === 'ko') return 'ko'
-      if (browserLang === 'zh') return 'zh'
-      if (browserLang === 'ja') return 'ja'
-      return 'en'
-    })()
-
-    setLanguage(targetLang)
+    persistLanguage(resolved)
+    // Mount-only reconciliation against cookie/localStorage/browser language.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
-    }
-
-    if (typeof document !== "undefined") {
-      document.documentElement.lang = language
-    }
-  }, [language])
+  const setLanguage = useCallback((next: Language) => {
+    setLanguageState(next)
+    persistLanguage(next)
+  }, [])
 
   const getSeedValue = (seed?: string | number) => {
     if (typeof seed === "number") return seed

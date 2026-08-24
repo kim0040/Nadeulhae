@@ -42,7 +42,7 @@ export const LAB_MAX_DIFFICULTY = 10
 export const LAB_DEFAULT_DIFFICULTY = 5
 
 // --- Learning & relearning step intervals (minutes) ---
-// Initial learning queue: consecutive learning steps then graduate.
+// FSRS-inspired custom SRS: short learning queue then graduate. Not a full FSRS v5 library.
 export const LAB_LEARNING_STEPS_MINUTES = [5, 10] as const
 export const LAB_RELEARNING_STEPS_MINUTES = [5, 10] as const
 

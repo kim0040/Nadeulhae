@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
+import { classifyForecastWeatherIcon } from "@/lib/weather-presentation";
 
 interface ForecastDay {
   date: string;
@@ -191,7 +192,7 @@ export function PicnicDetailDrawer({
   const dayDate = new Date(day.date.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3"));
   const clr = scoreColors(day.score);
   const isRecommended = day.score >= 80;
-  const isWetDay = day.sky?.includes("비") || day.sky?.includes("눈") || day.precipChance >= 60;
+  const skyIcon = classifyForecastWeatherIcon(day);
 
   return (
     <AnimatePresence>
@@ -273,9 +274,9 @@ export function PicnicDetailDrawer({
                         "size-10 rounded-xl flex items-center justify-center border",
                         isRecommended ? "bg-nature-green/10 border-nature-green/20 text-nature-green" : "bg-[var(--interactive)] border-[var(--interactive-border)] text-foreground/80"
                       )}>
-                        {day.sky?.includes("맑음") ? (
+                        {skyIcon === "sun" ? (
                           <Sun size={20} strokeWidth={2.5} />
-                        ) : isWetDay ? (
+                        ) : skyIcon === "rain" ? (
                           <CloudRain size={20} strokeWidth={2.5} />
                         ) : (
                           <Cloud size={20} strokeWidth={2.5} />

@@ -4,6 +4,7 @@ import {
   mockTrends,
   mockCourse,
 } from "@/data/mockData";
+import { markWeatherAsFallback } from "@/lib/weather-presentation";
 
 /**
  * [BACKEND_LINK]: 데이터 연동을 위한 전용 서비스 계층입니다.
@@ -119,6 +120,8 @@ export interface WeatherData {
     khaiGrade?: number;
     pty?: number;
     rn1?: number;
+    forecastPty?: number;
+    forecastRn1?: number;
     vec?: number;
     uv: string;
     kr?: string;
@@ -293,17 +296,17 @@ export const dataService = {
           });
           if (!response.ok) {
             console.warn(`[WeatherAPI] Returned status ${response.status}. Using fallback weather data.`);
-            return { ...mockWeatherData, isFallback: true };
+            return markWeatherAsFallback(mockWeatherData);
           }
           return await response.json();
         } catch (fetchErr) {
           console.warn("[WeatherAPI] Fetch request failed. Returning fallback data. Details:", fetchErr);
-          return { ...mockWeatherData, isFallback: true };
+          return markWeatherAsFallback(mockWeatherData);
         }
       });
     } catch (error) {
       console.error("Failed to fetch weather data:", error);
-      return mockWeatherData; // Fallback to mock on error
+      return markWeatherAsFallback(mockWeatherData);
     }
   },
 
