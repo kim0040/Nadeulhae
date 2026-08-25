@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PicnicDetailDrawer } from "./picnic-detail-drawer";
+import { classifyForecastWeatherIcon, isWetForecastDay } from "@/lib/weather-presentation";
 
 interface ForecastDay {
   date: string;
@@ -37,10 +38,7 @@ function pickDateFnsLocale(language: string) {
 }
 
 export function getAdviceText(dayForecast: ForecastDay, language: string): string {
-  const isWetDay =
-    dayForecast.sky?.includes("비") ||
-    dayForecast.sky?.includes("눈") ||
-    dayForecast.precipChance >= 60;
+  const isWetDay = isWetForecastDay(dayForecast);
 
   const tipSeed =
     (dayForecast.date?.length || 0) +
@@ -482,10 +480,8 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                   const localizedPrecipAmount = translatePrecipAmount(
                     dayForecast.precipAmount,
                   );
-                  const isWetDay =
-                    dayForecast.sky?.includes("비") ||
-                    dayForecast.sky?.includes("눈") ||
-                    dayForecast.precipChance >= 60;
+                  const isWetDay = isWetForecastDay(dayForecast);
+                  const skyIcon = classifyForecastWeatherIcon(dayForecast);
                   
                   const advice = getAdviceText(dayForecast, language);
 
@@ -544,15 +540,14 @@ export function PicnicCalendar({ useGeolocation = true }: PicnicCalendarProps) {
                               "transition-transform",
                               isRecommended
                                 ? "text-nature-green"
-                                : dayForecast.sky?.includes("비")
+                                : isWetDay
                                   ? "text-active-blue"
                                   : "text-nature-green/80",
                             )}
                           >
-                            {dayForecast.sky?.includes("맑음") ? (
+                            {skyIcon === "sun" ? (
                               <Sun size={36} strokeWidth={2.5} />
-                            ) : dayForecast.sky?.includes("비") ||
-                              dayForecast.sky?.includes("눈") ? (
+                            ) : skyIcon === "rain" ? (
                               <CloudRain size={36} strokeWidth={2.5} />
                             ) : (
                               <Cloud size={36} strokeWidth={2.5} />

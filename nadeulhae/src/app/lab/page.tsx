@@ -39,7 +39,7 @@ const LAB_HUB_COPY = {
       "글쓰기, 코딩, 공부, 번역, 요약, 아이디어 정리까지 나들 AI와 이어서 대화할 수 있는 다용도 채팅입니다.",
     vocabTitle: "단어 암기 실험실",
     vocabDescription:
-      "프로필 기반 주제로 카드를 생성하고, 간격 반복 복습으로 기억 유지까지 이어지는 학습 실험 기능입니다.",
+      "프로필 기반 주제로 카드를 생성하고, FSRS에서 영감을 받은 자체 간격 반복으로 기억 유지까지 이어지는 학습 실험 기능입니다.",
     codeShareTitle: "코드공유 실험실",
     codeShareDescription:
       "링크 하나로 여러 명이 동시에 코드를 편집하고, 1시간 비활동 시 자동 종료되어 기록으로 남는 협업 기능입니다.",
@@ -67,7 +67,7 @@ const LAB_HUB_COPY = {
       "Continue with Nadeul AI across writing, coding, studying, translation, summaries, and idea work.",
     vocabTitle: "Vocabulary Memory Lab",
     vocabDescription:
-      "Generate profile-based cards and retain them with spaced-repetition review.",
+      "Generate profile-based cards and retain them with an FSRS-inspired custom spaced-repetition scheduler (not a full FSRS v5 library).",
     codeShareTitle: "Code Share Lab",
     codeShareDescription:
       "Collaborate on code in real time through a shared link, with auto-close after 1 hour of inactivity and archived history.",
@@ -90,7 +90,7 @@ const LAB_HUB_COPY = {
     aiChatTitle: "Nadeul AI 聊天",
     aiChatDescription: "写作、编程、学习、翻译、摘要、创意整理 — 与 Nadeul AI 持续对话的多功能聊天。",
     vocabTitle: "单词记忆实验室",
-    vocabDescription: "基于个人资料生成学习卡片，通过间隔重复复习保持记忆。",
+    vocabDescription: "基于个人资料生成学习卡片，通过受 FSRS 启发的自定义间隔重复复习保持记忆。",
     codeShareTitle: "代码共享实验室",
     codeShareDescription: "通过一个链接让多人同时编辑代码，1小时无活动自动关闭，记录保留。",
     algorithmTitle: "算法学习路径",
@@ -111,7 +111,7 @@ const LAB_HUB_COPY = {
     aiChatTitle: "Nadeul AI チャット",
     aiChatDescription: "文章作成、コーディング、学習、翻訳、要約、アイデア整理まで Nadeul AI と継続して対話できる多目的チャットです。",
     vocabTitle: "単語暗記ラボ",
-    vocabDescription: "プロフィールベースのテーマでカードを作成し、間隔反復復習で記憶を維持する学習機能です。",
+    vocabDescription: "プロフィールベースのテーマでカードを作成し、FSRS に着想を得た独自の間隔反復で記憶を維持する学習機能です。",
     codeShareTitle: "コード共有ラボ",
     codeShareDescription: "リンク一つで複数人が同時にコードを編集でき、1時間の無活動で自動終了、記録として残るコラボレーション機能です。",
     algorithmTitle: "アルゴリズム学習パス",

@@ -4,7 +4,7 @@
 
 > **Weather-based picnic scoring + AI dashboard chat + Lab (vocab/code-share) + Jeonju local briefing**
 
-Full-stack Next.js 16 web application. Real-time collaborative code editor, FSRS spaced repetition learning, AI web-search chat, GPS-based weather scoring — all in one service.
+Full-stack Next.js 16 web application. Real-time collaborative code editor, FSRS-inspired custom spaced repetition, AI web-search chat, GPS-based weather scoring — all in one service.
 
 ---
 
@@ -27,7 +27,7 @@ Full-stack Next.js 16 web application. Real-time collaborative code editor, FSRS
 |---------|-------------|
 | **🌤️ Weather Intelligence** | Combines KMA, AirKorea, and APIHub real-time data to compute a 0-100 outdoor activity score. Satellite/radar imagery, hourly forecasts, and wildfire information |
 | **🤖 Dashboard AI Chat** | AI chatbot with weather context injection. SSE streaming responses, cross-session user memory, and automatic context compaction |
-| **📚 Lab** | FSRS v5 algorithm-based vocabulary cards, AI deck generation, and web-search-integrated AI chat |
+| **📚 Lab** | FSRS-inspired custom SRS vocabulary cards, AI deck generation, and web-search-integrated AI chat |
 | **💻 Code Share** | CodeMirror 6-based real-time collaborative editor. WebSocket presence, typing indicators, and optimistic concurrency control |
 | **📍 Jeonju Daily Briefing** | AI-generated daily briefing tailored for Jeonju City. Local chat and safety information |
 | **📊 Statistics Calendar** | Historical weather archives and monthly outdoor activity score trends |
@@ -83,7 +83,7 @@ Nadeulhae/
 │       ├── lib/                 # 28 modules, 60+ business logic files
 │       │   ├── auth/            # Authentication (10 files)
 │       │   ├── chat/            # AI chat (7 files)
-│       │   ├── lab/             # FSRS spaced repetition (7 files)
+│       │   ├── lab/             # FSRS-inspired custom SRS (7 files)
 │       │   ├── websocket/       # WS server/client (3 files)
 │       │   ├── security/        # AES-256-GCM encryption
 │       │   └── ...

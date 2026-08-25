@@ -33,10 +33,23 @@ import type { ChatWeatherContext } from "@/lib/chat/prompt"
 import type { AuthUser } from "@/lib/auth/types"
 import { dataService, type WeatherData } from "@/services/dataService"
 import { getCopy } from "@/lib/utils"
+import {
+  BROWSER_GEOLOCATION_OPTIONS,
+  classifyCurrentWeatherIcon,
+} from "@/lib/weather-presentation"
 
 import { DASHBOARD_COPY } from "./constants"
 import { SectionCard, StatusMetric } from "@/components/dashboard/ui"
 import { SettingsModal } from "@/components/dashboard/settings-modal"
+
+function ChatPanelLoading() {
+  const { t } = useLanguage()
+  return (
+    <div className="flex min-h-[16rem] items-center justify-center text-sm font-semibold text-muted-foreground">
+      <span className="animate-pulse">{t("dashboard_chat_loading")}</span>
+    </div>
+  )
+}
 
 // The chat panel pulls in react-markdown + its plugin graph; load it on demand
 // so it stays out of the dashboard's initial JS. ssr:false — client-only.
@@ -44,11 +57,7 @@ const DashboardChatPanel = dynamic(
   () => import("@/components/chat/dashboard-chat-panel").then((m) => m.DashboardChatPanel),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex min-h-[16rem] items-center justify-center text-sm font-semibold text-muted-foreground">
-        <span className="animate-pulse">채팅 불러오는 중…</span>
-      </div>
-    ),
+    loading: () => <ChatPanelLoading />,
   }
 )
 
@@ -119,9 +128,9 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
         await fallback()
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10_000,
-        maximumAge: 0,
+        enableHighAccuracy: BROWSER_GEOLOCATION_OPTIONS.enableHighAccuracy,
+        timeout: BROWSER_GEOLOCATION_OPTIONS.timeout,
+        maximumAge: BROWSER_GEOLOCATION_OPTIONS.maximumAge,
       }
     )
   }, [loadWeather])
@@ -171,6 +180,17 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
     }
   }, [weatherData])
 
+  const weatherIcon = weatherData
+    ? classifyCurrentWeatherIcon({
+        isRain: weatherData.eventData?.isRain,
+        pty: weatherData.details.pty,
+        forecastPty: weatherData.details.forecastPty,
+        rn1: weatherData.details.rn1,
+        forecastRn1: weatherData.details.forecastRn1,
+        sky: weatherData.details.sky,
+      })
+    : null
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-24 sm:px-6 sm:pt-28 lg:px-8">
       {particleQuantity > 0 && <Particles className="absolute inset-0 z-0 opacity-70" quantity={particleQuantity} ease={80} color={particleColor} refresh />}
@@ -203,9 +223,9 @@ const DashboardWorkspace = memo(function DashboardWorkspace({ user }: { user: Au
                 <div className="relative overflow-hidden rounded-[1.3rem] border border-sky-blue/20 bg-sky-blue/5 p-4.5 flex items-center justify-between gap-4 backdrop-blur-md shadow-inner shadow-white/5 animate-in fade-in duration-300">
                   <div className="flex items-center gap-3">
                     <div className="rounded-xl bg-gradient-to-br from-sky-blue to-active-blue p-2.5 text-white shadow-md shadow-sky-blue/20 shrink-0">
-                      {weatherData.status.includes("비") || weatherData.status.includes("눈") || weatherData.status.includes("소나기") ? (
+                      {weatherIcon === "rain" ? (
                         <CloudRain className="size-5" />
-                      ) : weatherData.status.includes("맑음") ? (
+                      ) : weatherIcon === "sun" ? (
                         <Sun className="size-5 animate-spin" style={{ animationDuration: "35s" }} />
                       ) : (
                         <Cloud className="size-5" />

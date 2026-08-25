@@ -50,7 +50,7 @@ export const EMPTY_BULLETIN_PATTERN = NON_ALERT_BULLETIN_PATTERN
  *   - "showing fallback air quality data"
  */
 export const NON_BULLETIN_MESSAGE_PATTERN =
-  /(전주 기준 대기질 데이터를 표시 중입니다|showing fallback air quality data)/i
+  /(aq_fallback_warning|전주 기준 대기질 데이터를 표시 중입니다|전주 기본 대기질 데이터를 표시 중입니다|showing fallback air quality data|showing default jeonju air-quality data)/i
 
 /** Maximum character length for a bulletin headline before truncation (with ellipsis). */
 export const BULLETIN_HIGHLIGHT_MAX_LENGTH = 96

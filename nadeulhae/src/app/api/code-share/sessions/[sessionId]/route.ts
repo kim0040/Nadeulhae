@@ -1,6 +1,8 @@
 /**
  * GET    /api/code-share/sessions/[sessionId] — Get code session by ID.
  * PATCH  /api/code-share/sessions/[sessionId] — Update code content (version-gated).
+ *          Collaboration model: possession of the session link is edit access.
+ *          Login is required only for DELETE (creator). Do not gate PATCH on auth.
  * DELETE /api/code-share/sessions/[sessionId] — Delete session (creator-only).
  *
  * GET returns session with viewer identity cookies set.
@@ -318,6 +320,7 @@ async function handleGET(
 }
 
 // ========== HANDLER: PATCH ==========
+// Link possession is edit access. Participants do not need to be logged in.
 async function handlePATCH(
   request: NextRequest,
   context: { params: Promise<{ sessionId: string }> }
