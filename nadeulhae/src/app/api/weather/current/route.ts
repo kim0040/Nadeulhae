@@ -1394,6 +1394,7 @@ async function handleGET(req: Request) {
     status: statusKey,
     message: messageKey,
     isFallback,
+    fallbackReason: isFallback ? "air_quality" : undefined,
     eventData: {
       isEarthquake,
       isWeatherWarning,

@@ -252,7 +252,7 @@ export const zh = {
   alert_heavy_rain_desc: "天气条件恶化，野餐指数大幅下降。请将行程改为室内活动。",
 
   // Fallback Location
-  fallback_message: "暂时无法获取您所在地区的空气质量，因此同时显示全州默认空气质量。位置和天气仍以当前观测地区为准。",
+  fallback_message: "暂时无法获取实时天气，因此正在显示全州的示例数据。这不是您当前地区的实际观测值。",
 
   // Detailed Data Descriptions
   about_data_title: "数据项目详细说明",

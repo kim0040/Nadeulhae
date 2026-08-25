@@ -252,7 +252,7 @@ export const ja = {
   alert_heavy_rain_desc: "気象条件の悪化によりピクニック指数が大幅に下落しました。屋内活動に予定を変更してください。",
 
   // Fallback Location
-  fallback_message: "現在地の大気質を一時的に取得できないため、全州のデフォルト大気質を併せて表示します。位置と天気は観測地域のままです。",
+  fallback_message: "リアルタイムの天気情報を取得できないため、全州のサンプルデータを表示しています。現在地の実測値ではありません。",
 
   // Detailed Data Descriptions
   about_data_title: "データ項目詳細案内",

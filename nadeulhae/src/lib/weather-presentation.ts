@@ -8,6 +8,15 @@
 import type { AppLanguage } from "@/lib/language"
 
 export const AIR_QUALITY_FALLBACK_WARNING_KEY = "aq_fallback_warning"
+export const WEATHER_FALLBACK_WARNING_KEY = "fallback_message"
+
+export type WeatherFallbackReason = "air_quality" | "weather"
+
+export function getFallbackWarningKey(reason?: WeatherFallbackReason) {
+  return reason === "air_quality"
+    ? AIR_QUALITY_FALLBACK_WARNING_KEY
+    : WEATHER_FALLBACK_WARNING_KEY
+}
 
 /** Browser geolocation options shared by home and dashboard (avoid GPS timeouts). */
 export const BROWSER_GEOLOCATION_OPTIONS: PositionOptions = {
@@ -96,10 +105,13 @@ export function resolveObservedRegionPresentation(input: {
 }
 
 /** Mark mock/error payloads as fallback so the UI never treats them as live. */
-export function markWeatherAsFallback<T extends { isFallback?: boolean }>(
+export function markWeatherAsFallback<T extends {
+  isFallback?: boolean
+  fallbackReason?: WeatherFallbackReason
+}>(
   data: T,
-): T & { isFallback: true } {
-  return { ...data, isFallback: true }
+): T & { isFallback: true; fallbackReason: "weather" } {
+  return { ...data, isFallback: true, fallbackReason: "weather" }
 }
 
 export function isPrecipitatingNow(input: CurrentWeatherIconInput) {

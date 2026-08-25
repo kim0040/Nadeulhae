@@ -13,6 +13,7 @@ import {
   AIR_QUALITY_FALLBACK_WARNING_KEY,
   classifyCurrentWeatherIcon,
   classifyForecastWeatherIcon,
+  getFallbackWarningKey,
   isWetForecastDay,
   localizeUvLabel,
   markWeatherAsFallback,
@@ -53,8 +54,11 @@ function run() {
   assert.equal(mockWeatherData.isFallback, false)
   const failed = markWeatherAsFallback(mockWeatherData)
   assert.equal(failed.isFallback, true)
+  assert.equal(failed.fallbackReason, "weather")
   assert.equal(failed.score, 95)
   assert.notEqual(failed.isFallback, mockWeatherData.isFallback)
+  assert.equal(getFallbackWarningKey("air_quality"), AIR_QUALITY_FALLBACK_WARNING_KEY)
+  assert.equal(getFallbackWarningKey("weather"), "fallback_message")
 
   // 3. Dashboard icon uses PTY / isRain / SKY codes, not i18n status keys.
   assert.equal(
@@ -106,9 +110,11 @@ function run() {
   assert.equal(localizeUvLabel("낮음", "ko", (key) => `t:${key}`), "t:uv_low")
   assert.equal(localizeUvLabel(undefined, "en"), "--")
 
-  // Language cookie / Accept-Language resolution (no Korean flash for EN).
+  // Language resolution honors saved preferences and Accept-Language priority.
   assert.equal(parseLanguage("en-US"), "en")
   assert.equal(detectLanguageFromAcceptLanguage("en-US,en;q=0.9"), "en")
+  assert.equal(detectLanguageFromAcceptLanguage("en-US;q=0.1,ko-KR;q=0.9"), "ko")
+  assert.equal(detectLanguageFromAcceptLanguage("ko-KR;q=0,en-US;q=0.9"), "en")
   assert.equal(
     resolvePreferredLanguage({ stored: "ja", acceptLanguage: "ko-KR" }),
     "ja",
@@ -121,14 +127,22 @@ function run() {
   const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
   const routeSource = readFileSync(resolve(projectRoot, "src/app/api/weather/current/route.ts"), "utf8")
   const dataServiceSource = readFileSync(resolve(projectRoot, "src/services/dataService.ts"), "utf8")
+  const weatherPresentationSource = readFileSync(resolve(projectRoot, "src/lib/weather-presentation.ts"), "utf8")
+  const layoutSource = readFileSync(resolve(projectRoot, "src/app/layout.tsx"), "utf8")
+  const skipLinkSource = readFileSync(resolve(projectRoot, "src/components/skip-to-content-link.tsx"), "utf8")
   const nextConfigSource = readFileSync(resolve(projectRoot, "next.config.ts"), "utf8")
   const dashboardSource = readFileSync(resolve(projectRoot, "src/app/dashboard/page.tsx"), "utf8")
 
   assert.equal(routeSource.includes("const isHomeRegion = isFallback"), false)
   assert.equal(routeSource.includes("locationLabel = isFallback ? HOME_REGION.displayName"), false)
   assert.match(routeSource, /resolveObservedRegionPresentation/)
+  assert.match(routeSource, /fallbackReason: isFallback \? "air_quality" : undefined/)
   assert.match(dataServiceSource, /markWeatherAsFallback\(mockWeatherData\)/)
+  assert.match(weatherPresentationSource, /fallbackReason: "weather"/)
   assert.equal(dataServiceSource.includes("return mockWeatherData; // Fallback to mock on error"), false)
+  assert.equal(layoutSource.includes("from \"next/headers\""), false)
+  assert.equal(layoutSource.includes("<SkipToContentLink />"), true)
+  assert.match(skipLinkSource, /t\("skip_to_content"\)/)
   assert.match(nextConfigSource, /src\/proxy\.ts/)
   assert.equal(dashboardSource.includes('weatherData.status.includes("비")'), false)
   assert.match(dashboardSource, /classifyCurrentWeatherIcon/)

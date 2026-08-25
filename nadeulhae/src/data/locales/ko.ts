@@ -252,7 +252,7 @@ export const ko = {
   alert_heavy_rain_desc: "기상 조건 악화로 피크닉 지수가 크게 하락했습니다. 실내 활동으로 일정을 변경하세요.",
   
   // Fallback Location
-  fallback_message: "현재 계신 지역의 대기질을 일시적으로 불러올 수 없어, 전주 기본 대기질을 함께 표시해요. 위치와 날씨는 현재 지역 기준입니다.",
+  fallback_message: "실시간 날씨 정보를 불러오지 못해 전주 기본 예시 데이터를 표시하고 있어요. 현재 위치의 실제 관측값이 아닙니다.",
 
   // Detailed Data Descriptions
   about_data_title: "데이터 항목 상세 안내",

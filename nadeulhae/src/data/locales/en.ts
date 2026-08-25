@@ -252,7 +252,7 @@ export const en = {
   alert_heavy_rain_desc: "Picnic index has plummeted due to worsening conditions. We recommend switching to indoor plans.",
   
   // Fallback Location
-  fallback_message: "Air quality for your area is temporarily unavailable, so Jeonju default air-quality values are shown. Location and weather stay on the observed region.",
+  fallback_message: "Live weather is unavailable, so sample data for Jeonju is being shown. It is not an observation for your current location.",
 
   // Detailed Data Descriptions
   about_data_title: "Detailed Data Guide",

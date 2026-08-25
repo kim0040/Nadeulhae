@@ -27,7 +27,10 @@ import {
   shouldRunRichAnimation,
 } from "@/lib/performance";
 import { parseServerTimestamp } from "@/lib/time/server-time";
-import { localizeUvLabel } from "@/lib/weather-presentation";
+import {
+  getFallbackWarningKey,
+  localizeUvLabel,
+} from "@/lib/weather-presentation";
 import { useLanguage } from "@/context/LanguageContext";
 import { useDerivedWeatherData, useWeatherData } from "@/hooks/use-weather";
 import { Particles } from "@/components/magicui/particles";
@@ -265,7 +268,7 @@ export default function Home() {
             <div className="flex items-center gap-2 px-4 py-2 bg-card rounded-full border border-card-border shadow-lg">
               <Info className="text-sky-blue size-4 animate-pulse" />
               <span className="text-[12px] sm:text-sm font-black text-foreground">
-                {t("fallback_message")}
+                {t(getFallbackWarningKey(weatherData.fallbackReason))}
               </span>
             </div>
           )}

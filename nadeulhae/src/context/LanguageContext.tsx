@@ -9,22 +9,20 @@
  * selected language, falling back to Korean, then to the raw key.
  *
  * ## Language detection priority
- * 1. Cookie / `localStorage` key `nadeulhae_language` (server reads the cookie
- *    so `html lang` matches before hydration)
- * 2. Browser `Accept-Language` / `navigator.language`
+ * 1. `localStorage` key `nadeulhae_language`
+ * 2. Browser `navigator.language`
  * 3. Default: Korean (`"ko"`)
  *
  * ## Adding a new language
  * See `src/data/locales/index.ts` for the full step-by-step guide.
  *
  * ## State persistence
- * The selected language is synced to `localStorage`, a first-party cookie, and
+ * The selected language is synced to `localStorage` and
  * `document.documentElement.lang` on every change.
  */
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { translations, type Language } from "@/data/locales"
 import {
-  buildLanguageCookie,
   LANGUAGE_STORAGE_KEY,
   parseLanguage,
   resolvePreferredLanguage,
@@ -42,7 +40,6 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 function persistLanguage(language: Language) {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
-    document.cookie = buildLanguageCookie(language)
   }
 
   if (typeof document !== "undefined") {
@@ -74,7 +71,7 @@ export function LanguageProvider({
       setLanguageState(resolved)
     }
     persistLanguage(resolved)
-    // Mount-only reconciliation against cookie/localStorage/browser language.
+    // Mount-only reconciliation against localStorage/browser language.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

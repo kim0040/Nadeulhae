@@ -24,6 +24,7 @@ import {
   getBulletinTags,
   getToneClasses,
 } from "@/lib/bulletin"
+import { getFallbackWarningKey } from "@/lib/weather-presentation"
 
 interface PicnicBriefingProps {
   weatherData: WeatherData
@@ -48,7 +49,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     return en || ko
   }
 
-  const { details, metadata, eventData, isFallback } = weatherData
+  const { details, metadata, eventData, isFallback, fallbackReason } = weatherData
   const regionLabel = language === "ko"
     ? metadata?.region || "현재 지역"
     : metadata?.regionEn || metadata?.region || "your area"
@@ -409,7 +410,7 @@ export function PicnicBriefing({ weatherData }: PicnicBriefingProps) {
     // -- Precipitation --
     if (isFallback) {
       points.push({
-        text: t("fallback_message"),
+        text: t(getFallbackWarningKey(fallbackReason)),
         type: "neutral",
         icon: <Info size={18} />,
         fullWidth: true,

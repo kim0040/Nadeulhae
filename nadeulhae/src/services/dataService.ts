@@ -4,7 +4,10 @@ import {
   mockTrends,
   mockCourse,
 } from "@/data/mockData";
-import { markWeatherAsFallback } from "@/lib/weather-presentation";
+import {
+  markWeatherAsFallback,
+  type WeatherFallbackReason,
+} from "@/lib/weather-presentation";
 
 /**
  * [BACKEND_LINK]: 데이터 연동을 위한 전용 서비스 계층입니다.
@@ -95,6 +98,7 @@ export interface WeatherData {
   status: string;
   message: string;
   isFallback?: boolean;
+  fallbackReason?: WeatherFallbackReason;
   eventData?: {
     isEarthquake: boolean;
     isWeatherWarning: boolean;
